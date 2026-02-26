@@ -41,19 +41,13 @@ class InjectionDetectedError(SecurityError):
     """Raised when prompt injection is detected in user input.
 
     Args:
-        text: The original (possibly truncated) input text.
+        text: The original input text (stored in full; message display is truncated).
         risk_score: Computed risk score 0-100.
         patterns: Names of the injection patterns matched.
     """
 
     def __init__(self, text: str, risk_score: int, patterns: list[str]) -> None:
-        """Initialize InjectionDetectedError.
-
-        Args:
-            text: The original (possibly truncated) input text.
-            risk_score: Computed risk score 0-100.
-            patterns: Names of the injection patterns matched.
-        """
+        """Initialize InjectionDetectedError."""
         self.text = text
         self.risk_score = risk_score
         self.patterns = patterns
@@ -73,12 +67,7 @@ class PermissionDeniedError(SecurityError):
     """
 
     def __init__(self, resource: str, action: str) -> None:
-        """Initialize PermissionDeniedError.
-
-        Args:
-            resource: The resource path/identifier that was accessed.
-            action: The attempted action (read, write, execute, network, shell).
-        """
+        """Initialize PermissionDeniedError."""
         self.resource = resource
         self.action = action
         super().__init__(
@@ -96,11 +85,7 @@ class CanaryLeakError(SecurityError):
     """
 
     def __init__(self, token: str) -> None:
-        """Initialize CanaryLeakError.
-
-        Args:
-            token: The detected canary token value.
-        """
+        """Initialize CanaryLeakError."""
         self.token = token
         super().__init__(f"Canary token leaked in LLM output: '{token}'")
 
@@ -120,11 +105,7 @@ class ModelNotFoundError(ProviderError):
     """
 
     def __init__(self, model_id: str) -> None:
-        """Initialize ModelNotFoundError.
-
-        Args:
-            model_id: The model identifier that was requested.
-        """
+        """Initialize ModelNotFoundError."""
         self.model_id = model_id
         super().__init__(f"Model not found or not configured: '{model_id}'")
 
@@ -138,12 +119,7 @@ class ProviderTimeoutError(ProviderError):
     """
 
     def __init__(self, model_id: str, timeout_seconds: int) -> None:
-        """Initialize ProviderTimeoutError.
-
-        Args:
-            model_id: The model that timed out.
-            timeout_seconds: The configured timeout that was exceeded.
-        """
+        """Initialize ProviderTimeoutError."""
         self.model_id = model_id
         self.timeout_seconds = timeout_seconds
         super().__init__(
@@ -167,12 +143,7 @@ class SkillLoadError(SkillError):
     """
 
     def __init__(self, skill_name: str, reason: str) -> None:
-        """Initialize SkillLoadError.
-
-        Args:
-            skill_name: The name of the skill that failed to load.
-            reason: Human-readable reason for the failure.
-        """
+        """Initialize SkillLoadError."""
         self.skill_name = skill_name
         self.reason = reason
         super().__init__(f"Failed to load skill '{skill_name}': {reason}")
@@ -187,12 +158,7 @@ class SkillValidationError(SkillError):
     """
 
     def __init__(self, skill_name: str, violations: list[str]) -> None:
-        """Initialize SkillValidationError.
-
-        Args:
-            skill_name: The name of the skill that failed validation.
-            violations: List of violation messages from linters/type checkers.
-        """
+        """Initialize SkillValidationError."""
         self.skill_name = skill_name
         self.violations = violations
         joined = "; ".join(violations)
@@ -218,12 +184,7 @@ class MCPConnectionError(MCPError):
     """
 
     def __init__(self, server_name: str, reason: str) -> None:
-        """Initialize MCPConnectionError.
-
-        Args:
-            server_name: The name of the MCP server from config.
-            reason: Human-readable reason for the connection failure.
-        """
+        """Initialize MCPConnectionError."""
         self.server_name = server_name
         self.reason = reason
         super().__init__(
@@ -237,17 +198,33 @@ class MCPToolError(MCPError):
     Args:
         tool_name: The name of the tool that failed.
         server_name: The MCP server that hosts the tool.
+        reason: Human-readable reason for the tool failure.
     """
 
-    def __init__(self, tool_name: str, server_name: str) -> None:
-        """Initialize MCPToolError.
-
-        Args:
-            tool_name: The name of the tool that failed.
-            server_name: The MCP server that hosts the tool.
-        """
+    def __init__(self, tool_name: str, server_name: str, reason: str = "") -> None:
+        """Initialize MCPToolError."""
         self.tool_name = tool_name
         self.server_name = server_name
-        super().__init__(
-            f"MCP tool '{tool_name}' on server '{server_name}' failed"
-        )
+        self.reason = reason
+        msg = f"MCP tool '{tool_name}' on server '{server_name}' failed"
+        if reason:
+            msg += f": {reason}"
+        super().__init__(msg)
+
+
+__all__ = [
+    "CanaryLeakError",
+    "InjectionDetectedError",
+    "LightAgentError",
+    "MCPConnectionError",
+    "MCPError",
+    "MCPToolError",
+    "ModelNotFoundError",
+    "PermissionDeniedError",
+    "ProviderError",
+    "ProviderTimeoutError",
+    "SecurityError",
+    "SkillError",
+    "SkillLoadError",
+    "SkillValidationError",
+]

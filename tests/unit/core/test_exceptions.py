@@ -140,12 +140,13 @@ def test_mcp_connection_error() -> None:
 
 
 def test_mcp_tool_error() -> None:
-    """MCPToolError carries tool_name and server_name."""
+    """MCPToolError carries tool_name, server_name, and optional reason."""
     from lightagent.core.exceptions import MCPToolError
 
-    err = MCPToolError(tool_name="list_files", server_name="filesystem")
+    err = MCPToolError(tool_name="list_files", server_name="filesystem", reason="timeout")
     assert err.tool_name == "list_files"
     assert err.server_name == "filesystem"
+    assert err.reason == "timeout"
 
 
 def test_catch_as_base_class() -> None:
