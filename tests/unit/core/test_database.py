@@ -43,10 +43,18 @@ async def test_get_db_session_yields_async_session() -> None:
 @pytest.mark.asyncio
 async def test_init_db_creates_tables_without_error() -> None:
     """init_db() runs without error on a clean in-memory database."""
-    from lightagent.core.database import create_async_engine_from_url, init_db
+    from lightagent.core.database import Base, create_async_engine_from_url, init_db
 
     engine = create_async_engine_from_url("sqlite+aiosqlite:///:memory:")
-    await init_db(engine)  # Should not raise
+    await init_db(engine)
+
+    # Verify tables can be inspected (confirms DB connection works post-init)
+    async with engine.connect() as conn:
+        table_names = await conn.run_sync(
+            lambda sync_conn: sync_conn.dialect.get_table_names(sync_conn)
+        )
+        assert isinstance(table_names, list)  # No models yet, so empty list is correct
+
     await engine.dispose()
 
 

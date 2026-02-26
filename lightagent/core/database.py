@@ -23,6 +23,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -65,7 +66,20 @@ def create_async_engine_from_url(db_url: str) -> AsyncEngine:
     if db_url.startswith("sqlite"):
         engine_kwargs["connect_args"] = {"check_same_thread": False}
 
-    return create_async_engine(db_url, **engine_kwargs)
+    async_engine = create_async_engine(db_url, **engine_kwargs)
+
+    if db_url.startswith("sqlite"):
+        # Enable WAL mode (better concurrent read performance) and enforce
+        # foreign key constraints (SQLite disables them by default).
+        @event.listens_for(async_engine.sync_engine, "connect")
+        def set_sqlite_pragmas(dbapi_conn: object, _connection_record: object) -> None:
+            """Set SQLite pragmas for WAL mode and foreign key enforcement."""
+            cursor = dbapi_conn.cursor()  # type: ignore[attr-defined]
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+    return async_engine
 
 
 @lru_cache(maxsize=1)
@@ -141,3 +155,12 @@ async def init_db(engine: AsyncEngine | None = None) -> None:
     resolved = engine if engine is not None else _get_engine()
     async with resolved.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+__all__ = [
+    "Base",
+    "create_async_engine_from_url",
+    "get_db_session",
+    "get_session_factory",
+    "init_db",
+]
