@@ -104,3 +104,17 @@ def test_system_prompt_not_in_user_message(builder: SecurePromptBuilder) -> None
     """System prompt text must not appear in the user message."""
     messages = builder.build("top secret system prompt", "user question")
     assert "top secret system prompt" not in messages[1]["content"]
+
+
+def test_canary_matches_builder_canary_attribute(builder: SecurePromptBuilder) -> None:
+    """The canary stored in builder.canary must appear verbatim in system content."""
+    messages = builder.build("Be helpful.", "Hello!")
+    assert builder.canary in messages[0]["content"]
+
+
+def test_canary_format_is_well_formed(builder: SecurePromptBuilder) -> None:
+    """Canary in system prompt must match the expected HTML comment format."""
+    import re
+
+    messages = builder.build("sys", "user")
+    assert re.search(r"<!-- canary:[0-9a-f-]{36} -->", messages[0]["content"])

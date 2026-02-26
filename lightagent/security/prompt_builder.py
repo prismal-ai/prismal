@@ -8,10 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from lightagent.core.logging import get_logger
 from lightagent.security.sanitizer import InputSanitizer
-
-logger = get_logger("lightagent.security.prompt_builder")
 
 
 class SecurePromptBuilder:
@@ -51,6 +48,8 @@ class SecurePromptBuilder:
             system: System prompt text (trusted code — not sanitized).
             user: Raw user input (automatically sanitized).
             docs: Optional list of document strings to include as context.
+                Treated as trusted content — NOT sanitized. Callers must ensure
+                document content has been validated before passing here.
 
         Returns:
             List of two dicts: system message followed by user message.
