@@ -1,7 +1,8 @@
-"""Provider registry — LiteLLM-backed LLM factory with usage tracking.
+"""
+Provider registry — LiteLLM-backed LLM factory with usage tracking.
 
-Provides provider-agnostic LLM access via ChatLiteLLM. All provider
-routing is handled by LiteLLM; no provider-specific imports here.
+Provides provider-agnostic LLM access via ChatLiteLLM. All provider routing is handled
+by LiteLLM; no provider-specific imports here.
 """
 
 from __future__ import annotations
