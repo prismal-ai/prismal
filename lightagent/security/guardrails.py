@@ -160,7 +160,7 @@ class GuardrailsEngine:
         risk_score = min(100, len(reasons) * 30)
         safe = len(reasons) == 0
 
-        if _config_module.get_settings().security_mode == "audit-only":
+        if _config_module.get_settings().security_mode in ("audit-only", "permissive"):
             safe = True
 
         if not safe:

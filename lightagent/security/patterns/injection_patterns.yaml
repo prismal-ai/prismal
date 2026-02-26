@@ -11,6 +11,7 @@ patterns:
     - "do\\s+not\\s+follow\\s+(your|the)\\s+(instructions|guidelines)"
     - "new\\s+instructions?\\s*:"
     - "updated\\s+instructions?\\s*:"
+    - "cancel\\s+(previous|all|your)\\s+(directives?|instructions?|rules?)"
 
   persona_injection:
     - "you\\s+are\\s+now\\s+(a|an|the)\\s+\\w+"
@@ -19,6 +20,7 @@ patterns:
     - "roleplay\\s+as"
     - "simulate\\s+(being|a|an)"
     - "from\\s+now\\s+on\\s+you\\s+(are|will)"
+    - "imagine\\s+you\\s+(are|were)\\s+(a|an)"
 
   jailbreak_keywords:
     - "\\bDAN\\b"
@@ -29,6 +31,7 @@ patterns:
     - "no\\s+(restrictions|limits|rules|boundaries)"
     - "do\\s+anything\\s+now"
     - "evil\\s+mode"
+    - "disable\\s+(content\\s+)?filter"
 
   template_injection:
     - "<\\s*s\\s*>"              # XML system tag
@@ -42,6 +45,7 @@ patterns:
     - "<\\|im_end\\|>"
     - "\\[SYSTEM\\]"
     - "\\{\\{\\s*system\\s*\\}\\}"   # Handlebars-style
+    - "<<\\s*SYS\\s*>>"               # Llama2 instruct template
 
   data_exfiltration:
     - "send\\s+(this|the|all)\\s+(data|information|content)\\s+to"
@@ -50,6 +54,7 @@ patterns:
     - "repeat\\s+(the\\s+)?(system\\s+)?prompt"
     - "what\\s+(is|are|was)\\s+(your|the)\\s+system\\s+prompt"
     - "print\\s+your\\s+(initial|system)\\s+(instructions?|prompt)"
+    - "(output|display|show)\\s+(the\\s+)?contents?\\s+of\\s+(your|my)\\s+context"
 
   code_injection:
     - "exec\\s*\\("
@@ -59,6 +64,7 @@ patterns:
     - "subprocess\\."
     - "\\bimport\\s+os\\b"
     - "\\bimport\\s+subprocess\\b"
+    - "__builtins__"
 
 output_patterns:
   pii:
