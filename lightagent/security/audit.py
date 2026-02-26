@@ -9,7 +9,8 @@ Verification protocol:
     2. Re-serialize the remaining dict with ``json.dumps(entry, sort_keys=True)``.
     3. Compute SHA-256 of the resulting UTF-8 bytes.
     4. Compare the digest to the stored ``entry_hash`` value.
-    The written JSON lines are NOT pre-sorted; verification requires re-serialization.
+    The on-disk JSON lines are written without sort_keys. Verification MUST
+    re-serialize with sort_keys=True to reproduce the original hash input.
 """
 
 from __future__ import annotations

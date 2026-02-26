@@ -122,3 +122,32 @@ def test_default_log_path_is_data_logs(
     audit_logger = AuditLogger()
     audit_logger.log_input("test", risk_score=0, session_id="s1")
     assert (tmp_path / "data" / "logs" / "audit.jsonl").exists()
+
+
+def test_corrupted_log_warns_and_falls_back_to_genesis(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Corrupted log file must log a warning and fall back to genesis hash."""
+    import lightagent.security.audit as audit_module
+
+    warnings_emitted: list[str] = []
+    original_logger = audit_module.logger
+
+    class _FakeLogger:
+        def warning(self, event: str, **kw: object) -> None:
+            warnings_emitted.append(event)
+
+    monkeypatch.setattr(audit_module, "logger", _FakeLogger())
+    bad_path = tmp_path / "bad.jsonl"
+    bad_path.write_text("not valid json\n", encoding="utf-8")
+    audit_logger = AuditLogger(log_path=bad_path)
+    monkeypatch.setattr(audit_module, "logger", original_logger)
+    assert "audit_log_load_error" in warnings_emitted
+    audit_logger.log_input("after corruption", risk_score=0, session_id="s1")
+    # Skip the original corrupt line; read only valid JSON lines.
+    valid_entries = [
+        json.loads(line)
+        for line in bad_path.read_text().splitlines()
+        if line.strip() and line.strip() != "not valid json"
+    ]
+    assert valid_entries[0]["prev_hash"] == "0" * 64
