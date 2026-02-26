@@ -7,7 +7,7 @@ All configuration is validated at startup.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,15 +35,41 @@ class Settings(BaseSettings):
         default="gpt-4o-mini",
         description="Fallback model if primary is unavailable",
     )
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=4096, ge=1)
-    timeout_seconds: int = Field(default=60, ge=1)
-    retry_attempts: int = Field(default=3, ge=0)
+    temperature: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=2.0,
+        description="LLM sampling temperature (0.0 = deterministic, 2.0 = most random)",
+    )
+    max_tokens: int = Field(
+        default=4096,
+        ge=1,
+        description="Maximum number of tokens in the LLM response",
+    )
+    timeout_seconds: int = Field(
+        default=60,
+        ge=1,
+        description="Timeout in seconds for a single LLM API call",
+    )
+    retry_attempts: int = Field(
+        default=3,
+        ge=0,
+        description="Number of retry attempts on transient LLM API errors",
+    )
 
     # ── API Keys ──────────────────────────────────────────────────────
-    anthropic_api_key: str = Field(default="", description="Anthropic API key")
-    openai_api_key: str = Field(default="", description="OpenAI API key")
-    google_api_key: str = Field(default="", description="Google AI API key")
+    anthropic_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="Anthropic API key",
+    )
+    openai_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="OpenAI API key",
+    )
+    google_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="Google AI API key",
+    )
 
     # ── Security ──────────────────────────────────────────────────────
     security_mode: Literal["strict", "permissive", "audit-only"] = Field(
@@ -63,7 +89,7 @@ class Settings(BaseSettings):
     nemo_guardrails_enabled: bool = Field(
         default=False,
         description="Enable NVIDIA NeMo Guardrails (requires config/nemo/)",
-    )
+    )  # Wired up in T-022 (GuardrailsEngine)
 
     # ── Database ──────────────────────────────────────────────────────
     db_url: str = Field(
@@ -93,9 +119,9 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, description="Enable debug mode")
 
     # ── Logging ───────────────────────────────────────────────────────
-    log_level: str = Field(
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
         default="INFO",
-        description="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL",
+        description="Structured logging verbosity level",
     )
     log_format: Literal["json", "pretty"] = Field(
         default="pretty",

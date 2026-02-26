@@ -33,7 +33,7 @@ def test_settings_security_mode_invalid() -> None:
     from lightagent.core.config import Settings
 
     with pytest.raises(ValidationError):
-        Settings(security_mode="unknown")  # type: ignore[call-arg]
+        Settings(security_mode="unknown")  # type: ignore[arg-type]
 
 
 def test_settings_risk_threshold_default() -> None:
@@ -85,4 +85,15 @@ def test_get_settings_cache_clear(monkeypatch: pytest.MonkeyPatch) -> None:
     s1 = get_settings()
     s2 = get_settings()
     assert s1 is s2
+    get_settings.cache_clear()
+
+
+def test_settings_env_var_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """LIGHTAGENT_ env vars override defaults."""
+    from lightagent.core.config import Settings, get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("LIGHTAGENT_DEFAULT_MODEL", "gpt-4o")
+    s = Settings()  # fresh instance, not cached
+    assert s.default_model == "gpt-4o"
     get_settings.cache_clear()
