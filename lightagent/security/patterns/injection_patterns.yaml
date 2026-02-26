@@ -1,0 +1,77 @@
+# LightAgent — Injection Pattern Catalog
+# Add new patterns here; do NOT hardcode them in Python source.
+# Patterns use Python regex syntax with DOTALL and MULTILINE flags.
+
+patterns:
+  override_instructions:
+    - "ignore\\s+(previous|all|prior|your)\\s+instructions"
+    - "disregard\\s+(your|the)\\s+(guidelines|rules|training|prompt)"
+    - "forget\\s+(everything|all|your)\\s+(above|before|previous)"
+    - "override\\s+(your|the)\\s+(instructions|system\\s+prompt)"
+    - "do\\s+not\\s+follow\\s+(your|the)\\s+(instructions|guidelines)"
+    - "new\\s+instructions?\\s*:"
+    - "updated\\s+instructions?\\s*:"
+
+  persona_injection:
+    - "you\\s+are\\s+now\\s+(a|an|the)\\s+\\w+"
+    - "act\\s+as\\s+(if\\s+you\\s+(are|were)|a|an)"
+    - "pretend\\s+you\\s+(are|have|don't|do)"
+    - "roleplay\\s+as"
+    - "simulate\\s+(being|a|an)"
+    - "from\\s+now\\s+on\\s+you\\s+(are|will)"
+
+  jailbreak_keywords:
+    - "\\bDAN\\b"
+    - "\\bjailbreak\\b"
+    - "developer\\s+mode"
+    - "bypass\\s+(safety|filter|guard|restriction)"
+    - "unrestricted\\s+mode"
+    - "no\\s+(restrictions|limits|rules|boundaries)"
+    - "do\\s+anything\\s+now"
+    - "evil\\s+mode"
+
+  template_injection:
+    - "<\\s*s\\s*>"              # XML system tag
+    - "<\\s*/s\\s*>"
+    - "<\\s*system\\s*>"        # XML system tag (verbose)
+    - "\\[INST\\]"              # Llama/Mistral template
+    - "\\[/INST\\]"
+    - "###\\s*Human:"           # Alpaca/Vicuna template
+    - "###\\s*Assistant:"
+    - "<\\|im_start\\|>"        # ChatML
+    - "<\\|im_end\\|>"
+    - "\\[SYSTEM\\]"
+    - "\\{\\{\\s*system\\s*\\}\\}"   # Handlebars-style
+
+  data_exfiltration:
+    - "send\\s+(this|the|all)\\s+(data|information|content)\\s+to"
+    - "exfiltrate"
+    - "leak\\s+(the\\s+)?(system|prompt|instructions)"
+    - "repeat\\s+(the\\s+)?(system\\s+)?prompt"
+    - "what\\s+(is|are|was)\\s+(your|the)\\s+system\\s+prompt"
+    - "print\\s+your\\s+(initial|system)\\s+(instructions?|prompt)"
+
+  code_injection:
+    - "exec\\s*\\("
+    - "eval\\s*\\("
+    - "__import__\\s*\\("
+    - "os\\.system\\s*\\("
+    - "subprocess\\."
+    - "\\bimport\\s+os\\b"
+    - "\\bimport\\s+subprocess\\b"
+
+output_patterns:
+  pii:
+    email: "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}"
+    phone_us: "\\b(?:\\+?1[-.\\s]?)?(?:\\(?[0-9]{3}\\)?[-.\\s]?)[0-9]{3}[-.\\s]?[0-9]{4}\\b"
+    ssn: "\\b(?!000|666|9\\d{2})\\d{3}[\\s\\-]?(?!00)\\d{2}[\\s\\-]?(?!0000)\\d{4}\\b"
+    credit_card: "\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\\b"
+
+  api_keys:
+    anthropic: "sk-ant-[a-zA-Z0-9\\-_]{95}"
+    openai: "sk-[a-zA-Z0-9]{48}"
+    google: "AIza[0-9A-Za-z\\-_]{35}"
+    github: "gh[pousr]_[A-Za-z0-9_]{36}"
+    aws_access: "AKIA[0-9A-Z]{16}"
+    aws_secret: "[0-9a-zA-Z/+]{40}"
+    generic_key: "(?:api[_\\-]?key|secret|token)[\"'\\s:=]+[a-zA-Z0-9\\-_]{20,}"
