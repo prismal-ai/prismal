@@ -10,6 +10,7 @@ serialized dicts and Any outputs) — unavoidable, documented per CLAUDE.md.
 from __future__ import annotations
 
 import time
+import uuid
 from typing import Any
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -59,14 +60,14 @@ class ActionInterceptor(BaseCallbackHandler):
         super().__init__()
         self._pm = permission_manager
         self._audit = audit_logger or AuditLogger()
-        self._tool_start_time: float = 0.0
-        self._last_tool_name: str = "unknown"
+        # key: run_id str → (tool_name, input_str, start_time)
+        self._runs: dict[str, tuple[str, str, float]] = {}
 
     async def on_tool_start(
         self,
         serialized: dict[str, Any],
-        input_str: str,  # noqa: ARG002 — required by LangChain BaseCallbackHandler interface
-        **kwargs: Any,  # noqa: ANN401, ARG002 — required by LangChain interface
+        input_str: str,
+        **kwargs: Any,  # noqa: ANN401 — required by LangChain interface
     ) -> None:
         """Check permissions before a tool executes.
 
@@ -78,8 +79,8 @@ class ActionInterceptor(BaseCallbackHandler):
             PermissionDeniedError: If a required permission is not granted.
         """
         tool_name = str(serialized.get("name") or "unknown")
-        self._last_tool_name = tool_name
-        self._tool_start_time = time.monotonic()
+        run_id_val = str(kwargs.get("run_id") or uuid.uuid4())
+        self._runs[run_id_val] = (tool_name, input_str, time.monotonic())
 
         required_perm = _TOOL_PERMISSION_MAP.get(tool_name)
         if required_perm is None:
@@ -99,17 +100,21 @@ class ActionInterceptor(BaseCallbackHandler):
     async def on_tool_end(
         self,
         output: Any,  # noqa: ANN401 — required by LangChain interface
-        **kwargs: Any,  # noqa: ANN401, ARG002 — required by LangChain interface
+        **kwargs: Any,  # noqa: ANN401 — required by LangChain interface
     ) -> None:
         """Log successful tool execution to audit log.
 
         Args:
             output: Tool output (any type; stored as string preview).
         """
-        duration_ms = int((time.monotonic() - self._tool_start_time) * 1000)
+        run_id_val = str(kwargs.get("run_id") or "")
+        tool_name, input_str, start_time = self._runs.pop(
+            run_id_val, ("unknown", "", 0.0)
+        )
+        duration_ms = int((time.monotonic() - start_time) * 1000)
         self._audit.log_tool_call(
-            name=self._last_tool_name,
-            params={},
+            name=tool_name,
+            params={"input": input_str},
             result=str(output),
             duration_ms=duration_ms,
         )
@@ -117,17 +122,21 @@ class ActionInterceptor(BaseCallbackHandler):
     async def on_tool_error(
         self,
         error: BaseException,
-        **kwargs: Any,  # noqa: ANN401, ARG002 — required by LangChain interface
+        **kwargs: Any,  # noqa: ANN401 — required by LangChain interface
     ) -> None:
         """Log tool errors to audit log.
 
         Args:
             error: The exception raised during tool execution.
         """
-        duration_ms = int((time.monotonic() - self._tool_start_time) * 1000)
+        run_id_val = str(kwargs.get("run_id") or "")
+        tool_name, input_str, start_time = self._runs.pop(
+            run_id_val, ("unknown", "", 0.0)
+        )
+        duration_ms = int((time.monotonic() - start_time) * 1000)
         self._audit.log_tool_call(
-            name=self._last_tool_name,
-            params={},
+            name=tool_name,
+            params={"input": input_str},
             result=f"ERROR: {error!r}",
             duration_ms=duration_ms,
         )

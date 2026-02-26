@@ -7,7 +7,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from lightagent.core.exceptions import PermissionDeniedError
-from lightagent.security.action_interceptor import ActionInterceptor, _TOOL_PERMISSION_MAP
+from lightagent.security.action_interceptor import (
+    _TOOL_PERMISSION_MAP,
+    ActionInterceptor,
+)
 from lightagent.security.permissions import PermissionType
 
 
@@ -91,3 +94,19 @@ async def test_tool_error_logs_to_audit(
     """on_tool_error must call audit_logger.log_tool_call."""
     await interceptor.on_tool_error(ValueError("test error"))
     mock_audit.log_tool_call.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tool_name", "expected_perm"), list(_TOOL_PERMISSION_MAP.items())
+)
+async def test_all_mapped_tools_check_permission(
+    interceptor: ActionInterceptor,
+    mock_pm: AsyncMock,
+    tool_name: str,
+    expected_perm: PermissionType,
+) -> None:
+    """Each mapped tool must trigger a permission check for its required permission."""
+    mock_pm.check.return_value = True
+    await interceptor.on_tool_start({"name": tool_name}, "arg")
+    mock_pm.check.assert_awaited_once_with(expected_perm, "*")
