@@ -4,7 +4,7 @@
 
 patterns:
   override_instructions:
-    - "ignore\\s+(previous|all|prior|your)\\s+instructions"
+    - "ignore\\s+(?:\\w+\\s+)*instructions"
     - "disregard\\s+(your|the)\\s+(guidelines|rules|training|prompt)"
     - "forget\\s+(everything|all|your)\\s+(above|before|previous)"
     - "override\\s+(your|the)\\s+(instructions|system\\s+prompt)"
@@ -24,7 +24,7 @@ patterns:
     - "\\bDAN\\b"
     - "\\bjailbreak\\b"
     - "developer\\s+mode"
-    - "bypass\\s+(safety|filter|guard|restriction)"
+    - "bypass\\s+(?:\\w+\\s+)*(safety|filter|guard|restrictions?)"
     - "unrestricted\\s+mode"
     - "no\\s+(restrictions|limits|rules|boundaries)"
     - "do\\s+anything\\s+now"
