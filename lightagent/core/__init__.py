@@ -17,6 +17,7 @@ from lightagent.core.exceptions import (
     SkillLoadError,
     SkillValidationError,
 )
+from lightagent.core.logging import get_logger, setup_logging
 
 __all__ = [
     "CanaryLeakError",
@@ -34,5 +35,7 @@ __all__ = [
     "SkillError",
     "SkillLoadError",
     "SkillValidationError",
+    "get_logger",
     "get_settings",
+    "setup_logging",
 ]
