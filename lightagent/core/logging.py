@@ -20,9 +20,11 @@ from typing import Literal
 
 import structlog
 
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+
 
 def setup_logging(
-    log_level: str = "INFO",
+    log_level: LogLevel = "INFO",
     log_format: Literal["json", "pretty"] = "pretty",
 ) -> None:
     """Configure structlog and stdlib logging for the application.
@@ -33,11 +35,17 @@ def setup_logging(
 
     Args:
         log_level: Standard logging level name (DEBUG, INFO, WARNING, ERROR,
-            CRITICAL). Case-insensitive.
+            CRITICAL). Case-insensitive. Raises ValueError for invalid values.
         log_format: Output format. Use ``"json"`` in production/containers
             for log aggregation; ``"pretty"`` for local development.
+
+    Raises:
+        ValueError: If ``log_level`` is not a recognised logging level name.
     """
-    level = getattr(logging, log_level.upper(), logging.INFO)
+    level = logging.getLevelName(log_level.upper())
+    if not isinstance(level, int):
+        msg = f"Invalid log level: {log_level!r}"
+        raise ValueError(msg)
 
     # Processors applied to every log event
     shared_processors: list[structlog.types.Processor] = [
@@ -46,6 +54,7 @@ def setup_logging(
         structlog.stdlib.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.StackInfoRenderer(),
+        structlog.processors.ExceptionRenderer(),
     ]
 
     if log_format == "json":
@@ -72,7 +81,9 @@ def setup_logging(
     handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()
-    # Clear existing handlers to prevent duplicate output on repeated calls
+    # Clear existing handlers to prevent duplicate output on repeated calls.
+    # NOTE: Call setup_logging() BEFORE starting Uvicorn, not in the FastAPI
+    # lifespan, to avoid removing Uvicorn's own access log handlers.
     root_logger.handlers.clear()
     root_logger.addHandler(handler)
     root_logger.setLevel(level)

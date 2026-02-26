@@ -1,6 +1,18 @@
 """Unit tests for structured logging setup."""
 
 import logging
+from collections.abc import Generator
+
+import pytest
+import structlog
+
+
+@pytest.fixture(autouse=True)
+def reset_structlog() -> Generator[None, None, None]:
+    """Reset structlog to default config between tests to prevent state leakage."""
+    structlog.reset_defaults()
+    yield
+    structlog.reset_defaults()
 
 
 def test_get_logger_returns_bound_logger() -> None:
@@ -64,9 +76,15 @@ def test_get_logger_returns_non_none() -> None:
 
 def test_get_logger_default_name() -> None:
     """get_logger() with no args uses 'lightagent' as default name."""
-    import structlog
-
     from lightagent.core.logging import get_logger
 
     logger = get_logger()
     assert isinstance(logger, structlog.stdlib.BoundLogger)
+
+
+def test_setup_logging_invalid_level_raises() -> None:
+    """setup_logging with an invalid log level raises ValueError."""
+    from lightagent.core.logging import setup_logging
+
+    with pytest.raises(ValueError, match="Invalid log level"):
+        setup_logging(log_level="NONSENSE")  # type: ignore[arg-type]
