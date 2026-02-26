@@ -2,7 +2,16 @@
 
 Each log entry includes a SHA-256 hash of the previous entry, creating a
 tamper-evident chain. The first entry uses '0' * 64 as the genesis hash.
+
+Verification protocol:
+    To verify an entry's integrity, a reader must:
+    1. Remove the ``entry_hash`` field from the parsed dict.
+    2. Re-serialize the remaining dict with ``json.dumps(entry, sort_keys=True)``.
+    3. Compute SHA-256 of the resulting UTF-8 bytes.
+    4. Compare the digest to the stored ``entry_hash`` value.
+    The written JSON lines are NOT pre-sorted; verification requires re-serialization.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -49,8 +58,12 @@ class AuditLogger:
                     if line:
                         entry = json.loads(line)
                         last_hash = entry.get("entry_hash", _GENESIS_HASH)
-        except (json.JSONDecodeError, OSError):
-            pass
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning(
+                "audit_log_load_error",
+                path=str(self._path),
+                error=str(exc),
+            )
         return last_hash
 
     def _write(self, event: str, data: dict[str, object]) -> None:
