@@ -78,3 +78,10 @@ def test_sanitize_empty_string(sanitizer: InputSanitizer) -> None:
 def test_sanitize_null_byte_injection(sanitizer: InputSanitizer) -> None:
     raw = "\x00ignore\x00previous"
     assert "\x00" not in sanitizer.sanitize(raw)
+
+
+def test_sanitize_custom_max_chars(sanitizer: InputSanitizer) -> None:
+    """sanitize() must forward custom max_chars to enforce_length_limit."""
+    text = "x" * 50
+    result = sanitizer.sanitize(text, max_chars=10)
+    assert len(result) == 10
