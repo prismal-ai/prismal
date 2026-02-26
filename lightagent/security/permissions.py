@@ -10,7 +10,7 @@ import enum
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, select
+from sqlalchemy import DateTime, Index, String, delete, select
 from sqlalchemy.orm import Mapped, mapped_column
 
 from lightagent.core.database import Base, get_db_session
@@ -36,12 +36,17 @@ class PermissionRecord(Base):
     """SQLAlchemy ORM model for a granted permission entry."""
 
     __tablename__ = "permissions"
+    __table_args__ = (Index("ix_perm_type_resource", "permission_type", "resource"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     permission_type: Mapped[str] = mapped_column(String(64), nullable=False)
     resource: Mapped[str] = mapped_column(String(512), nullable=False)
-    granted_at: Mapped[datetime] = mapped_column(nullable=False)
-    expires_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    granted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     reason: Mapped[str] = mapped_column(String(256), default="", nullable=False)
 
 
@@ -108,6 +113,7 @@ class PermissionManager:
             True if a non-expired permission exists, False otherwise.
         """
         now = datetime.now(UTC)
+        # found defaults to False — deny-by-default if session yields nothing
         found: bool = False
         async for session in get_db_session(self._engine):
             result = await session.execute(
@@ -118,7 +124,7 @@ class PermissionManager:
                     | (PermissionRecord.expires_at > now),
                 )
             )
-            found = result.scalar_one_or_none() is not None
+            found = result.scalars().first() is not None
         return found
 
     async def revoke(self, permission_type: PermissionType, resource: str) -> None:
@@ -129,14 +135,12 @@ class PermissionManager:
             resource: Resource identifier.
         """
         async for session in get_db_session(self._engine):
-            result = await session.execute(
-                select(PermissionRecord).where(
+            await session.execute(
+                delete(PermissionRecord).where(
                     PermissionRecord.permission_type == permission_type.value,
                     PermissionRecord.resource == resource,
                 )
             )
-            for record in result.scalars().all():
-                await session.delete(record)
 
     async def list_permissions(self) -> list[PermissionRecord]:
         """Return all currently active (non-expired) permissions.
@@ -145,6 +149,7 @@ class PermissionManager:
             List of active PermissionRecord ORM objects.
         """
         now = datetime.now(UTC)
+        # records defaults to [] — safe empty list if session yields nothing
         records: list[PermissionRecord] = []
         async for session in get_db_session(self._engine):
             result = await session.execute(
