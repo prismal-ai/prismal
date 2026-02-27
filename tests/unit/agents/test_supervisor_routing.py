@@ -18,7 +18,6 @@ from langchain_core.messages import AIMessage, HumanMessage
 from lightagent.agents.state import create_initial_state
 from lightagent.agents.supervisor import supervisor_node, supervisor_router
 
-
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
@@ -54,8 +53,8 @@ async def test_supervisor_routes_to_researcher() -> None:
     state = create_initial_state(session_id="sess-test-researcher")
     state["messages"] = [HumanMessage(content="Find information about LangGraph")]
 
-    with patch("lightagent.agents.supervisor.ProviderRegistry") as MockRegistry:
-        MockRegistry.return_value.get_llm_with_fallback.return_value = (
+    with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
+        mock_registry.return_value.get_llm_with_fallback.return_value = (
             _make_mock_llm("researcher")
         )
         result = await supervisor_node(state)
@@ -69,8 +68,8 @@ async def test_supervisor_routes_to_end_when_done() -> None:
     state = create_initial_state(session_id="sess-test-end")
     state["messages"] = [HumanMessage(content="What is 2+2?")]
 
-    with patch("lightagent.agents.supervisor.ProviderRegistry") as MockRegistry:
-        MockRegistry.return_value.get_llm_with_fallback.return_value = (
+    with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
+        mock_registry.return_value.get_llm_with_fallback.return_value = (
             _make_mock_llm("END")
         )
         result = await supervisor_node(state)
@@ -84,8 +83,8 @@ async def test_supervisor_handles_invalid_routing() -> None:
     state = create_initial_state(session_id="sess-test-invalid")
     state["messages"] = [HumanMessage(content="Do something")]
 
-    with patch("lightagent.agents.supervisor.ProviderRegistry") as MockRegistry:
-        MockRegistry.return_value.get_llm_with_fallback.return_value = (
+    with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
+        mock_registry.return_value.get_llm_with_fallback.return_value = (
             _make_mock_llm("blah_blah_not_a_valid_agent_xyz_123")
         )
         result = await supervisor_node(state)
@@ -100,8 +99,8 @@ async def test_supervisor_updates_current_agent() -> None:
     state = create_initial_state(session_id="sess-test-current-agent")
     state["messages"] = [HumanMessage(content="Write some code")]
 
-    with patch("lightagent.agents.supervisor.ProviderRegistry") as MockRegistry:
-        MockRegistry.return_value.get_llm_with_fallback.return_value = (
+    with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
+        mock_registry.return_value.get_llm_with_fallback.return_value = (
             _make_mock_llm("coder")
         )
         result = await supervisor_node(state)
