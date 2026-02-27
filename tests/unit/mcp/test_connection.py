@@ -587,6 +587,46 @@ class TestConnectionErrorHandling:
         with pytest.raises(MCPToolError, match="bad arg"):
             await conn.call_tool("tool_a", {})
 
+    @pytest.mark.asyncio
+    async def test_disconnect_still_marks_disconnected_when_aclose_raises(
+        self,
+    ) -> None:
+        """disconnect() must set connected=False even if _exit_stack.aclose() raises."""
+        cfg = _make_stdio_config()
+        conn = MCPServerConnection(cfg)
+
+        session = AsyncMock(spec=mcp.ClientSession)
+        session.initialize = AsyncMock(return_value=None)
+        list_result = MagicMock()
+        list_result.tools = []
+        session.list_tools = AsyncMock(return_value=list_result)
+
+        read_mock, write_mock = MagicMock(), MagicMock()
+
+        with (
+            patch(
+                "lightagent.mcp.connection.stdio_client",
+                return_value=_fake_transport(read_mock, write_mock),
+            ),
+            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+        ):
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=session)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+            await conn.connect()
+
+        assert conn.connected is True
+
+        # Patch aclose on the live exit stack to simulate a cleanup failure.
+        assert conn._exit_stack is not None
+        conn._exit_stack.aclose = AsyncMock(  # type: ignore[method-assign]
+            side_effect=RuntimeError("cleanup failed")
+        )
+
+        # disconnect() must not propagate the exception.
+        await conn.disconnect()
+
+        assert conn.connected is False
+
 
 # ---------------------------------------------------------------------------
 # Timeout enforcement — AC-004-6

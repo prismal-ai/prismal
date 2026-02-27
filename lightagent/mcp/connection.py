@@ -16,7 +16,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-from datetime import timedelta
 from typing import Any, Literal
 
 import mcp.types
@@ -309,6 +308,7 @@ class MCPServerConnection:
             return await self._open_stdio(stack)
         if self._config.type == "sse":
             return await self._open_sse(stack)
+        # Defensive: Pydantic Literal["stdio","sse"] makes this unreachable at runtime
         msg = f"Unknown transport type: {self._config.type!r}"
         raise MCPConnectionError(server_name=self._config.name, reason=msg)
 
@@ -338,6 +338,12 @@ class MCPServerConnection:
         stack: contextlib.AsyncExitStack,
     ) -> tuple[Any, Any]:  # Any: anyio streams
         """Open an SSE (HTTP) transport with optional bearer auth (AC-004-9).
+
+        Note:
+            ``sse_read_timeout`` is not currently set on the ``sse_client``
+            call, so long-running SSE streams are bounded only by the
+            ``asyncio.wait_for`` timeout applied at the tool-call level.
+            This is a known architectural limitation.
 
         Args:
             stack: The ``AsyncExitStack`` to register the context manager with.
@@ -471,9 +477,6 @@ class MCPServerConnection:
                 self._session.call_tool(
                     name,
                     arguments=arguments,
-                    read_timeout_seconds=timedelta(
-                        seconds=self._config.timeout_seconds
-                    ),
                 ),
                 timeout=self._config.timeout_seconds,
             )
