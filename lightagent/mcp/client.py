@@ -315,9 +315,9 @@ class MCPClientManager:
         for conn in self._connections.values():
             if not conn.connected:
                 continue
-            # _cached_tools is populated during connect(); iterate directly to
+            # cached_tools is populated during connect(); iterate directly to
             # avoid the async list_tools() call from a sync context.
-            for tool in conn._cached_tools:  # intentional: internal cross-module access
+            for tool in conn.cached_tools:
                 tools.append(MCPToolAdapter(conn, tool))
 
         return tools
@@ -327,9 +327,11 @@ class MCPClientManager:
     # ------------------------------------------------------------------
 
     def get_server_status(self) -> list[MCPServerStatus]:
-        """Return a status snapshot for every configured server.
+        """Return a status snapshot for every server that has been attempted.
 
-        Includes servers that are connected, disconnected, or failed.
+        Only servers for which ``connect()`` was called are included.  Disabled
+        servers that were never attempted (i.e. skipped by ``load_from_config``
+        because ``enabled=False``) are **not** included in the returned list.
 
         Returns:
             List of ``MCPServerStatus`` instances, one per tracked server.

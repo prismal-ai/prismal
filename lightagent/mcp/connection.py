@@ -197,6 +197,11 @@ class MCPServerConnection:
         return self._connected
 
     @property
+    def cached_tools(self) -> list[mcp.types.Tool]:
+        """Return the cached tool list populated during connect()."""
+        return self._cached_tools
+
+    @property
     def status(self) -> MCPServerStatus:
         """Return a snapshot of the current connection status.
 

@@ -13,13 +13,9 @@ All network I/O and MCP SDK calls are mocked.  Tests cover:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-if TYPE_CHECKING:
-    pass
 
 from lightagent.mcp.client import MCPClientManager
 from lightagent.mcp.connection import MCPServerConfig, MCPServerStatus
@@ -52,13 +48,15 @@ def _make_yaml(servers: list[dict]) -> str:  # type: ignore[type-arg]
     return yaml.dump({"servers": servers})
 
 
-def _make_connected_mock_conn(name: str = "test-server", tool_count: int = 0) -> MagicMock:
+def _make_connected_mock_conn(
+    name: str = "test-server", tool_count: int = 0
+) -> MagicMock:
     """Return a mock MCPServerConnection that is already connected."""
     conn = MagicMock()
     conn.connected = True
     conn.connect = AsyncMock()
     conn.disconnect = AsyncMock()
-    conn._cached_tools = [MagicMock() for _ in range(tool_count)]
+    conn.cached_tools = [MagicMock() for _ in range(tool_count)]
     conn.status = MCPServerStatus(
         name=name,
         connected=True,
@@ -75,7 +73,7 @@ def _make_disconnected_mock_conn(name: str = "test-server") -> MagicMock:
     conn.connected = False
     conn.connect = AsyncMock()
     conn.disconnect = AsyncMock()
-    conn._cached_tools = []
+    conn.cached_tools = []
     conn.status = MCPServerStatus(
         name=name,
         connected=False,
@@ -99,9 +97,9 @@ class TestMCPClientManagerInit:
         manager = MCPClientManager()
         assert manager._config_path == Path("config/mcp_servers.yaml")
 
-    def test_custom_config_path(self) -> None:
+    def test_custom_config_path(self, tmp_path: Path) -> None:
         """Manager must store a custom config path when supplied."""
-        custom = Path("/tmp/custom_mcp.yaml")
+        custom = tmp_path / "custom_mcp.yaml"
         manager = MCPClientManager(config_path=custom)
         assert manager._config_path == custom
 
@@ -387,7 +385,9 @@ class TestReload:
         assert "old-server" not in manager._connections
 
     @pytest.mark.asyncio
-    async def test_reload_disconnects_newly_disabled_server(self, tmp_path: Path) -> None:
+    async def test_reload_disconnects_newly_disabled_server(
+        self, tmp_path: Path
+    ) -> None:
         """reload() must disconnect a server that is now disabled in the config."""
         cfg_file = tmp_path / "mcp_servers.yaml"
         cfg_file.write_text(_make_yaml([_STDIO_ENTRY_DISABLED]))
@@ -449,7 +449,8 @@ class TestGetAllLangchainTools:
         mock_adapter_cls.assert_not_called()
 
     def test_returns_tools_from_connected_servers(self) -> None:
-        """get_all_langchain_tools() must return one BaseTool per (server, tool) pair."""
+        """get_all_langchain_tools() must return one BaseTool per (server, tool)
+        pair."""
         manager = MCPClientManager()
         conn = _make_connected_mock_conn(tool_count=2)
         manager._connections["test-server"] = conn
@@ -469,12 +470,13 @@ class TestGetAllLangchainTools:
         assert tools[1] is fake_tool_b
 
     def test_returns_empty_list_when_adapter_import_fails(self) -> None:
-        """get_all_langchain_tools() must return [] when MCPToolAdapter is not available."""
+        """get_all_langchain_tools() must return [] when MCPToolAdapter is not
+        available."""
         manager = MCPClientManager()
         conn = _make_connected_mock_conn(tool_count=1)
         manager._connections["test-server"] = conn
 
-        with patch.dict("sys.modules", {"lightagent.mcp.adapter": None}):  # type: ignore[dict-item]
+        with patch.dict("sys.modules", {"lightagent.mcp.adapter": None}):
             tools = manager.get_all_langchain_tools()
 
         assert tools == []
