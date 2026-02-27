@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from langchain_core.language_models import BaseChatModel
+from pydantic import SecretStr
 
 from lightagent.core.config import Settings
 from lightagent.providers.registry import ModelInfo, ProviderRegistry, TokenUsage
@@ -140,3 +141,56 @@ def test_get_llm_anthropic_model(
     """get_llm(model='claude-sonnet-4-5') must route to Anthropic via LiteLLM."""
     registry.get_llm(model="claude-sonnet-4-5")
     assert mock_cls.call_args.kwargs["model"] == "claude-sonnet-4-5"
+
+
+def test_get_available_models_with_anthropic_key(settings: Settings) -> None:
+    """Anthropic models appear when ANTHROPIC_API_KEY is set."""
+    settings.anthropic_api_key = SecretStr("sk-ant-test")
+    reg = ProviderRegistry(settings=settings)
+    models = reg.get_available_models()
+    ids = [m.id for m in models]
+    assert "claude-sonnet-4-5" in ids
+
+
+def test_get_available_models_with_openai_key(settings: Settings) -> None:
+    """OpenAI models appear when OPENAI_API_KEY is set."""
+    settings.openai_api_key = SecretStr("sk-openai-test")
+    reg = ProviderRegistry(settings=settings)
+    models = reg.get_available_models()
+    ids = [m.id for m in models]
+    assert "gpt-4o" in ids
+    assert "gpt-4o-mini" in ids
+
+
+def test_get_available_models_with_google_key(settings: Settings) -> None:
+    """Google models appear when GOOGLE_API_KEY is set."""
+    settings.google_api_key = SecretStr("google-test-key")
+    reg = ProviderRegistry(settings=settings)
+    models = reg.get_available_models()
+    ids = [m.id for m in models]
+    assert any("gemini" in i for i in ids)
+
+
+def test_get_available_models_no_keys_returns_ollama(settings: Settings) -> None:
+    """Ollama model always appears regardless of API keys."""
+    reg = ProviderRegistry(settings=settings)
+    models = reg.get_available_models()
+    providers = [m.provider for m in models]
+    assert "ollama" in providers
+
+
+def test_get_available_models_no_anthropic_key_excludes_claude(
+    settings: Settings,
+) -> None:
+    """Anthropic models must not appear when API key is empty."""
+    reg = ProviderRegistry(settings=settings)
+    models = reg.get_available_models()
+    ids = [m.id for m in models]
+    assert "claude-sonnet-4-5" not in ids
+
+
+def test_get_available_models_returns_model_info_instances(settings: Settings) -> None:
+    """get_available_models() must return ModelInfo objects."""
+    reg = ProviderRegistry(settings=settings)
+    models = reg.get_available_models()
+    assert all(isinstance(m, ModelInfo) for m in models)

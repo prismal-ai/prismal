@@ -107,5 +107,48 @@ class ProviderRegistry:
             max_retries=self._settings.retry_attempts,
         )
 
+    def get_available_models(self) -> list[ModelInfo]:
+        """
+        Return list of models available given the configured API keys.
+
+        A model is included only when its required API key is non-empty
+        (or for Ollama, which needs no key). Does not verify liveness.
+
+        Returns:
+            List of ``ModelInfo`` for all configured providers.
+        """
+        models: list[ModelInfo] = []
+        s = self._settings
+
+        if s.anthropic_api_key.get_secret_value():
+            models.extend(
+                [
+                    ModelInfo(id="claude-sonnet-4-5", provider="anthropic"),
+                    ModelInfo(id="claude-opus-4-6", provider="anthropic"),
+                    ModelInfo(id="claude-haiku-4-5-20251001", provider="anthropic"),
+                ]
+            )
+
+        if s.openai_api_key.get_secret_value():
+            models.extend(
+                [
+                    ModelInfo(id="gpt-4o", provider="openai"),
+                    ModelInfo(id="gpt-4o-mini", provider="openai"),
+                ]
+            )
+
+        if s.google_api_key.get_secret_value():
+            models.extend(
+                [
+                    ModelInfo(id="gemini/gemini-1.5-pro", provider="google"),
+                    ModelInfo(id="gemini/gemini-2.0-flash", provider="google"),
+                ]
+            )
+
+        # Ollama requires no key — always listed as potentially available
+        models.append(ModelInfo(id="ollama/llama3", provider="ollama"))
+
+        return models
+
 
 __all__ = ["ModelInfo", "ProviderRegistry", "TokenUsage"]
