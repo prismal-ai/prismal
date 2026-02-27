@@ -150,5 +150,54 @@ class ProviderRegistry:
 
         return models
 
+    def get_token_usage(self, session_id: str) -> TokenUsage:
+        """
+        Return cumulative token usage for a session.
+
+        If no usage has been tracked yet for *session_id*, returns a
+        ``TokenUsage`` with all fields at zero.
+
+        Args:
+            session_id: Unique session identifier.
+
+        Returns:
+            ``TokenUsage`` with accumulated totals for the session.
+        """
+        return self._usage.get(session_id, TokenUsage(session_id=session_id))
+
+    def track_usage(
+        self,
+        session_id: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        estimated_cost: float = 0.0,
+    ) -> None:
+        """
+        Record token usage for a session.
+
+        Accumulates usage across multiple calls for the same session_id.
+        Thread-safety is not guaranteed — use one registry per async context.
+
+        Args:
+            session_id: Unique session identifier.
+            prompt_tokens: Number of input/prompt tokens used.
+            completion_tokens: Number of output/completion tokens generated.
+            estimated_cost: Estimated USD cost for this call.
+        """
+        if session_id not in self._usage:
+            self._usage[session_id] = TokenUsage(session_id=session_id)
+        usage = self._usage[session_id]
+        usage.prompt_tokens += prompt_tokens
+        usage.completion_tokens += completion_tokens
+        usage.total_tokens += prompt_tokens + completion_tokens
+        usage.estimated_cost += estimated_cost
+        logger.debug(
+            "usage_tracked",
+            session_id=session_id,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total=usage.total_tokens,
+        )
+
 
 __all__ = ["ModelInfo", "ProviderRegistry", "TokenUsage"]

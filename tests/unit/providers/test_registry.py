@@ -194,3 +194,58 @@ def test_get_available_models_returns_model_info_instances(settings: Settings) -
     reg = ProviderRegistry(settings=settings)
     models = reg.get_available_models()
     assert all(isinstance(m, ModelInfo) for m in models)
+
+
+def test_get_token_usage_new_session_returns_zeros(registry: ProviderRegistry) -> None:
+    """get_token_usage() for unknown session_id must return all-zero TokenUsage."""
+    usage = registry.get_token_usage("new-session-id")
+    assert usage.session_id == "new-session-id"
+    assert usage.total_tokens == 0
+    assert usage.estimated_cost == 0.0
+
+
+def test_track_usage_accumulates_tokens(registry: ProviderRegistry) -> None:
+    """track_usage() must accumulate prompt + completion tokens."""
+    registry.track_usage("s1", prompt_tokens=100, completion_tokens=50)
+    usage = registry.get_token_usage("s1")
+    assert usage.prompt_tokens == 100
+    assert usage.completion_tokens == 50
+    assert usage.total_tokens == 150
+
+
+def test_track_usage_multiple_calls_accumulate(registry: ProviderRegistry) -> None:
+    """Multiple track_usage() calls must sum into the same session."""
+    registry.track_usage("s2", prompt_tokens=50, completion_tokens=25)
+    registry.track_usage("s2", prompt_tokens=50, completion_tokens=25)
+    usage = registry.get_token_usage("s2")
+    assert usage.prompt_tokens == 100
+    assert usage.completion_tokens == 50
+    assert usage.total_tokens == 150
+
+
+def test_track_usage_accumulates_cost(registry: ProviderRegistry) -> None:
+    """track_usage() must accumulate estimated_cost."""
+    registry.track_usage(
+        "s3", prompt_tokens=100, completion_tokens=50, estimated_cost=0.001
+    )
+    registry.track_usage(
+        "s3", prompt_tokens=100, completion_tokens=50, estimated_cost=0.002
+    )
+    usage = registry.get_token_usage("s3")
+    assert abs(usage.estimated_cost - 0.003) < 1e-9
+
+
+def test_track_usage_sessions_are_independent(registry: ProviderRegistry) -> None:
+    """Token usage must be tracked independently per session_id."""
+    registry.track_usage("alpha", prompt_tokens=100, completion_tokens=50)
+    registry.track_usage("beta", prompt_tokens=200, completion_tokens=100)
+    assert registry.get_token_usage("alpha").total_tokens == 150
+    assert registry.get_token_usage("beta").total_tokens == 300
+
+
+def test_get_token_usage_returns_token_usage_instance(
+    registry: ProviderRegistry,
+) -> None:
+    """get_token_usage() must return a TokenUsage instance."""
+    usage = registry.get_token_usage("any")
+    assert isinstance(usage, TokenUsage)
