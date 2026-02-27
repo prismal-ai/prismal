@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 
-import pytest
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
-from lightagent.agents.state import AgentState, create_initial_state
+from lightagent.agents.state import create_initial_state
 
 
 def test_agent_state_has_required_fields() -> None:
-    """create_initial_state returns a state with all required fields at their zero/empty defaults."""
+    """create_initial_state returns a state with all required fields."""
     state = create_initial_state(session_id="sess-test-001")
 
     assert "messages" in state
@@ -59,16 +59,22 @@ def test_agent_state_default_values() -> None:
 
 def test_add_messages_annotation_works() -> None:
     """The add_messages reducer appends new messages rather than replacing the list."""
-    from langgraph.graph.message import add_messages
+    from langgraph.graph.message import Messages, add_messages
 
-    initial: list = []
+    initial: list[BaseMessage] = []
     msg1 = HumanMessage(content="Hello")
-    after_first = add_messages(initial, [msg1])
+    after_first = cast(
+        "list[BaseMessage]",
+        add_messages(cast("Messages", initial), cast("Messages", [msg1])),
+    )
     assert len(after_first) == 1
     assert after_first[0].content == "Hello"
 
     msg2 = AIMessage(content="Hi there!")
-    after_second = add_messages(after_first, [msg2])
+    after_second = cast(
+        "list[BaseMessage]",
+        add_messages(cast("Messages", after_first), cast("Messages", [msg2])),
+    )
     assert len(after_second) == 2
     assert after_second[1].content == "Hi there!"
 
@@ -109,7 +115,7 @@ def test_created_at_is_iso_format() -> None:
 
 
 def test_create_initial_state_unique_per_call() -> None:
-    """Two calls to create_initial_state with different session_ids produce independent states."""
+    """Two calls with different session_ids produce independent states."""
     state_a = create_initial_state(session_id="sess-a")
     state_b = create_initial_state(session_id="sess-b")
 
