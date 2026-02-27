@@ -12,8 +12,8 @@ References:
 
 from __future__ import annotations
 
-import asyncio
 import json
+import uuid
 from typing import TYPE_CHECKING, Any
 
 import mcp.types
@@ -84,6 +84,7 @@ class MCPToolAdapter(BaseTool):
             description=mcp_tool.description or "",
         )
         self._connection = connection
+        # Retained for future use (e.g. inputSchema validation).
         self._mcp_tool = mcp_tool
         self._interceptor = interceptor
 
@@ -94,18 +95,19 @@ class MCPToolAdapter(BaseTool):
     def _run(
         self,
         tool_input: str,
-        run_manager: CallbackManagerForToolRun | None = None,  # noqa: ARG002
+        run_manager: CallbackManagerForToolRun | None = None,
     ) -> str:
-        """Execute the tool synchronously by running the async version.
+        """Synchronous execution is not supported for MCP tools.
 
-        Args:
-            tool_input: JSON string or plain string passed by LangChain.
-            run_manager: Unused sync callback manager.
+        MCPToolAdapter requires async execution. Use arun() or ainvoke() instead.
 
-        Returns:
-            Tool result as a plain string.
+        Raises:
+            NotImplementedError: Always raised. Use _arun instead.
         """
-        return asyncio.run(self._arun(tool_input))
+        raise NotImplementedError(
+            "MCPToolAdapter does not support synchronous execution. "
+            "Use arun() or ainvoke() instead."
+        )
 
     async def _arun(
         self,
@@ -137,6 +139,9 @@ class MCPToolAdapter(BaseTool):
                 underlying call raises.
             PermissionDeniedError: If the interceptor blocks the call.
         """
+        # ── Correlation ID for audit logging ─────────────────────────────
+        run_id = str(uuid.uuid4())
+
         # ── Parse arguments ──────────────────────────────────────────────
         args: dict[str, Any]  # Any: MCP JSON-compatible values — unavoidable
         try:
@@ -156,6 +161,7 @@ class MCPToolAdapter(BaseTool):
             await self._interceptor.on_tool_start(
                 serialized=serialized,
                 input_str=tool_input,
+                run_id=run_id,
             )
 
         # ── MCP call ─────────────────────────────────────────────────────
@@ -171,7 +177,7 @@ class MCPToolAdapter(BaseTool):
                 error=str(exc),
             )
             if self._interceptor is not None:
-                await self._interceptor.on_tool_error(error=exc)
+                await self._interceptor.on_tool_error(error=exc, run_id=run_id)
             raise
 
         # ── Extract text content ─────────────────────────────────────────
@@ -197,12 +203,12 @@ class MCPToolAdapter(BaseTool):
                 reason=error_reason,
             )
             if self._interceptor is not None:
-                await self._interceptor.on_tool_error(error=exc_err)
+                await self._interceptor.on_tool_error(error=exc_err, run_id=run_id)
             raise exc_err
 
         # ── Interceptor: post-call hook ──────────────────────────────────
         if self._interceptor is not None:
-            await self._interceptor.on_tool_end(output=output)
+            await self._interceptor.on_tool_end(output=output, run_id=run_id)
 
         logger.debug(
             "mcp_adapter_call_success",

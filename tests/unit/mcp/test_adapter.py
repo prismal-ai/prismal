@@ -11,7 +11,7 @@ just verifying mock invocations.
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import mcp.types
 import pytest
@@ -425,8 +425,47 @@ class TestArunInterceptorIntegration:
         adapter = MCPToolAdapter(conn, _make_mcp_tool(), interceptor=interceptor)
         result = await adapter._arun("{}")
 
-        interceptor.on_tool_end.assert_awaited_once_with(output="done")
+        interceptor.on_tool_end.assert_awaited_once()
+        call_kwargs = interceptor.on_tool_end.call_args.kwargs
+        assert call_kwargs["output"] == "done"
+        assert "run_id" in call_kwargs
         assert result == "done"
+
+    @pytest.mark.asyncio
+    async def test_run_id_consistent_across_start_and_end(self) -> None:
+        """run_id passed to on_tool_start must match the one passed to on_tool_end."""
+        conn = _make_mock_connection()
+        conn.call_tool = AsyncMock(return_value=_make_call_tool_result("ok"))
+        interceptor = _make_mock_interceptor()
+
+        adapter = MCPToolAdapter(conn, _make_mcp_tool(), interceptor=interceptor)
+        await adapter._arun("{}")
+
+        start_run_id = interceptor.on_tool_start.call_args.kwargs["run_id"]
+        end_run_id = interceptor.on_tool_end.call_args.kwargs["run_id"]
+        assert start_run_id == end_run_id
+        # run_id must be a non-empty string (UUID format)
+        assert isinstance(start_run_id, str)
+        assert len(start_run_id) > 0
+
+    @pytest.mark.asyncio
+    async def test_run_id_consistent_across_start_and_error(self) -> None:
+        """run_id passed to on_tool_start must match the one passed to on_tool_error."""
+        conn = _make_mock_connection()
+        exc = MCPToolError("my_tool", "test-server", "boom")
+        conn.call_tool = AsyncMock(side_effect=exc)
+        interceptor = _make_mock_interceptor()
+
+        adapter = MCPToolAdapter(conn, _make_mcp_tool(), interceptor=interceptor)
+
+        with pytest.raises(MCPToolError):
+            await adapter._arun("{}")
+
+        start_run_id = interceptor.on_tool_start.call_args.kwargs["run_id"]
+        error_run_id = interceptor.on_tool_error.call_args.kwargs["run_id"]
+        assert start_run_id == error_run_id
+        assert isinstance(start_run_id, str)
+        assert len(start_run_id) > 0
 
     @pytest.mark.asyncio
     async def test_on_tool_start_receives_correct_serialized(self) -> None:
@@ -544,33 +583,10 @@ class TestArunInterceptorIntegration:
 class TestRun:
     """Tests for the synchronous _run method."""
 
-    def test_run_delegates_to_arun_via_asyncio(self) -> None:
-        """_run must call asyncio.run() with the async version and return a
-        string."""
-        import asyncio
-        import inspect
-
+    def test_run_raises_not_implemented_error(self) -> None:
+        """_run must raise NotImplementedError — MCP tools require async execution."""
         conn = _make_mock_connection()
-        conn.call_tool = AsyncMock(return_value=_make_call_tool_result("sync result"))
         adapter = MCPToolAdapter(conn, _make_mcp_tool())
 
-        received_coro: list[Any] = []
-
-        def capture_and_close(coro: Any) -> str:
-            """Capture the coroutine, close it to avoid leaks, return mock result."""
-            received_coro.append(coro)
-            if inspect.iscoroutine(coro):
-                coro.close()  # prevent ResourceWarning
-            return "sync result"
-
-        # Patch asyncio.run to avoid nested event-loop issues in test runner.
-        with patch(
-            "lightagent.mcp.adapter.asyncio.run",
-            side_effect=capture_and_close,
-        ):
-            result = adapter._run("{}")
-
-        assert len(received_coro) == 1
-        # The coroutine passed to asyncio.run must be _arun's coroutine object.
-        assert asyncio.iscoroutine(received_coro[0]) or callable(received_coro[0])
-        assert result == "sync result"
+        with pytest.raises(NotImplementedError, match="does not support synchronous"):
+            adapter._run("{}")
