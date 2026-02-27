@@ -88,7 +88,7 @@ class ProviderRegistry:
         Returns:
             A ``ChatLiteLLM`` instance (implements ``BaseChatModel``).
         """
-        resolved_model = model or self._settings.default_model
+        resolved_model = model if model is not None else self._settings.default_model
         temp = temperature if temperature is not None else self._settings.temperature
 
         logger.debug(

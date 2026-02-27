@@ -119,3 +119,10 @@ def test_get_llm_gemini_model(mock_cls: MagicMock, registry: ProviderRegistry) -
     """get_llm(model='gemini/gemini-1.5-pro') must route to Google Gemini."""
     registry.get_llm(model="gemini/gemini-1.5-pro")
     assert mock_cls.call_args.kwargs["model"] == "gemini/gemini-1.5-pro"
+
+
+@patch("lightagent.providers.registry.ChatLiteLLM")
+def test_get_llm_anthropic_model(mock_cls: MagicMock, registry: ProviderRegistry) -> None:
+    """get_llm(model='claude-sonnet-4-5') must route to Anthropic via LiteLLM."""
+    registry.get_llm(model="claude-sonnet-4-5")
+    assert mock_cls.call_args.kwargs["model"] == "claude-sonnet-4-5"
