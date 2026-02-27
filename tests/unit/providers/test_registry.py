@@ -169,7 +169,7 @@ def test_get_available_models_with_google_key(settings: Settings) -> None:
     reg = ProviderRegistry(settings=settings)
     models = reg.get_available_models()
     ids = [m.id for m in models]
-    assert any("gemini" in i for i in ids)
+    assert "gemini/gemini-1.5-pro" in ids
 
 
 def test_get_available_models_no_keys_returns_ollama(settings: Settings) -> None:

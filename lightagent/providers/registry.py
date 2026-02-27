@@ -170,12 +170,11 @@ class ProviderRegistry:
             )
 
         if s.google_api_key.get_secret_value():
-            models.extend(
-                [
-                    ModelInfo(id="gemini/gemini-1.5-pro", provider="google"),
-                    ModelInfo(id="gemini/gemini-2.0-flash", provider="google"),
-                ]
-            )
+            models.extend([
+                # LiteLLM requires the 'gemini/' provider prefix for routing
+                ModelInfo(id="gemini/gemini-1.5-pro", provider="google"),
+                ModelInfo(id="gemini/gemini-2.0-flash", provider="google"),
+            ])
 
         # Ollama requires no key — always listed as potentially available
         models.append(ModelInfo(id="ollama/llama3", provider="ollama"))

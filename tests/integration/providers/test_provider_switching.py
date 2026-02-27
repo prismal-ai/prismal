@@ -34,6 +34,7 @@ def test_anthropic_live_call() -> None:
     registry = ProviderRegistry()
     llm = registry.get_llm(model="claude-haiku-4-5-20251001", temperature=0.0)
     response = llm.invoke([HumanMessage(content="Say 'pong' and nothing else.")])
+    assert isinstance(response.content, str)
     assert "pong" in response.content.lower()
 
 
@@ -46,4 +47,5 @@ def test_openai_live_call() -> None:
     registry = ProviderRegistry()
     llm = registry.get_llm(model="gpt-4o-mini", temperature=0.0)
     response = llm.invoke([HumanMessage(content="Say 'pong' and nothing else.")])
+    assert isinstance(response.content, str)
     assert "pong" in response.content.lower()
