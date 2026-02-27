@@ -8,6 +8,17 @@ by LiteLLM; no provider-specific imports here.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from langchain_community.chat_models import ChatLiteLLM
+
+from lightagent.core.config import Settings, get_settings
+from lightagent.core.logging import get_logger
+
+if TYPE_CHECKING:
+    from langchain_core.language_models import BaseChatModel
+
+logger = get_logger("lightagent.providers.registry")
 
 
 @dataclass
@@ -30,4 +41,71 @@ class TokenUsage:
     estimated_cost: float = 0.0
 
 
-__all__ = ["ModelInfo", "TokenUsage"]
+class ProviderRegistry:
+    """
+    LiteLLM-backed registry for provider-agnostic LLM access.
+
+    All provider routing (Anthropic, OpenAI, Google, Ollama, etc.) is
+    handled transparently by LiteLLM. No provider-specific code lives here.
+
+    Usage::
+
+        registry = ProviderRegistry()
+        llm = registry.get_llm()  # uses settings.default_model
+        llm = registry.get_llm("gpt-4o")  # override for this call
+    """
+
+    def __init__(self, settings: Settings | None = None) -> None:
+        """
+        Initialize the registry.
+
+        Args:
+            settings: Optional Settings override (useful for testing).
+                      None = load from environment via get_settings().
+        """
+        self._settings = settings or get_settings()
+        self._usage: dict[str, TokenUsage] = {}
+
+    def get_llm(
+        self,
+        model: str | None = None,
+        streaming: bool = False,
+        temperature: float | None = None,
+    ) -> BaseChatModel:
+        """
+        Return a LangChain-compatible LLM for the specified model.
+
+        Falls back to ``settings.default_model`` when *model* is None.
+        Provider routing is transparent: pass ``"gpt-4o"``, ``"claude-sonnet-4-5"``,
+        ``"gemini/gemini-1.5-pro"``, or ``"ollama/llama3"`` and LiteLLM will
+        route to the correct provider.
+
+        Args:
+            model: LiteLLM model string. None = use ``settings.default_model``.
+            streaming: Whether to enable streaming output.
+            temperature: Sampling temperature. None = use ``settings.temperature``.
+
+        Returns:
+            A ``ChatLiteLLM`` instance (implements ``BaseChatModel``).
+        """
+        resolved_model = model or self._settings.default_model
+        temp = temperature if temperature is not None else self._settings.temperature
+
+        logger.debug(
+            "creating_llm",
+            model=resolved_model,
+            streaming=streaming,
+            temperature=temp,
+        )
+
+        return ChatLiteLLM(
+            model=resolved_model,
+            streaming=streaming,
+            temperature=temp,
+            max_tokens=self._settings.max_tokens,
+            request_timeout=float(self._settings.timeout_seconds),
+            max_retries=self._settings.retry_attempts,
+        )
+
+
+__all__ = ["ModelInfo", "ProviderRegistry", "TokenUsage"]
