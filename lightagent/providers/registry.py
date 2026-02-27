@@ -16,7 +16,9 @@ from lightagent.core.config import Settings, get_settings
 from lightagent.core.logging import get_logger
 
 if TYPE_CHECKING:
-    from langchain_core.language_models import BaseChatModel
+    from langchain_core.language_models import BaseChatModel, LanguageModelInput
+    from langchain_core.messages import BaseMessage
+    from langchain_core.runnables.fallbacks import RunnableWithFallbacks
 
 logger = get_logger("lightagent.providers.registry")
 
@@ -106,6 +108,36 @@ class ProviderRegistry:
             request_timeout=float(self._settings.timeout_seconds),
             max_retries=self._settings.retry_attempts,
         )
+
+    def get_llm_with_fallback(
+        self,
+        model: str | None = None,
+        streaming: bool = False,
+        temperature: float | None = None,
+    ) -> RunnableWithFallbacks[LanguageModelInput, BaseMessage]:
+        """
+        Return a primary LLM wrapped with automatic fallback.
+
+        If the primary model raises any exception (network, quota, timeout),
+        LangChain will automatically retry with ``settings.fallback_model``.
+
+        Args:
+            model: Primary model string. None = ``settings.default_model``.
+            streaming: Whether to enable streaming output.
+            temperature: Sampling temperature. None = ``settings.temperature``.
+
+        Returns:
+            A ``RunnableWithFallbacks`` wrapping primary and fallback models.
+        """
+        primary = self.get_llm(
+            model=model, streaming=streaming, temperature=temperature
+        )
+        fallback = self.get_llm(
+            model=self._settings.fallback_model,
+            streaming=streaming,
+            temperature=temperature,
+        )
+        return primary.with_fallbacks([fallback])
 
     def get_available_models(self) -> list[ModelInfo]:
         """

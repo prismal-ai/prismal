@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from langchain_core.language_models import BaseChatModel
+from langchain_core.runnables.fallbacks import RunnableWithFallbacks
 from pydantic import SecretStr
 
 from lightagent.core.config import Settings
@@ -249,3 +250,36 @@ def test_get_token_usage_returns_token_usage_instance(
     """get_token_usage() must return a TokenUsage instance."""
     usage = registry.get_token_usage("any")
     assert isinstance(usage, TokenUsage)
+
+
+def test_fallback_model_differs_from_default(registry: ProviderRegistry) -> None:
+    """settings.fallback_model must differ from settings.default_model."""
+    assert registry._settings.fallback_model != registry._settings.default_model
+
+
+@patch("lightagent.providers.registry.ChatLiteLLM")
+def test_get_llm_with_fallback_returns_runnable_with_fallbacks(
+    mock_cls: MagicMock, registry: ProviderRegistry
+) -> None:
+    """get_llm_with_fallback() must return a RunnableWithFallbacks."""
+    mock_llm = MagicMock(spec=BaseChatModel)
+    mock_llm.with_fallbacks.return_value = MagicMock(spec=RunnableWithFallbacks)
+    mock_cls.return_value = mock_llm
+    result = registry.get_llm_with_fallback()
+    assert isinstance(result, RunnableWithFallbacks)
+
+
+@patch("lightagent.providers.registry.ChatLiteLLM")
+def test_get_llm_with_fallback_uses_fallback_model(
+    mock_cls: MagicMock, registry: ProviderRegistry
+) -> None:
+    """get_llm_with_fallback() must configure the fallback model."""
+    mock_llm = MagicMock(spec=BaseChatModel)
+    mock_llm.with_fallbacks.return_value = MagicMock(spec=RunnableWithFallbacks)
+    mock_cls.return_value = mock_llm
+    registry.get_llm_with_fallback()
+    # ChatLiteLLM must be called twice: once for primary, once for fallback
+    assert mock_cls.call_count == 2
+    models_used = [call.kwargs["model"] for call in mock_cls.call_args_list]
+    assert "claude-sonnet-4-5" in models_used
+    assert "gpt-4o-mini" in models_used
