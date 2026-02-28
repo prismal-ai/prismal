@@ -469,3 +469,62 @@ def test_delete_by_source_swallows_exception_when_collection_empty() -> None:
         store = ChromaVectorStore(collection_name="col", settings=settings)
         # Must not raise
         store.delete_by_source("/nonexistent/file.txt")
+
+
+# ── Exception wrapping ────────────────────────────────────────────────────────
+
+
+def test_add_documents_raises_chroma_store_error_on_failure() -> None:
+    """add_documents() must wrap any underlying exception in ChromaStoreError."""
+    settings = _make_settings()
+    mock_chroma_instance = MagicMock()
+    mock_chroma_instance.add_documents.side_effect = Exception("chroma is down")
+
+    with (
+        patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
+        patch(CHROMA_PATH) as mock_chroma_cls,
+    ):
+        mock_factory.create.return_value = MagicMock()
+        mock_chroma_cls.return_value = mock_chroma_instance
+
+        store = ChromaVectorStore(collection_name="col", settings=settings)
+        with pytest.raises(ChromaStoreError, match="chroma is down"):
+            store.add_documents([MagicMock()])
+
+
+def test_similarity_search_raises_chroma_store_error_on_failure() -> None:
+    """similarity_search() must wrap any underlying exception in ChromaStoreError."""
+    settings = _make_settings()
+    mock_chroma_instance = MagicMock()
+    mock_chroma_instance.similarity_search_with_score.side_effect = Exception(
+        "index corrupt"
+    )
+
+    with (
+        patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
+        patch(CHROMA_PATH) as mock_chroma_cls,
+    ):
+        mock_factory.create.return_value = MagicMock()
+        mock_chroma_cls.return_value = mock_chroma_instance
+
+        store = ChromaVectorStore(collection_name="col", settings=settings)
+        with pytest.raises(ChromaStoreError, match="index corrupt"):
+            store.similarity_search("query")
+
+
+def test_delete_collection_raises_chroma_store_error_on_failure() -> None:
+    """delete_collection() must wrap any underlying exception in ChromaStoreError."""
+    settings = _make_settings()
+    mock_chroma_instance = MagicMock()
+    mock_chroma_instance.delete_collection.side_effect = Exception("collection missing")
+
+    with (
+        patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
+        patch(CHROMA_PATH) as mock_chroma_cls,
+    ):
+        mock_factory.create.return_value = MagicMock()
+        mock_chroma_cls.return_value = mock_chroma_instance
+
+        store = ChromaVectorStore(collection_name="col", settings=settings)
+        with pytest.raises(ChromaStoreError, match="collection missing"):
+            store.delete_collection()

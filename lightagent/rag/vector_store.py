@@ -127,7 +127,10 @@ class ChromaVectorStore:
             collection=self._collection_name,
             document_count=count,
         )
-        return self._chroma.add_documents(documents)
+        try:
+            return self._chroma.add_documents(documents)
+        except Exception as exc:
+            raise ChromaStoreError(str(exc)) from exc
 
     def similarity_search(
         self,
@@ -157,7 +160,10 @@ class ChromaVectorStore:
             query=query,
             k=k,
         )
-        return self._chroma.similarity_search_with_score(query, k=k)
+        try:
+            return self._chroma.similarity_search_with_score(query, k=k)
+        except Exception as exc:
+            raise ChromaStoreError(str(exc)) from exc
 
     def delete_by_source(self, source: str) -> None:
         """Delete all documents whose ``metadata["source"]`` matches *source*.
@@ -198,7 +204,10 @@ class ChromaVectorStore:
         Raises:
             ChromaStoreError: If the underlying Chroma call raises an exception.
         """
-        self._chroma.delete_collection()
+        try:
+            self._chroma.delete_collection()
+        except Exception as exc:
+            raise ChromaStoreError(str(exc)) from exc
 
 
 __all__ = ["ChromaStoreError", "ChromaVectorStore"]

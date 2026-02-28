@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from lightagent.core.config import get_settings
+from lightagent.core.exceptions import RAGError
 from lightagent.core.logging import get_logger
 from lightagent.providers.registry import ProviderRegistry
 from lightagent.security.prompt_builder import SecurePromptBuilder
@@ -283,9 +284,7 @@ class CRAGPipeline:
         try:
             response = await self._llm.ainvoke(lc_messages)
         except Exception as exc:
-            raise RuntimeError(
-                f"LLM generation failed: {exc}"
-            ) from exc
+            raise RAGError(f"LLM generation failed: {exc}") from exc
         return str(response.content)
 
     @staticmethod

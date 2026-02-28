@@ -222,7 +222,7 @@ class RAGError(LightAgentError):
     """Raised when a RAG operation fails."""
 
 
-class DocumentLoadError(RAGError):
+class DocumentLoadError(RAGError):  # reserved for future use by the document loader
     """Raised when a document fails to load.
 
     Args:
@@ -237,7 +237,7 @@ class DocumentLoadError(RAGError):
         super().__init__(f"Failed to load document '{path}': {reason}")
 
 
-class RAGIndexError(RAGError):
+class RAGIndexError(RAGError):  # reserved for future use by the indexing pipeline
     """Raised when document indexing fails.
 
     Args:

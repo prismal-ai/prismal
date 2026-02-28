@@ -25,6 +25,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from lightagent.core.exceptions import RAGError
 from lightagent.rag.crag import CRAGPipeline, CRAGResult, RetrievedChunk
 
 # ── Paths for patching ─────────────────────────────────────────────────────────
@@ -638,3 +639,57 @@ async def test_grading_parse_failure_low_score_triggers_web_fallback() -> None:
         result = await pipeline.run("query")
 
     assert result.used_web_fallback is True
+
+
+# ── Exception paths ───────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_grade_llm_error_falls_back_to_similarity_score() -> None:
+    """When llm.ainvoke raises during grading, the fallback_score is used."""
+    doc = _make_document("content", "file.txt")
+    mock_store = MagicMock()
+    # similarity score is 0.8 (above threshold)
+    mock_store.similarity_search.return_value = [(doc, 0.8)]
+
+    llm = MagicMock()
+    # First call (grading) raises; second call (generation) succeeds.
+    llm.ainvoke = AsyncMock(
+        side_effect=[
+            Exception("LLM grading connection error"),
+            _make_llm_response("generated answer"),
+        ]
+    )
+
+    with patch(PROVIDER_REGISTRY_PATH) as mock_registry_cls:
+        mock_registry_cls.return_value.get_llm.return_value = llm
+        pipeline = CRAGPipeline(vector_store=mock_store)
+        result = await pipeline.run("query")
+
+    # Fallback score 0.8 >= 0.5, so the chunk must survive filtering.
+    assert result.used_web_fallback is False
+    assert len(result.sources) == 1
+    assert result.sources[0].relevance_score == pytest.approx(0.8)
+
+
+@pytest.mark.asyncio
+async def test_generate_llm_error_raises_rag_error() -> None:
+    """When the generation LLM call raises, RAGError must be re-raised."""
+    doc = _make_document("content", "file.txt")
+    mock_store = MagicMock()
+    mock_store.similarity_search.return_value = [(doc, 0.9)]
+
+    llm = MagicMock()
+    # First call (grading) succeeds; second call (generation) raises.
+    llm.ainvoke = AsyncMock(
+        side_effect=[
+            _make_llm_response("0.9"),
+            Exception("LLM generation network timeout"),
+        ]
+    )
+
+    with patch(PROVIDER_REGISTRY_PATH) as mock_registry_cls:
+        mock_registry_cls.return_value.get_llm.return_value = llm
+        pipeline = CRAGPipeline(vector_store=mock_store)
+        with pytest.raises(RAGError, match="LLM generation failed"):
+            await pipeline.run("query")
