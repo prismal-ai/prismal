@@ -250,8 +250,43 @@ class RAGIndexError(RAGError):  # reserved for future use by the indexing pipeli
         super().__init__(f"Indexing failed: {reason}")
 
 
+# ── Scheduler ─────────────────────────────────────────────────────────────────
+
+
+class SchedulerError(LightAgentError):
+    """Raised when a scheduler operation fails."""
+
+
+class CronJobNotFoundError(SchedulerError):
+    """Raised when a cron job name cannot be found.
+
+    Args:
+        name: The job name that was not found.
+    """
+
+    def __init__(self, name: str) -> None:
+        """Initialize CronJobNotFoundError."""
+        self.name = name
+        super().__init__(f"Cron job '{name}' not found")
+
+
+class CronJobExistsError(SchedulerError):
+    """Raised when a cron job name is already registered.
+
+    Args:
+        name: The duplicate job name.
+    """
+
+    def __init__(self, name: str) -> None:
+        """Initialize CronJobExistsError."""
+        self.name = name
+        super().__init__(f"Cron job '{name}' already exists")
+
+
 __all__ = [
     "CanaryLeakError",
+    "CronJobExistsError",
+    "CronJobNotFoundError",
     "DocumentLoadError",
     "InjectionDetectedError",
     "LightAgentError",
@@ -264,6 +299,7 @@ __all__ = [
     "ProviderTimeoutError",
     "RAGError",
     "RAGIndexError",
+    "SchedulerError",
     "SecurityError",
     "SkillError",
     "SkillLoadError",
