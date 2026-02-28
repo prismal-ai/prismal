@@ -499,3 +499,13 @@ def test_load_multiline_txt(tmp_path: Path) -> None:
     combined = "\n".join(d.page_content for d in docs)
     assert "Line one" in combined
     assert "Line two" in combined
+
+
+def test_load_accepts_uppercase_extension(tmp_path: Path) -> None:
+    """load() handles uppercase extensions case-insensitively."""
+    txt_file = tmp_path / "DOCUMENT.TXT"
+    txt_file.write_text("uppercase extension content", encoding="utf-8")
+    factory = DocumentProcessorFactory()
+    docs = factory.load(txt_file)
+    assert len(docs) >= 1
+    assert docs[0].metadata["source"] == str(txt_file)
