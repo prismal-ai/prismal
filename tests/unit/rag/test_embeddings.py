@@ -15,7 +15,7 @@ Coverage targets:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -204,11 +204,9 @@ def test_create_logs_selected_provider() -> None:
 
         EmbeddingsFactory.create(settings=settings)
 
-    mock_logger.info.assert_called_once()
-    # The call must include the provider name somewhere in the positional/kw args
-    info_call: call = mock_logger.info.call_args
-    all_args = str(info_call)
-    assert "openai" in all_args
+    mock_logger.info.assert_called_once_with(
+        "embeddings_provider_selected", provider="openai"
+    )
 
 
 def test_create_logs_huggingface_provider() -> None:
@@ -225,9 +223,9 @@ def test_create_logs_huggingface_provider() -> None:
 
         EmbeddingsFactory.create(settings=settings)
 
-    mock_logger.info.assert_called_once()
-    info_call = mock_logger.info.call_args
-    assert "huggingface" in str(info_call)
+    mock_logger.info.assert_called_once_with(
+        "embeddings_provider_selected", provider="huggingface"
+    )
 
 
 def test_create_logs_ollama_provider() -> None:
@@ -244,9 +242,9 @@ def test_create_logs_ollama_provider() -> None:
 
         EmbeddingsFactory.create(settings=settings)
 
-    mock_logger.info.assert_called_once()
-    info_call = mock_logger.info.call_args
-    assert "ollama" in str(info_call)
+    mock_logger.info.assert_called_once_with(
+        "embeddings_provider_selected", provider="ollama"
+    )
 
 
 # ── Settings object accepted directly ─────────────────────────────────────────
