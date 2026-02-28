@@ -16,9 +16,12 @@ Hierarchy::
     ├── SkillError
     │   ├── SkillLoadError
     │   └── SkillValidationError
-    └── MCPError
-        ├── MCPConnectionError
-        └── MCPToolError
+    ├── MCPError
+    │   ├── MCPConnectionError
+    │   └── MCPToolError
+    └── RAGError
+        ├── DocumentLoadError
+        └── RAGIndexError
 """
 
 from __future__ import annotations
@@ -212,8 +215,44 @@ class MCPToolError(MCPError):
         super().__init__(msg)
 
 
+# ── RAG ───────────────────────────────────────────────────────────────────────
+
+
+class RAGError(LightAgentError):
+    """Raised when a RAG operation fails."""
+
+
+class DocumentLoadError(RAGError):
+    """Raised when a document fails to load.
+
+    Args:
+        path: The file path that failed to load.
+        reason: Human-readable reason for the failure.
+    """
+
+    def __init__(self, path: str, reason: str) -> None:
+        """Initialize DocumentLoadError."""
+        self.path = path
+        self.reason = reason
+        super().__init__(f"Failed to load document '{path}': {reason}")
+
+
+class RAGIndexError(RAGError):
+    """Raised when document indexing fails.
+
+    Args:
+        reason: Human-readable reason for the indexing failure.
+    """
+
+    def __init__(self, reason: str) -> None:
+        """Initialize RAGIndexError."""
+        self.reason = reason
+        super().__init__(f"Indexing failed: {reason}")
+
+
 __all__ = [
     "CanaryLeakError",
+    "DocumentLoadError",
     "InjectionDetectedError",
     "LightAgentError",
     "MCPConnectionError",
@@ -223,6 +262,8 @@ __all__ = [
     "PermissionDeniedError",
     "ProviderError",
     "ProviderTimeoutError",
+    "RAGError",
+    "RAGIndexError",
     "SecurityError",
     "SkillError",
     "SkillLoadError",
