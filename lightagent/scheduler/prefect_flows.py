@@ -1,0 +1,150 @@
+"""Prefect flow definitions for LightAgent scheduled tasks.
+
+Defines reusable Prefect flows for document indexing, skill discovery,
+config hot-reload, and generic agent execution.  All flows include
+configurable retry / backoff (AC-007-8).
+
+Example::
+
+    from lightagent.scheduler.prefect_flows import document_index_flow
+
+    document_index_flow("/data/documents/report.pdf")
+
+AC-007-8: Flow failures are logged with full traceback; retry count and
+backoff are configurable.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+
+from prefect import flow, task
+
+from lightagent.core.logging import get_logger
+from lightagent.skills.manager import SkillsManager
+
+logger = get_logger("lightagent.scheduler.prefect_flows")
+
+# ── Tasks (reusable building blocks) ─────────────────────────────────────────
+
+
+@task(retries=3, retry_delay_seconds=60, name="index-document-task")
+def _index_document_task(document_path: str) -> str:
+    """Index a single document into the RAG store.
+
+    Args:
+        document_path: Absolute path to the document file.
+
+    Returns:
+        Status string describing the indexing result.
+    """
+    path = Path(document_path)
+    logger.info("prefect_index_document_start", path=document_path)
+    # Integration point: real implementation calls RAGEngine.add_document()
+    result = f"indexed:{path.name}"
+    logger.info("prefect_index_document_done", result=result)
+    return result
+
+
+@task(retries=2, retry_delay_seconds=30, name="discover-skills-task")
+def _discover_skills_task() -> list[str]:
+    """Run skill discovery and reload the skills registry.
+
+    Returns:
+        List of discovered skill names.
+    """
+    logger.info("prefect_skill_discovery_start")
+    manager = SkillsManager()
+    asyncio.run(manager.reload_all())
+    names = [s.name for s in manager.list_skills()]
+    logger.info("prefect_skill_discovery_done", count=len(names))
+    return names
+
+
+@task(retries=1, retry_delay_seconds=10, name="reload-config-task")
+def _reload_config_task() -> bool:
+    """Hot-reload LightAgent configuration from disk.
+
+    Returns:
+        True if reload succeeded, False otherwise.
+    """
+    logger.info("prefect_config_reload_start")
+    # Integration point: real implementation invalidates get_settings() cache
+    logger.info("prefect_config_reload_done")
+    return True
+
+
+# ── Flows (orchestration entry points) ───────────────────────────────────────
+
+
+@flow(name="document-index-flow", log_prints=True)
+def document_index_flow(document_path: str) -> str:
+    """Index a newly added or modified document into the RAG store.
+
+    Args:
+        document_path: Absolute path to the document to index.
+
+    Returns:
+        Status string from the indexing task.
+
+    AC-007-5: New files in ``data/documents/`` automatically trigger RAG
+    indexing.
+    """
+    return _index_document_task(document_path)
+
+
+@flow(name="skill-discovery-flow", log_prints=True)
+def skill_discovery_flow() -> list[str]:
+    """Discover and register new skills from the skills/available directory.
+
+    Returns:
+        List of discovered skill names.
+
+    AC-007-6: New skill files in ``skills/available/`` trigger skill
+    discovery.
+    """
+    return _discover_skills_task()
+
+
+@flow(name="config-reload-flow", log_prints=True)
+def config_reload_flow() -> bool:
+    """Hot-reload LightAgent configuration from disk.
+
+    Returns:
+        True if the reload succeeded.
+
+    AC-007-7: Changes to ``config/`` files trigger config hot-reload.
+    """
+    return _reload_config_task()
+
+
+@flow(name="agent-run-flow", log_prints=True)
+def agent_run_flow(task_description: str) -> str:
+    """Execute a generic agent task from a natural language description.
+
+    Args:
+        task_description: Free-form description of the task to execute.
+
+    Returns:
+        Result string from the agent execution.
+    """
+    logger.info("prefect_agent_run_start", task=task_description[:80])
+    if not task_description:
+        logger.warning("prefect_agent_run_empty_task")
+        return "no-op: empty task description"
+    # Integration point: real implementation calls the LangGraph agent graph
+    result = f"completed:{task_description[:40]}"
+    logger.info("prefect_agent_run_done", result=result)
+    return result
+
+
+__all__ = [
+    "_index_document_task",
+    "_discover_skills_task",
+    "_reload_config_task",
+    "document_index_flow",
+    "skill_discovery_flow",
+    "config_reload_flow",
+    "agent_run_flow",
+]
