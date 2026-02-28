@@ -189,4 +189,26 @@ def get_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any, Any]:
     return build_supervisor_graph()
 
 
-__all__ = ["build_supervisor_graph", "get_compiled_graph"]
+def list_session_ids() -> list[str]:
+    """Return all distinct thread IDs from the LangGraph SQLite checkpointer.
+
+    Reads directly from the checkpointer's SQLite database.  Returns an
+    empty list if the database does not exist yet.
+
+    Returns:
+        Sorted list of session ID strings.
+    """
+    db = _DEFAULT_CHECKPOINT_PATH
+    if not db.exists():
+        return []
+    try:
+        with sqlite3.connect(db) as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT thread_id FROM checkpoints ORDER BY thread_id"
+            ).fetchall()
+        return [r[0] for r in rows]
+    except Exception:
+        return []
+
+
+__all__ = ["build_supervisor_graph", "get_compiled_graph", "list_session_ids"]
