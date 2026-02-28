@@ -68,9 +68,7 @@ def _read_events(calendar_dir: Path, days_ahead: int) -> list[dict[str, str]]:
         return []
 
     now = datetime.now(tz=UTC)
-    cutoff = datetime(
-        now.year, now.month, now.day, tzinfo=UTC
-    )
+    cutoff = datetime(now.year, now.month, now.day, tzinfo=UTC)
     future_limit_days = days_ahead * 86400  # seconds
 
     events: list[dict[str, str]] = []
@@ -84,7 +82,9 @@ def _read_events(calendar_dir: Path, days_ahead: int) -> list[dict[str, str]]:
             for component in cal.walk():
                 if component.name != "VEVENT":
                     continue
-                dtstart = _parse_dt(component.get("DTSTART").dt if component.get("DTSTART") else None)  # noqa: E501
+                dtstart = _parse_dt(
+                    component.get("DTSTART").dt if component.get("DTSTART") else None
+                )
                 if dtstart is None:
                     continue
                 delta = (dtstart - cutoff).total_seconds()

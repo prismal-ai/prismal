@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 from pydantic import ValidationError
 
 from lightagent.skills.base import BaseSkill, SkillMetadata
 
+if TYPE_CHECKING:
+    from langchain_core.tools import BaseTool
 
 # ── SkillMetadata ─────────────────────────────────────────────────────────────
 
@@ -80,7 +84,6 @@ def test_base_skill_cannot_be_instantiated_directly() -> None:
 
 def test_concrete_skill_with_validate_false() -> None:
     """A concrete skill whose validate() returns False signals not-ready."""
-    from langchain_core.tools import BaseTool
 
     class BadSkill(BaseSkill):
         """Broken skill for testing."""
@@ -107,7 +110,6 @@ def test_concrete_skill_with_validate_false() -> None:
 @pytest.mark.asyncio
 async def test_base_skill_default_initialize_is_noop() -> None:
     """Default initialize() and teardown() complete without error."""
-    from langchain_core.tools import BaseTool
 
     class MinimalSkill(BaseSkill):
         """Minimal concrete skill."""
@@ -125,14 +127,13 @@ async def test_base_skill_default_initialize_is_noop() -> None:
 
     skill = MinimalSkill()
     await skill.initialize()  # should not raise
-    await skill.teardown()    # should not raise
+    await skill.teardown()  # should not raise
     assert skill.validate() is True
 
 
 @pytest.mark.asyncio
 async def test_base_skill_default_validate_returns_true() -> None:
     """Default validate() returns True."""
-    from langchain_core.tools import BaseTool
 
     class ASkill(BaseSkill):
         """Another concrete skill."""
