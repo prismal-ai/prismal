@@ -159,6 +159,36 @@ class ChromaVectorStore:
         )
         return self._chroma.similarity_search_with_score(query, k=k)
 
+    def delete_by_source(self, source: str) -> None:
+        """Delete all documents whose ``metadata["source"]`` matches *source*.
+
+        Used by the engine layer to implement duplicate-prevention (AC-005-7):
+        before re-indexing a file, its existing vectors are deleted so that
+        re-indexing does not accumulate duplicate chunks.
+
+        The operation is best-effort: if the underlying Chroma call raises
+        (e.g. the collection is empty), the error is silently swallowed because
+        there is nothing to delete.
+
+        Args:
+            source: The source metadata value to match against — typically the
+                absolute path string of the file being re-indexed.
+        """
+        logger.info(
+            "vector_store_delete_by_source",
+            collection=self._collection_name,
+            source=source,
+        )
+        try:
+            self._chroma.delete(where={"source": source})
+        except Exception as exc:
+            logger.debug(
+                "vector_store_delete_by_source_noop",
+                collection=self._collection_name,
+                source=source,
+                reason=str(exc),
+            )
+
     def delete_collection(self) -> None:
         """Delete the entire ChromaDB collection.
 

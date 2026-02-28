@@ -410,3 +410,62 @@ def test_delete_collection_returns_none() -> None:
         result = store.delete_collection()
 
     assert result is None
+
+
+# ── delete_by_source ──────────────────────────────────────────────────────────
+
+
+def test_delete_by_source_calls_chroma_delete_with_where_filter() -> None:
+    """delete_by_source(source) must call self._chroma.delete(where={"source": source})."""
+    settings = _make_settings()
+    mock_chroma_instance = MagicMock()
+
+    with (
+        patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
+        patch(CHROMA_PATH) as mock_chroma_cls,
+    ):
+        mock_factory.create.return_value = MagicMock()
+        mock_chroma_cls.return_value = mock_chroma_instance
+
+        store = ChromaVectorStore(collection_name="col", settings=settings)
+        store.delete_by_source("/path/to/file.txt")
+
+    mock_chroma_instance.delete.assert_called_once_with(
+        where={"source": "/path/to/file.txt"}
+    )
+
+
+def test_delete_by_source_returns_none() -> None:
+    """delete_by_source() must return None."""
+    settings = _make_settings()
+    mock_chroma_instance = MagicMock()
+
+    with (
+        patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
+        patch(CHROMA_PATH) as mock_chroma_cls,
+    ):
+        mock_factory.create.return_value = MagicMock()
+        mock_chroma_cls.return_value = mock_chroma_instance
+
+        store = ChromaVectorStore(collection_name="col", settings=settings)
+        result = store.delete_by_source("/some/path.md")
+
+    assert result is None
+
+
+def test_delete_by_source_swallows_exception_when_collection_empty() -> None:
+    """delete_by_source() must not raise if the underlying Chroma.delete raises."""
+    settings = _make_settings()
+    mock_chroma_instance = MagicMock()
+    mock_chroma_instance.delete.side_effect = Exception("no documents match")
+
+    with (
+        patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
+        patch(CHROMA_PATH) as mock_chroma_cls,
+    ):
+        mock_factory.create.return_value = MagicMock()
+        mock_chroma_cls.return_value = mock_chroma_instance
+
+        store = ChromaVectorStore(collection_name="col", settings=settings)
+        # Must not raise
+        store.delete_by_source("/nonexistent/file.txt")

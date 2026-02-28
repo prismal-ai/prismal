@@ -171,7 +171,12 @@ class DocumentProcessorFactory:
         return docs
 
 
+# Module-level alias so callers can import the set without instantiating the
+# factory or triggering mock interference in tests.
+SUPPORTED_EXTENSIONS: frozenset[str] = DocumentProcessorFactory.SUPPORTED_EXTENSIONS
+
 __all__ = [
+    "SUPPORTED_EXTENSIONS",
     "DocumentProcessorFactory",
     "UnsupportedDocumentTypeError",
 ]
