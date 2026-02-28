@@ -148,8 +148,8 @@ class Settings(BaseSettings):
     )
 
     # ── API ───────────────────────────────────────────────────────────
-    api_key: str = Field(
-        default="",
+    api_key: SecretStr = Field(
+        default=SecretStr(""),
         description="X-API-Key for REST auth; empty string disables auth (dev mode)",
     )
     cors_origins: list[str] = Field(
