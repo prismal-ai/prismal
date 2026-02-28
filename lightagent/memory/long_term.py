@@ -167,13 +167,9 @@ class LongTermMemory:
         if retention_days is not None:
             self._retention = retention_days
         else:
-            # Temporary fallback until Settings.memory_retention_days is added (Task 4)
-            try:
-                from lightagent.core.config import get_settings  # noqa: PLC0415
+            from lightagent.core.config import get_settings  # noqa: PLC0415
 
-                self._retention = get_settings().memory_retention_days
-            except AttributeError:
-                self._retention = 30
+            self._retention = get_settings().memory_retention_days
 
     # ── SQLite helpers ────────────────────────────────────────────────────────
 

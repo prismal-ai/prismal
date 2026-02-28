@@ -283,6 +283,26 @@ class CronJobExistsError(SchedulerError):
         super().__init__(f"Cron job '{name}' already exists")
 
 
+# ── Memory ────────────────────────────────────────────────────────────────────
+
+
+class MemoryError(LightAgentError):
+    """Raised when a memory operation fails."""
+
+
+class MemoryRedactionError(MemoryError):
+    """Raised when sensitive-data redaction fails unexpectedly.
+
+    Args:
+        reason: Human-readable reason for the failure.
+    """
+
+    def __init__(self, reason: str) -> None:
+        """Initialize MemoryRedactionError."""
+        self.reason = reason
+        super().__init__(f"Memory redaction failed: {reason}")
+
+
 __all__ = [
     "CanaryLeakError",
     "CronJobExistsError",
@@ -293,6 +313,8 @@ __all__ = [
     "MCPConnectionError",
     "MCPError",
     "MCPToolError",
+    "MemoryError",
+    "MemoryRedactionError",
     "ModelNotFoundError",
     "PermissionDeniedError",
     "ProviderError",

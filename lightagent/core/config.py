@@ -140,6 +140,13 @@ class Settings(BaseSettings):
         description="Maximum seconds for a single agent run",
     )
 
+    # ── Memory ────────────────────────────────────────────────────────
+    memory_retention_days: int = Field(
+        default=30,
+        ge=1,
+        description="Days before long-term memory entries expire (AC-011-6)",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
