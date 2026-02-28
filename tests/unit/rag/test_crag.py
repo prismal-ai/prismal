@@ -104,23 +104,47 @@ def test_crag_result_can_be_instantiated() -> None:
     assert result.used_web_fallback is False
 
 
-def test_retrieved_chunk_has_four_fields() -> None:
-    """RetrievedChunk must expose source, chunk_id, relevance_score, content."""
-    chunk = RetrievedChunk(
-        source="src", chunk_id="1", relevance_score=0.5, content="text"
+@pytest.mark.asyncio
+async def test_grade_score_clamped_above_1_0() -> None:
+    """When LLM returns a value > 1.0, grade score must be clamped to 1.0."""
+    doc = _make_document("content", "file.txt")
+    mock_store = MagicMock()
+    mock_store.similarity_search.return_value = [(doc, 0.9)]
+
+    mock_llm = _make_mock_llm(
+        grade_responses=["1.5"],
+        generate_response="answer",
     )
-    assert hasattr(chunk, "source")
-    assert hasattr(chunk, "chunk_id")
-    assert hasattr(chunk, "relevance_score")
-    assert hasattr(chunk, "content")
+
+    with patch(PROVIDER_REGISTRY_PATH) as mock_registry_cls:
+        mock_registry_cls.return_value.get_llm.return_value = mock_llm
+        pipeline = CRAGPipeline(vector_store=mock_store)
+        result = await pipeline.run("query")
+
+    assert len(result.sources) == 1
+    assert result.sources[0].relevance_score == pytest.approx(1.0)
 
 
-def test_crag_result_has_three_fields() -> None:
-    """CRAGResult must expose answer, sources, used_web_fallback."""
-    result = CRAGResult(answer="ans", sources=[], used_web_fallback=True)
-    assert hasattr(result, "answer")
-    assert hasattr(result, "sources")
-    assert hasattr(result, "used_web_fallback")
+@pytest.mark.asyncio
+async def test_grade_score_clamped_below_0_0() -> None:
+    """When LLM returns a value < 0.0, grade score must be clamped to 0.0."""
+    doc = _make_document("content", "file.txt")
+    mock_store = MagicMock()
+    mock_store.similarity_search.return_value = [(doc, 0.9)]
+
+    mock_llm = _make_mock_llm(
+        grade_responses=["-0.2"],
+        generate_response="answer",
+    )
+
+    with patch(PROVIDER_REGISTRY_PATH) as mock_registry_cls:
+        mock_registry_cls.return_value.get_llm.return_value = mock_llm
+        pipeline = CRAGPipeline(vector_store=mock_store)
+        result = await pipeline.run("query")
+
+    # Score clamped to 0.0 which is below the 0.5 threshold, so web fallback fires
+    assert result.used_web_fallback is True
+    assert result.sources[0].source == "web_fallback"
 
 
 # ── CRAGPipeline.__init__ ─────────────────────────────────────────────────────
@@ -374,7 +398,7 @@ async def test_web_fallback_chunk_has_correct_source() -> None:
     assert result.sources[0].source == "web_fallback"
     assert result.sources[0].chunk_id == "0"
     assert result.sources[0].relevance_score == pytest.approx(0.7)
-    assert "my query" in result.sources[0].content
+    assert "stub" in result.sources[0].content
 
 
 # ── Step 5: GENERATE ──────────────────────────────────────────────────────────

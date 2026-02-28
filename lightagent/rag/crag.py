@@ -29,11 +29,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from lightagent.core.config import get_settings
 from lightagent.core.logging import get_logger
 from lightagent.providers.registry import ProviderRegistry
+from lightagent.security.prompt_builder import SecurePromptBuilder
 
 if TYPE_CHECKING:
     from langchain_core.documents import Document
@@ -177,7 +178,7 @@ class CRAGPipeline:
         # ── Step 4: DECIDE ────────────────────────────────────────────────────
         used_web_fallback = False
         if not filtered:
-            fallback_chunk = self._web_search_fallback(query)
+            fallback_chunk = self._web_search_fallback()
             filtered = [fallback_chunk]
             used_web_fallback = True
             logger.info("crag_web_fallback_activated", query=query)
@@ -214,21 +215,36 @@ class CRAGPipeline:
         Returns:
             A relevance score in [0.0, 1.0].
         """
-        prompt = (
-            "Score the relevance of this document to the query"
-            " on a scale from 0.0 to 1.0.\n"
-            f"Query: {query}\n"
-            f"Document: {content}\n"
-            "Respond with ONLY a float number between 0.0 and 1.0."
+        builder = SecurePromptBuilder()
+        messages = builder.build(
+            system=(
+                "Score the relevance of this document to the query"
+                " on a scale from 0.0 to 1.0."
+                " Respond with ONLY a float number between 0.0 and 1.0."
+            ),
+            user=query,
+            docs=[content],
         )
-        response = await self._llm.ainvoke([HumanMessage(content=prompt)])
-        raw_text: str = str(response.content).strip()
+        lc_messages = [
+            SystemMessage(content=messages[0]["content"]),
+            HumanMessage(content=messages[1]["content"]),
+        ]
         try:
-            score = float(raw_text)
-        except ValueError:
-            logger.info(
-                "crag_grade_parse_failure",
-                raw_response=raw_text,
+            response = await self._llm.ainvoke(lc_messages)
+            raw_text: str = str(response.content).strip()
+            try:
+                score = max(0.0, min(1.0, float(raw_text)))
+            except ValueError:
+                logger.info(
+                    "crag_grade_parse_failure",
+                    raw_response=raw_text,
+                    fallback_score=fallback_score,
+                )
+                score = fallback_score
+        except Exception as exc:
+            logger.warning(
+                "crag_grade_llm_error",
+                error=str(exc),
                 fallback_score=fallback_score,
             )
             score = fallback_score
@@ -247,34 +263,38 @@ class CRAGPipeline:
         Returns:
             The LLM-generated answer string.
         """
-        context_parts: list[str] = []
+        doc_entries: list[str] = []
         for i, chunk in enumerate(chunks):
-            context_parts.append(
-                f"[{i + 1}] Source: {chunk.source}\n{chunk.content}"
-            )
-        context_block = "\n\n".join(context_parts)
+            doc_entries.append(f"[{i + 1}] Source: {chunk.source}\n{chunk.content}")
 
-        prompt = (
-            "Answer the following query using the provided context. "
-            "Include source citations.\n"
-            f"Query: {query}\n"
-            "Context:\n"
-            f"{context_block}\n"
-            "Answer:"
+        builder = SecurePromptBuilder()
+        messages = builder.build(
+            system=(
+                "Answer the following query using the provided context."
+                " Include source citations."
+            ),
+            user=query,
+            docs=doc_entries,
         )
-        response = await self._llm.ainvoke([HumanMessage(content=prompt)])
+        lc_messages = [
+            SystemMessage(content=messages[0]["content"]),
+            HumanMessage(content=messages[1]["content"]),
+        ]
+        try:
+            response = await self._llm.ainvoke(lc_messages)
+        except Exception as exc:
+            raise RuntimeError(
+                f"LLM generation failed: {exc}"
+            ) from exc
         return str(response.content)
 
     @staticmethod
-    def _web_search_fallback(query: str) -> RetrievedChunk:
-        """Return a stub web-search fallback chunk for *query*.
+    def _web_search_fallback() -> RetrievedChunk:
+        """Return a stub web-search fallback chunk.
 
         Full web-search integration is deferred to a later phase.  This stub
         ensures the pipeline can always produce an answer when ChromaDB
         retrieval yields no relevant results.
-
-        Args:
-            query: The user query for which web search would be performed.
 
         Returns:
             A :class:`RetrievedChunk` with ``source='web_fallback'``.
@@ -283,7 +303,7 @@ class CRAGPipeline:
             source="web_fallback",
             chunk_id="0",
             relevance_score=0.7,
-            content=f"Web search fallback for: {query} (stub implementation)",
+            content="Web search fallback result (stub implementation)",
         )
 
 
