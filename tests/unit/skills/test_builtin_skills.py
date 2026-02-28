@@ -213,8 +213,10 @@ class TestCodeExecutorSkill:
         from lightagent.skills.available.code_executor.skill import CodeExecutorSkill
 
         monkeypatch.setenv("LIGHTAGENT_SHELL_ENABLED", "true")
-        result = CodeExecutorSkill().get_tools()[0].invoke(
-            {"code": "import time; time.sleep(60)", "timeout": 1}
+        result = (
+            CodeExecutorSkill()
+            .get_tools()[0]
+            .invoke({"code": "import time; time.sleep(60)", "timeout": 1})
         )
         assert "timed out" in result.lower()
 
@@ -358,8 +360,10 @@ class TestDatabaseQuerySkill:
                 conn.execute("CREATE TABLE t (x INT)")
                 conn.close()
 
-                result = DatabaseQuerySkill().get_tools()[0].invoke(
-                    {"query": "INSERT INTO t VALUES (1)"}
+                result = (
+                    DatabaseQuerySkill()
+                    .get_tools()[0]
+                    .invoke({"query": "INSERT INTO t VALUES (1)"})
                 )
 
         assert "Only SELECT" in result or "not permitted" in result
@@ -377,8 +381,10 @@ class TestDatabaseQuerySkill:
                 conn.execute("CREATE TABLE t (x INT)")
                 conn.close()
 
-                result = DatabaseQuerySkill().get_tools()[0].invoke(
-                    {"query": "DROP TABLE t"}
+                result = (
+                    DatabaseQuerySkill()
+                    .get_tools()[0]
+                    .invoke({"query": "DROP TABLE t"})
                 )
 
         assert "Only SELECT" in result or "not permitted" in result
@@ -397,8 +403,10 @@ class TestDatabaseQuerySkill:
             conn.close()
 
             with patch.dict(os.environ, {"LIGHTAGENT_DB_PATH": db_path}):
-                result = DatabaseQuerySkill().get_tools()[0].invoke(
-                    {"query": "SELECT * FROM users ORDER BY id"}
+                result = (
+                    DatabaseQuerySkill()
+                    .get_tools()[0]
+                    .invoke({"query": "SELECT * FROM users ORDER BY id"})
                 )
 
         assert "Alice" in result
@@ -426,8 +434,12 @@ class TestDatabaseQuerySkill:
             conn.close()
 
             with patch.dict(os.environ, {"LIGHTAGENT_DB_PATH": db_path}):
-                result = DatabaseQuerySkill().get_tools()[0].invoke(
-                    {"query": "WITH src AS (SELECT n FROM nums) SELECT * FROM src"}
+                result = (
+                    DatabaseQuerySkill()
+                    .get_tools()[0]
+                    .invoke(
+                        {"query": "WITH src AS (SELECT n FROM nums) SELECT * FROM src"}
+                    )
                 )
 
         assert "1" in result
@@ -482,7 +494,7 @@ class TestEmailReaderHelpers:
         raw = (
             "From: test@example.com\r\n"
             "MIME-Version: 1.0\r\n"
-            "Content-Type: multipart/mixed; boundary=\"boundary\"\r\n"
+            'Content-Type: multipart/mixed; boundary="boundary"\r\n'
             "\r\n"
             "--boundary\r\n"
             "Content-Type: text/plain; charset=utf-8\r\n"
@@ -552,9 +564,7 @@ class TestEmailReaderHelpers:
             mock_imap.search = MagicMock(return_value=(None, [b""]))
             mock_ssl.return_value = mock_imap
 
-            _fetch_emails(
-                "imap.example.com", "user", "pass", 993, "INBOX", 5, True
-            )
+            _fetch_emails("imap.example.com", "user", "pass", 993, "INBOX", 5, True)
 
         mock_imap.search.assert_called_with(None, "UNSEEN")
 

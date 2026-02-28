@@ -125,9 +125,7 @@ async def create_skill(spec: str, skills_root: Path | None = None) -> str:
         A multi-line result string describing what was created, the skill
         directory path, ruff check results, and next steps for the user.
     """
-    custom_dir = (
-        (skills_root / "custom") if skills_root else _SKILLS_CUSTOM_DIR
-    )
+    custom_dir = (skills_root / "custom") if skills_root else _SKILLS_CUSTOM_DIR
     custom_dir.mkdir(parents=True, exist_ok=True)
 
     # Build a safe prompt
@@ -147,8 +145,7 @@ async def create_skill(spec: str, skills_root: Path | None = None) -> str:
     from langchain_core.messages import BaseMessage
 
     lc_messages = [
-        BaseMessage(content=m["content"], type=m.get("role", "user"))
-        for m in messages
+        BaseMessage(content=m["content"], type=m.get("role", "user")) for m in messages
     ]
     response = await llm.ainvoke(lc_messages)
     content = response.content if hasattr(response, "content") else str(response)
