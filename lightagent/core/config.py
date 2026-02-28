@@ -147,6 +147,16 @@ class Settings(BaseSettings):
         description="Days before long-term memory entries expire (AC-011-6)",
     )
 
+    # ── API ───────────────────────────────────────────────────────────
+    api_key: str = Field(
+        default="",
+        description="X-API-Key for REST auth; empty string disables auth (dev mode)",
+    )
+    cors_origins: list[str] = Field(
+        default_factory=lambda: ["*"],
+        description="Allowed CORS origins for the REST API",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
