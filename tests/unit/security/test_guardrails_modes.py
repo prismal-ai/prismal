@@ -64,6 +64,7 @@ async def test_permissive_allows_injection(monkeypatch: pytest.MonkeyPatch) -> N
     class _FakeSettings:
         security_mode = "permissive"
         risk_threshold = 30
+        nemo_guardrails_enabled = False
 
     monkeypatch.setattr(cfg_module, "get_settings", lambda: _FakeSettings())
     eng = GuardrailsEngine()
@@ -80,6 +81,7 @@ async def test_audit_only_allows_everything(monkeypatch: pytest.MonkeyPatch) -> 
     class _FakeSettings:
         security_mode = "audit-only"
         risk_threshold = 30
+        nemo_guardrails_enabled = False
 
     monkeypatch.setattr(cfg_module, "get_settings", lambda: _FakeSettings())
     eng = GuardrailsEngine()
