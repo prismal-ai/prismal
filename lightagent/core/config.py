@@ -220,6 +220,38 @@ class Settings(BaseSettings):
         description="Allowed CORS origins for the REST API",
     )
 
+    # ── Auth / RBAC ────────────────────────────────────────────────────
+    rbac_enabled: bool = Field(
+        default=False,
+        description=(
+            "Enable JWT-based multi-user RBAC. "
+            "When False, the simple api_key auth is used."
+        ),
+    )
+    jwt_secret_key: SecretStr = Field(
+        default=SecretStr("change-me-in-production"),
+        description="HMAC secret used to sign JWT tokens (HS256)",
+    )
+    access_token_expire_minutes: int = Field(
+        default=60,
+        ge=1,
+        description="JWT access token lifetime in minutes (AC-018-10)",
+    )
+    refresh_token_expire_days: int = Field(
+        default=30,
+        ge=1,
+        description="JWT refresh token lifetime in days (AC-018-10)",
+    )
+    users_db_path: str = Field(
+        default="data/db/users.db",
+        description="SQLite file path for the user store",
+    )
+    budget_alert_usd: float = Field(
+        default=10.0,
+        ge=0.0,
+        description="Per-user cost budget threshold in USD before an alert is raised",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
