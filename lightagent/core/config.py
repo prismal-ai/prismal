@@ -252,6 +252,30 @@ class Settings(BaseSettings):
         description="Per-user cost budget threshold in USD before an alert is raised",
     )
 
+    # ── Voice Interface ────────────────────────────────────────────────
+    stt_provider: str = Field(
+        default="openai",
+        description="STT backend: 'openai' (Whisper API) or 'local'",
+    )
+    tts_provider: str = Field(
+        default="pyttsx3",
+        description="TTS backend: 'pyttsx3', 'openai', or 'elevenlabs'",
+    )
+    elevenlabs_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="ElevenLabs API key for TTS (optional)",
+    )
+    voice_language: str = Field(
+        default="",
+        description="ISO-639-1 language hint for STT (empty = auto-detect)",
+    )
+    voice_record_seconds: float = Field(
+        default=5.0,
+        ge=0.5,
+        le=60.0,
+        description="Max recording duration per voice turn in seconds",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
