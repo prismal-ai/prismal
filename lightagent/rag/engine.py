@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING
 
 from lightagent.core.config import get_settings
 from lightagent.core.logging import get_logger
+from lightagent.monitoring.otel import OTelManager
 from lightagent.rag.crag import CRAGPipeline, RetrievedChunk
 from lightagent.rag.loaders import SUPPORTED_EXTENSIONS, DocumentProcessorFactory
 from lightagent.rag.vector_store import ChromaVectorStore
@@ -201,25 +202,32 @@ class RAGEngine:
             List of :class:`~lightagent.rag.crag.RetrievedChunk` objects
             ordered by descending relevance.
         """
-        logger.info("rag_engine_search", query=query, k=k)
-        raw_results = self._store.similarity_search(query, k=k)
+        otel = OTelManager()
+        with otel.start_span("rag.search") as span:
+            span.set_attribute("lightagent.query_len", len(query))
+            span.set_attribute("lightagent.k", k)
 
-        chunks: list[RetrievedChunk] = []
-        for i, (doc, score) in enumerate(raw_results):
-            chunk = RetrievedChunk(
-                source=doc.metadata.get("source", "unknown"),
-                chunk_id=doc.metadata.get("chunk_id", str(i)),
-                relevance_score=score,
-                content=doc.page_content,
+            logger.info("rag_engine_search", query_len=len(query), k=k)
+            raw_results = self._store.similarity_search(query, k=k)
+
+            chunks: list[RetrievedChunk] = []
+            for i, (doc, score) in enumerate(raw_results):
+                chunk = RetrievedChunk(
+                    source=doc.metadata.get("source", "unknown"),
+                    chunk_id=doc.metadata.get("chunk_id", str(i)),
+                    relevance_score=score,
+                    content=doc.page_content,
+                )
+                chunks.append(chunk)
+
+            span.set_attribute("lightagent.num_results", len(chunks))
+            otel.increment_counter("rag_queries")
+
+            logger.info(
+                "rag_engine_search_done",
+                result_count=len(chunks),
             )
-            chunks.append(chunk)
-
-        logger.info(
-            "rag_engine_search_done",
-            query=query,
-            result_count=len(chunks),
-        )
-        return chunks
+            return chunks
 
     async def query(self, query: str) -> CRAGResult:
         """Run the full CRAG pipeline on *query*.
@@ -236,9 +244,16 @@ class RAGEngine:
             answer, the list of cited source chunks, and a flag indicating
             whether the web-search fallback was activated.
         """
-        logger.info("rag_engine_query", query=query)
-        pipeline = CRAGPipeline(vector_store=self._store, settings=self._settings)
-        return await pipeline.run(query)
+        otel = OTelManager()
+        with otel.start_span("rag.query") as span:
+            span.set_attribute("lightagent.query_len", len(query))
+            logger.info("rag_engine_query", query_len=len(query))
+            pipeline = CRAGPipeline(vector_store=self._store, settings=self._settings)
+            result = await pipeline.run(query)
+            span.set_attribute("lightagent.used_web_fallback", result.used_web_fallback)
+            span.set_attribute("lightagent.num_sources", len(result.sources))
+            otel.increment_counter("rag_queries")
+            return result
 
     # ── Collection management ─────────────────────────────────────────────────
 

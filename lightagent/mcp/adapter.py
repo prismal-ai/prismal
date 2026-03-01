@@ -22,6 +22,7 @@ from pydantic import ConfigDict, PrivateAttr
 
 from lightagent.core.exceptions import MCPToolError
 from lightagent.core.logging import get_logger
+from lightagent.monitoring.otel import OTelManager
 
 if TYPE_CHECKING:
     from langchain_core.callbacks import (
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
     from lightagent.security.action_interceptor import ActionInterceptor
 
 logger = get_logger("lightagent.mcp.adapter")
+_otel = OTelManager()
 
 
 class MCPToolAdapter(BaseTool):
@@ -164,47 +166,58 @@ class MCPToolAdapter(BaseTool):
                 run_id=run_id,
             )
 
-        # ── MCP call ─────────────────────────────────────────────────────
-        try:
-            result = await self._connection.call_tool(
-                name=self.name,
-                arguments=args,
-            )
-        except Exception as exc:
-            logger.error(
-                "mcp_adapter_call_error",
-                tool=self.name,
-                error=str(exc),
-            )
-            if self._interceptor is not None:
-                await self._interceptor.on_tool_error(error=exc, run_id=run_id)
-            raise
+        # ── MCP call (wrapped in OTEL span) ──────────────────────────────
+        server_name: str = self._connection._config.name
+        with _otel.start_span("mcp.tool_call") as span:
+            span.set_attribute("lightagent.mcp.server_name", server_name)
+            span.set_attribute("lightagent.mcp.tool_name", self.name)
+            span.set_attribute("lightagent.mcp.input_len", len(tool_input))
 
-        # ── Extract text content ─────────────────────────────────────────
-        texts: list[str] = []
-        for block in result.content:
-            if isinstance(block, mcp.types.TextContent):
-                texts.append(block.text)
-            else:
-                texts.append(str(block))
-        output = "\n".join(texts)
+            try:
+                result = await self._connection.call_tool(
+                    name=self.name,
+                    arguments=args,
+                )
+            except Exception as exc:
+                logger.error(
+                    "mcp_adapter_call_error",
+                    tool=self.name,
+                    error=str(exc),
+                )
+                if self._interceptor is not None:
+                    await self._interceptor.on_tool_error(error=exc, run_id=run_id)
+                raise
 
-        # ── Check for tool-level error flag ──────────────────────────────
-        if result.isError:
-            error_reason = output or "server reported isError=True"
-            logger.warning(
-                "mcp_adapter_tool_error",
-                tool=self.name,
-                reason=error_reason,
+            # ── Extract text content ─────────────────────────────────────
+            texts: list[str] = []
+            for block in result.content:
+                if isinstance(block, mcp.types.TextContent):
+                    texts.append(block.text)
+                else:
+                    texts.append(str(block))
+            output = "\n".join(texts)
+
+            # ── Check for tool-level error flag ──────────────────────────
+            if result.isError:
+                error_reason = output or "server reported isError=True"
+                logger.warning(
+                    "mcp_adapter_tool_error",
+                    tool=self.name,
+                    reason=error_reason,
+                )
+                exc_err = MCPToolError(
+                    tool_name=self.name,
+                    server_name=server_name,
+                    reason=error_reason,
+                )
+                if self._interceptor is not None:
+                    await self._interceptor.on_tool_error(error=exc_err, run_id=run_id)
+                raise exc_err
+
+            _otel.increment_counter(
+                "mcp_tool_calls",
+                attributes={"server": server_name, "tool": self.name},
             )
-            exc_err = MCPToolError(
-                tool_name=self.name,
-                server_name=self._connection._config.name,
-                reason=error_reason,
-            )
-            if self._interceptor is not None:
-                await self._interceptor.on_tool_error(error=exc_err, run_id=run_id)
-            raise exc_err
 
         # ── Interceptor: post-call hook ──────────────────────────────────
         if self._interceptor is not None:

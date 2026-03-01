@@ -34,6 +34,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from lightagent.core.config import get_settings
 from lightagent.core.exceptions import RAGError
 from lightagent.core.logging import get_logger
+from lightagent.monitoring.otel import OTelManager
 from lightagent.providers.registry import ProviderRegistry
 from lightagent.security.prompt_builder import SecurePromptBuilder
 
@@ -136,37 +137,46 @@ class CRAGPipeline:
             :class:`CRAGResult` with the generated answer, cited sources, and
             a flag indicating whether the web-search fallback was used.
         """
+        otel = OTelManager()
+
         # ── Step 1: RETRIEVE ──────────────────────────────────────────────────
-        raw_results: list[tuple[Document, float]] = self._store.similarity_search(
-            query, k=5
-        )
-        logger.info(
-            "crag_retrieve",
-            query=query,
-            retrieved_count=len(raw_results),
-        )
+        with otel.start_span("crag.retrieve") as retrieve_span:
+            raw_results: list[tuple[Document, float]] = self._store.similarity_search(
+                query, k=5
+            )
+            retrieve_span.set_attribute("lightagent.query_len", len(query))
+            retrieve_span.set_attribute("lightagent.retrieved_count", len(raw_results))
+            logger.info(
+                "crag_retrieve",
+                retrieved_count=len(raw_results),
+            )
 
         # ── Step 2: GRADE ─────────────────────────────────────────────────────
         graded: list[RetrievedChunk] = []
-        for i, (doc, similarity_score) in enumerate(raw_results):
-            score = await self._grade_document(
-                query=query,
-                content=doc.page_content,
-                fallback_score=similarity_score,
-            )
-            chunk = RetrievedChunk(
-                source=doc.metadata.get("source", "unknown"),
-                chunk_id=doc.metadata.get("chunk_id", str(i)),
-                relevance_score=score,
-                content=doc.page_content,
-            )
-            graded.append(chunk)
-            logger.info(
-                "crag_grade",
-                source=chunk.source,
-                chunk_id=chunk.chunk_id,
-                relevance_score=score,
-            )
+        with otel.start_span("crag.grade") as grade_span:
+            for i, (doc, similarity_score) in enumerate(raw_results):
+                score = await self._grade_document(
+                    query=query,
+                    content=doc.page_content,
+                    fallback_score=similarity_score,
+                )
+                chunk = RetrievedChunk(
+                    source=doc.metadata.get("source", "unknown"),
+                    chunk_id=doc.metadata.get("chunk_id", str(i)),
+                    relevance_score=score,
+                    content=doc.page_content,
+                )
+                graded.append(chunk)
+                logger.info(
+                    "crag_grade",
+                    source=chunk.source,
+                    chunk_id=chunk.chunk_id,
+                    relevance_score=score,
+                )
+            grade_span.set_attribute("lightagent.graded_count", len(graded))
+            if graded:
+                avg_score = sum(c.relevance_score for c in graded) / len(graded)
+                grade_span.set_attribute("lightagent.avg_relevance_score", avg_score)
 
         # ── Step 3: FILTER ────────────────────────────────────────────────────
         filtered = [c for c in graded if c.relevance_score >= _RELEVANCE_THRESHOLD]
@@ -182,11 +192,15 @@ class CRAGPipeline:
             fallback_chunk = self._web_search_fallback()
             filtered = [fallback_chunk]
             used_web_fallback = True
-            logger.info("crag_web_fallback_activated", query=query)
+            logger.info("crag_web_fallback_activated")
 
         # ── Step 5: GENERATE ──────────────────────────────────────────────────
-        logger.info("crag_generate_start", context_chunks=len(filtered))
-        answer = await self._generate(query=query, chunks=filtered)
+        with otel.start_span("crag.generate") as generate_span:
+            generate_span.set_attribute("lightagent.context_chunks", len(filtered))
+            generate_span.set_attribute("lightagent.used_web_fallback", used_web_fallback)
+            logger.info("crag_generate_start", context_chunks=len(filtered))
+            answer = await self._generate(query=query, chunks=filtered)
+            generate_span.set_attribute("lightagent.answer_len", len(answer))
 
         return CRAGResult(
             answer=answer,

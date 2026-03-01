@@ -14,6 +14,8 @@ from langchain_community.chat_models import ChatLiteLLM
 
 from lightagent.core.config import Settings, get_settings
 from lightagent.core.logging import get_logger
+from lightagent.monitoring.langfuse_client import LangfuseManager
+from lightagent.monitoring.otel import OTelManager
 
 if TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel, LanguageModelInput
@@ -100,14 +102,31 @@ class ProviderRegistry:
             temperature=temp,
         )
 
-        return ChatLiteLLM(
-            model=resolved_model,
-            streaming=streaming,
-            temperature=temp,
-            max_tokens=self._settings.max_tokens,
-            request_timeout=float(self._settings.timeout_seconds),
-            max_retries=self._settings.retry_attempts,
-        )
+        langfuse = LangfuseManager()
+        otel = OTelManager()
+
+        with otel.start_span(
+            "provider.get_llm",
+            attributes={
+                "lightagent.model": resolved_model,
+                "lightagent.streaming": streaming,
+                "lightagent.temperature": temp,
+            },
+        ):
+            otel.increment_counter("llm_requests", attributes={"model": resolved_model})
+            llm = ChatLiteLLM(
+                model=resolved_model,
+                streaming=streaming,
+                temperature=temp,
+                max_tokens=self._settings.max_tokens,
+                request_timeout=float(self._settings.timeout_seconds),
+                max_retries=self._settings.retry_attempts,
+            )
+            # Inject Langfuse callback handler if available
+            handler = langfuse.get_callback_handler()
+            if handler is not None:
+                llm.callbacks = [handler]
+            return llm
 
     def get_llm_with_fallback(
         self,
@@ -222,6 +241,9 @@ class ProviderRegistry:
         usage.completion_tokens += completion_tokens
         usage.total_tokens += prompt_tokens + completion_tokens
         usage.estimated_cost += estimated_cost
+        otel = OTelManager()
+        total = prompt_tokens + completion_tokens
+        otel.increment_counter("llm_tokens", total, attributes={"session_id": session_id})
         logger.debug(
             "usage_tracked",
             session_id=session_id,

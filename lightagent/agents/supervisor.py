@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Literal
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from lightagent.core.logging import get_logger
+from lightagent.monitoring.otel import OTelManager
 from lightagent.providers.registry import ProviderRegistry
 
 if TYPE_CHECKING:
@@ -96,64 +97,76 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
           answer when the supervisor routes to END, otherwise an empty list so
           that LangGraph's ``add_messages`` reducer appends nothing.
     """
+    session_id: str = str(state.get("session_id", "unknown"))
     logger.debug(
         "supervisor_node_invoked",
-        session_id=state.get("session_id", "unknown"),
+        session_id=session_id,
         message_count=len(state["messages"]),
     )
 
-    llm = ProviderRegistry().get_llm_with_fallback()
+    otel = OTelManager()
+    with otel.start_span(
+        "agent.supervisor",
+        attributes={
+            "lightagent.agent": "supervisor",
+            "lightagent.session_id": session_id,
+            "lightagent.message_count": len(state["messages"]),
+        },
+    ) as span:
+        llm = ProviderRegistry().get_llm_with_fallback()
 
-    # Build the message list directly so the LLM can be called via ainvoke
-    # without relying on the prompt | llm pipe operator (which is harder to mock
-    # in unit tests and adds no value for this simple routing prompt).
-    routing_messages = [
-        SystemMessage(content=_SYSTEM_PROMPT),
-        *state["messages"],
-        HumanMessage(
-            content=(
-                "Based on the conversation above, which agent should handle "
-                "the next step? Respond with ONLY the agent name or 'END'."
+        # Build the message list directly so the LLM can be called via ainvoke
+        # without relying on the prompt | llm pipe operator (which is harder to mock
+        # in unit tests and adds no value for this simple routing prompt).
+        routing_messages = [
+            SystemMessage(content=_SYSTEM_PROMPT),
+            *state["messages"],
+            HumanMessage(
+                content=(
+                    "Based on the conversation above, which agent should handle "
+                    "the next step? Respond with ONLY the agent name or 'END'."
+                )
+            ),
+        ]
+
+        response = await llm.ainvoke(routing_messages)
+
+        raw: str = str(response.content).strip()
+        # Normalise: strip surrounding quotes/whitespace and match case-insensitively
+        normalised = raw.strip("\"' \t\n").upper()
+
+        # Find exact match against valid routes (case-insensitive)
+        matched: str | None = None
+        for valid in _VALID_ROUTES:
+            if valid.upper() == normalised:
+                matched = valid
+                break
+
+        if matched is None:
+            logger.warning(
+                "supervisor_invalid_routing",
+                raw_response=raw,
+                defaulting_to="END",
+                session_id=session_id,
             )
-        ),
-    ]
+            matched = "END"
 
-    response = await llm.ainvoke(routing_messages)
+        next_agent: str | None = None if matched == "END" else matched
 
-    raw: str = str(response.content).strip()
-    # Normalise: strip surrounding quotes/whitespace and match case-insensitively
-    normalised = raw.strip("\"' \t\n").upper()
+        span.set_attribute("lightagent.routing_decision", matched)
 
-    # Find exact match against valid routes (case-insensitive)
-    matched: str | None = None
-    for valid in _VALID_ROUTES:
-        if valid.upper() == normalised:
-            matched = valid
-            break
-
-    if matched is None:
-        logger.warning(
-            "supervisor_invalid_routing",
+        logger.info(
+            "supervisor_routing_decision",
+            next_agent=next_agent,
             raw_response=raw,
-            defaulting_to="END",
-            session_id=state.get("session_id", "unknown"),
+            session_id=session_id,
         )
-        matched = "END"
 
-    next_agent: str | None = None if matched == "END" else matched
-
-    logger.info(
-        "supervisor_routing_decision",
-        next_agent=next_agent,
-        raw_response=raw,
-        session_id=state.get("session_id", "unknown"),
-    )
-
-    return {
-        "current_agent": "supervisor",
-        "next_agent": next_agent,
-        "messages": [],
-    }
+        return {
+            "current_agent": "supervisor",
+            "next_agent": next_agent,
+            "messages": [],
+        }
 
 
 # ---------------------------------------------------------------------------

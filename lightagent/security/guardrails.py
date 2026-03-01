@@ -14,6 +14,7 @@ import yaml
 
 import lightagent.core.config as _config_module
 from lightagent.core.logging import get_logger
+from lightagent.monitoring.otel import OTelManager
 from lightagent.security.sanitizer import InputSanitizer
 
 logger = get_logger("lightagent.security.guardrails")
@@ -103,37 +104,44 @@ class GuardrailsEngine:
         Returns:
             GuardrailResult with safe flag, risk_score, reasons, and sanitized text.
         """
-        sanitized = self._sanitizer.sanitize(text)
-        settings = _config_module.get_settings()
+        otel = OTelManager()
+        with otel.start_span("security.validate_input") as span:
+            sanitized = self._sanitizer.sanitize(text)
+            settings = _config_module.get_settings()
 
-        matched_categories: list[str] = [
-            category
-            for category, patterns in self._input_patterns.items()
-            if any(p.search(sanitized) for p in patterns)
-        ]
-        reasons = [f"injection:{cat}" for cat in matched_categories]
-        risk_score = self._compute_risk_score(matched_categories)
+            matched_categories: list[str] = [
+                category
+                for category, patterns in self._input_patterns.items()
+                if any(p.search(sanitized) for p in patterns)
+            ]
+            reasons = [f"injection:{cat}" for cat in matched_categories]
+            risk_score = self._compute_risk_score(matched_categories)
 
-        mode = settings.security_mode
-        if mode in ("audit-only", "permissive"):
-            safe = True
-        else:  # strict
-            safe = risk_score < settings.risk_threshold
+            mode = settings.security_mode
+            if mode in ("audit-only", "permissive"):
+                safe = True
+            else:  # strict
+                safe = risk_score < settings.risk_threshold
 
-        if not safe:
-            logger.warning(
-                "input_blocked",
+            if not safe:
+                logger.warning(
+                    "input_blocked",
+                    risk_score=risk_score,
+                    reasons=reasons,
+                    mode=mode,
+                )
+
+            span.set_attribute("lightagent.risk_score", risk_score)
+            span.set_attribute("lightagent.blocked", not safe)
+            if not safe:
+                otel.increment_counter("security_blocks", attributes={"mode": mode})
+
+            return GuardrailResult(
+                safe=safe,
                 risk_score=risk_score,
                 reasons=reasons,
-                mode=mode,
+                sanitized_text=sanitized,
             )
-
-        return GuardrailResult(
-            safe=safe,
-            risk_score=risk_score,
-            reasons=reasons,
-            sanitized_text=sanitized,
-        )
 
     async def validate_output(
         self, text: str, canary: str | None = None
@@ -147,31 +155,36 @@ class GuardrailsEngine:
         Returns:
             GuardrailResult; safe=False if any pattern matched.
         """
-        reasons: list[str] = []
+        otel = OTelManager()
+        with otel.start_span("security.validate_output") as span:
+            reasons: list[str] = []
 
-        for group, patterns in self._output_patterns.items():
-            for name, pattern in patterns.items():
-                if pattern.search(text):
-                    reasons.append(f"output:{group}:{name}")
+            for group, patterns in self._output_patterns.items():
+                for name, pattern in patterns.items():
+                    if pattern.search(text):
+                        reasons.append(f"output:{group}:{name}")
 
-        if canary and canary in text:
-            reasons.append("output:canary_leak")
+            if canary and canary in text:
+                reasons.append("output:canary_leak")
 
-        risk_score = min(100, len(reasons) * 30)
-        safe = len(reasons) == 0
+            risk_score = min(100, len(reasons) * 30)
+            safe = len(reasons) == 0
 
-        if _config_module.get_settings().security_mode in ("audit-only", "permissive"):
-            safe = True
+            if _config_module.get_settings().security_mode in ("audit-only", "permissive"):
+                safe = True
 
-        if not safe:
-            logger.warning("output_flagged", reasons=reasons, risk_score=risk_score)
+            if not safe:
+                logger.warning("output_flagged", reasons=reasons, risk_score=risk_score)
 
-        return GuardrailResult(
-            safe=safe,
-            risk_score=risk_score,
-            reasons=reasons,
-            sanitized_text=text,
-        )
+            span.set_attribute("lightagent.risk_score", risk_score)
+            span.set_attribute("lightagent.blocked", not safe)
+
+            return GuardrailResult(
+                safe=safe,
+                risk_score=risk_score,
+                reasons=reasons,
+                sanitized_text=text,
+            )
 
 
 __all__ = ["GuardrailResult", "GuardrailsEngine"]

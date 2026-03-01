@@ -128,6 +128,62 @@ class Settings(BaseSettings):
         description="Log output format (json for production)",
     )
 
+    # ── Monitoring — Langfuse ────────────────────────────────────
+    langfuse_enabled: bool = Field(
+        default=True,
+        description="Enable Langfuse LLM observability tracing",
+    )
+    langfuse_host: str = Field(
+        default="https://cloud.langfuse.com",
+        description="Langfuse server URL",
+    )
+    langfuse_public_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="Langfuse public key",
+    )
+    langfuse_secret_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="Langfuse secret key",
+    )
+    langfuse_sample_rate: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of traces sent to Langfuse (1.0 = all)",
+    )
+
+    # ── Monitoring — OpenTelemetry ───────────────────────────────
+    otel_enabled: bool = Field(
+        default=True,
+        description="Enable OpenTelemetry distributed tracing and metrics",
+    )
+    otel_exporter: Literal["otlp", "jaeger", "zipkin", "console"] = Field(
+        default="otlp",
+        description="OTEL exporter backend",
+    )
+    otel_endpoint: str = Field(
+        default="http://localhost:4318",
+        description="OTLP exporter endpoint (HTTP)",
+    )
+    otel_service_name: str = Field(
+        default="lightagent",
+        description="Service name for OTEL resource attributes",
+    )
+
+    # ── Monitoring — Log file ────────────────────────────────────
+    log_file_rotation: str = Field(
+        default="500 MB",
+        description="Loguru file rotation policy",
+    )
+    log_file_retention: str = Field(
+        default="30 days",
+        description="Loguru file retention policy",
+    )
+    log_file_path: str = Field(
+        default="data/logs/lightagent.log",
+        description="Log file path for Loguru file sink",
+    )
+
     # ── Agent ─────────────────────────────────────────────────────────
     max_concurrent_agents: int = Field(
         default=5,

@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from lightagent.core.logging import get_logger
+from lightagent.monitoring.otel import OTelManager
 
 logger = get_logger("lightagent.security.audit")
 
@@ -110,6 +111,8 @@ class AuditLogger:
     def log_blocked(self, text: str, *, reasons: list[str], session_id: str) -> None:
         """Log a blocked input event.
 
+        Emits an OTEL event with metadata only — never logs the actual text content.
+
         Args:
             text: The blocked input text.
             reasons: List of reason tags from GuardrailResult.
@@ -119,6 +122,19 @@ class AuditLogger:
             "blocked",
             {"session_id": session_id, "reasons": reasons, "text_length": len(text)},
         )
+        otel = OTelManager()
+        with otel.start_span("security.audit.blocked") as span:
+            span.set_attribute("lightagent.session_id", session_id)
+            span.set_attribute("lightagent.text_length", len(text))
+            span.set_attribute("lightagent.reason_count", len(reasons))
+            span.add_event(
+                "security.input_blocked",
+                attributes={
+                    "session_id": session_id,
+                    "text_length": len(text),
+                    "reason_count": len(reasons),
+                },
+            )
 
     def log_tool_call(
         self,

@@ -48,6 +48,8 @@ if TYPE_CHECKING:
 
     from langgraph.graph.state import CompiledStateGraph
 
+from lightagent.monitoring.langfuse_client import LangfuseManager
+from lightagent.monitoring.otel import OTelManager
 from lightagent.agents.coder import coder_node
 from lightagent.agents.critic import critic_node
 from lightagent.agents.data_analyst import data_analyst_node
@@ -238,20 +240,38 @@ class AgentFactory:
             "Callable[[Path], CompiledStateGraph[AgentState, Any, Any, Any]]",
             getattr(self, builder_method_name),
         )
-        logger.debug(
-            "building_pattern_graph",
-            pattern=pattern.value,
-            checkpoint_path=str(db_path),
-        )
-        compiled: CompiledStateGraph[AgentState, Any, Any, Any] = (
-            builder_method(db_path)
-        )
-        logger.info(
-            "pattern_graph_compiled",
-            pattern=pattern.value,
-            checkpoint_path=str(db_path),
-        )
-        return compiled
+        otel = OTelManager()
+        with otel.start_span(
+            "agent.factory.build",
+            attributes={
+                "lightagent.pattern": pattern.value,
+                "lightagent.checkpoint_path": str(db_path),
+            },
+        ):
+            logger.debug(
+                "building_pattern_graph",
+                pattern=pattern.value,
+                checkpoint_path=str(db_path),
+            )
+            compiled: CompiledStateGraph[AgentState, Any, Any, Any] = (
+                builder_method(db_path)
+            )
+
+            # Log that the graph was built; attach Langfuse callback handler if available
+            langfuse = LangfuseManager()
+            handler = langfuse.get_callback_handler()
+            if handler is not None:
+                logger.debug(
+                    "langfuse_callback_attached",
+                    pattern=pattern.value,
+                )
+
+            logger.info(
+                "pattern_graph_compiled",
+                pattern=pattern.value,
+                checkpoint_path=str(db_path),
+            )
+            return compiled
 
     # ------------------------------------------------------------------
     # Pattern builders (private)
