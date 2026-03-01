@@ -151,3 +151,60 @@ def test_corrupted_log_warns_and_falls_back_to_genesis(
         if line.strip() and line.strip() != "not valid json"
     ]
     assert valid_entries[0]["prev_hash"] == "0" * 64
+
+
+def test_log_nemo_event_fields(audit: AuditLogger, audit_path: Path) -> None:
+    """log_nemo_event() writes a nemo_rail entry with all required fields."""
+    audit.log_nemo_event(
+        direction="input",
+        blocked=True,
+        category="violence",
+        text_length=42,
+    )
+    entries = _read_entries(audit_path)
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry["event"] == "nemo_rail"
+    assert entry["direction"] == "input"
+    assert entry["blocked"] is True
+    assert entry["category"] == "violence"
+    assert entry["text_length"] == 42
+    assert "entry_hash" in entry
+    assert "prev_hash" in entry
+
+
+def test_log_nemo_event_not_blocked(audit: AuditLogger, audit_path: Path) -> None:
+    """log_nemo_event() records non-blocked events correctly."""
+    audit.log_nemo_event(
+        direction="output",
+        blocked=False,
+        category="",
+        text_length=100,
+    )
+    entries = _read_entries(audit_path)
+    assert entries[0]["blocked"] is False
+    assert entries[0]["category"] == ""
+
+
+def test_audit_resumes_hash_chain_from_existing_file(
+    tmp_path: Path,
+) -> None:
+    """A new AuditLogger instance continues the hash chain from an existing file."""
+    path = tmp_path / "chain_resume.jsonl"
+
+    # Write first entry with logger #1
+    logger1 = AuditLogger(log_path=path)
+    logger1.log_input("first entry", risk_score=0, session_id="s1")
+
+    # Read the written hash
+    entries = _read_entries(path)
+    first_hash = entries[0]["entry_hash"]
+
+    # Create logger #2 — _load_last_hash() must read the existing hash
+    logger2 = AuditLogger(log_path=path)
+    logger2.log_input("second entry", risk_score=0, session_id="s1")
+
+    entries_after = _read_entries(path)
+    assert len(entries_after) == 2
+    # The second entry's prev_hash must link to the first entry's hash
+    assert entries_after[1]["prev_hash"] == first_hash

@@ -297,3 +297,74 @@ def test_get_nemo_layer_enabled_missing_config(tmp_path: Path) -> None:
 
     assert layer is not None
     assert layer.available is False
+
+
+# ── NemoRailsLayer — successful initialization ────────────────────────────────
+
+
+def test_nemo_rails_layer_successful_init(tmp_path: Path) -> None:
+    """NemoRailsLayer sets available=True when nemoguardrails loads successfully."""
+    import sys
+    from unittest.mock import MagicMock, patch
+
+    config_dir = tmp_path / "nemo_rails"
+    config_dir.mkdir()
+
+    mock_rails_config = MagicMock()
+    mock_rails_cls = MagicMock()
+    mock_rails_cls.from_path.return_value = mock_rails_config
+
+    mock_llm_rails_instance = MagicMock()
+    mock_llm_rails_cls = MagicMock(return_value=mock_llm_rails_instance)
+
+    mock_nemoguardrails = MagicMock()
+    mock_nemoguardrails.RailsConfig = mock_rails_cls
+    mock_nemoguardrails.LLMRails = mock_llm_rails_cls
+
+    with patch.dict(sys.modules, {"nemoguardrails": mock_nemoguardrails}):
+        layer = NemoRailsLayer(config_dir)
+
+    assert layer.available is True
+    assert layer._rails is mock_llm_rails_instance
+    mock_rails_cls.from_path.assert_called_once_with(str(config_dir))
+    mock_llm_rails_cls.assert_called_once_with(mock_rails_config)
+
+
+def test_nemo_rails_layer_init_generic_exception(tmp_path: Path) -> None:
+    """Generic exception during rails init sets available=False."""
+    import sys
+    from unittest.mock import MagicMock, patch
+
+    config_dir = tmp_path / "nemo_rails"
+    config_dir.mkdir()
+
+    mock_rails_cls = MagicMock()
+    mock_rails_cls.from_path.side_effect = RuntimeError("config parse error")
+
+    mock_nemoguardrails = MagicMock()
+    mock_nemoguardrails.RailsConfig = mock_rails_cls
+
+    with patch.dict(sys.modules, {"nemoguardrails": mock_nemoguardrails}):
+        layer = NemoRailsLayer(config_dir)
+
+    assert layer.available is False
+
+
+# ── check_output — exception path ────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_check_output_exception_fails_open() -> None:
+    """Generic exception in check_output results in fail-open (False, '')."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_rails = MagicMock()
+    mock_rails.generate_async = AsyncMock(side_effect=RuntimeError("NeMo crash"))
+
+    layer = NemoRailsLayer.__new__(NemoRailsLayer)
+    layer._rails = mock_rails  # type: ignore[attr-defined]
+    layer._config_path = Path("config/nemo_rails")  # type: ignore[attr-defined]
+
+    blocked, category = await layer.check_output("some output text")
+    assert blocked is False
+    assert category == ""

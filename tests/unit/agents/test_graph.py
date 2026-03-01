@@ -67,3 +67,68 @@ def test_graph_creates_checkpoint_dir(tmp_path: Path) -> None:
     build_supervisor_graph(checkpoint_path=nested_db_path)
 
     assert nested_db_path.parent.exists()
+
+
+def test_list_session_ids_returns_empty_when_no_db() -> None:
+    """list_session_ids returns [] when the default checkpoint DB does not exist."""
+    from unittest.mock import patch
+    from pathlib import Path
+
+    from lightagent.agents.graph import list_session_ids
+
+    with patch("lightagent.agents.graph._DEFAULT_CHECKPOINT_PATH", Path("/nonexistent/path/x.db")):
+        result = list_session_ids()
+    assert result == []
+
+
+def test_list_session_ids_reads_thread_ids(tmp_path: Path) -> None:
+    """list_session_ids returns sorted thread IDs from the SQLite checkpointer DB."""
+    import sqlite3
+    from unittest.mock import patch
+
+    from lightagent.agents.graph import list_session_ids
+
+    db_path = tmp_path / "checkpoints.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "CREATE TABLE checkpoints (thread_id TEXT, checkpoint_id TEXT, checkpoint BLOB)"
+        )
+        conn.execute("INSERT INTO checkpoints VALUES ('sess-b', 'c1', NULL)")
+        conn.execute("INSERT INTO checkpoints VALUES ('sess-a', 'c2', NULL)")
+        conn.execute("INSERT INTO checkpoints VALUES ('sess-a', 'c3', NULL)")
+        conn.commit()
+
+    with patch("lightagent.agents.graph._DEFAULT_CHECKPOINT_PATH", db_path):
+        result = list_session_ids()
+
+    assert result == ["sess-a", "sess-b"]
+
+
+def test_list_session_ids_handles_exception(tmp_path: Path) -> None:
+    """list_session_ids returns [] on any DB error (corrupt DB, etc.)."""
+    from unittest.mock import patch
+
+    from lightagent.agents.graph import list_session_ids
+
+    # Create a corrupted DB file (not a valid SQLite)
+    db_path = tmp_path / "bad.db"
+    db_path.write_bytes(b"THIS IS NOT A VALID SQLITE DATABASE")
+
+    with patch("lightagent.agents.graph._DEFAULT_CHECKPOINT_PATH", db_path):
+        result = list_session_ids()
+
+    assert result == []
+
+
+def test_supervisor_router_wrapper_delegates(tmp_path: Path) -> None:
+    """_supervisor_router delegates correctly to the underlying supervisor_router."""
+    from unittest.mock import MagicMock, patch
+
+    from lightagent.agents.graph import _supervisor_router
+
+    mock_state = MagicMock()
+    with patch("lightagent.agents.graph.supervisor_router", return_value="researcher") as mock_router:
+        result = _supervisor_router(mock_state)
+
+    mock_router.assert_called_once_with(mock_state)
+    assert result == "researcher"
