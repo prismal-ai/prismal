@@ -100,6 +100,13 @@ class Settings(BaseSettings):
         default="data/db/chroma",
         description="ChromaDB persistence directory",
     )
+    mongodb_url: str = Field(
+        default="",
+        description=(
+            "MongoDB connection URL (optional — enables MongoDBMemoryStore). "
+            "Example: mongodb://user:pass@localhost:27017/lightagent"
+        ),
+    )
 
     # ── Embeddings ────────────────────────────────────────────────────
     embeddings_model: Literal["openai", "huggingface", "ollama"] = Field(
