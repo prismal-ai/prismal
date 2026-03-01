@@ -1,6 +1,13 @@
-"""Guardrails engine — Security Layers L2 (injection detection) and output scanning.
+"""Guardrails engine - Security Layers L1-L3: injection detection and output scanning.
 
-Orchestrates L1 (InputSanitizer) + L2 (regex pattern matching from YAML).
+Orchestrates three layers of security:
+
+* **L1** — :class:`~lightagent.security.sanitizer.InputSanitizer` (control
+  chars, Unicode normalisation, length truncation).
+* **L2** — Regex pattern matching from ``security/patterns/injection_patterns.yaml``.
+* **L3** — :class:`~lightagent.security.nemo_rails.NemoRailsLayer` (NVIDIA NeMo
+  Guardrails — optional, enabled via ``LIGHTAGENT_NEMO_GUARDRAILS_ENABLED=true``).
+
 Supports three enforcement modes: strict, permissive, audit-only.
 """
 
@@ -56,12 +63,21 @@ class GuardrailsEngine:
     Formula: ``min(100, 50 + 20 * n)`` when n >= 1.
     """
 
-    def __init__(self) -> None:
-        """Load and compile patterns from YAML at initialization."""
+    def __init__(self, nemo_config_path: Path | None = None) -> None:
+        """Load and compile patterns from YAML at initialization.
+
+        Args:
+            nemo_config_path: Override path for the NeMo config directory.
+                Defaults to ``config/nemo_rails`` relative to CWD.
+        """
         self._sanitizer = InputSanitizer()
         self._input_patterns: dict[str, list[re.Pattern[str]]] = {}
         self._output_patterns: dict[str, dict[str, re.Pattern[str]]] = {}
         self._load_patterns()
+
+        from lightagent.security.nemo_rails import get_nemo_layer
+
+        self._nemo_layer = get_nemo_layer(nemo_config_path)
 
     def _load_patterns(self) -> None:
         """Load injection and output patterns from YAML and compile to re.Pattern."""
@@ -117,6 +133,17 @@ class GuardrailsEngine:
             reasons = [f"injection:{cat}" for cat in matched_categories]
             risk_score = self._compute_risk_score(matched_categories)
 
+            # L3: NeMo Guardrails (optional)
+            if self._nemo_layer is not None and self._nemo_layer.available:
+                nemo_blocked, nemo_category = await self._nemo_layer.check_input(
+                    sanitized
+                )
+                if nemo_blocked:
+                    reasons.append(f"nemo:{nemo_category}")
+                    risk_score = max(risk_score, 85)
+                    span.set_attribute("lightagent.nemo_blocked", True)
+                    span.set_attribute("lightagent.nemo_category", nemo_category)
+
             mode = settings.security_mode
             if mode in ("audit-only", "permissive"):
                 safe = True
@@ -167,10 +194,19 @@ class GuardrailsEngine:
             if canary and canary in text:
                 reasons.append("output:canary_leak")
 
+            # L3: NeMo output rails (optional)
+            if self._nemo_layer is not None and self._nemo_layer.available:
+                nemo_blocked, nemo_category = await self._nemo_layer.check_output(text)
+                if nemo_blocked:
+                    reasons.append(f"nemo_output:{nemo_category}")
+                    span.set_attribute("lightagent.nemo_output_blocked", True)
+                    span.set_attribute("lightagent.nemo_output_category", nemo_category)
+
             risk_score = min(100, len(reasons) * 30)
             safe = len(reasons) == 0
 
-            if _config_module.get_settings().security_mode in ("audit-only", "permissive"):
+            mode = _config_module.get_settings().security_mode
+            if mode in ("audit-only", "permissive"):
                 safe = True
 
             if not safe:

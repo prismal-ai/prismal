@@ -217,5 +217,33 @@ class AuditLogger:
             },
         )
 
+    def log_nemo_event(
+        self,
+        *,
+        direction: str,
+        blocked: bool,
+        category: str,
+        text_length: int,
+    ) -> None:
+        """Log a NeMo Guardrails Layer 3 event.
+
+        Records whether NeMo blocked input or output and which category triggered.
+
+        Args:
+            direction: ``"input"`` or ``"output"`` indicating the rail direction.
+            blocked: True if NeMo blocked the content.
+            category: Colang category tag (e.g. ``"violence"``). Empty when not blocked.
+            text_length: Length of the checked text in characters.
+        """
+        self._write(
+            "nemo_rail",
+            {
+                "direction": direction,
+                "blocked": blocked,
+                "category": category,
+                "text_length": text_length,
+            },
+        )
+
 
 __all__ = ["AuditLogger"]

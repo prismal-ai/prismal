@@ -88,8 +88,8 @@ class Settings(BaseSettings):
     )
     nemo_guardrails_enabled: bool = Field(
         default=False,
-        description="Enable NVIDIA NeMo Guardrails (requires config/nemo/)",
-    )  # Wired up in T-022 (GuardrailsEngine)
+        description="Enable NVIDIA NeMo Guardrails (requires config/nemo_rails/)",
+    )
 
     # ── Database ──────────────────────────────────────────────────────
     db_url: str = Field(
