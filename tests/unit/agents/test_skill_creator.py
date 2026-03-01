@@ -186,7 +186,7 @@ async def test_create_skill_ruff_failure_reported(tmp_path: Path) -> None:
         result = await create_skill("unit converter", skills_root=tmp_path)
 
     assert "ruff" in result.lower()
-    assert "E501" in result
+    assert "✗" in result          # ruff failure shown as ✗ icon
 
 
 # ── skill_creator_node ────────────────────────────────────────────────────────
