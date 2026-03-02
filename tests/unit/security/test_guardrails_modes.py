@@ -134,3 +134,85 @@ async def test_output_canary_not_present_passes(engine: GuardrailsEngine) -> Non
         "The capital of France is Paris.", canary=canary
     )
     assert result.safe
+
+
+# ---------------------------------------------------------------------------
+# validate_output permissive/audit-only mode — line 210
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_validate_output_permissive_allows_pii(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """validate_output in permissive mode returns safe=True even for PII."""
+    import lightagent.core.config as cfg_module
+
+    class _FakeSettings:
+        security_mode = "permissive"
+        risk_threshold = 30
+        nemo_guardrails_enabled = False
+
+    monkeypatch.setattr(cfg_module, "get_settings", lambda: _FakeSettings())
+    eng = GuardrailsEngine()
+    result = await eng.validate_output("Contact user@example.com for help.")
+    assert result.safe
+
+
+@pytest.mark.asyncio
+async def test_validate_output_audit_only_allows_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """validate_output in audit-only mode returns safe=True even for API key patterns."""
+    import lightagent.core.config as cfg_module
+
+    class _FakeSettings:
+        security_mode = "audit-only"
+        risk_threshold = 30
+        nemo_guardrails_enabled = False
+
+    monkeypatch.setattr(cfg_module, "get_settings", lambda: _FakeSettings())
+    eng = GuardrailsEngine()
+    fake_key = "sk-" + "B" * 48
+    result = await eng.validate_output(f"Your key: {fake_key}")
+    assert result.safe
+
+
+# ---------------------------------------------------------------------------
+# NeMo layer integration — lines 138-145, 199-203
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_validate_input_nemo_layer_blocks() -> None:
+    """validate_input adds nemo reason and raises risk score when NeMo blocks."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    eng = GuardrailsEngine()
+
+    mock_nemo = MagicMock()
+    mock_nemo.available = True
+    mock_nemo.check_input = AsyncMock(return_value=(True, "jailbreak"))
+    eng._nemo_layer = mock_nemo
+
+    result = await eng.validate_input("Safe-looking text that NeMo blocks")
+
+    assert any("nemo:jailbreak" in r for r in result.reasons)
+    assert result.risk_score >= 85
+
+
+@pytest.mark.asyncio
+async def test_validate_output_nemo_layer_blocks() -> None:
+    """validate_output adds nemo_output reason when NeMo blocks the response."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    eng = GuardrailsEngine()
+
+    mock_nemo = MagicMock()
+    mock_nemo.available = True
+    mock_nemo.check_output = AsyncMock(return_value=(True, "toxicity"))
+    eng._nemo_layer = mock_nemo
+
+    result = await eng.validate_output("Apparently clean output text")
+
+    assert any("nemo_output:toxicity" in r for r in result.reasons)
