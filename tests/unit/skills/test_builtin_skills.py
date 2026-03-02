@@ -945,3 +945,208 @@ class TestEmailReaderCoverage:
 
         assert "Missing configuration" in result
         assert "LIGHTAGENT_EMAIL_HOST" in result
+
+
+# ── Calendar — additional coverage tests ──────────────────────────────────────
+
+_ICS_NO_DTSTART = """\
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+SUMMARY:No Date Event
+DESCRIPTION:This event has no DTSTART
+END:VEVENT
+END:VCALENDAR
+"""
+
+_ICS_FUTURE_EVENT = """\
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:20991231T120000Z
+SUMMARY:Far Future Meeting
+LOCATION:Room 1
+DESCRIPTION:Agenda items here
+END:VEVENT
+END:VCALENDAR
+"""
+
+
+class TestCalendarCoverage:
+    """Additional coverage tests for calendar skill — targets lines 67-68, 89, 93-96, 154-162."""
+
+    # ── Lines 67-68: ImportError branch when icalendar is not installed ────────
+
+    def test_read_events_icalendar_not_installed(self) -> None:
+        """_read_events returns empty list when icalendar package is not installed (lines 67-68).
+
+        Patches sys.modules to simulate the icalendar package being absent so
+        the ``except ImportError: return []`` branch at lines 67-68 is exercised.
+        """
+        import sys
+        import tempfile
+
+        from lightagent.skills.available.calendar.skill import _read_events
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            with patch.dict(sys.modules, {"icalendar": None}):  # type: ignore[dict-item]
+                result = _read_events(tmp_path, 7)
+
+        assert result == []
+
+    # ── Line 89: dtstart is None branch (event with no DTSTART) ───────────────
+
+    def test_read_events_event_without_dtstart_is_skipped(self) -> None:
+        """_read_events skips VEVENT components that have no DTSTART (line 89).
+
+        Writes a .ics file whose sole VEVENT has no DTSTART field, so _parse_dt
+        returns None and the ``if dtstart is None: continue`` branch fires.
+        Lines 93-96 are NOT reached for this event.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ics_path = Path(tmpdir) / "nodtstart.ics"
+            ics_path.write_text(_ICS_NO_DTSTART)
+
+            from lightagent.skills.available.calendar.skill import _read_events
+
+            result = _read_events(Path(tmpdir), 30)
+
+        # Event without DTSTART must be filtered out
+        assert result == []
+
+    # ── Lines 93-96: event fields built and appended when within window ────────
+
+    def test_read_events_non_directory_returns_empty(self) -> None:
+        """_read_events returns empty list when calendar_dir is not a directory (line 76-77).
+
+        Passes a path that does not exist so ``calendar_dir.is_dir()`` is False
+        and the early return fires before the glob loop.  This also confirms lines
+        93-96 cannot execute when no files are scanned.
+        """
+        from lightagent.skills.available.calendar.skill import _read_events
+
+        result = _read_events(Path("/this/path/does/not/exist/at/all"), 7)
+
+        assert result == []
+
+    # ── Lines 154-162: no-events path in list_events tool ─────────────────────
+
+    def test_list_events_tool_no_events(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """list_events returns 'No events found' message when _read_events returns [] (line 152).
+
+        Patches _read_events to return an empty list and patches the calendar
+        directory to a real temporary directory so the ``cal_dir.is_dir()`` guard
+        does not block execution.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            monkeypatch.setenv("LIGHTAGENT_CALENDAR_DIR", tmpdir)
+
+            with patch(
+                "lightagent.skills.available.calendar.skill._read_events",
+                return_value=[],
+            ):
+                from lightagent.skills.available.calendar.skill import CalendarSkill
+
+                list_events = CalendarSkill().get_tools()[0]
+                result = list_events.invoke({"days_ahead": 7})
+
+        assert "No events found" in result
+        assert "7" in result
+
+    # ── Lines 154-162: event formatting loop with location and description ─────
+
+    def test_list_events_tool_formats_events_with_location(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """list_events formats events including location and description lines (lines 154-162).
+
+        Patches _read_events to return a single mock event dict that has both
+        ``location`` and ``description`` populated so that lines 157-160 (the
+        ``if ev["location"]`` and ``if ev["description"]`` branches) both fire,
+        and lines 154-162 are fully covered.
+        """
+        mock_events = [
+            {
+                "start": "2026-03-10 10:00 UTC",
+                "summary": "Meeting",
+                "location": "Room 1",
+                "description": "Agenda",
+            }
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            monkeypatch.setenv("LIGHTAGENT_CALENDAR_DIR", tmpdir)
+
+            with patch(
+                "lightagent.skills.available.calendar.skill._read_events",
+                return_value=mock_events,
+            ):
+                from lightagent.skills.available.calendar.skill import CalendarSkill
+
+                list_events = CalendarSkill().get_tools()[0]
+                result = list_events.invoke({"days_ahead": 7})
+
+        assert "Upcoming events" in result
+        assert "Meeting" in result
+        assert "Room 1" in result
+        assert "Agenda" in result
+        assert "2026-03-10 10:00 UTC" in result
+
+    def test_list_events_tool_formats_events_without_optional_fields(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """list_events formats events that have no location or description (lines 156-162).
+
+        Patches _read_events to return an event with empty location and description
+        so the ``if ev["location"]`` and ``if ev["description"]`` branches evaluate
+        to False, exercising the negative path of those conditionals.
+        """
+        mock_events = [
+            {
+                "start": "2026-03-15 14:00 UTC",
+                "summary": "Solo reminder",
+                "location": "",
+                "description": "",
+            }
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            monkeypatch.setenv("LIGHTAGENT_CALENDAR_DIR", tmpdir)
+
+            with patch(
+                "lightagent.skills.available.calendar.skill._read_events",
+                return_value=mock_events,
+            ):
+                from lightagent.skills.available.calendar.skill import CalendarSkill
+
+                list_events = CalendarSkill().get_tools()[0]
+                result = list_events.invoke({"days_ahead": 7})
+
+        assert "Solo reminder" in result
+        assert "@" not in result  # no location appended
+        assert "2026-03-15 14:00 UTC" in result
+
+    # ── Lines 93-96: event fields built and appended (real icalendar parse) ───
+
+    def test_read_events_future_event_fields_populated(self) -> None:
+        """_read_events builds summary, location, description fields for in-window events (lines 93-96).
+
+        Writes a .ics file whose VEVENT falls well in the future so that
+        lines 93-96 (``summary = …``, ``location = …``, ``description = …``,
+        ``events.append(…)``) are all reached via a real icalendar parse.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ics_path = Path(tmpdir) / "future.ics"
+            ics_path.write_text(_ICS_FUTURE_EVENT)
+
+            from lightagent.skills.available.calendar.skill import _read_events
+
+            # 40 000 days ≈ 110 years — covers 2099-12-31
+            result = _read_events(Path(tmpdir), 40_000)
+
+        assert len(result) == 1
+        ev = result[0]
+        assert ev["summary"] == "Far Future Meeting"
+        assert ev["location"] == "Room 1"
+        assert "Agenda" in ev["description"]
