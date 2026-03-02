@@ -20,9 +20,12 @@ AC-007-4: cron pause / cron resume work correctly.
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 from pathlib import Path
 from typing import Literal
 
@@ -109,7 +112,7 @@ class CronManager:
     # ── private helpers ──────────────────────────────────────────────────────
 
     @contextmanager
-    def _conn(self) -> Generator[sqlite3.Connection, None, None]:
+    def _conn(self) -> Generator[sqlite3.Connection]:
         """Yield a SQLite connection and guarantee it is closed on exit."""
         conn = sqlite3.connect(self._db)
         conn.row_factory = sqlite3.Row
@@ -132,7 +135,7 @@ class CronManager:
         """Convert a SQLite row to a CronJob model."""
 
         def _parse_dt(s: str | None) -> datetime | None:
-            return datetime.strptime(s, _DT_FMT) if s else None
+            return datetime.strptime(s, _DT_FMT) if s else None  # noqa: DTZ007
 
         return CronJob(
             name=row["name"],
@@ -141,7 +144,7 @@ class CronManager:
             status=row["status"],
             last_run=_parse_dt(row["last_run"]),
             next_run=_parse_dt(row["next_run"]),
-            created_at=datetime.strptime(row["created_at"], _DT_FMT),
+            created_at=datetime.strptime(row["created_at"], _DT_FMT),  # noqa: DTZ007
         )
 
     def _require_job(self, name: str) -> None:
@@ -270,7 +273,7 @@ class CronManager:
             name: The job name.
             ts: Execution timestamp; defaults to ``datetime.utcnow()``.
         """
-        stamp = (ts or datetime.utcnow()).strftime(_DT_FMT)
+        stamp = (ts or datetime.now(UTC).replace(tzinfo=None)).strftime(_DT_FMT)
         with self._conn() as conn:
             conn.execute(
                 "UPDATE cron_jobs SET last_run = ? WHERE name = ?", (stamp, name)
@@ -289,7 +292,7 @@ class CronManager:
             job: The cron job for which to create a deployment.
         """
         try:
-            from lightagent.scheduler.prefect_flows import (  # noqa: PLC0415
+            from lightagent.scheduler.prefect_flows import (
                 agent_run_flow,
             )
 
@@ -299,7 +302,7 @@ class CronManager:
                 schedule=job.schedule,
                 flow=agent_run_flow.name,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(
                 "cron_prefect_deployment_skipped",
                 name=job.name,

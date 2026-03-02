@@ -29,8 +29,8 @@ AC-007-7: Changes to ``config/`` trigger config hot-reload.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
@@ -110,7 +110,7 @@ class _LightAgentEventHandler(FileSystemEventHandler):
 class _WatchEntry:
     """Internal entry mapping a path + event name to a callback."""
 
-    __slots__ = ("path", "event_name", "callback")
+    __slots__ = ("callback", "event_name", "path")
 
     def __init__(
         self, path: Path, event_name: str, callback: EventCallback
@@ -242,8 +242,8 @@ def create_default_watcher(
 
 
 __all__ = [
-    "_LightAgentEventHandler",
     "EventCallback",
     "FileWatcher",
+    "_LightAgentEventHandler",
     "create_default_watcher",
 ]

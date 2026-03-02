@@ -48,8 +48,6 @@ if TYPE_CHECKING:
 
     from langgraph.graph.state import CompiledStateGraph
 
-from lightagent.monitoring.langfuse_client import LangfuseManager
-from lightagent.monitoring.otel import OTelManager
 from lightagent.agents.coder import coder_node
 from lightagent.agents.critic import critic_node
 from lightagent.agents.data_analyst import data_analyst_node
@@ -61,6 +59,8 @@ from lightagent.agents.researcher import researcher_node
 from lightagent.agents.state import AgentState
 from lightagent.agents.supervisor import supervisor_node
 from lightagent.core.logging import get_logger
+from lightagent.monitoring.langfuse_client import LangfuseManager
+from lightagent.monitoring.otel import OTelManager
 
 logger = get_logger("lightagent.agents.factory")
 
@@ -257,7 +257,8 @@ class AgentFactory:
                 builder_method(db_path)
             )
 
-            # Log that the graph was built; attach Langfuse callback handler if available
+            # Log that the graph was built; attach Langfuse callback handler
+            # if available
             langfuse = LangfuseManager()
             handler = langfuse.get_callback_handler()
             if handler is not None:

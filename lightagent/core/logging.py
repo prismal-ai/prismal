@@ -16,7 +16,10 @@ Example::
 from __future__ import annotations
 
 import sys
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 import structlog
 from loguru import logger as _loguru
@@ -39,7 +42,7 @@ class _LoguruBridge:
         """Emit a log message via Loguru."""
         _loguru.opt(depth=3).info(message)
 
-    def __getattr__(self, name: str):  # type: ignore[override]
+    def __getattr__(self, name: str) -> Callable[..., None]:  # type: ignore[override]
         """Emit a level-specific message via Loguru."""
 
         def _emit(message: str, *_args: object, **_kw: object) -> None:

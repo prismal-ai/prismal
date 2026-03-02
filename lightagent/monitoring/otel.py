@@ -11,13 +11,13 @@ unavailable, :meth:`start_span` returns a no-op context manager.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Generator
-
-import structlog
+from contextlib import contextmanager, suppress
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from opentelemetry.trace import Span
+    from collections.abc import Generator
+
+import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -109,7 +109,9 @@ class OTelManager:
 
             # ── Metric exporter ────────────────────────────────────────
             metric_reader = self._build_metric_reader(exporter_name, endpoint)
-            meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+            meter_provider = MeterProvider(
+                resource=resource, metric_readers=[metric_reader]
+            )
             metrics.set_meter_provider(meter_provider)
             self._meter = meter_provider.get_meter(service_name)
 
@@ -120,7 +122,7 @@ class OTelManager:
             logger.warning("otel.init_failed", error=str(exc))
             self.enabled = False
 
-    def _build_span_exporter(self, exporter_name: str, endpoint: str) -> Any:
+    def _build_span_exporter(self, exporter_name: str, endpoint: str) -> Any:  # noqa: ANN401
         """Build and return the appropriate span exporter.
 
         Args:
@@ -147,14 +149,14 @@ class OTelManager:
             )
 
             return OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces")
-        # default: otlp
+        # Default case: otlp
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
             OTLPSpanExporter,
         )
 
         return OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces")
 
-    def _build_metric_reader(self, exporter_name: str, endpoint: str) -> Any:
+    def _build_metric_reader(self, exporter_name: str, endpoint: str) -> Any:  # noqa: ANN401
         """Build and return the appropriate metric reader.
 
         Args:
@@ -230,7 +232,7 @@ class OTelManager:
         self,
         name: str,
         attributes: dict[str, Any] | None = None,
-    ) -> Generator[Any, None, None]:
+    ) -> Generator[Any]:
         """Context manager that creates and manages an OTEL span.
 
         Returns a :class:`_NoOpSpan` when OTEL is disabled so callers need
@@ -272,10 +274,8 @@ class OTelManager:
         """
         counter = self._counters.get(metric)
         if counter is not None:
-            try:
+            with suppress(Exception):
                 counter.add(value, attributes or {})
-            except Exception:
-                pass
 
     def record_histogram(
         self,
@@ -292,10 +292,8 @@ class OTelManager:
         """
         histogram = self._histograms.get(metric)
         if histogram is not None:
-            try:
+            with suppress(Exception):
                 histogram.record(value, attributes or {})
-            except Exception:
-                pass
 
     def shutdown(self) -> None:
         """Flush and shut down all OTEL providers."""

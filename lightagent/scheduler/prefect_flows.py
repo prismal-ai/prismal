@@ -140,11 +140,11 @@ def agent_run_flow(task_description: str) -> str:
 
 
 __all__ = [
-    "_index_document_task",
     "_discover_skills_task",
+    "_index_document_task",
     "_reload_config_task",
+    "agent_run_flow",
+    "config_reload_flow",
     "document_index_flow",
     "skill_discovery_flow",
-    "config_reload_flow",
-    "agent_run_flow",
 ]

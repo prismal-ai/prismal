@@ -197,7 +197,9 @@ class CRAGPipeline:
         # ── Step 5: GENERATE ──────────────────────────────────────────────────
         with otel.start_span("crag.generate") as generate_span:
             generate_span.set_attribute("lightagent.context_chunks", len(filtered))
-            generate_span.set_attribute("lightagent.used_web_fallback", used_web_fallback)
+            generate_span.set_attribute(
+                "lightagent.used_web_fallback", used_web_fallback
+            )
             logger.info("crag_generate_start", context_chunks=len(filtered))
             answer = await self._generate(query=query, chunks=filtered)
             generate_span.set_attribute("lightagent.answer_len", len(answer))

@@ -107,7 +107,7 @@ class DuckDBEngine:
         self._validator.validate(sql)
         relation = self._conn.execute(sql)
         col_names = [desc[0] for desc in relation.description]
-        return [dict(zip(col_names, row)) for row in relation.fetchall()]
+        return [dict(zip(col_names, row, strict=False)) for row in relation.fetchall()]
 
     # ── CSV helpers ──────────────────────────────────────────────────────────
 
@@ -140,16 +140,16 @@ class DuckDBEngine:
         table_name = csv_path.stem
         # Register the CSV as a view so queries can reference it by name.
         self._conn.execute(
-            f"CREATE OR REPLACE VIEW {table_name} AS "
+            f"CREATE OR REPLACE VIEW {table_name} AS "  # noqa: S608 — table_name from file stem
             f"SELECT * FROM read_csv_auto('{csv_path.as_posix()}')"
         )
 
-        effective_sql = sql or f"SELECT * FROM {table_name}"
+        effective_sql = sql or f"SELECT * FROM {table_name}"  # noqa: S608
         return self.query(effective_sql)
 
     # ── Polars integration ───────────────────────────────────────────────────
 
-    def register_polars(self, name: str, df: Any) -> None:
+    def register_polars(self, name: str, df: Any) -> None:  # noqa: ANN401 — accepts pl.DataFrame or pd.DataFrame
         """Register a Polars DataFrame as a queryable virtual table.
 
         Args:

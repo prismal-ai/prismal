@@ -243,7 +243,9 @@ class ProviderRegistry:
         usage.estimated_cost += estimated_cost
         otel = OTelManager()
         total = prompt_tokens + completion_tokens
-        otel.increment_counter("llm_tokens", total, attributes={"session_id": session_id})
+        otel.increment_counter(
+            "llm_tokens", total, attributes={"session_id": session_id}
+        )
         logger.debug(
             "usage_tracked",
             session_id=session_id,

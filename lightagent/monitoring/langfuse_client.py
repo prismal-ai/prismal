@@ -10,12 +10,9 @@ absent, all methods return no-op objects so callers need no guard checks.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import structlog
-
-if TYPE_CHECKING:
-    pass
 
 logger = structlog.get_logger(__name__)
 
@@ -23,16 +20,16 @@ logger = structlog.get_logger(__name__)
 class _NoOpTrace:
     """No-op trace object used when Langfuse is disabled."""
 
-    def update(self, **kwargs: Any) -> None:
+    def update(self, **_kwargs: object) -> None:
         """No-op update."""
 
-    def event(self, **kwargs: Any) -> None:
+    def event(self, **_kwargs: object) -> None:
         """No-op event."""
 
-    def score(self, **kwargs: Any) -> None:
+    def score(self, **_kwargs: object) -> None:
         """No-op score."""
 
-    def generation(self, **kwargs: Any) -> _NoOpGeneration:
+    def generation(self, **_kwargs: object) -> _NoOpGeneration:
         """Return a no-op generation."""
         return _NoOpGeneration()
 
@@ -40,10 +37,10 @@ class _NoOpTrace:
 class _NoOpGeneration:
     """No-op generation object used when Langfuse is disabled."""
 
-    def end(self, **kwargs: Any) -> None:
+    def end(self, **_kwargs: object) -> None:
         """No-op end."""
 
-    def update(self, **kwargs: Any) -> None:
+    def update(self, **_kwargs: object) -> None:
         """No-op update."""
 
 
@@ -119,7 +116,7 @@ class LangfuseManager:
         session_id: str | None = None,
         user_id: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> Any:
+    ) -> Any:  # noqa: ANN401 — returns Langfuse StatefulTraceClient or _NoOpTrace
         """Create a Langfuse trace or return a no-op.
 
         Args:
@@ -151,7 +148,7 @@ class LangfuseManager:
         self,
         trace_id: str | None = None,
         session_id: str | None = None,
-    ) -> Any | None:
+    ) -> Any | None:  # noqa: ANN401 — returns CallbackHandler or None
         """Return a LangChain/LangGraph Langfuse callback handler.
 
         Args:

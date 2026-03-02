@@ -30,9 +30,12 @@ from __future__ import annotations
 import re
 import sqlite3
 import uuid
-from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -123,7 +126,7 @@ class MemoryEntry(BaseModel):
         Returns:
             Boolean indicating whether the entry has expired.
         """
-        return self.expires_at < datetime.now(timezone.utc).replace(tzinfo=None)
+        return self.expires_at < datetime.now(UTC).replace(tzinfo=None)
 
 
 # ── Manager ───────────────────────────────────────────────────────────────────
@@ -160,21 +163,21 @@ class LongTermMemory:
         if vector_store is not None:
             self._store = vector_store
         else:
-            from lightagent.rag.vector_store import ChromaVectorStore  # noqa: PLC0415
+            from lightagent.rag.vector_store import ChromaVectorStore
 
             self._store = ChromaVectorStore(collection_name=_COLLECTION)
 
         if retention_days is not None:
             self._retention = retention_days
         else:
-            from lightagent.core.config import get_settings  # noqa: PLC0415
+            from lightagent.core.config import get_settings
 
             self._retention = get_settings().memory_retention_days
 
     # ── SQLite helpers ────────────────────────────────────────────────────────
 
     @contextmanager
-    def _conn(self) -> Generator[sqlite3.Connection, None, None]:
+    def _conn(self) -> Generator[sqlite3.Connection]:
         """Yield a SQLite connection, commit on success, close always."""
         conn = sqlite3.connect(self._db)
         conn.row_factory = sqlite3.Row
@@ -199,8 +202,8 @@ class LongTermMemory:
             id=row["id"],
             session_id=row["session_id"],
             content=row["content"],
-            created_at=datetime.strptime(row["created_at"], _DT_FMT),
-            expires_at=datetime.strptime(row["expires_at"], _DT_FMT),
+            created_at=datetime.strptime(row["created_at"], _DT_FMT),  # noqa: DTZ007
+            expires_at=datetime.strptime(row["expires_at"], _DT_FMT),  # noqa: DTZ007
         )
 
     def _list_all(self) -> list[MemoryEntry]:
@@ -230,14 +233,15 @@ class LongTermMemory:
         AC-011-6: Entry expires after ``retention_days`` days.
         """
         safe_content = _redact_sensitive(content)
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         expires = now + timedelta(days=self._retention)
         entry_id = str(uuid.uuid4())
 
         fmt = _DT_FMT
         with self._conn() as conn:
             conn.execute(
-                "INSERT INTO memory_entries (id, session_id, content, created_at, expires_at)"
+                "INSERT INTO memory_entries"
+                " (id, session_id, content, created_at, expires_at)"
                 " VALUES (?, ?, ?, ?, ?)",
                 (
                     entry_id,
@@ -284,7 +288,7 @@ class LongTermMemory:
         """
         try:
             results = self._store.similarity_search(query, k=k)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("long_term_memory_recall_error", error=str(exc))
             return []
 
@@ -344,7 +348,7 @@ class LongTermMemory:
         for entry_id in ids:
             try:
                 self._store.delete_by_source(entry_id)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(
                     "long_term_memory_clear_chroma_error",
                     entry_id=entry_id,
@@ -362,7 +366,7 @@ class LongTermMemory:
 
         AC-011-6: Entries expire after ``memory_retention_days`` days.
         """
-        now = datetime.now(timezone.utc).replace(tzinfo=None).strftime(_DT_FMT)
+        now = datetime.now(UTC).replace(tzinfo=None).strftime(_DT_FMT)
         with self._conn() as conn:
             rows = conn.execute(
                 "SELECT id FROM memory_entries WHERE expires_at <= ?", (now,)
@@ -375,7 +379,7 @@ class LongTermMemory:
         for entry_id in ids:
             try:
                 self._store.delete_by_source(entry_id)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(
                     "long_term_memory_expire_chroma_error",
                     entry_id=entry_id,

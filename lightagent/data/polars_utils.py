@@ -33,7 +33,9 @@ ChartKind = Literal["bar", "line", "scatter", "hist"]
 # ---------------------------------------------------------------------------
 
 
-def _apply_filter(df: pl.DataFrame, column: str, op: FilterOp, value: object) -> pl.DataFrame:
+def _apply_filter(
+    df: pl.DataFrame, column: str, op: FilterOp, value: object
+) -> pl.DataFrame:
     """Return rows from *df* where *column op value* is True.
 
     Args:
@@ -260,9 +262,9 @@ def save_chart(
         LightAgentError: If required columns are missing or *kind* is
             unsupported.
     """
-    import matplotlib
-    matplotlib.use("Agg")  # non-interactive backend — safe in server context
-    import matplotlib.pyplot as plt  # noqa: PLC0415
+    import matplotlib as mpl
+    mpl.use("Agg")  # non-interactive backend — safe in server context
+    import matplotlib.pyplot as plt
 
     for col in (x_col, y_col) if kind != "hist" else (x_col,):
         if col not in df.columns:
