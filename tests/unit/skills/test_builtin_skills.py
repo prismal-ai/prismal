@@ -746,3 +746,202 @@ class TestWebSearchHelpers:
             result = _search_google("obscure query", 3, "apikey", "cseid")
 
         assert "No results" in result
+
+
+# ── Email reader — additional coverage tests ───────────────────────────────────
+
+_RAW_EMAIL_BYTES = (
+    b"From: sender@example.com\r\n"
+    b"To: recipient@example.com\r\n"
+    b"Subject: Test Subject\r\n"
+    b"Date: Mon, 02 Mar 2026 10:00:00 +0000\r\n"
+    b"Content-Type: text/plain; charset=utf-8\r\n"
+    b"\r\n"
+    b"This is the email body.\r\n"
+)
+
+
+def _make_imap_mock(search_ids: bytes, fetch_response: list | None = None) -> MagicMock:
+    """Build a reusable IMAP4_SSL context-manager mock.
+
+    Args:
+        search_ids: Bytes containing space-separated message IDs (e.g. b"1 2").
+        fetch_response: List returned by imap.fetch(); defaults to a valid RFC822 tuple.
+
+    Returns:
+        Configured MagicMock that acts as both the class and the context manager.
+    """
+    if fetch_response is None:
+        fetch_response = [(b"1 (RFC822 {bytes})", _RAW_EMAIL_BYTES)]
+
+    mock_imap = MagicMock()
+    mock_imap.__enter__ = MagicMock(return_value=mock_imap)
+    mock_imap.__exit__ = MagicMock(return_value=False)
+    mock_imap.login = MagicMock()
+    mock_imap.select = MagicMock(return_value=("OK", [b"INBOX"]))
+    mock_imap.search = MagicMock(return_value=("OK", [search_ids]))
+    mock_imap.fetch = MagicMock(return_value=("OK", fetch_response))
+    return mock_imap
+
+
+class TestEmailReaderCoverage:
+    """Additional coverage tests for email_reader skill — targets lines 60, 127-144, 148-153, 215-216."""
+
+    # ── Line 60: bytes part decoded with charset inside _decode_header_value ──
+
+    def test_decode_header_value_bytes_encoding(self) -> None:
+        """_decode_header_value decodes an RFC 2047 encoded-word header (line 60).
+
+        When decode_header() returns a (bytes, charset) pair, the bytes part must
+        be decoded using the provided charset — this exercises the ``isinstance(part,
+        bytes)`` branch at line 59-60.
+        """
+        from lightagent.skills.available.email_reader.skill import _decode_header_value
+
+        # Build a proper RFC 2047 encoded-word: =?utf-8?b?<base64>?=
+        # "Héllo" base64-encoded in utf-8 → SGVsbG8=  (just "Hello" for simplicity)
+        # Use a real encoded-word so decode_header() returns (bytes, charset).
+        encoded = "=?utf-8?b?SGVsbG8gV29ybGQ=?="  # "Hello World" in base64/utf-8
+        result = _decode_header_value(encoded)
+        assert result == "Hello World"
+
+    # ── Lines 127-144: IMAP fetch loop — processing messages ──────────────────
+
+    def test_read_emails_imap_fetch_loop(self) -> None:
+        """read_emails processes IMAP messages and returns formatted summaries (lines 127-144).
+
+        Mocks imaplib.IMAP4_SSL so that search returns two IDs, fetch returns a
+        valid RFC822 message for each, and verifies the formatted output contains
+        expected header values.
+        """
+        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+
+        mock_imap = _make_imap_mock(search_ids=b"1 2")
+
+        env = {
+            "LIGHTAGENT_EMAIL_HOST": "imap.example.com",
+            "LIGHTAGENT_EMAIL_USER": "user@example.com",
+            "LIGHTAGENT_EMAIL_PASSWORD": "secret",
+        }
+        with patch.dict("os.environ", env), patch(
+            "imaplib.IMAP4_SSL", return_value=mock_imap
+        ):
+            tool = EmailReaderSkill().get_tools()[0]
+            result = tool.invoke({"max_emails": 5, "unread_only": False})
+
+        assert "sender@example.com" in result
+        assert "Test Subject" in result
+        assert "email body" in result
+
+    def test_read_emails_no_messages_found(self) -> None:
+        """read_emails returns 'No emails found' when summaries list is empty (line 148).
+
+        The fetch loop runs but fetch() returns data that is not a tuple, so no
+        summaries are appended and the ternary falls to the else branch.
+        """
+        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+
+        # fetch returns a non-tuple raw item so the ``isinstance(raw, tuple)`` check
+        # on line 137 skips the message — summaries stays empty.
+        mock_imap = _make_imap_mock(
+            search_ids=b"1",
+            fetch_response=[b"not-a-tuple"],
+        )
+
+        env = {
+            "LIGHTAGENT_EMAIL_HOST": "imap.example.com",
+            "LIGHTAGENT_EMAIL_USER": "user@example.com",
+            "LIGHTAGENT_EMAIL_PASSWORD": "secret",
+        }
+        with patch.dict("os.environ", env), patch(
+            "imaplib.IMAP4_SSL", return_value=mock_imap
+        ):
+            tool = EmailReaderSkill().get_tools()[0]
+            result = tool.invoke({"max_emails": 5})
+
+        assert "No emails found" in result
+
+    # ── Lines 148-149: IMAP4.error handling ───────────────────────────────────
+
+    def test_read_emails_imap_error(self) -> None:
+        """read_emails returns IMAP error string when imaplib.IMAP4.error is raised (lines 148-149).
+
+        Simulates an authentication failure by making imap.login() raise
+        imaplib.IMAP4.error; the except clause at line 150 should catch it.
+        """
+        import imaplib
+
+        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+
+        mock_imap = MagicMock()
+        mock_imap.__enter__ = MagicMock(return_value=mock_imap)
+        mock_imap.__exit__ = MagicMock(return_value=False)
+        mock_imap.login.side_effect = imaplib.IMAP4.error("authentication failed")
+
+        env = {
+            "LIGHTAGENT_EMAIL_HOST": "imap.example.com",
+            "LIGHTAGENT_EMAIL_USER": "user@example.com",
+            "LIGHTAGENT_EMAIL_PASSWORD": "wrong_password",
+        }
+        with patch.dict("os.environ", env), patch(
+            "imaplib.IMAP4_SSL", return_value=mock_imap
+        ):
+            tool = EmailReaderSkill().get_tools()[0]
+            result = tool.invoke({"max_emails": 5})
+
+        assert "IMAP error" in result
+
+    # ── Lines 152-153: OSError handling ───────────────────────────────────────
+
+    def test_read_emails_os_error(self) -> None:
+        """read_emails returns connection error string when OSError is raised (lines 152-153).
+
+        Simulates a network failure (e.g. connection refused) so the OSError except
+        clause at line 152 is exercised.
+        """
+        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+
+        mock_imap = MagicMock()
+        mock_imap.__enter__ = MagicMock(return_value=mock_imap)
+        mock_imap.__exit__ = MagicMock(return_value=False)
+        mock_imap.login.side_effect = OSError("connection refused")
+
+        env = {
+            "LIGHTAGENT_EMAIL_HOST": "imap.example.com",
+            "LIGHTAGENT_EMAIL_USER": "user@example.com",
+            "LIGHTAGENT_EMAIL_PASSWORD": "secret",
+        }
+        with patch.dict("os.environ", env), patch(
+            "imaplib.IMAP4_SSL", return_value=mock_imap
+        ):
+            tool = EmailReaderSkill().get_tools()[0]
+            result = tool.invoke({"max_emails": 5})
+
+        assert "Connection error" in result
+
+    # ── Lines 215-216: config present → logger.info + _fetch_emails called ────
+
+    def test_read_emails_missing_config(self) -> None:
+        """read_emails returns a config error message when env vars are absent (lines 215-216).
+
+        When HOST, USER, or PASSWORD env vars are not set, the early-return branch
+        at lines 208-213 fires — this verifies the config guard is the only path
+        that executes (i.e. lines 215-216 are NOT reached here).  The complementary
+        test ``test_read_emails_imap_fetch_loop`` ensures lines 215-216 ARE covered
+        by setting all required env vars and providing a valid IMAP mock.
+        """
+        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+
+        # Ensure none of the required env vars are set
+        env_removals = {
+            "LIGHTAGENT_EMAIL_HOST": "",
+            "LIGHTAGENT_EMAIL_USER": "",
+            "LIGHTAGENT_EMAIL_PASSWORD": "",
+        }
+        with patch.dict("os.environ", env_removals):
+            # Blank values are treated as falsy — triggers config error path
+            tool = EmailReaderSkill().get_tools()[0]
+            result = tool.invoke({"max_emails": 3})
+
+        assert "Missing configuration" in result
+        assert "LIGHTAGENT_EMAIL_HOST" in result
