@@ -80,6 +80,7 @@ _DEFAULT_CHECKPOINT_PATH: Path = Path("data/db/checkpoints.db")
 
 def build_supervisor_graph(
     checkpoint_path: Path | None = None,
+    checkpointer: Any = None,
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """Build and compile the LangGraph SUPERVISOR state machine.
 
@@ -96,7 +97,11 @@ def build_supervisor_graph(
     Args:
         checkpoint_path: Path to the SQLite database file used for LangGraph
             checkpointing.  Defaults to ``data/db/checkpoints.db`` relative to
-            the current working directory.
+            the current working directory.  Ignored when ``checkpointer`` is
+            provided.
+        checkpointer: Optional pre-built checkpointer (e.g. AsyncSqliteSaver
+            for async usage).  When provided, ``checkpoint_path`` is ignored
+            and no SQLite connection is opened internally.
 
     Returns:
         A fully compiled :class:`~langgraph.graph.state.CompiledStateGraph`
@@ -156,15 +161,15 @@ def build_supervisor_graph(
         builder.add_edge(member, "supervisor")
 
     # ------------------------------------------------------------------ #
-    # Compile with SQLite checkpointing                                    #
+    # Compile with checkpointing                                           #
     # ------------------------------------------------------------------ #
-    # Open a direct sqlite3 connection so that the checkpointer lifetime
-    # is tied to the compiled graph rather than a context manager block.
-    # A weakref finalizer ensures the connection is explicitly closed when
-    # the SqliteSaver is garbage-collected, preventing ResourceWarning.
-    conn = sqlite3.connect(str(db_path), check_same_thread=False)
-    checkpointer = SqliteSaver(conn)
-    weakref.finalize(checkpointer, conn.close)
+    # When a checkpointer is supplied externally (e.g. AsyncSqliteSaver
+    # created in an async context), use it directly.  Otherwise fall back
+    # to the sync SqliteSaver so that non-async callers still work.
+    if checkpointer is None:
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        checkpointer = SqliteSaver(conn)
+        weakref.finalize(checkpointer, conn.close)
 
     compiled: CompiledStateGraph[AgentState, Any, Any, Any] = builder.compile(
         checkpointer=checkpointer

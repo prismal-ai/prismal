@@ -127,6 +127,34 @@ def setup_logging(
     )
 
 
+def setup_chat_logging(log_file: str = "data/logs/lightagent.log") -> None:
+    """Configure logging for interactive chat: file-only, no console output.
+
+    Removes ALL Loguru sinks (including stderr) and adds a single file sink so
+    that INFO/DEBUG messages do not pollute the interactive chat interface.
+    Works regardless of structlog's per-logger cache state.
+
+    Args:
+        log_file: Path to the rotating log file.  Pass ``""`` to disable file
+            logging entirely (completely silent).
+    """
+    _loguru.remove()
+    if log_file:
+        import sys as _sys
+        from pathlib import Path as _Path
+
+        _Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+        _loguru.add(
+            log_file,
+            level="DEBUG",
+            format="{message}",
+            rotation="500 MB",
+            retention="30 days",
+        )
+        # Re-add stderr at ERROR only so critical failures are still visible.
+        _loguru.add(_sys.stderr, level="ERROR", format="{message}")
+
+
 def get_logger(name: str = "lightagent") -> structlog.stdlib.BoundLogger:
     """Return a structlog BoundLogger bound to the given module name.
 

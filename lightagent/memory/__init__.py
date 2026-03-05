@@ -10,11 +10,13 @@ from __future__ import annotations
 
 from lightagent.memory.long_term import LongTermMemory, MemoryEntry
 from lightagent.memory.mongodb_store import MongoDBMemoryStore
+from lightagent.memory.profile import ProfileManager
 from lightagent.memory.short_term import ShortTermMemory
 
 __all__ = [
     "LongTermMemory",
     "MemoryEntry",
     "MongoDBMemoryStore",
+    "ProfileManager",
     "ShortTermMemory",
 ]

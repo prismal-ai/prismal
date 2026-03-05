@@ -54,8 +54,8 @@ async def test_supervisor_routes_to_researcher() -> None:
     state["messages"] = [HumanMessage(content="Find information about LangGraph")]
 
     with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
-        mock_registry.return_value.get_llm_with_fallback.return_value = (
-            _make_mock_llm("researcher")
+        mock_registry.return_value.get_llm_with_fallback.return_value = _make_mock_llm(
+            "researcher"
         )
         result = await supervisor_node(state)
 
@@ -64,17 +64,26 @@ async def test_supervisor_routes_to_researcher() -> None:
 
 @pytest.mark.asyncio
 async def test_supervisor_routes_to_end_when_done() -> None:
-    """When the LLM returns 'END', next_agent must be None."""
+    """When the LLM returns 'END', next_agent must be None and an AIMessage is added."""
     state = create_initial_state(session_id="sess-test-end")
     state["messages"] = [HumanMessage(content="What is 2+2?")]
 
+    # First call returns routing decision "END"; second call returns the answer.
+    mock_llm = MagicMock()
+    mock_llm.ainvoke = AsyncMock(
+        side_effect=[
+            AIMessage(content="END"),
+            AIMessage(content="2+2 equals 4."),
+        ]
+    )
+
     with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
-        mock_registry.return_value.get_llm_with_fallback.return_value = (
-            _make_mock_llm("END")
-        )
+        mock_registry.return_value.get_llm_with_fallback.return_value = mock_llm
         result = await supervisor_node(state)
 
     assert result["next_agent"] is None
+    assert result["messages"], "Expected an AIMessage response when routing to END"
+    assert result["messages"][0].content == "2+2 equals 4."
 
 
 @pytest.mark.asyncio
@@ -83,14 +92,21 @@ async def test_supervisor_handles_invalid_routing() -> None:
     state = create_initial_state(session_id="sess-test-invalid")
     state["messages"] = [HumanMessage(content="Do something")]
 
+    mock_llm = MagicMock()
+    mock_llm.ainvoke = AsyncMock(
+        side_effect=[
+            AIMessage(content="blah_blah_not_a_valid_agent_xyz_123"),
+            AIMessage(content="I can help with that."),
+        ]
+    )
+
     with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
-        mock_registry.return_value.get_llm_with_fallback.return_value = (
-            _make_mock_llm("blah_blah_not_a_valid_agent_xyz_123")
-        )
+        mock_registry.return_value.get_llm_with_fallback.return_value = mock_llm
         result = await supervisor_node(state)
 
-    # Graceful fallback — must not raise and must set next_agent to None
+    # Graceful fallback — must not raise, must set next_agent to None, must answer
     assert result["next_agent"] is None
+    assert result["messages"], "Expected an AIMessage response even on invalid routing"
 
 
 @pytest.mark.asyncio
@@ -100,8 +116,8 @@ async def test_supervisor_updates_current_agent() -> None:
     state["messages"] = [HumanMessage(content="Write some code")]
 
     with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
-        mock_registry.return_value.get_llm_with_fallback.return_value = (
-            _make_mock_llm("coder")
+        mock_registry.return_value.get_llm_with_fallback.return_value = _make_mock_llm(
+            "coder"
         )
         result = await supervisor_node(state)
 

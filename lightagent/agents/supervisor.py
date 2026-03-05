@@ -23,9 +23,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from lightagent.core.logging import get_logger
+from lightagent.memory.profile import ProfileManager
 from lightagent.monitoring.otel import OTelManager
 from lightagent.providers.registry import ProviderRegistry
 
@@ -49,6 +50,11 @@ MEMBERS: list[str] = [
 ]
 
 _VALID_ROUTES: frozenset[str] = frozenset(MEMBERS) | {"END"}
+
+_ANSWER_SYSTEM_PROMPT: str = (
+    "You are a helpful, knowledgeable AI assistant. "
+    "Answer the user's question clearly and concisely."
+)
 
 _SYSTEM_PROMPT: str = """You are a supervisor coordinating a team of AI agents.
 Your role is to:
@@ -162,10 +168,34 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
             session_id=session_id,
         )
 
+        # When routing to END and the last message is from the user, generate a
+        # direct answer.  Sub-agents produce their own AIMessages, so we only
+        # need this for the supervisor-answers-directly path.
+        response_messages: list[AIMessage] = []
+        if next_agent is None and state.get("messages"):
+            last = state["messages"][-1]
+            if getattr(last, "type", "") == "human":
+                # Build the answer system prompt from SOUL.md (agent persona) and
+                # USER.md (user context) when available, otherwise fall back to the
+                # generic assistant prompt.
+                profile = ProfileManager()
+                soul_content = profile.load_soul()
+                user_context = profile.load_user_context()
+                if soul_content:
+                    answer_system = soul_content
+                    if user_context:
+                        answer_system += f"\n\n## User Context\n\n{user_context}"
+                else:
+                    answer_system = _ANSWER_SYSTEM_PROMPT
+                answer_resp = await llm.ainvoke(
+                    [SystemMessage(content=answer_system), *state["messages"]]
+                )
+                response_messages = [AIMessage(content=str(answer_resp.content))]
+
         return {
             "current_agent": "supervisor",
             "next_agent": next_agent,
-            "messages": [],
+            "messages": response_messages,
         }
 
 

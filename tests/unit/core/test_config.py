@@ -9,7 +9,7 @@ def test_settings_default_model() -> None:
     from lightagent.core.config import Settings
 
     s = Settings()
-    assert s.default_model == "claude-sonnet-4-5"
+    assert s.default_model == "claude-sonnet-4-6"
 
 
 def test_settings_fallback_model() -> None:

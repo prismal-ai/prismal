@@ -7,7 +7,7 @@ All configuration is validated at startup.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -60,15 +60,27 @@ class Settings(BaseSettings):
     # ── API Keys ──────────────────────────────────────────────────────
     anthropic_api_key: SecretStr = Field(
         default=SecretStr(""),
-        description="Anthropic API key",
+        validation_alias=AliasChoices(
+            "LIGHTAGENT_ANTHROPIC_API_KEY",
+            "ANTHROPIC_API_KEY",
+        ),
+        description="Anthropic API key (LIGHTAGENT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY)",
     )
     openai_api_key: SecretStr = Field(
         default=SecretStr(""),
-        description="OpenAI API key",
+        validation_alias=AliasChoices(
+            "LIGHTAGENT_OPENAI_API_KEY",
+            "OPENAI_API_KEY",
+        ),
+        description="OpenAI API key (LIGHTAGENT_OPENAI_API_KEY or OPENAI_API_KEY)",
     )
     google_api_key: SecretStr = Field(
         default=SecretStr(""),
-        description="Google AI API key",
+        validation_alias=AliasChoices(
+            "LIGHTAGENT_GOOGLE_API_KEY",
+            "GOOGLE_API_KEY",
+        ),
+        description="Google AI API key (LIGHTAGENT_GOOGLE_API_KEY or GOOGLE_API_KEY)",
     )
 
     # ── Security ──────────────────────────────────────────────────────
@@ -161,12 +173,12 @@ class Settings(BaseSettings):
 
     # ── Monitoring — OpenTelemetry ───────────────────────────────
     otel_enabled: bool = Field(
-        default=True,
-        description="Enable OpenTelemetry distributed tracing and metrics",
+        default=False,
+        description="Enable OpenTelemetry distributed tracing and metrics (set LIGHTAGENT_OTEL_ENABLED=true in production)",
     )
     otel_exporter: Literal["otlp", "jaeger", "zipkin", "console"] = Field(
-        default="otlp",
-        description="OTEL exporter backend",
+        default="console",
+        description="OTEL exporter backend (use 'otlp' in production with a collector)",
     )
     otel_endpoint: str = Field(
         default="http://localhost:4318",
