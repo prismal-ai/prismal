@@ -1,4 +1,5 @@
-"""LangGraph SUPERVISOR state machine assembly.
+"""
+LangGraph SUPERVISOR state machine assembly.
 
 Builds and compiles the complete multi-agent graph for LightAgent.  The graph
 follows the SUPERVISOR pattern: a central supervisor node routes each turn to
@@ -40,6 +41,7 @@ from lightagent.agents.file_manager import file_manager_node
 from lightagent.agents.planner import planner_node
 from lightagent.agents.rag_agent import rag_agent_node
 from lightagent.agents.researcher import researcher_node
+from lightagent.agents.skill_manager import skill_manager_node
 from lightagent.agents.state import AgentState
 from lightagent.agents.supervisor import supervisor_node, supervisor_router
 from lightagent.core.logging import get_logger
@@ -59,7 +61,8 @@ logger = get_logger("lightagent.agents.graph")
 # Defining a thin wrapper here — where ``AgentState`` *is* in scope — resolves
 # the forward reference correctly.
 def _supervisor_router(state: AgentState) -> str:
-    """Delegate to supervisor_router with AgentState resolvable at runtime.
+    """
+    Delegate to supervisor_router with AgentState resolvable at runtime.
 
     This wrapper exists solely to satisfy LangGraph's ``get_type_hints`` call
     during conditional-edge registration.  All routing logic remains in
@@ -82,7 +85,8 @@ def build_supervisor_graph(
     checkpoint_path: Path | None = None,
     checkpointer: Any = None,
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
-    """Build and compile the LangGraph SUPERVISOR state machine.
+    """
+    Build and compile the LangGraph SUPERVISOR state machine.
 
     Constructs a :class:`~langgraph.graph.StateGraph` wired with the supervisor
     node as the entry point, all seven specialist sub-agent nodes, conditional
@@ -128,6 +132,7 @@ def build_supervisor_graph(
     builder.add_node("critic", critic_node)
     builder.add_node("data_analyst", data_analyst_node)
     builder.add_node("file_manager", file_manager_node)
+    builder.add_node("skill_manager", skill_manager_node)
 
     # Entry point
     builder.set_entry_point("supervisor")
@@ -144,6 +149,7 @@ def build_supervisor_graph(
             "critic": "critic",
             "data_analyst": "data_analyst",
             "file_manager": "file_manager",
+            "skill_manager": "skill_manager",
             "__end__": END,
         },
     )
@@ -157,6 +163,7 @@ def build_supervisor_graph(
         "critic",
         "data_analyst",
         "file_manager",
+        "skill_manager",
     ):
         builder.add_edge(member, "supervisor")
 
@@ -181,7 +188,8 @@ def build_supervisor_graph(
 
 @lru_cache(maxsize=1)
 def get_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any, Any]:
-    """Return the compiled LangGraph supervisor graph as a cached singleton.
+    """
+    Return the compiled LangGraph supervisor graph as a cached singleton.
 
     On the first call the graph is built using the default checkpoint path
     (``data/db/checkpoints.db``).  Subsequent calls return the same object
@@ -195,7 +203,8 @@ def get_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any, Any]:
 
 
 def list_session_ids() -> list[str]:
-    """Return all distinct thread IDs from the LangGraph SQLite checkpointer.
+    """
+    Return all distinct thread IDs from the LangGraph SQLite checkpointer.
 
     Reads directly from the checkpointer's SQLite database.  Returns an
     empty list if the database does not exist yet.

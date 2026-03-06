@@ -1,4 +1,5 @@
-"""Structured logging with structlog API and Loguru sink backend.
+"""
+Structured logging with structlog API and Loguru sink backend.
 
 All LightAgent modules obtain loggers via :func:`get_logger`.
 :func:`setup_logging` must be called once at startup (CLI main or
@@ -64,7 +65,8 @@ def setup_logging(
     retention: str = "30 days",
     compression: str = "gz",
 ) -> None:
-    """Configure structlog processors with a Loguru sink.
+    """
+    Configure structlog processors with a Loguru sink.
 
     Must be called once at application startup. Subsequent calls replace
     existing sinks and reconfigure structlog (idempotent).
@@ -156,7 +158,8 @@ def setup_chat_logging(log_file: str = "data/logs/lightagent.log") -> None:
 
 
 def get_logger(name: str = "lightagent") -> structlog.stdlib.BoundLogger:
-    """Return a structlog BoundLogger bound to the given module name.
+    """
+    Return a structlog BoundLogger bound to the given module name.
 
     Bootstraps with default settings (INFO, pretty) if :func:`setup_logging`
     has not yet been called, so that logging always works at import time.

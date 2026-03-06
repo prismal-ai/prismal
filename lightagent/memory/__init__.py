@@ -1,4 +1,5 @@
-"""Memory system — short-term session buffer and long-term persistent store.
+"""
+Memory system — short-term session buffer and long-term persistent store.
 
 Public API::
 

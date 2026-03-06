@@ -1,4 +1,5 @@
-"""Unit tests for the supervisor agent node and router.
+"""
+Unit tests for the supervisor agent node and router.
 
 Tests cover:
 - Routing to valid sub-agents when LLM returns a member name
@@ -24,7 +25,8 @@ from lightagent.agents.supervisor import supervisor_node, supervisor_router
 
 
 def _make_mock_llm(response_text: str) -> MagicMock:
-    """Return a mock LLM whose ainvoke returns an AIMessage with response_text.
+    """
+    Return a mock LLM whose ainvoke returns an AIMessage with response_text.
 
     The supervisor calls ``llm.ainvoke(messages)`` directly, so only
     ``ainvoke`` needs to be mocked as an AsyncMock.

@@ -1,4 +1,5 @@
-"""Supervisor agent node for LangGraph multi-agent orchestration.
+"""
+Supervisor agent node for LangGraph multi-agent orchestration.
 
 The supervisor is the entry point and coordinator of the LangGraph graph.
 It analyses the conversation history, decides which specialist sub-agent
@@ -47,9 +48,15 @@ MEMBERS: list[str] = [
     "critic",
     "data_analyst",
     "file_manager",
+    "skill_manager",
 ]
 
 _VALID_ROUTES: frozenset[str] = frozenset(MEMBERS) | {"END"}
+
+# Maximum number of recent messages sent to the LLM per supervisor call.
+# Older messages are kept in LangGraph state but not re-sent to the provider,
+# preventing token explosion in long sessions and avoiding rate-limit errors.
+_HISTORY_WINDOW: int = 10
 
 _ANSWER_SYSTEM_PROMPT: str = (
     "You are a helpful, knowledgeable AI assistant. "
@@ -71,11 +78,17 @@ Available agents:
 - critic: Review and improve outputs
 - data_analyst: SQL queries (DuckDB), DataFrame transforms, charts
 - file_manager: File read/write operations
+- skill_manager: Install, activate, deactivate, list, or create skills.
+  Route here when the user mentions: skills, activar skill, instalar skill,
+  desactivar skill, crear skill, listar skills, "install skill from <path>",
+  "add skill", "enable skill", "disable skill".
 - END: Return final answer to the user
 
 Routing rules:
 - Route to 'END' when you have a complete answer
 - Route to 'END' for simple factual questions you can answer directly
+- Route to 'skill_manager' for ANY request about managing, installing,
+  activating, deactivating, listing, or creating skills
 
 Respond with ONLY the agent name (e.g. "researcher" or "END"). No explanation."""
 
@@ -85,7 +98,8 @@ Respond with ONLY the agent name (e.g. "researcher" or "END"). No explanation.""
 
 
 async def supervisor_node(state: AgentState) -> dict[str, object]:
-    """Execute the supervisor node logic and decide the next routing target.
+    """
+    Execute the supervisor node logic and decide the next routing target.
 
     Builds a prompt from the current conversation history, invokes the LLM,
     and normalises its response to a valid routing option.  If the LLM returns
@@ -121,12 +135,17 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
     ) as span:
         llm = ProviderRegistry().get_llm_with_fallback()
 
-        # Build the message list directly so the LLM can be called via ainvoke
-        # without relying on the prompt | llm pipe operator (which is harder to mock
-        # in unit tests and adds no value for this simple routing prompt).
+        # Trim the conversation history to the most recent messages before
+        # sending to the LLM.  Long sessions (message_count > 20) can easily
+        # exceed provider rate limits (e.g. Anthropic's 30k tokens/min cap)
+        # because every supervisor call re-sends the entire history.
+        # Keeping the last _HISTORY_WINDOW messages is sufficient for routing
+        # decisions — the full history is still stored in the LangGraph state.
+        trimmed = state["messages"][-_HISTORY_WINDOW:]
+
         routing_messages = [
             SystemMessage(content=_SYSTEM_PROMPT),
-            *state["messages"],
+            *trimmed,
             HumanMessage(
                 content=(
                     "Based on the conversation above, which agent should handle "
@@ -188,7 +207,7 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
                 else:
                     answer_system = _ANSWER_SYSTEM_PROMPT
                 answer_resp = await llm.ainvoke(
-                    [SystemMessage(content=answer_system), *state["messages"]]
+                    [SystemMessage(content=answer_system), *trimmed]
                 )
                 response_messages = [AIMessage(content=str(answer_resp.content))]
 
@@ -212,12 +231,14 @@ _RouterLiteral = Literal[
     "critic",
     "data_analyst",
     "file_manager",
+    "skill_manager",
     "__end__",
 ]
 
 
 def supervisor_router(state: AgentState) -> _RouterLiteral:
-    """Map ``state["next_agent"]`` to a LangGraph conditional-edge target.
+    """
+    Map ``state["next_agent"]`` to a LangGraph conditional-edge target.
 
     This function is passed directly to ``StateGraph.add_conditional_edges``
     as the routing function.  It reads the ``next_agent`` field set by

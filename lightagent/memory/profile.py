@@ -1,4 +1,5 @@
-"""Agent and user profile management via markdown files.
+"""
+Agent and user profile management via markdown files.
 
 Follows the OpenClaw markdown-first memory architecture:
 
@@ -58,7 +59,8 @@ _USER_TEMPLATE = """\
 
 
 class ProfileManager:
-    """Reads and writes agent/user profile markdown files.
+    """
+    Reads and writes agent/user profile markdown files.
 
     All data is stored as plain, human-readable markdown so it can be
     inspected or edited directly in any text editor and committed to
@@ -88,7 +90,8 @@ class ProfileManager:
     # ------------------------------------------------------------------
 
     def load_agent_name(self) -> str:
-        """Return the agent's name from SOUL.md, defaulting to ``'LightAgent'``.
+        """
+        Return the agent's name from SOUL.md, defaulting to ``'LightAgent'``.
 
         Returns:
             Agent name extracted from the first H1 heading in SOUL.md.
@@ -100,7 +103,8 @@ class ProfileManager:
         return match.group(1).strip() if match else "LightAgent"
 
     def load_user_name(self) -> str:
-        """Return the user's name from USER.md, defaulting to ``'You'``.
+        """
+        Return the user's name from USER.md, defaulting to ``'You'``.
 
         Returns:
             User name extracted from the first H1 heading in USER.md.
@@ -112,7 +116,8 @@ class ProfileManager:
         return match.group(1).strip() if match else "You"
 
     def load_soul(self) -> str:
-        """Return the full SOUL.md content, or empty string if not configured.
+        """
+        Return the full SOUL.md content, or empty string if not configured.
 
         Returns:
             Raw markdown text of SOUL.md.
@@ -122,7 +127,8 @@ class ProfileManager:
         return self._soul.read_text(encoding="utf-8")
 
     def load_user_context(self) -> str:
-        """Return the full USER.md content, or empty string if not configured.
+        """
+        Return the full USER.md content, or empty string if not configured.
 
         Returns:
             Raw markdown text of USER.md.
@@ -136,7 +142,8 @@ class ProfileManager:
     # ------------------------------------------------------------------
 
     def save_soul(self, name: str, persona: str) -> None:
-        """Write SOUL.md with the agent's name and persona description.
+        """
+        Write SOUL.md with the agent's name and persona description.
 
         Args:
             name: Chosen name for the agent.
@@ -149,8 +156,24 @@ class ProfileManager:
             encoding="utf-8",
         )
 
+    def update_soul_persona(self, persona: str) -> None:
+        """
+        Update the Persona section of SOUL.md while preserving the agent name.
+
+        Reads the current H1 name from SOUL.md (or falls back to ``'LightAgent'``)
+        and rewrites the file with the new persona, keeping the user-defined name
+        intact.  Use this instead of :meth:`save_soul` when only the persona
+        description needs to change.
+
+        Args:
+            persona: New free-text persona/capabilities description.
+        """
+        name = self.load_agent_name()
+        self.save_soul(name, persona)
+
     def save_user(self, name: str) -> None:
-        """Write USER.md with the user's name.
+        """
+        Write USER.md with the user's name.
 
         Args:
             name: The user's preferred name.
@@ -160,3 +183,14 @@ class ProfileManager:
             _USER_TEMPLATE.format(name=name),
             encoding="utf-8",
         )
+
+    def reset(self) -> None:
+        """
+        Delete SOUL.md and USER.md so the next session triggers fresh onboarding.
+
+        Both files are removed if they exist; missing files are silently ignored.
+        """
+        if self._soul.exists():
+            self._soul.unlink()
+        if self._user.exists():
+            self._user.unlink()

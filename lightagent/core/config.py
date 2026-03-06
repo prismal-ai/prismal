@@ -1,7 +1,8 @@
-"""Core configuration module using Pydantic Settings.
+"""
+Core configuration module using Pydantic Settings.
 
-Loads from environment variables (prefix: LIGHTAGENT_) and optional .env file.
-All configuration is validated at startup.
+Loads from environment variables (prefix: LIGHTAGENT_) and optional .env file. All
+configuration is validated at startup.
 """
 
 from functools import lru_cache
@@ -12,10 +13,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """LightAgent application settings.
+    """
+    LightAgent application settings.
 
-    All fields can be overridden via environment variables using the
-    LIGHTAGENT_ prefix (e.g. LIGHTAGENT_DEFAULT_MODEL=gpt-4o).
+    All fields can be overridden via environment variables using the LIGHTAGENT_ prefix
+    (e.g. LIGHTAGENT_DEFAULT_MODEL=gpt-4o).
     """
 
     model_config = SettingsConfigDict(
@@ -291,7 +293,8 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Return the cached application settings instance.
+    """
+    Return the cached application settings instance.
 
     Uses lru_cache to ensure a single Settings object is created
     and reused across the application lifetime.

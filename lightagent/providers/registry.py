@@ -7,9 +7,11 @@ by LiteLLM; no provider-specific imports here.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import litellm
 from langchain_community.chat_models import ChatLiteLLM
 
 from lightagent.core.config import Settings, get_settings
@@ -69,6 +71,28 @@ class ProviderRegistry:
         """
         self._settings = settings or get_settings()
         self._usage: dict[str, TokenUsage] = {}
+        self._inject_api_keys()
+
+    def _inject_api_keys(self) -> None:
+        """Inject configured API keys into os.environ for LiteLLM consumption.
+
+        Pydantic Settings loads keys from .env into the Settings object but does
+        NOT set them in os.environ. LiteLLM reads from os.environ directly, so
+        we bridge the two here using setdefault to avoid overwriting values that
+        were already set by the shell environment.
+        """
+        key_map = {
+            "ANTHROPIC_API_KEY": self._settings.anthropic_api_key.get_secret_value(),
+            "OPENAI_API_KEY": self._settings.openai_api_key.get_secret_value(),
+            "GOOGLE_API_KEY": self._settings.google_api_key.get_secret_value(),
+        }
+        for env_var, value in key_map.items():
+            if value:
+                os.environ.setdefault(env_var, value)
+        # Allow LiteLLM to auto-fix provider-specific parameter mismatches.
+        # Anthropic rejects requests containing tool-use message history without
+        # `tools=`; modify_params=True makes LiteLLM add a dummy tool automatically.
+        litellm.modify_params = True
 
     def get_llm(
         self,
@@ -189,11 +213,13 @@ class ProviderRegistry:
             )
 
         if s.google_api_key.get_secret_value():
-            models.extend([
-                # LiteLLM requires the 'gemini/' provider prefix for routing
-                ModelInfo(id="gemini/gemini-1.5-pro", provider="google"),
-                ModelInfo(id="gemini/gemini-2.0-flash", provider="google"),
-            ])
+            models.extend(
+                [
+                    # LiteLLM requires the 'gemini/' provider prefix for routing
+                    ModelInfo(id="gemini/gemini-1.5-pro", provider="google"),
+                    ModelInfo(id="gemini/gemini-2.0-flash", provider="google"),
+                ]
+            )
 
         # Ollama requires no key — always listed as potentially available
         models.append(ModelInfo(id="ollama/llama3", provider="ollama"))

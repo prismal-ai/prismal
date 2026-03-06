@@ -75,6 +75,7 @@ class SkillsManager:
         self._active = self._root / "active"
         self._custom = self._root / "custom"
         self._active_skills: dict[str, BaseSkill] = {}
+        self._restore_active_skills()
 
     # ── Discovery ────────────────────────────────────────────────────────────
 
@@ -246,24 +247,66 @@ class SkillsManager:
         """Teardown all active skills and re-discover from the filesystem.
 
         Called by the file watcher (Phase 8) when skills are added/modified.
+        The ``active/`` symlinks are the source of truth: names are collected
+        from that directory *before* any deactivation (since :meth:`deactivate`
+        removes symlinks), then all skills are torn down and the collected
+        names are re-activated.
         """
-        names = list(self._active_skills.keys())
-        for name in names:
-            await self.deactivate(name)
-
-        # Re-activate anything linked in active/
+        # Snapshot symlinks BEFORE deactivation removes them
+        names_to_reload: list[str] = []
         if self._active.exists():
             for link in sorted(self._active.iterdir()):
-                if link.name.startswith((".", "_")):
+                if link.name.startswith((".", "_")) or not link.is_dir():
                     continue
-                if not link.is_dir():
-                    continue
-                try:
-                    await self.activate(link.name, confirm=True)
-                except Exception as exc:
-                    logger.error("skill_reload_error", skill=link.name, error=str(exc))
+                names_to_reload.append(link.name)
+
+        # Teardown everything currently in memory
+        for name in list(self._active_skills.keys()):
+            await self.deactivate(name)
+
+        # Re-activate from available/ / custom/
+        for name in names_to_reload:
+            try:
+                await self.activate(name, confirm=True)
+            except Exception as exc:
+                logger.error("skill_reload_error", skill=name, error=str(exc))
 
     # ── Internal helpers ─────────────────────────────────────────────────────
+
+    def _restore_active_skills(self) -> None:
+        """Restore active skills from symlinks in ``active/`` on startup.
+
+        Scans the ``active/`` directory for symlinks left by previous
+        :meth:`activate` calls and loads each skill into ``_active_skills``.
+        ``initialize()`` is **not** called here (it is async and most skills
+        leave it as a no-op); if a skill requires async setup it will be
+        called the next time :meth:`activate` is invoked explicitly.
+
+        Errors (broken symlinks, missing ``skill.py``, bad code) are logged
+        as warnings so a single broken skill never prevents the others from
+        loading.
+        """
+        if not self._active.exists():
+            return
+        for link in sorted(self._active.iterdir()):
+            if link.name.startswith((".", "_")):
+                continue
+            if not link.is_dir():
+                continue
+            skill_py = link / "skill.py"
+            if not skill_py.exists():
+                logger.warning(
+                    "skill_restore_broken_symlink",
+                    skill=link.name,
+                    path=str(link),
+                )
+                continue
+            try:
+                skill_cls = self._load_skill_class(skill_py)
+                self._active_skills[link.name] = skill_cls()
+                logger.debug("skill_restored", skill=link.name)
+            except Exception as exc:
+                logger.warning("skill_restore_error", skill=link.name, error=str(exc))
 
     def _find_skill_dir(self, name: str) -> tuple[Path, bool]:
         """Return (skill_dir, is_custom) for the given skill name.

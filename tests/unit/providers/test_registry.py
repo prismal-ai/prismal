@@ -183,7 +183,15 @@ def test_get_available_models_no_keys_returns_ollama(settings: Settings) -> None
 def test_get_available_models_no_anthropic_key_excludes_claude(
     settings: Settings,
 ) -> None:
-    """Anthropic models must not appear when API key is empty."""
+    """Anthropic models must not appear when API key is empty.
+
+    Explicitly zeroes all provider keys after Settings construction to
+    override any values loaded from .env or os.environ (both of which
+    Pydantic Settings reads at construction time).
+    """
+    settings.anthropic_api_key = SecretStr("")
+    settings.openai_api_key = SecretStr("")
+    settings.google_api_key = SecretStr("")
     reg = ProviderRegistry(settings=settings)
     models = reg.get_available_models()
     ids = [m.id for m in models]
