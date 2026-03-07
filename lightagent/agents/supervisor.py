@@ -74,7 +74,14 @@ Available agents:
 - researcher: Web search, RAG queries, reading files
 - coder: Writing and executing code, reading/writing code files
 - rag_agent: Internal document knowledge base Q&A
-- planner: Decompose complex multi-step tasks
+- planner: Decompose complex multi-step tasks AND create software specifications
+  using Spec-Driven Design (SDD). Route here when the user asks to:
+  · Plan a new feature, API, service, or architecture before coding
+  · Write a PRD, API Spec, Technical Design, Data Model, or Implementation Plan
+  · Validate coherence between existing specs
+  · Any request mentioning: "PRD", "spec", "especificación", "diseño técnico",
+    "arquitectura", "plan de implementación", "modelo de datos", "diseño de API",
+    "planificar antes de codificar", "spec-driven", "SDD"
 - critic: Review and improve outputs
 - data_analyst: SQL queries (DuckDB), DataFrame transforms, charts
 - file_manager: File read/write operations
@@ -90,6 +97,33 @@ Available agents:
   · any GitHub URL (github.com/...) paired with install/add/download verbs
   · owner/repo slugs like "anthropics/skills" with install intent
   · "skill-creator de anthropics", "instala el skill-creator"
+  · zip archives or folders with skill.md + scripts/ + references/ layout
+  · "instala skill desde /ruta/mi_skill.zip", "install from /path/skill.zip"
+
+  SKILL PACKAGE FORMAT (zip or folder — no skill.py required):
+  A skill package can be a .zip archive or a plain directory with this layout:
+    skill.md          ← YAML frontmatter (name, description, version, author,
+                         tags, safe_to_auto_activate, requires_permissions)
+                         followed by free-form documentation for the agent.
+    scripts/          ← Python files; each @tool-decorated function becomes
+    │  └─ my_tool.py    a LangChain tool exposed to the agent.
+    references/       ← Optional reference documents (txt, md, pdf, …) the
+       └─ doc.md        agent can load for context.
+
+  The YAML frontmatter inside skill.md must be fenced with --- delimiters:
+    ---
+    name: my_skill
+    description: One-line description
+    version: 1.0.0
+    author: your-name
+    tags: [utility]
+    safe_to_auto_activate: false
+    requires_permissions: []
+    ---
+
+  A skill.py wrapper is generated automatically — users never write it.
+  After installation the agent will confirm the skill name so the user can
+  request activation: "activa el skill <name>".
 - END: Return final answer to the user
 
 Routing rules:

@@ -100,6 +100,32 @@ class Settings(BaseSettings):
         default=False,
         description="Allow shell execution via ActionInterceptor (dangerous)",
     )
+
+    # ── Sandbox multi-lenguaje ────────────────────────────────────────
+    sandbox_path: str = Field(
+        default="sandbox",
+        description="Ruta raíz de la sandbox de desarrollo multi-lenguaje",
+    )
+    sandbox_node_version: str = Field(
+        default="20.11.0",
+        description="Versión de Node.js a instalar en la sandbox",
+    )
+    sandbox_go_version: str = Field(
+        default="1.22.0",
+        description="Versión de Go a instalar en la sandbox",
+    )
+    sandbox_exec_timeout: int = Field(
+        default=60,
+        ge=5,
+        le=300,
+        description="Timeout en segundos para ejecuciones en sandbox",
+    )
+    sandbox_max_output_chars: int = Field(
+        default=8_000,
+        ge=500,
+        description="Máximo de caracteres de output retornados por la sandbox",
+    )
+
     nemo_guardrails_enabled: bool = Field(
         default=False,
         description="Enable NVIDIA NeMo Guardrails (requires config/nemo_rails/)",

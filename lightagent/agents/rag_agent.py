@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 
-from lightagent.agents.tool_registry import get_tools_for_agent
+from lightagent.agents.tool_registry import get_tools_for_agent, react_loop
 from lightagent.core.logging import get_logger
 from lightagent.providers.registry import ProviderRegistry
 
@@ -38,8 +38,9 @@ Your pipeline:
 async def rag_agent_node(state: AgentState) -> dict[str, object]:
     """Execute the rag_agent sub-agent node using the CRAG pipeline.
 
-    Retrieves and grades documents, falls back to web search when necessary,
-    and generates a grounded answer with citations.
+    Runs a ReAct loop with vector search, document indexing and web search
+    tools so the LLM can iteratively retrieve, grade and fall back to the
+    web until it has enough information to generate a grounded answer.
 
     Args:
         state: Current agent state from LangGraph.
@@ -49,19 +50,27 @@ async def rag_agent_node(state: AgentState) -> dict[str, object]:
         new ``messages`` containing the grounded answer, and the existing
         ``retrieved_docs`` and ``doc_grades`` fields preserved.
     """
-    logger.debug("rag_agent_node_called", session_id=state.get("session_id"))
+    session_id = state.get("session_id")
+    logger.debug("rag_agent_node_called", session_id=session_id)
 
     registry = ProviderRegistry()
     llm = registry.get_llm_with_fallback()
-    llm_with_tools = llm.bind_tools(get_tools_for_agent('rag_agent'))
+    tools = get_tools_for_agent("rag_agent")
+    llm_with_tools = llm.bind_tools(tools)
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), *state["messages"]]
-    response: AIMessage = await llm_with_tools.ainvoke(messages)
+    response = await react_loop(
+        llm_with_tools,
+        tools,
+        messages,
+        agent_name="rag_agent",
+        session_id=str(session_id) if session_id else None,
+    )
 
     retrieved_docs: list[dict[str, Any]] = state.get("retrieved_docs", [])
     doc_grades: list[float] = state.get("doc_grades", [])
 
-    logger.info("rag_agent_complete", session_id=state.get("session_id"))
+    logger.info("rag_agent_complete", session_id=session_id)
     return {
         "current_agent": "rag_agent",
         "messages": [response],

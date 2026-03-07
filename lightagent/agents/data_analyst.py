@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 
-from lightagent.agents.tool_registry import get_tools_for_agent
+from lightagent.agents.tool_registry import get_tools_for_agent, react_loop
 from lightagent.core.logging import get_logger
 from lightagent.providers.registry import ProviderRegistry
 
@@ -41,10 +41,11 @@ Best practices:
 
 
 async def data_analyst_node(state: AgentState) -> dict[str, object]:
-    """Execute the data_analyst sub-agent node.
+    """Execute the data_analyst sub-agent node with a ReAct tool loop.
 
-    Invokes the LLM with data-analysis tools (DuckDB query, Polars transform,
-    chart creation) and returns insights explained in plain language.
+    Runs a full ReAct loop with DuckDB, Polars, and chart tools so the LLM
+    can iteratively query, transform and visualise data before returning a
+    final answer.
 
     Args:
         state: Current agent state from LangGraph.
@@ -53,16 +54,24 @@ async def data_analyst_node(state: AgentState) -> dict[str, object]:
         Updated state dict with ``current_agent`` set to ``'data_analyst'``
         and new ``messages`` containing the analysis results.
     """
-    logger.debug("data_analyst_node_called", session_id=state.get("session_id"))
+    session_id = state.get("session_id")
+    logger.debug("data_analyst_node_called", session_id=session_id)
 
     registry = ProviderRegistry()
     llm = registry.get_llm_with_fallback()
-    llm_with_tools = llm.bind_tools(get_tools_for_agent('data_analyst'))
+    tools = get_tools_for_agent("data_analyst")
+    llm_with_tools = llm.bind_tools(tools)
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), *state["messages"]]
-    response: AIMessage = await llm_with_tools.ainvoke(messages)
+    response = await react_loop(
+        llm_with_tools,
+        tools,
+        messages,
+        agent_name="data_analyst",
+        session_id=str(session_id) if session_id else None,
+    )
 
-    logger.info("data_analyst_complete", session_id=state.get("session_id"))
+    logger.info("data_analyst_complete", session_id=session_id)
     return {"current_agent": "data_analyst", "messages": [response]}
 
 

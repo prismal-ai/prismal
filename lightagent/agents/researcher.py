@@ -15,11 +15,11 @@ non-human messages from the conversation history before each LLM call.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
+from langchain_core.messages import BaseMessage, SystemMessage
 
-from lightagent.agents.tool_registry import get_tools_for_agent
+from lightagent.agents.tool_registry import get_tools_for_agent, react_loop
 from lightagent.core.logging import get_logger
 from lightagent.providers.registry import ProviderRegistry
 
@@ -86,7 +86,7 @@ async def researcher_node(state: AgentState) -> dict[str, object]:
 
     Calls the LLM (with tools bound), executes any requested tool calls,
     feeds the results back as ``ToolMessage`` objects, and repeats until
-    the LLM returns a final answer or ``_MAX_TOOL_ITERATIONS`` is reached.
+    the LLM returns a final answer or the iteration cap is reached.
 
     The conversation slice sent to the provider is trimmed so that it always
     ends with a ``HumanMessage``, satisfying the Anthropic API constraint.
@@ -104,58 +104,19 @@ async def researcher_node(state: AgentState) -> dict[str, object]:
     registry = ProviderRegistry()
     llm = registry.get_llm_with_fallback()
     active_tools = get_tools_for_agent("researcher")
-    tool_map: dict[str, Any] = {t.name: t for t in active_tools}
     llm_with_tools = llm.bind_tools(active_tools)
 
     system = [SystemMessage(content=_SYSTEM_PROMPT)]
+    loop_messages = list(_trim_to_last_human(list(state["messages"])))
 
-    # Local message list for the ReAct loop — starts from state history
-    # trimmed so the last message is always a HumanMessage.
-    loop_messages: list[BaseMessage] = list(
-        _trim_to_last_human(list(state["messages"]))
+    response = await react_loop(
+        llm_with_tools,
+        active_tools,
+        system + loop_messages,
+        agent_name="researcher",
+        max_iterations=_MAX_TOOL_ITERATIONS,
+        session_id=str(session_id) if session_id else None,
     )
-
-    response: AIMessage = AIMessage(content="")
-
-    for iteration in range(_MAX_TOOL_ITERATIONS):
-        response = await llm_with_tools.ainvoke(system + loop_messages)
-
-        tool_calls = getattr(response, "tool_calls", None) or []
-        if not tool_calls:
-            # LLM produced a final answer — exit the loop
-            break
-
-        logger.debug(
-            "researcher_tool_calls",
-            iteration=iteration,
-            tools=[tc["name"] for tc in tool_calls],
-            session_id=session_id,
-        )
-
-        # Append the assistant's tool-call message before the results
-        loop_messages.append(response)
-
-        # Execute each requested tool and collect ToolMessages
-        for tc in tool_calls:
-            tool_fn = tool_map.get(tc["name"])
-            if tool_fn is None:
-                result = f"Tool '{tc['name']}' not found."
-            else:
-                try:
-                    result = str(tool_fn.invoke(tc.get("args", {})))
-                except Exception as exc:
-                    result = f"Tool error: {exc}"
-            # Truncate very long tool results to avoid token explosion.
-            # MCP tools can return thousands of chars; cap at 4k per result.
-            if len(result) > 4_000:
-                result = result[:4_000] + "\n…[truncated]"
-            loop_messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
-    else:
-        logger.warning(
-            "researcher_tool_iteration_cap_reached",
-            max_iterations=_MAX_TOOL_ITERATIONS,
-            session_id=session_id,
-        )
 
     logger.info("researcher_complete", session_id=session_id)
     return {"current_agent": "researcher", "messages": [response]}

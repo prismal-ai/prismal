@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 
-from lightagent.agents.tool_registry import get_tools_for_agent
+from lightagent.agents.tool_registry import get_tools_for_agent, react_loop
 from lightagent.core.logging import get_logger
 from lightagent.providers.registry import ProviderRegistry
 
@@ -39,10 +39,11 @@ Safety constraints:
 
 
 async def file_manager_node(state: AgentState) -> dict[str, object]:
-    """Execute the file_manager sub-agent node.
+    """Execute the file_manager sub-agent node with a ReAct tool loop.
 
-    Invokes the LLM with file management tools (read file, write file) and
-    returns the result of the requested file operation.
+    Runs a ReAct loop with read/write file tools so the LLM can perform
+    multi-step file operations (read → transform → write) before returning
+    a final confirmation.
 
     Args:
         state: Current agent state from LangGraph.
@@ -51,16 +52,24 @@ async def file_manager_node(state: AgentState) -> dict[str, object]:
         Updated state dict with ``current_agent`` set to ``'file_manager'``
         and new ``messages`` containing the operation result.
     """
-    logger.debug("file_manager_node_called", session_id=state.get("session_id"))
+    session_id = state.get("session_id")
+    logger.debug("file_manager_node_called", session_id=session_id)
 
     registry = ProviderRegistry()
     llm = registry.get_llm_with_fallback()
-    llm_with_tools = llm.bind_tools(get_tools_for_agent('file_manager'))
+    tools = get_tools_for_agent("file_manager")
+    llm_with_tools = llm.bind_tools(tools)
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), *state["messages"]]
-    response: AIMessage = await llm_with_tools.ainvoke(messages)
+    response = await react_loop(
+        llm_with_tools,
+        tools,
+        messages,
+        agent_name="file_manager",
+        session_id=str(session_id) if session_id else None,
+    )
 
-    logger.info("file_manager_complete", session_id=state.get("session_id"))
+    logger.info("file_manager_complete", session_id=session_id)
     return {"current_agent": "file_manager", "messages": [response]}
 
 

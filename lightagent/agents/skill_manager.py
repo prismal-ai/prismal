@@ -271,23 +271,37 @@ def _install_from_path(
     source_path: str,
     available_dir: Path,
 ) -> tuple[str, str | None]:
-    """Copy a skill directory from *source_path* into *available_dir*.
+    """Copy a skill package from *source_path* into *available_dir*.
 
-    Validates that the source is a directory containing ``skill.py``, then
-    copies the whole tree.  Does not activate — the caller is responsible.
+    Accepts three formats:
+
+    * **Python skill** — a directory containing ``skill.py``.
+    * **Markdown skill package** — a directory containing ``skill.md``
+      (+ optional ``scripts/`` and ``references/``).  A ``skill.py`` wrapper
+      is generated automatically via :func:`~lightagent.skills.base.generate_skill_py`.
+    * **Zip archive** — a ``.zip`` file whose contents follow either of the
+      above layouts.  Delegated to
+      :meth:`~lightagent.skills.manager.SkillsManager.install_from_zip`.
 
     Args:
-        source_path: Filesystem path supplied by the user.
+        source_path: Filesystem path supplied by the user (directory or .zip).
         available_dir: The ``skills/available/`` directory.
 
     Returns:
         ``(skill_name, None)`` on success, or ``("", error_message)`` on
         failure.
     """
+    from lightagent.skills.manager import SkillsManager  # noqa: PLC0415
+
     src = Path(source_path).expanduser().resolve()
 
-    # Tolerate the user pointing directly at skill.py
-    if src.is_file() and src.name == "skill.py":
+    # ── Zip archive ──────────────────────────────────────────────────────
+    if src.suffix.lower() == ".zip":
+        manager = SkillsManager()
+        return manager.install_from_zip(src)
+
+    # Tolerate pointing directly at skill.py or skill.md
+    if src.is_file() and src.name in ("skill.py", "skill.md"):
         src = src.parent
 
     if not src.exists():
@@ -295,12 +309,13 @@ def _install_from_path(
 
     if not src.is_dir():
         return "", (
-            f"La ruta debe ser un directorio que contenga skill.py: {source_path}"
+            f"La ruta debe ser un directorio con skill.py o skill.md: {source_path}"
         )
 
     skill_py = src / "skill.py"
-    if not skill_py.exists():
-        return "", f"No se encontró skill.py en: {source_path}"
+    skill_md = src / "skill.md"
+    if not skill_py.exists() and not skill_md.exists():
+        return "", f"No se encontró skill.py ni skill.md en: {source_path}"
 
     skill_name = src.name
     dest = available_dir / skill_name
@@ -315,6 +330,16 @@ def _install_from_path(
         shutil.copytree(str(src), str(dest))
     except Exception as exc:
         return "", f"Error al copiar el skill: {exc}"
+
+    # ── Auto-generate skill.py for Markdown-based skill packages ─────────
+    if not (dest / "skill.py").exists() and (dest / "skill.md").exists():
+        try:
+            from lightagent.skills.base import generate_skill_py  # noqa: PLC0415
+
+            generate_skill_py(dest)
+        except Exception as exc:  # noqa: BLE001
+            shutil.rmtree(str(dest), ignore_errors=True)
+            return "", f"Error generando skill.py desde skill.md: {exc}"
 
     return skill_name, None
 
@@ -457,19 +482,21 @@ async def skill_manager_node(state: AgentState) -> dict[str, object]:
                     "y el nombre del skill."
                 )
 
-    # ── INSTALL FROM PATH ─────────────────────────────────────────────────
+    # ── INSTALL FROM PATH / ZIP ───────────────────────────────────────────
     elif intent.startswith("INSTALL:"):
         source_path = intent.split(":", 1)[1].strip()
+        is_zip = source_path.lower().endswith(".zip")
         skill_name, error = _install_from_path(source_path, manager._available)
         if error:
             result = f"❌ Error instalando skill desde `{source_path}`:\n{error}"
         else:
+            pkg_type = "zip" if is_zip else "carpeta"
             try:
                 await manager.activate(skill_name, confirm=True)
                 result = (
-                    f"✅ Skill `{skill_name}` instalado y activado.\n"
-                    f"   Origen:    {source_path}\n"
-                    f"   Destino:   lightagent/skills/available/{skill_name}/"
+                    f"✅ Skill `{skill_name}` instalado ({pkg_type}) y activado.\n"
+                    f"   Origen:  {source_path}\n"
+                    f"   Destino: lightagent/skills/available/{skill_name}/"
                 )
                 logger.info(
                     "skill_installed_from_path",
@@ -478,7 +505,7 @@ async def skill_manager_node(state: AgentState) -> dict[str, object]:
                 )
             except Exception as exc:
                 result = (
-                    f"✅ Skill `{skill_name}` copiado a `available/`.\n"
+                    f"✅ Skill `{skill_name}` copiado a `available/` ({pkg_type}).\n"
                     f"   Origen: {source_path}\n\n"
                     f"⚠️  No se pudo activar automáticamente: {exc}\n"
                     f"   Revisa el skill y luego dime: "

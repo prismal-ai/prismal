@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 
-from lightagent.agents.tools import CRITIC_TOOLS
+from lightagent.agents.tool_registry import get_tools_for_agent, react_loop
 from lightagent.core.logging import get_logger
 from lightagent.providers.registry import ProviderRegistry
 
@@ -40,11 +40,12 @@ Be constructive and specific. Vague feedback like "improve clarity" is not helpf
 
 
 async def critic_node(state: AgentState) -> dict[str, object]:
-    """Execute the critic sub-agent node.
+    """Execute the critic sub-agent node with a ReAct tool loop.
 
     Evaluates the most recent agent output for accuracy, completeness,
-    clarity, and safety, then returns a scored review.  Increments
-    ``iteration_count`` to track the number of self-critique cycles.
+    clarity, and safety using the ``evaluate`` and ``score`` tools, then
+    returns a scored review.  Increments ``iteration_count`` to track
+    the number of self-critique cycles.
 
     Args:
         state: Current agent state from LangGraph.
@@ -54,20 +55,28 @@ async def critic_node(state: AgentState) -> dict[str, object]:
         new ``messages`` containing the review, and ``iteration_count``
         incremented by 1.
     """
-    logger.debug("critic_node_called", session_id=state.get("session_id"))
+    session_id = state.get("session_id")
+    logger.debug("critic_node_called", session_id=session_id)
 
     current_iteration: int = state.get("iteration_count", 0)
 
     registry = ProviderRegistry()
     llm = registry.get_llm_with_fallback()
-    llm_with_tools = llm.bind_tools(CRITIC_TOOLS)
+    tools = get_tools_for_agent("critic")
+    llm_with_tools = llm.bind_tools(tools)
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), *state["messages"]]
-    response: AIMessage = await llm_with_tools.ainvoke(messages)
+    response = await react_loop(
+        llm_with_tools,
+        tools,
+        messages,
+        agent_name="critic",
+        session_id=str(session_id) if session_id else None,
+    )
 
     logger.info(
         "critic_complete",
-        session_id=state.get("session_id"),
+        session_id=session_id,
         iteration=current_iteration + 1,
     )
     return {

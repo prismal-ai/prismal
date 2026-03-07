@@ -22,13 +22,16 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shutil
 import sys
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from lightagent.core.exceptions import SkillLoadError, SkillValidationError
 from lightagent.core.logging import get_logger
+from lightagent.skills.base import _find_skill_md
 
 if TYPE_CHECKING:
     from langchain_core.tools import BaseTool
@@ -52,6 +55,50 @@ class SkillInfo:
     safe_to_auto_activate: bool
     requires_permissions: list[str] = field(default_factory=list)
     error_message: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Zip-archive helpers (module-level, used by SkillsManager.install_from_zip)
+# ---------------------------------------------------------------------------
+
+
+def _zip_detect_prefix(names: list[str]) -> str | None:
+    """Return the top-level prefix where ``skill.md`` lives inside a zip.
+
+    Comparison is case-insensitive so both ``skill.md`` and ``SKILL.md`` are
+    recognised.
+
+    Args:
+        names: List of member paths returned by :meth:`zipfile.ZipFile.namelist`.
+
+    Returns:
+        ``""`` if ``skill.md`` is at the archive root, ``"dirname/"`` if it is
+        inside a single top-level directory, or ``None`` if not found.
+    """
+    names_lower = {n.lower(): n for n in names}
+    if "skill.md" in names_lower:
+        return ""
+    top_dirs = {n.split("/")[0] for n in names if "/" in n}
+    for top in sorted(top_dirs):
+        if f"{top}/skill.md" in names_lower:
+            return f"{top}/"
+    return None
+
+
+def _zip_skill_name(prefix: str, zip_path: Path) -> str:
+    """Derive a snake_case skill name from the zip prefix or filename.
+
+    Args:
+        prefix: Top-level prefix from :func:`_zip_detect_prefix`
+            (``""`` when ``skill.md`` is at the archive root).
+        zip_path: Path to the zip file, used as fallback when prefix is empty.
+
+    Returns:
+        Snake-case skill name string.
+    """
+    if prefix:
+        return prefix.rstrip("/").replace("-", "_")
+    return zip_path.stem.replace("-", "_")
 
 
 class SkillsManager:
@@ -141,7 +188,12 @@ class SkillsManager:
         skill_dir, is_custom = self._find_skill_dir(name)
         skill_py = skill_dir / "skill.py"
         if not skill_py.exists():
-            raise SkillLoadError(name, f"skill.py not found in {skill_dir}")
+            if _find_skill_md(skill_dir) is not None:
+                from lightagent.skills.base import generate_skill_py  # noqa: PLC0415
+
+                generate_skill_py(skill_dir)
+            else:
+                raise SkillLoadError(name, f"skill.py not found in {skill_dir}")
 
         # Custom skill human-review gate (AC-006-8)
         if is_custom and not (skill_dir / "validated_by_human.txt").exists():
@@ -271,6 +323,91 @@ class SkillsManager:
             except Exception as exc:
                 logger.error("skill_reload_error", skill=name, error=str(exc))
 
+    def install_from_zip(
+        self, zip_path: str | Path
+    ) -> tuple[str, str | None]:
+        """Install a skill from a zip archive containing a ``skill.md`` package.
+
+        The zip must contain ``skill.md`` either at the archive root or inside a
+        single top-level directory.  ``scripts/`` and ``references/`` are
+        optional.  A ``skill.py`` wrapper is generated automatically so the
+        skill can be loaded by the standard :class:`SkillsManager` machinery.
+
+        Expected archive layouts (both accepted)::
+
+            # Root-level layout
+            skill.md
+            scripts/my_tool.py
+            references/doc.md
+
+            # Single top-level directory layout
+            my_skill/skill.md
+            my_skill/scripts/my_tool.py
+            my_skill/references/doc.md
+
+        Args:
+            zip_path: Filesystem path to the ``.zip`` archive.
+
+        Returns:
+            ``(skill_name, None)`` on success, or ``("", error_message)`` on
+            failure.
+        """
+        from lightagent.skills.base import generate_skill_py  # noqa: PLC0415
+
+        src = Path(zip_path).expanduser().resolve()
+        if not src.exists():
+            return "", f"Archivo no encontrado: {zip_path}"
+        if src.suffix.lower() != ".zip":
+            return "", f"Se esperaba un archivo .zip: {zip_path}"
+
+        try:
+            with zipfile.ZipFile(src, "r") as zf:
+                names = zf.namelist()
+                prefix = _zip_detect_prefix(names)
+                if prefix is None:
+                    return (
+                        "",
+                        "El zip no contiene skill.md "
+                        "(ni en la raíz ni en un directorio raíz único).",
+                    )
+
+                skill_name = _zip_skill_name(prefix, src)
+                dest = self._available / skill_name
+                if dest.exists():
+                    return (
+                        "",
+                        f"Ya existe un skill llamado '{skill_name}' en available/. "
+                        "Elige un nombre distinto o elimínalo primero.",
+                    )
+
+                dest.mkdir(parents=True)
+                for member in names:
+                    rel = member[len(prefix):]
+                    if not rel:
+                        continue
+                    target = dest / rel
+                    if member.endswith("/"):
+                        target.mkdir(parents=True, exist_ok=True)
+                    else:
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        with zf.open(member) as zf_src, target.open("wb") as out_f:
+                            out_f.write(zf_src.read())
+
+        except zipfile.BadZipFile:
+            return "", f"Archivo zip inválido: {zip_path}"
+        except Exception as exc:  # noqa: BLE001
+            return "", f"Error al extraer el zip: {exc}"
+
+        # Auto-generate skill.py from the extracted skill.md
+        try:
+            generate_skill_py(dest)
+        except Exception as exc:  # noqa: BLE001
+            shutil.rmtree(str(dest), ignore_errors=True)
+            return "", f"Error generando skill.py desde skill.md: {exc}"
+
+        logger.info("skill_installed_from_zip", skill=skill_name, source=str(src))
+        return skill_name, None
+
     # ── Internal helpers ─────────────────────────────────────────────────────
 
     def _restore_active_skills(self) -> None:
@@ -295,12 +432,25 @@ class SkillsManager:
                 continue
             skill_py = link / "skill.py"
             if not skill_py.exists():
-                logger.warning(
-                    "skill_restore_broken_symlink",
-                    skill=link.name,
-                    path=str(link),
-                )
-                continue
+                if _find_skill_md(link) is not None:
+                    try:
+                        from lightagent.skills.base import (  # noqa: PLC0415
+                            generate_skill_py,
+                        )
+
+                        generate_skill_py(link)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "skill_restore_md_error", skill=link.name, error=str(exc)
+                        )
+                        continue
+                else:
+                    logger.warning(
+                        "skill_restore_broken_symlink",
+                        skill=link.name,
+                        path=str(link),
+                    )
+                    continue
             try:
                 skill_cls = self._load_skill_class(skill_py)
                 self._active_skills[link.name] = skill_cls()
@@ -363,6 +513,8 @@ class SkillsManager:
                 isinstance(attr, type)
                 and issubclass(attr, BaseSkill)
                 and attr is not BaseSkill
+                # Only pick classes actually defined in this module, not imported ones
+                and getattr(attr, "__module__", None) == module.__name__
             ):
                 return attr
 
@@ -396,7 +548,31 @@ class SkillsManager:
                 continue
             skill_py = d / "skill.py"
             if not skill_py.exists():
-                continue
+                if _find_skill_md(d) is not None:
+                    try:
+                        from lightagent.skills.base import (  # noqa: PLC0415
+                            generate_skill_py,
+                        )
+
+                        generate_skill_py(d)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "skill_md_generate_error", skill=d.name, error=str(exc)
+                        )
+                        infos.append(
+                            SkillInfo(
+                                name=d.name,
+                                status="error",
+                                version="?",
+                                description="",
+                                author="?",
+                                safe_to_auto_activate=False,
+                                error_message=str(exc),
+                            )
+                        )
+                        continue
+                else:
+                    continue
             try:
                 skill_cls = self._load_skill_class(skill_py)
                 meta = skill_cls().metadata
