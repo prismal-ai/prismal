@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.constants import END
 from langgraph.graph import StateGraph
 
@@ -83,7 +84,7 @@ _DEFAULT_CHECKPOINT_PATH: Path = Path("data/db/checkpoints.db")
 
 def build_supervisor_graph(
     checkpoint_path: Path | None = None,
-    checkpointer: Any = None,
+    checkpointer: Any = None,  # noqa: ANN401 — no common base type for LangGraph checkpointers
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Build and compile the LangGraph SUPERVISOR state machine.
@@ -202,6 +203,41 @@ def get_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any, Any]:
     return build_supervisor_graph()
 
 
+# ---------------------------------------------------------------------------
+# Async graph singleton (for channel bots / ainvoke callers)
+# ---------------------------------------------------------------------------
+_async_graph: CompiledStateGraph[AgentState, Any, Any, Any] | None = None
+
+
+async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    """
+    Return the compiled LangGraph supervisor graph with an async checkpointer.
+
+    Uses :class:`~langgraph.checkpoint.sqlite.aio.AsyncSqliteSaver` so that
+    ``graph.ainvoke()`` works correctly in async contexts (e.g. channel bots).
+
+    The graph is built once and cached as a module-level singleton; subsequent
+    calls return the same object without reopening the database.
+
+    Returns:
+        A compiled graph backed by :class:`AsyncSqliteSaver`.
+    """
+    global _async_graph
+    if _async_graph is not None:
+        return _async_graph
+
+    import aiosqlite
+
+    db_path = _DEFAULT_CHECKPOINT_PATH
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = await aiosqlite.connect(str(db_path))
+    checkpointer = AsyncSqliteSaver(conn)
+    await checkpointer.setup()
+    _async_graph = build_supervisor_graph(checkpointer=checkpointer)
+    logger.debug("async_graph_initialized")
+    return _async_graph
+
+
 def list_session_ids() -> list[str]:
     """
     Return all distinct thread IDs from the LangGraph SQLite checkpointer.
@@ -225,4 +261,9 @@ def list_session_ids() -> list[str]:
         return []
 
 
-__all__ = ["build_supervisor_graph", "get_compiled_graph", "list_session_ids"]
+__all__ = [
+    "build_supervisor_graph",
+    "get_async_compiled_graph",
+    "get_compiled_graph",
+    "list_session_ids",
+]
