@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
 logger = get_logger("lightagent.skills.manager")
 
-SkillStatus = Literal["active", "available", "custom", "error"]
+SkillStatus = Literal["active", "available", "custom", "external", "error"]
 
 
 @dataclass
@@ -109,12 +109,25 @@ class SkillsManager:
             package directory next to this module.
     """
 
-    def __init__(self, skills_root: Path | None = None) -> None:
+    def __init__(
+        self,
+        skills_root: Path | None = None,
+        external_dirs: list[Path] | None = None,
+    ) -> None:
         """Initialise the manager.
 
         Args:
             skills_root: Override for the default skills root directory.
+                When ``None`` (the default), the package ``skills/`` directory
+                is used and ``external_skills_dirs`` from Settings is loaded
+                automatically.  When an explicit path is supplied (e.g. in
+                tests) external dirs default to empty unless also provided.
+            external_dirs: Additional directories to scan for skills.  When
+                ``None`` and *skills_root* was not overridden, directories are
+                loaded from ``settings.external_skills_dirs`` automatically.
+                Pass an empty list to suppress external-dir loading entirely.
         """
+        use_default_root = skills_root is None
         if skills_root is None:
             skills_root = Path(__file__).parent
         self._root = skills_root
@@ -122,6 +135,23 @@ class SkillsManager:
         self._active = self._root / "active"
         self._custom = self._root / "custom"
         self._active_skills: dict[str, BaseSkill] = {}
+
+        if external_dirs is not None:
+            self._external_dirs: list[Path] = [
+                Path(d).expanduser().resolve() for d in external_dirs
+            ]
+        elif use_default_root:
+            from lightagent.core.config import get_settings  # noqa: PLC0415
+
+            self._external_dirs = [
+                Path(d).expanduser().resolve()
+                for d in get_settings().external_skills_dirs
+                if d
+            ]
+        else:
+            # Explicit skills_root provided (e.g. tests) — no external dirs
+            self._external_dirs = []
+
         self._restore_active_skills()
 
     # ── Discovery ────────────────────────────────────────────────────────────
@@ -158,6 +188,9 @@ class SkillsManager:
         infos.extend(self._scan_dir(self._available, "available", active_names))
         # Custom (not yet active)
         infos.extend(self._scan_dir(self._custom, "custom", active_names))
+        # External directories (not yet active)
+        for ext_dir in self._external_dirs:
+            infos.extend(self._scan_dir(ext_dir, "external", active_names))
 
         if status is not None:
             infos = [i for i in infos if i.status == status]
@@ -461,11 +494,16 @@ class SkillsManager:
     def _find_skill_dir(self, name: str) -> tuple[Path, bool]:
         """Return (skill_dir, is_custom) for the given skill name.
 
+        Searches ``available/``, ``custom/``, and any configured external
+        directories in that order.  External-directory skills are treated the
+        same as ``available/`` skills (``is_custom=False``).
+
         Args:
             name: Skill directory name.
 
         Raises:
-            SkillLoadError: Skill not found in available/ or custom/.
+            SkillLoadError: Skill not found in available/, custom/, or any
+                external directory.
         """
         available_dir = self._available / name
         if available_dir.is_dir():
@@ -473,7 +511,15 @@ class SkillsManager:
         custom_dir = self._custom / name
         if custom_dir.is_dir():
             return custom_dir, True
-        raise SkillLoadError(name, "Not found in available/ or custom/")
+        for ext_dir in self._external_dirs:
+            ext_skill_dir = ext_dir / name
+            if ext_skill_dir.is_dir():
+                return ext_skill_dir, False
+        raise SkillLoadError(
+            name,
+            f"Not found in available/, custom/, or external dirs: "
+            f"{[str(d) for d in self._external_dirs]}",
+        )
 
     def _load_skill_class(self, skill_py: Path) -> type[BaseSkill]:
         """Dynamically load the BaseSkill subclass from a skill.py file.

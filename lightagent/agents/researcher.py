@@ -15,6 +15,7 @@ non-human messages from the conversation history before each LLM call.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from langchain_core.messages import BaseMessage, SystemMessage
@@ -30,10 +31,18 @@ logger = get_logger("lightagent.agents.researcher")
 
 # Maximum tool-call iterations per researcher invocation.  Guards against
 # runaway loops when tool results never satisfy the LLM.
-_MAX_TOOL_ITERATIONS: int = 5
+# Set to 8 to give the researcher enough room for browser workflows that
+# require navigate → snapshot → optional follow-up calls (3+ tool rounds).
+_MAX_TOOL_ITERATIONS: int = 8
 
-_SYSTEM_PROMPT = """You are a research specialist with access to web search and a \
-knowledge base.
+# Absolute path to the MCP servers config — computed once at import time so
+# the researcher can always read the live file regardless of the process CWD.
+_MCP_CONFIG_PATH: str = str(
+    Path(__file__).resolve().parents[2] / "config" / "mcp_servers.yaml"
+)
+
+_SYSTEM_PROMPT = f"""You are a research specialist with access to web search, a \
+knowledge base, and filesystem tools.
 
 Your responsibilities:
 - Search the web for up-to-date information relevant to the user's query.
@@ -43,6 +52,31 @@ Your responsibilities:
 - Synthesise findings into a concise, well-structured response.
 - If conflicting information is found, present all perspectives and note discrepancies.
 - Flag when information may be outdated or uncertain.
+
+MCP Servers queries (CRITICAL — never answer from memory):
+When the user asks about MCP servers (list them, check which are active/enabled,
+or get details about a specific one), you MUST read the live configuration file
+using the read_file tool with this EXACT absolute path:
+  {_MCP_CONFIG_PATH}
+Do NOT use list_mcp_tools — that lists MCP tool functions, not MCP server config.
+After reading the file, parse and present the results:
+- Show ONLY servers with `enabled: true` as "active".
+- Servers with `enabled: false` are disabled/inactive.
+- Present name and description for each active server.
+- Never use a memorised or hardcoded list of MCP servers — always read the file.
+
+Browser / Playwright queries (CRITICAL — follow this exact sequence):
+When the user asks you to open, visit, navigate to, or read a web page using
+Playwright or the browser MCP, use this exact sequence of tool calls:
+  1. browser_navigate(url="<the full URL>")  ← navigate first
+  2. browser_snapshot()                      ← capture page content
+  3. Analyse the snapshot and answer the user.
+NEVER use browser_evaluate for navigation. browser_evaluate runs arbitrary
+JavaScript — it cannot navigate to a URL. Use browser_navigate for that.
+NEVER call list_mcp_tools to discover Playwright tools — you already know them:
+  browser_navigate, browser_snapshot, browser_click, browser_fill_form,
+  browser_type, browser_press_key, browser_take_screenshot, browser_evaluate,
+  browser_close, browser_tabs, browser_wait_for.
 
 Tool and skill failure handling (IMPORTANT):
 - If a tool returns a stub result (e.g. "[stub] ..."), an error, or no useful

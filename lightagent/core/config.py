@@ -101,6 +101,18 @@ class Settings(BaseSettings):
         description="Allow shell execution via ActionInterceptor (dangerous)",
     )
 
+    # ── Skills ────────────────────────────────────────────────────────
+    external_skills_dirs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Additional directories to search for skills. "
+            "Each entry is a filesystem path that contains skill subdirectories "
+            "(same layout as lightagent/skills/available/). "
+            "Set via env var as a JSON array: "
+            'LIGHTAGENT_EXTERNAL_SKILLS_DIRS=\'["/home/user/.agents/skills"]\''
+        ),
+    )
+
     # ── Sandbox multi-lenguaje ────────────────────────────────────────
     sandbox_path: str = Field(
         default="sandbox",

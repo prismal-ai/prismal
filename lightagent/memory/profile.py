@@ -1,14 +1,16 @@
 """
 Agent and user profile management via markdown files.
 
-Follows the OpenClaw markdown-first memory architecture:
+Follows a three-file markdown architecture:
 
 - ``SOUL.md``: Agent name, persona, tone, communication style.
+  Personalidad pura — puede ser reseteada sin perder capacidades.
+- ``CAPACITIES.md``: Permanent agent capabilities (skills, MCPs, RAG,
+  data tools, agents).  Never deleted on reset.
 - ``USER.md``: User identity, name, known facts and preferences.
 
-Both files are stored under ``data/workspace/profile/`` and are loaded at
-chat startup so the agent can use the persona in responses and address the
-user by their preferred name.
+All files are stored under ``data/workspace/profile/`` and loaded at
+chat startup to build the system prompt.
 
 Example::
 
@@ -19,8 +21,12 @@ Example::
         profile.save_soul("Lumi", "Friendly, concise technical assistant.")
         profile.save_user("Ernesto")
 
-    print(profile.load_agent_name())  # "Lumi"
-    print(profile.load_user_name())  # "Ernesto"
+    # Build the full system prompt (soul + capacities + user context)
+    print(profile.load_system_prompt())
+
+    # Reset only personality — capacities are preserved
+    profile.reset()
+    print(profile.load_capacities())  # still returns content
 """
 
 from __future__ import annotations
@@ -75,6 +81,7 @@ class ProfileManager:
         """Initialise the manager with an optional custom directory."""
         self._dir = profile_dir if profile_dir is not None else _PROFILE_DIR
         self._soul = self._dir / "SOUL.md"
+        self._capacities = self._dir / "CAPACITIES.md"
         self._user = self._dir / "USER.md"
 
     # ------------------------------------------------------------------
@@ -126,6 +133,20 @@ class ProfileManager:
             return ""
         return self._soul.read_text(encoding="utf-8")
 
+    def load_capacities(self) -> str:
+        """
+        Return the full CAPACITIES.md content, or empty string if not present.
+
+        CAPACITIES.md contains the permanent agent capabilities (skills, MCPs,
+        RAG, data tools).  It is never deleted by :meth:`reset`.
+
+        Returns:
+            Raw markdown text of CAPACITIES.md.
+        """
+        if not self._capacities.exists():
+            return ""
+        return self._capacities.read_text(encoding="utf-8")
+
     def load_user_context(self) -> str:
         """
         Return the full USER.md content, or empty string if not configured.
@@ -136,6 +157,31 @@ class ProfileManager:
         if not self._user.exists():
             return ""
         return self._user.read_text(encoding="utf-8")
+
+    def load_system_prompt(self) -> str:
+        """
+        Build the complete system prompt by combining SOUL, CAPACITIES and USER.
+
+        Concatenation order:
+          1. SOUL.md — persona and communication style (may be absent after reset)
+          2. CAPACITIES.md — permanent capabilities (always present when configured)
+          3. USER.md — user context and preferences (may be absent)
+
+        Returns:
+            Combined markdown string ready to be used as the LLM system prompt.
+            Returns an empty string when none of the files exist.
+        """
+        parts: list[str] = []
+        soul = self.load_soul()
+        if soul:
+            parts.append(soul)
+        capacities = self.load_capacities()
+        if capacities:
+            parts.append(capacities)
+        user_ctx = self.load_user_context()
+        if user_ctx:
+            parts.append(f"## User Context\n\n{user_ctx}")
+        return "\n\n---\n\n".join(parts)
 
     # ------------------------------------------------------------------
     # Writers
@@ -188,7 +234,13 @@ class ProfileManager:
         """
         Delete SOUL.md and USER.md so the next session triggers fresh onboarding.
 
-        Both files are removed if they exist; missing files are silently ignored.
+        CAPACITIES.md is intentionally **not** deleted: it holds permanent
+        system capabilities (skills, MCPs, RAG, data tools) that remain valid
+        regardless of which persona is configured.  Only the personality
+        (SOUL.md) and user context (USER.md) are cleared.
+
+        Both targeted files are removed if they exist; missing files are
+        silently ignored.
         """
         if self._soul.exists():
             self._soul.unlink()

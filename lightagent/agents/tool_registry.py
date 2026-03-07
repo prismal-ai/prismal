@@ -116,10 +116,12 @@ def get_skill_tools() -> list[BaseTool]:
 
 
 # Maximum number of MCP tools injected per agent call.
-# Each tool schema costs ~200-300 tokens; 51 tools ≈ 12k tokens just in
-# definitions, which combined with conversation history easily exceeds the
-# 30k tokens/min rate limit on the free Anthropic tier.
-_MAX_MCP_TOOLS: int = 20
+# The cap is applied globally across all connected MCP servers.  Setting it
+# too low silently drops tools from servers that appear later in the list
+# (e.g. playwright browser_navigate being cut out when filesystem already
+# consumes 10+ slots out of 20).  Claude Sonnet 4.6 handles 60 tool schemas
+# (~15 k tokens) without issue.
+_MAX_MCP_TOOLS: int = 60
 
 # ---------------------------------------------------------------------------
 # Per-agent tool merge
@@ -254,10 +256,17 @@ async def react_loop(
         for tc in tool_calls:
             tool_fn = tool_map.get(tc["name"])
             if tool_fn is None:
+                logger.warning(
+                    "react_loop.tool_not_found",
+                    agent=agent_name,
+                    tool_name=tc["name"],
+                    available_tools=sorted(tool_map.keys()),
+                    session_id=session_id,
+                )
                 result = f"Tool '{tc['name']}' not found."
             else:
                 try:
-                    result = str(tool_fn.invoke(tc.get("args", {})))
+                    result = str(await tool_fn.ainvoke(tc.get("args", {})))
                 except Exception as exc:  # noqa: BLE001
                     result = f"Tool error: {exc}"
             # Cap individual tool results to avoid token explosion
@@ -273,6 +282,24 @@ async def react_loop(
             max_iterations=max_iterations,
             session_id=session_id,
         )
+        # The last `response` still has pending tool_calls and no useful content.
+        # Append the last tool results already in loop_messages and ask the LLM
+        # to synthesise a final answer from everything gathered so far.
+        from langchain_core.messages import HumanMessage  # noqa: PLC0415
+
+        loop_messages.append(response)
+        loop_messages.append(
+            HumanMessage(
+                content=(
+                    "You have reached the maximum number of tool call iterations. "
+                    "Based on everything you have gathered so far, please provide "
+                    "your best final answer to the user's original question. "
+                    "If you were unable to retrieve the needed information, say so "
+                    "clearly and explain what you found instead."
+                )
+            )
+        )
+        response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
 
     return response
 

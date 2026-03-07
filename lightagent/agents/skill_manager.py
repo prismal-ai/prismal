@@ -54,24 +54,58 @@ logger = get_logger("lightagent.agents.skill_manager")
 # Regex-based intent detection (zero LLM calls — no tokens consumed)
 # ---------------------------------------------------------------------------
 
-# Patterns that indicate the user wants to list/show skills.
+# Patterns that indicate the user wants to see ONLY active/enabled skills.
+_RE_LIST_ACTIVE = re.compile(
+    r"\b(?:"
+    # "skills activos", "skills habilitados", etc.
+    r"skills?\s+(?:activos?|habilitados?|encendidos?|enabled?|en\s+uso|funcionando)|"
+    # "activos skills", "enabled skills"
+    r"(?:activos?|habilitados?|enabled?)\s+skills?|"
+    # "qué skills tengo activos", "qué skills hay activos"
+    r"qu[eé]\s+skills?\s+(?:tengo|hay)\s+activos?|"
+    # "cuáles skills están activos"
+    r"cu[aá]les?\s+skills?\s+est[aá]n\s+activos?|"
+    # "qué está activo/habilitado/encendido"
+    r"qu[eé]\s+(?:est[aá]|hay)\s+(?:activo|habilitado|encendido)|"
+    # "qué está/están activos"
+    r"qu[eé]\s+est[aá]n\s+(?:activos?|habilitados?|encendidos?)|"
+    # "qué tengo activo/habilitado", "qué hay activo"
+    r"qu[eé]\s+(?:tengo|hay)\s+activos?\b"
+    r")",
+    re.IGNORECASE,
+)
+
+# Patterns that indicate the user wants to list/show ALL skills.
 _RE_LIST = re.compile(
     r"\b(list|listar|show|muestra|mostrar|ver|display|skills?\s+disponibles?|"
-    r"qu[eé]\s+skills?|skills?\s+tengo|tengo\s+skills?)\b",
+    r"todos?\s+los?\s+skills?|qu[eé]\s+skills?|skills?\s+tengo|tengo\s+skills?)\b",
     re.IGNORECASE,
 )
 
-# Patterns that capture a skill name after activate/enable keywords.
+# Patterns that DETECT activate/deactivate intent (no capture group needed —
+# the skill name is extracted separately by _RE_SKILL_NAME_ARG or _RE_BARE_NAME).
 _RE_ACTIVATE = re.compile(
     r"\b(?:activ[ao]|activ[ao]r|enabl[eo]|habilit[ao]|habilitar|"
-    r"encend[eo]r?|start)\b[^/\n]*?\b([\w_]+)\b",
+    r"encend[eo]r?|start)\b",
     re.IGNORECASE,
 )
 
-# Patterns that capture a skill name after deactivate/disable keywords.
 _RE_DEACTIVATE = re.compile(
     r"\b(?:desactiv[ao]|desactivar|disabl[eo]|deshabilit[ao]|deshabilitarl?o?|"
-    r"apag[ao]r?|stop)\b[^/\n]*?\b([\w_]+)\b",
+    r"apag[ao]r?|stop)\b",
+    re.IGNORECASE,
+)
+
+# Extracts a skill name that follows the verb directly (no "skill" keyword).
+# Supports hyphenated names like "conventional-commit" or "langgraph-docs".
+# Skips common Spanish/English stop words (el, la, the, etc.).
+_RE_BARE_NAME = re.compile(
+    r"\b(?:activ[ao]|activ[ao]r|enabl[eo]|habilit[ao]|habilitar|encend[eo]r?|start|"
+    r"desactiv[ao]|desactivar|disabl[eo]|deshabilit[ao]|deshabilitarl?o?|apag[ao]r?|stop)"
+    r"\b\s+(?:el\s+|la\s+|los\s+|las\s+|un\s+|una\s+|the\s+|a\s+)?"
+    r"(?:skill[:\s]+)?"
+    r"(?:el\s+|la\s+|the\s+)?"
+    r"([\"']?[\w][\w\-_]+[\"']?)",
     re.IGNORECASE,
 )
 
@@ -164,15 +198,19 @@ def _detect_intent(user_message: str) -> str:
     No LLM call is made — classification is instant and consumes zero tokens.
 
     Priority order:
-        INSTALL_REMOTE > INSTALL > ACTIVATE > DEACTIVATE > CREATE > LIST
+        INSTALL_REMOTE > INSTALL > LIST_ACTIVE > ACTIVATE > DEACTIVATE > CREATE > LIST
+
+    ``LIST_ACTIVE`` is checked before ``ACTIVATE`` because words like "activo"
+    (adjective meaning "active") also match the activate verb pattern — the more
+    specific list-active patterns must win first.
 
     Args:
         user_message: Raw user input text.
 
     Returns:
-        One of: ``"LIST"``, ``"ACTIVATE:<name>"``, ``"DEACTIVATE:<name>"``,
-        ``"INSTALL:<path>"``, ``"INSTALL_REMOTE:<repo>|<skill>"``,
-        ``"CREATE:<rest>"``.
+        One of: ``"LIST"``, ``"LIST_ACTIVE"``, ``"ACTIVATE:<name>"``,
+        ``"DEACTIVATE:<name>"``, ``"INSTALL:<path>"``,
+        ``"INSTALL_REMOTE:<repo>|<skill>"``, ``"CREATE:<rest>"``.
     """
     # MCP guard — queries about MCP servers are NOT skill operations.
     # Return a sentinel so skill_manager_node can delegate back gracefully.
@@ -190,21 +228,38 @@ def _detect_intent(user_message: str) -> str:
     if m:
         return f"INSTALL:{m.group(1).strip()}"
 
-    # ACTIVATE
-    m = _RE_ACTIVATE.search(user_message)
-    if m:
-        return f"ACTIVATE:{m.group(1).strip()}"
+    # LIST_ACTIVE — checked before ACTIVATE because "activo" (adjective) also
+    # matches the activate verb regex; the list-active patterns are more specific.
+    if _RE_LIST_ACTIVE.search(user_message):
+        return "LIST_ACTIVE"
 
-    # DEACTIVATE
-    m = _RE_DEACTIVATE.search(user_message)
-    if m:
-        return f"DEACTIVATE:{m.group(1).strip()}"
+    # ACTIVATE — detect verb, then extract skill name separately so that
+    # hyphenated names ("conventional-commit", "langgraph-docs") are captured
+    # in full.  Priority: explicit "--skill"/"el skill" pattern, then bare name.
+    if _RE_ACTIVATE.search(user_message):
+        m_name = _RE_SKILL_NAME_ARG.search(user_message) or _RE_BARE_NAME.search(
+            user_message
+        )
+        skill_name = m_name.group(1).strip().strip("\"'") if m_name else ""
+        return f"ACTIVATE:{skill_name}"
+
+    # DEACTIVATE — same two-step approach.
+    if _RE_DEACTIVATE.search(user_message):
+        m_name = _RE_SKILL_NAME_ARG.search(user_message) or _RE_BARE_NAME.search(
+            user_message
+        )
+        skill_name = m_name.group(1).strip().strip("\"'") if m_name else ""
+        return f"DEACTIVATE:{skill_name}"
 
     # CREATE — extract everything after the trigger phrase
     m = _RE_CREATE.search(user_message)
     if m:
         # Return the full message as the spec; skill_creator handles it well
         return f"CREATE:{user_message.strip()}"
+
+    # LIST_ACTIVE — checked before LIST so "activos" queries don't fall through
+    if _RE_LIST_ACTIVE.search(user_message):
+        return "LIST_ACTIVE"
 
     # LIST — explicit keywords or fallback
     if _RE_LIST.search(user_message):
@@ -216,6 +271,31 @@ def _detect_intent(user_message: str) -> str:
 # ---------------------------------------------------------------------------
 # Operation helpers
 # ---------------------------------------------------------------------------
+
+
+def _format_active_skills_only(manager: SkillsManager) -> str:
+    """Render only active skills as a concise markdown list.
+
+    Used when the user explicitly asks for active/enabled skills only,
+    without showing available or external inactive skills.
+
+    Args:
+        manager: Initialised :class:`~lightagent.skills.manager.SkillsManager`.
+
+    Returns:
+        Formatted string listing only active skills.
+    """
+    active = manager.list_skills(status="active")
+    if not active:
+        return (
+            "No hay ningún skill activo en este momento.\n\n"
+            'Para activar uno dime: **"activa el skill \\<nombre>"**\n'
+            'Para ver todos los disponibles: **"muéstrame todos los skills"**'
+        )
+    lines = [f"**Skills activos ({len(active)}):**\n"]
+    for s in active:
+        lines.append(f"  - `{s.name}` v{s.version} — {s.description}")
+    return "\n".join(lines)
 
 
 def _format_skills_list(manager: SkillsManager) -> str:
@@ -233,6 +313,7 @@ def _format_skills_list(manager: SkillsManager) -> str:
 
     active = [s for s in skills if s.status == "active"]
     available = [s for s in skills if s.status == "available"]
+    external = [s for s in skills if s.status == "external"]
     custom = [s for s in skills if s.status == "custom"]
     errors = [s for s in skills if s.status == "error"]
 
@@ -246,6 +327,12 @@ def _format_skills_list(manager: SkillsManager) -> str:
     if available:
         lines.append("\n📦 **Disponibles (inactivos):**")
         for s in available:
+            lines.append(f"  - `{s.name}` v{s.version} — {s.description}")
+        lines.append('\n  Para activar uno: dime **"activa el skill <nombre>"**')
+
+    if external:
+        lines.append("\n🌐 **Externos (inactivos):**")
+        for s in external:
             lines.append(f"  - `{s.name}` v{s.version} — {s.description}")
         lines.append('\n  Para activar uno: dime **"activa el skill <nombre>"**')
 
@@ -397,7 +484,11 @@ async def skill_manager_node(state: AgentState) -> dict[str, object]:
             "consulta al supervisor o revisa el archivo de configuración."
         )
 
-    # ── LIST ──────────────────────────────────────────────────────────────
+    # ── LIST ACTIVE ONLY ──────────────────────────────────────────────────
+    elif intent == "LIST_ACTIVE":
+        result = _format_active_skills_only(manager)
+
+    # ── LIST ALL ──────────────────────────────────────────────────────────
     elif intent == "LIST":
         result = _format_skills_list(manager)
 
