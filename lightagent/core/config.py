@@ -328,6 +328,68 @@ class Settings(BaseSettings):
         description="Max recording duration per voice turn in seconds",
     )
 
+    # ---------------------------------------------------------------------------
+    # Channel gateway settings
+    # ---------------------------------------------------------------------------
+
+    # Telegram
+    telegram_bot_token: SecretStr = Field(
+        default=SecretStr(""),
+        description="Telegram Bot API token",
+    )
+
+    # Slack
+    slack_bot_token: SecretStr = Field(
+        default=SecretStr(""),
+        description="Slack Bot User OAuth token (xoxb-...)",
+    )
+    slack_app_token: SecretStr = Field(
+        default=SecretStr(""),
+        description="Slack App-level token for Socket Mode (xapp-...)",
+    )
+
+    # Discord
+    discord_bot_token: SecretStr = Field(
+        default=SecretStr(""),
+        description="Discord Bot token",
+    )
+
+    # Microsoft Teams
+    teams_webhook_secret: SecretStr = Field(
+        default=SecretStr(""),
+        description="Teams HMAC webhook signing secret",
+    )
+
+    # WhatsApp (Meta Business)
+    whatsapp_access_token: SecretStr = Field(
+        default=SecretStr(""),
+        description="Meta WhatsApp Cloud API access token",
+    )
+    whatsapp_phone_number_id: str = Field(
+        default="",
+        description="Meta WhatsApp phone number ID",
+    )
+    whatsapp_webhook_secret: SecretStr = Field(
+        default=SecretStr(""),
+        description="WhatsApp webhook verification token and hub secret",
+    )
+
+    # Signal (via signal-cli-rest-api)
+    signal_api_url: str = Field(
+        default="http://localhost:8080",
+        description="signal-cli-rest-api base URL",
+    )
+    signal_phone_number: str = Field(
+        default="",
+        description="Signal account phone number (E.164 format)",
+    )
+
+    # Channel security
+    channel_security_enabled: bool = Field(
+        default=True,
+        description="Enable/disable the full 8-guard channel security pipeline",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
