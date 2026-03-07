@@ -25,11 +25,6 @@ from lightagent.core.logging import get_logger
 from lightagent.monitoring.otel import OTelManager
 
 if TYPE_CHECKING:
-    from langchain_core.callbacks import (
-        AsyncCallbackManagerForToolRun,
-        CallbackManagerForToolRun,
-    )
-
     from lightagent.mcp.connection import MCPServerConnection
     from lightagent.security.action_interceptor import ActionInterceptor
 
@@ -97,7 +92,7 @@ class MCPToolAdapter(BaseTool):
     def _run(
         self,
         tool_input: str,
-        run_manager: CallbackManagerForToolRun | None = None,
+        run_manager: Any | None = None,  # noqa: ANN401 — LangChain interface
     ) -> str:
         """Synchronous execution is not supported for MCP tools.
 
@@ -114,7 +109,7 @@ class MCPToolAdapter(BaseTool):
     async def _arun(
         self,
         tool_input: str,
-        run_manager: AsyncCallbackManagerForToolRun | None = None,  # noqa: ARG002
+        run_manager: Any | None = None,  # noqa: ANN401 ARG002 — LangChain interface
     ) -> str:
         """Execute the MCP tool asynchronously.
 

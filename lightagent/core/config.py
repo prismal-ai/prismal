@@ -54,7 +54,7 @@ class Settings(BaseSettings):
         description="Timeout in seconds for a single LLM API call",
     )
     retry_attempts: int = Field(
-        default=3,
+        default=1,
         ge=0,
         description="Number of retry attempts on transient LLM API errors",
     )

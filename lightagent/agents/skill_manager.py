@@ -2,20 +2,27 @@
 
 Handles the full skill lifecycle:
 
-- **list**   — show available, active and custom skills with their status.
-- **activate** — enable a skill that lives in ``skills/available/`` by name.
-- **deactivate** — disable an active skill by name.
-- **install** — copy a skill directory from a user-supplied filesystem path into
-  ``skills/available/`` and activate it immediately.
-- **create** — generate a brand-new skill from a natural-language specification
-  using the :mod:`~lightagent.agents.skill_creator` pipeline (ruff + mypy +
-  bandit quality checks, human-review sentinel).
+- **list**          — show available, active and custom skills with their status.
+- **activate**      — enable a skill that lives in ``skills/available/`` by name.
+- **deactivate**    — disable an active skill by name.
+- **install**       — copy a skill directory from a user-supplied filesystem path
+  into ``skills/available/`` and activate it immediately.
+- **install_remote** — download a skill from a GitHub repository (e.g.
+  ``anthropics/skills``) via the GitHub API, wrap Claude Code YAML/MD skills as
+  a ``BaseSkill`` Python class, and place it in ``skills/available/``.
+- **create**        — generate a brand-new skill from a natural-language
+  specification using the :mod:`~lightagent.agents.skill_creator` pipeline
+  (ruff + mypy + bandit quality checks, human-review sentinel).
 
 Example conversation::
 
     User: instala el skill que está en /home/ernesto/mis_skills/traductor
     Seraph> ✅ Skill `traductor` instalado desde /home/ernesto/mis_skills/traductor
             y activado correctamente.
+
+    User: instala el skill skill-creator de anthropics
+    Seraph> ✅ Skill `skill_creator` descargado desde github.com/anthropics/skills.
+            Revísalo y luego dime: "activa el skill skill_creator"
 
     User: activa el skill web_search
     Seraph> ✅ Skill `web_search` activado correctamente.
@@ -36,6 +43,7 @@ from langchain_core.messages import AIMessage
 from lightagent.agents.skill_creator import create_skill
 from lightagent.core.logging import get_logger
 from lightagent.skills.manager import SkillsManager
+from lightagent.skills.remote_installer import RemoteSkillInstaller
 
 if TYPE_CHECKING:
     from lightagent.agents.state import AgentState
@@ -81,22 +89,103 @@ _RE_CREATE = re.compile(
     re.IGNORECASE,
 )
 
+# Detects remote skill install intent (GitHub URL, "github" keyword, an
+# owner/repo slug preceded by whitespace, or the shorthand "anthropics").
+# Checked BEFORE _RE_INSTALL so "anthropics/skills" is not confused with a
+# local filesystem path (which requires a leading /, ./, or ~/).
+_RE_INSTALL_REMOTE = re.compile(
+    r"\b(?:instala[r]?|install|agrega[r]?|add|descarga[r]?|a[ñn]ade[r]?)\b"
+    r".{0,120}?"
+    r"(?:https?://github|github(?:\.com)?|anthropics?"
+    r"|(?<=\s)[\w][\w\-]*/[\w][\w\-]+)",
+    re.IGNORECASE,
+)
+
+# Extracts the owner/repo portion from a GitHub URL.
+_RE_GITHUB_URL_SLUG = re.compile(
+    r"github\.com/([\w][\w\-]+)/([\w][\w\-]+)",
+    re.IGNORECASE,
+)
+
+# Extracts a bare owner/repo slug (not preceded by / so not a local path).
+_RE_REPO_SLUG = re.compile(
+    r"(?:^|\s)([\w][\w\-]+/[\w][\w\-]+)(?=\s|$|[,;.])",
+    re.IGNORECASE,
+)
+
+# Extracts a skill name from --skill flag or common natural-language patterns.
+_RE_SKILL_NAME_ARG = re.compile(
+    r"(?:--skill\s+|(?:el\s+|the\s+)?skill[:\s]+)([\w][\w\-_]+)",
+    re.IGNORECASE,
+)
+
+
+def _parse_remote_install_args(user_message: str) -> tuple[str, str]:
+    """Extract ``(repo_slug, skill_name)`` from a remote-install message.
+
+    Falls back to ``"anthropics/skills"`` for the repo and ``""`` for the
+    skill name when extraction is uncertain.  An empty skill name causes the
+    agent to list available skills in the repo instead of installing.
+
+    Args:
+        user_message: Raw user message text.
+
+    Returns:
+        A ``(repo_slug, skill_name)`` tuple; either field may be empty.
+    """
+    # 1. Repo: prefer full GitHub URL, then bare owner/repo slug
+    m_url = _RE_GITHUB_URL_SLUG.search(user_message)
+    if m_url:
+        repo = f"{m_url.group(1)}/{m_url.group(2)}"
+    else:
+        m_slug = _RE_REPO_SLUG.search(user_message)
+        candidate = m_slug.group(1).strip() if m_slug else ""
+        # Ignore internal paths like 'skills/available' or 'lightagent/skills'
+        if candidate and not candidate.startswith(("skills/", "lightagent/")):
+            repo = candidate
+        else:
+            repo = "anthropics/skills"
+
+    # 2. Skill name: explicit --skill flag, "el skill <name>", or a
+    #    hyphenated word (common pattern for skill names, e.g. "skill-creator")
+    m_skill = _RE_SKILL_NAME_ARG.search(user_message)
+    if m_skill:
+        skill = m_skill.group(1).strip()
+    else:
+        m_hyphen = re.search(r"\b([\w][\w]*(?:-[\w]+)+)\b", user_message, re.IGNORECASE)
+        skill = m_hyphen.group(1).strip() if m_hyphen else ""
+
+    return repo, skill
+
 
 def _detect_intent(user_message: str) -> str:
     """Classify the skill-management intent using regex patterns.
 
     No LLM call is made — classification is instant and consumes zero tokens.
 
-    Priority order: INSTALL > ACTIVATE > DEACTIVATE > CREATE > LIST > LIST(fallback)
+    Priority order:
+        INSTALL_REMOTE > INSTALL > ACTIVATE > DEACTIVATE > CREATE > LIST
 
     Args:
         user_message: Raw user input text.
 
     Returns:
         One of: ``"LIST"``, ``"ACTIVATE:<name>"``, ``"DEACTIVATE:<name>"``,
-        ``"INSTALL:<path>"``, ``"CREATE:<rest>"``.
+        ``"INSTALL:<path>"``, ``"INSTALL_REMOTE:<repo>|<skill>"``,
+        ``"CREATE:<rest>"``.
     """
-    # INSTALL — check first: paths are unambiguous anchors
+    # MCP guard — queries about MCP servers are NOT skill operations.
+    # Return a sentinel so skill_manager_node can delegate back gracefully.
+    if re.search(r"\bmcp[s]?\b", user_message, re.IGNORECASE):
+        return "NOT_SKILL"
+
+    # INSTALL_REMOTE — checked first: GitHub/slug patterns take priority over
+    # local paths so "anthropics/skills" is not mistaken for a filesystem path.
+    if _RE_INSTALL_REMOTE.search(user_message):
+        repo, skill = _parse_remote_install_args(user_message)
+        return f"INSTALL_REMOTE:{repo}|{skill}"
+
+    # INSTALL (local path) — check next: paths are unambiguous anchors
     m = _RE_INSTALL.search(user_message)
     if m:
         return f"INSTALL:{m.group(1).strip()}"
@@ -274,8 +363,17 @@ async def skill_manager_node(state: AgentState) -> dict[str, object]:
 
     result: str
 
+    # ── NOT_SKILL (MCP query misdirected here) ────────────────────────────
+    if intent == "NOT_SKILL":
+        result = (
+            "⚠️ Esta consulta es sobre **MCP servers**, no sobre skills.\n\n"
+            "Los MCP servers se configuran en `config/mcp_servers.yaml` y se "
+            "gestionan al reiniciar el agente. No los gestiono directamente — "
+            "consulta al supervisor o revisa el archivo de configuración."
+        )
+
     # ── LIST ──────────────────────────────────────────────────────────────
-    if intent == "LIST":
+    elif intent == "LIST":
         result = _format_skills_list(manager)
 
     # ── ACTIVATE ──────────────────────────────────────────────────────────
@@ -300,6 +398,64 @@ async def skill_manager_node(state: AgentState) -> dict[str, object]:
             logger.info("skill_deactivated_via_agent", skill=skill_name)
         except Exception as exc:
             result = f"❌ No se pudo desactivar `{skill_name}`: {exc}"
+
+    # ── INSTALL FROM GITHUB ───────────────────────────────────────────────
+    elif intent.startswith("INSTALL_REMOTE:"):
+        raw = intent.split(":", 1)[1]
+        parts = raw.split("|", 1)
+        repo = parts[0].strip() or "anthropics/skills"
+        skill_name = parts[1].strip() if len(parts) > 1 else ""
+
+        installer = RemoteSkillInstaller(manager)
+
+        if not skill_name:
+            # No skill name given — list what's available in the repo
+            try:
+                available = await installer.list_available_skills(repo)
+                items = "\n".join(f"  - `{s}`" for s in available)
+                result = (
+                    f"No especificaste qué skill instalar de `{repo}`.\n\n"
+                    f"**Skills disponibles:**\n{items}\n\n"
+                    f"Dime cuál quieres, por ejemplo:\n"
+                    f'**"instala el skill skill-creator de {repo}"**'
+                )
+            except Exception as exc:
+                result = (
+                    f"❌ No pude listar los skills de `{repo}`: {exc}\n\n"
+                    "Verifica la conexión a internet o el nombre del repositorio."
+                )
+        else:
+            try:
+                dest = await installer.install(
+                    repo=repo,
+                    skill_name=skill_name,
+                    enable=False,
+                )
+                installed_name = dest.name
+                result = (
+                    f"✅ Skill `{installed_name}` descargado desde "
+                    f"`github.com/{repo}`.\n\n"
+                    f"   Instalado en: "
+                    f"`lightagent/skills/available/{installed_name}/`\n\n"
+                    f"⚠️  El skill requiere revisión humana antes de activarse.\n"
+                    f"   Cuando lo hayas revisado, dime:\n"
+                    f'   **"activa el skill {installed_name}"**'
+                )
+                logger.info(
+                    "skill_installed_from_remote",
+                    skill=installed_name,
+                    repo=repo,
+                    session_id=session_id,
+                )
+            except ValueError as exc:
+                result = f"❌ {exc}"
+            except Exception as exc:
+                result = (
+                    f"❌ No se pudo instalar `{skill_name}` desde "
+                    f"`{repo}`: {exc}\n\n"
+                    "Verifica la conexión a internet, el nombre del repositorio "
+                    "y el nombre del skill."
+                )
 
     # ── INSTALL FROM PATH ─────────────────────────────────────────────────
     elif intent.startswith("INSTALL:"):

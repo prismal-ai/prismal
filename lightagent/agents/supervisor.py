@@ -56,7 +56,7 @@ _VALID_ROUTES: frozenset[str] = frozenset(MEMBERS) | {"END"}
 # Maximum number of recent messages sent to the LLM per supervisor call.
 # Older messages are kept in LangGraph state but not re-sent to the provider,
 # preventing token explosion in long sessions and avoiding rate-limit errors.
-_HISTORY_WINDOW: int = 10
+_HISTORY_WINDOW: int = 6
 
 _ANSWER_SYSTEM_PROMPT: str = (
     "You are a helpful, knowledgeable AI assistant. "
@@ -78,17 +78,30 @@ Available agents:
 - critic: Review and improve outputs
 - data_analyst: SQL queries (DuckDB), DataFrame transforms, charts
 - file_manager: File read/write operations
-- skill_manager: Install, activate, deactivate, list, or create skills.
-  Route here when the user mentions: skills, activar skill, instalar skill,
-  desactivar skill, crear skill, listar skills, "install skill from <path>",
-  "add skill", "enable skill", "disable skill".
+- skill_manager: Install, activate, deactivate, list, or create **skills** ONLY.
+  Skills are Python modules in ``skills/available/`` / ``skills/active/``.
+  Do NOT route here for MCP server queries — MCP is a separate system.
+  Also downloads skills from GitHub repositories (e.g. anthropics/skills).
+  Route here when the user mentions:
+  · skills, activar skill, instalar skill, desactivar skill, crear skill,
+    listar skills, "add skill", "enable skill", "disable skill"
+  · "install skill from <path>", "agrega skill desde /ruta"
+  · "instalar desde github", "install from github", "download from github"
+  · any GitHub URL (github.com/...) paired with install/add/download verbs
+  · owner/repo slugs like "anthropics/skills" with install intent
+  · "skill-creator de anthropics", "instala el skill-creator"
 - END: Return final answer to the user
 
 Routing rules:
 - Route to 'END' when you have a complete answer
 - Route to 'END' for simple factual questions you can answer directly
-- Route to 'skill_manager' for ANY request about managing, installing,
-  activating, deactivating, listing, or creating skills
+- Route to 'END' for queries about MCP server configuration (how to add/remove
+  servers, what mcp_servers.yaml contains, etc.)
+- Route to 'researcher' for queries about MCP server capabilities: "what tools
+  does X have?", "list tools of X server", "what can skillsmith do?", etc.
+  The researcher has all live MCP tools bound and can answer from real data.
+- Route to 'skill_manager' ONLY for requests about Python skills: installing
+  (local or remote), activating, deactivating, listing, or creating skills
 
 Respond with ONLY the agent name (e.g. "researcher" or "END"). No explanation."""
 

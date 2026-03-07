@@ -198,7 +198,51 @@ def create_chart(data: str, chart_type: str = "bar", title: str = "") -> str:
     )
 
 
-RESEARCHER_TOOLS: list[BaseTool] = [web_search, rag_search, read_file]
+@tool
+def list_mcp_tools(server_name: str = "") -> str:
+    """List tools available from connected MCP servers.
+
+    Args:
+        server_name: Filter by server name (e.g. ``"skillsmith"``).
+            When empty, returns tools from all connected servers.
+
+    Returns:
+        Formatted list of tool names and descriptions grouped by server.
+    """
+    try:
+        from lightagent.agents.tool_registry import get_mcp_tools
+
+        all_tools = get_mcp_tools()
+        if not all_tools:
+            return (
+                "No MCP tools available. The MCP servers may not be initialised "
+                "yet or no servers are connected."
+            )
+
+        # Group by server (tool name prefix is server-agnostic; use description)
+        lines: list[str] = []
+        query = server_name.lower().strip()
+        for t in all_tools:
+            desc = t.description or ""
+            if query and query not in t.name.lower() and query not in desc.lower():
+                # Try matching against the connection's server name via private attr
+                server_attr = getattr(getattr(t, "_connection", None), "_config", None)
+                srv = getattr(server_attr, "name", "")
+                if query not in srv.lower():
+                    continue
+            lines.append(f"- **{t.name}**: {desc[:100]}")
+
+        if not lines:
+            return f"No tools found for server '{server_name}'."
+        header = (
+            f"MCP tools (filter: '{server_name}')" if server_name else "All MCP tools"
+        )
+        return f"**{header}** ({len(lines)} tools):\n" + "\n".join(lines)
+    except Exception as exc:
+        return f"Error listing MCP tools: {exc!s}"
+
+
+RESEARCHER_TOOLS: list[BaseTool] = [web_search, rag_search, read_file, list_mcp_tools]
 CODER_TOOLS: list[BaseTool] = [code_executor, read_file, write_file]
 RAG_AGENT_TOOLS: list[BaseTool] = [vector_search, doc_index, web_search]
 CRITIC_TOOLS: list[BaseTool] = [evaluate, score]
@@ -217,6 +261,7 @@ __all__ = [
     "doc_index",
     "duckdb_query",
     "evaluate",
+    "list_mcp_tools",
     "polars_transform",
     "rag_search",
     "read_file",

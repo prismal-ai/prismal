@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from langchain_core.messages import AIMessage, SystemMessage
 
-from lightagent.agents.tools import DATA_ANALYST_TOOLS
+from lightagent.agents.tool_registry import get_tools_for_agent
 from lightagent.core.logging import get_logger
 from lightagent.providers.registry import ProviderRegistry
 
@@ -57,7 +57,7 @@ async def data_analyst_node(state: AgentState) -> dict[str, object]:
 
     registry = ProviderRegistry()
     llm = registry.get_llm_with_fallback()
-    llm_with_tools = llm.bind_tools(DATA_ANALYST_TOOLS)
+    llm_with_tools = llm.bind_tools(get_tools_for_agent('data_analyst'))
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), *state["messages"]]
     response: AIMessage = await llm_with_tools.ainvoke(messages)

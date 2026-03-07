@@ -330,10 +330,17 @@ class MCPServerConnection:
             A ``(read, write)`` tuple.
         """
         cmd: list[str] = self._config.command or []  # validated non-empty by model
+        # Expand ${VAR} / $VAR references in env values so that secrets stored
+        # in the process environment (e.g. loaded from .env) are resolved at
+        # connection time rather than stored as literals in the YAML config.
+        raw_env = self._config.env or {}
+        resolved_env: dict[str, str] | None = (
+            {k: os.path.expandvars(v) for k, v in raw_env.items()} if raw_env else None
+        )
         params = StdioServerParameters(
             command=cmd[0],
             args=cmd[1:],
-            env=self._config.env or None,
+            env=resolved_env,
         )
         read, write = await stack.enter_async_context(stdio_client(params))
         return read, write

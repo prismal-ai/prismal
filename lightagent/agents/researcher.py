@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
 
-from lightagent.agents.tools import RESEARCHER_TOOLS
+from lightagent.agents.tool_registry import get_tools_for_agent
 from lightagent.core.logging import get_logger
 from lightagent.providers.registry import ProviderRegistry
 
@@ -54,8 +54,7 @@ Tool and skill failure handling (IMPORTANT):
 - If no information was found, say so honestly and offer alternative approaches
   or ask the user for a more specific query."""
 
-# Build a name → callable map once at import time
-_TOOL_MAP: dict[str, Any] = {t.name: t for t in RESEARCHER_TOOLS}
+# Tool map is built dynamically at call time to include live MCP + skill tools.
 
 
 def _trim_to_last_human(messages: list[BaseMessage]) -> list[BaseMessage]:
@@ -104,7 +103,9 @@ async def researcher_node(state: AgentState) -> dict[str, object]:
 
     registry = ProviderRegistry()
     llm = registry.get_llm_with_fallback()
-    llm_with_tools = llm.bind_tools(RESEARCHER_TOOLS)
+    active_tools = get_tools_for_agent("researcher")
+    tool_map: dict[str, Any] = {t.name: t for t in active_tools}
+    llm_with_tools = llm.bind_tools(active_tools)
 
     system = [SystemMessage(content=_SYSTEM_PROMPT)]
 
@@ -136,14 +137,18 @@ async def researcher_node(state: AgentState) -> dict[str, object]:
 
         # Execute each requested tool and collect ToolMessages
         for tc in tool_calls:
-            tool_fn = _TOOL_MAP.get(tc["name"])
+            tool_fn = tool_map.get(tc["name"])
             if tool_fn is None:
-                result = f"Tool '{tc['name']}' not found in RESEARCHER_TOOLS."
+                result = f"Tool '{tc['name']}' not found."
             else:
                 try:
                     result = str(tool_fn.invoke(tc.get("args", {})))
                 except Exception as exc:
                     result = f"Tool error: {exc}"
+            # Truncate very long tool results to avoid token explosion.
+            # MCP tools can return thousands of chars; cap at 4k per result.
+            if len(result) > 4_000:
+                result = result[:4_000] + "\n…[truncated]"
             loop_messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
     else:
         logger.warning(
