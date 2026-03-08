@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 
 from lightagent.agents.coder import coder_node
 from lightagent.agents.critic import critic_node
+from lightagent.agents.cron_manager import cron_manager_node
 from lightagent.agents.data_analyst import data_analyst_node
 from lightagent.agents.file_manager import file_manager_node
 from lightagent.agents.planner import planner_node
@@ -134,6 +135,7 @@ def build_supervisor_graph(
     builder.add_node("data_analyst", data_analyst_node)
     builder.add_node("file_manager", file_manager_node)
     builder.add_node("skill_manager", skill_manager_node)
+    builder.add_node("cron_manager", cron_manager_node)
 
     # Entry point
     builder.set_entry_point("supervisor")
@@ -151,6 +153,7 @@ def build_supervisor_graph(
             "data_analyst": "data_analyst",
             "file_manager": "file_manager",
             "skill_manager": "skill_manager",
+            "cron_manager": "cron_manager",
             "__end__": END,
         },
     )
@@ -165,6 +168,7 @@ def build_supervisor_graph(
         "data_analyst",
         "file_manager",
         "skill_manager",
+        "cron_manager",
     ):
         builder.add_edge(member, "supervisor")
 

@@ -49,6 +49,7 @@ MEMBERS: list[str] = [
     "data_analyst",
     "file_manager",
     "skill_manager",
+    "cron_manager",
 ]
 
 _VALID_ROUTES: frozenset[str] = frozenset(MEMBERS) | {"END"}
@@ -124,6 +125,12 @@ Available agents:
   A skill.py wrapper is generated automatically — users never write it.
   After installation the agent will confirm the skill name so the user can
   request activation: "activa el skill <name>".
+- cron_manager: Schedule recurring tasks, list/pause/resume/remove cron jobs.
+  Route here when the user asks to:
+  · Schedule something periodically (daily, weekly, every hour, etc.)
+  · List, pause, resume, or remove scheduled jobs
+  · Use time-based triggers: "every day", "cada hora", "programar", "agendar",
+    "cron", "schedule", "recurring", "periodic", "reminder"
 - END: Return final answer to the user
 
 Routing rules:
@@ -304,6 +311,7 @@ _RouterLiteral = Literal[
     "data_analyst",
     "file_manager",
     "skill_manager",
+    "cron_manager",
     "__end__",
 ]
 
