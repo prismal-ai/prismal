@@ -35,11 +35,11 @@ def web_search(query: str) -> str:
         error message if the search backend is unavailable.
     """
     try:
-        from langchain_community.tools import DuckDuckGoSearchRun  # noqa: PLC0415
+        from langchain_community.tools import DuckDuckGoSearchRun
 
         results = DuckDuckGoSearchRun().run(query)
         return results if results else f"No results found for: {query!r}"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return (
             f"Web search unavailable: {exc!s}\n"
             "Tip: install 'duckduckgo-search' or configure a search MCP server."
@@ -59,7 +59,7 @@ def rag_search(query: str, collection: str = "default") -> str:
         or an error message when the RAG engine is unavailable.
     """
     try:
-        from lightagent.rag.engine import RAGEngine  # noqa: PLC0415
+        from lightagent.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name=collection)
         chunks = engine.search(query, k=5)
@@ -72,7 +72,7 @@ def rag_search(query: str, collection: str = "default") -> str:
                 f"   {chunk.content[:300]}{'…' if len(chunk.content) > 300 else ''}"
             )
         return "\n".join(lines)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"RAG search error: {exc!s}"
 
 
@@ -89,7 +89,7 @@ def read_file(path: str) -> str:
     Returns:
         File contents as a string, or an error message on failure.
     """
-    from pathlib import Path  # noqa: PLC0415
+    from pathlib import Path
 
     _BLOCKED_PREFIXES = ("/etc/", "/sys/", "/proc/", "/dev/", "/root/", "/boot/")
 
@@ -113,7 +113,7 @@ def read_file(path: str) -> str:
         if len(content) > 20_000:
             content = content[:20_000] + "\n…[file truncated at 20 000 chars]"
         return content
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"Error reading file: {exc!s}"
 
 
@@ -131,7 +131,7 @@ def write_file(path: str, content: str) -> str:
     Returns:
         Confirmation message with the resolved path, or an error message.
     """
-    from pathlib import Path  # noqa: PLC0415
+    from pathlib import Path
 
     _BLOCKED_PREFIXES = ("/etc/", "/sys/", "/proc/", "/dev/", "/root/", "/boot/")
 
@@ -152,7 +152,7 @@ def write_file(path: str, content: str) -> str:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(content, encoding="utf-8")
         return f"File written: {dest} ({len(content)} chars)"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"Error writing file: {exc!s}"
 
 
@@ -172,9 +172,9 @@ def code_executor(code: str, language: str = "python") -> str:
         Combined stdout + stderr output, or an error message on failure or
         when shell execution is disabled.
     """
-    import subprocess  # noqa: PLC0415
+    import subprocess
 
-    from lightagent.core.config import get_settings  # noqa: PLC0415
+    from lightagent.core.config import get_settings
 
     settings = get_settings()
     if not settings.shell_enabled:
@@ -208,7 +208,7 @@ def code_executor(code: str, language: str = "python") -> str:
         return output or "(no output)"
     except subprocess.TimeoutExpired:
         return "Execution timed out after 30 seconds."
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"Execution error: {exc!s}"
 
 
@@ -225,7 +225,7 @@ def vector_search(query: str, collection: str = "default", k: int = 5) -> str:
         Formatted results with relevance scores and content snippets.
     """
     try:
-        from lightagent.rag.engine import RAGEngine  # noqa: PLC0415
+        from lightagent.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name=collection)
         chunks = engine.search(query, k=k)
@@ -238,7 +238,7 @@ def vector_search(query: str, collection: str = "default", k: int = 5) -> str:
                 f"   {chunk.content[:400]}{'…' if len(chunk.content) > 400 else ''}"
             )
         return "\n".join(lines)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"Vector search error: {exc!s}"
 
 
@@ -253,9 +253,9 @@ def doc_index(path: str, collection: str = "default") -> str:
     Returns:
         Confirmation with the number of chunks indexed, or an error message.
     """
-    from pathlib import Path  # noqa: PLC0415
+    from pathlib import Path
 
-    from lightagent.rag.engine import RAGEngine  # noqa: PLC0415
+    from lightagent.rag.engine import RAGEngine
 
     src = Path(path).expanduser().resolve()
     if not src.exists():
@@ -271,7 +271,7 @@ def doc_index(path: str, collection: str = "default") -> str:
             f"Indexed {count} chunk(s) from '{src}' "
             f"into collection '{collection}'."
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"Indexing error: {exc!s}"
 
 
@@ -288,9 +288,9 @@ def evaluate(text: str, criteria: str) -> str:
         weaknesses, and recommendations.
     """
     try:
-        from langchain_core.messages import HumanMessage, SystemMessage  # noqa: PLC0415
+        from langchain_core.messages import HumanMessage, SystemMessage
 
-        from lightagent.providers.registry import ProviderRegistry  # noqa: PLC0415
+        from lightagent.providers.registry import ProviderRegistry
 
         llm = ProviderRegistry().get_llm_with_fallback()
         prompt = (
@@ -305,7 +305,7 @@ def evaluate(text: str, criteria: str) -> str:
              HumanMessage(content=prompt)]
         )
         return str(response.content)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"Evaluation error: {exc!s}"
 
 
@@ -321,12 +321,12 @@ def score(text: str, rubric: str) -> float:
     Returns:
         A float score between 0.0 and 1.0.  Returns 0.5 on LLM/parse error.
     """
-    import re  # noqa: PLC0415
+    import re
 
     try:
-        from langchain_core.messages import HumanMessage, SystemMessage  # noqa: PLC0415
+        from langchain_core.messages import HumanMessage, SystemMessage
 
-        from lightagent.providers.registry import ProviderRegistry  # noqa: PLC0415
+        from lightagent.providers.registry import ProviderRegistry
 
         llm = ProviderRegistry().get_llm_with_fallback()
         prompt = (
@@ -343,7 +343,7 @@ def score(text: str, rubric: str) -> float:
         raw = str(response.content).strip()
         m = re.search(r"[01]?\.\d+|[01]", raw)
         return float(m.group()) if m else 0.5
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 0.5
 
 
@@ -365,7 +365,7 @@ def duckdb_query(sql: str, source: str = "") -> str:
         or an error message on failure or blocked SQL.
     """
     try:
-        from lightagent.data.duckdb_engine import DuckDBEngine  # noqa: PLC0415
+        from lightagent.data.duckdb_engine import DuckDBEngine
 
         db_path = source if source and not source.endswith((".csv", ".parquet")) else ":memory:"
         with DuckDBEngine(db_path) as engine:
@@ -382,7 +382,7 @@ def duckdb_query(sql: str, source: str = "") -> str:
             lines.append(" | ".join(str(row.get(h, "")) for h in headers))
         suffix = f"\n…({len(rows) - 200} more rows)" if len(rows) > 200 else ""
         return "\n".join(lines) + suffix
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"DuckDB query error: {exc!s}"
 
 
@@ -405,14 +405,13 @@ def polars_transform(operation: str, data_source: str) -> str:
     Returns:
         Transformed data as a formatted string, or an error message.
     """
-    import re  # noqa: PLC0415
-
-    from pathlib import Path  # noqa: PLC0415
+    import re
+    from pathlib import Path
 
     try:
-        import polars as pl  # noqa: PLC0415
+        import polars as pl
 
-        from lightagent.data.polars_utils import (  # noqa: PLC0415
+        from lightagent.data.polars_utils import (
             filter_rows,
             group_by_aggregate,
             select_columns,
@@ -428,7 +427,7 @@ def polars_transform(operation: str, data_source: str) -> str:
 
     try:
         df = pl.read_csv(str(src)) if src.suffix == ".csv" else pl.read_parquet(str(src))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"Error reading data source: {exc!s}"
 
     op = operation.lower().strip()
@@ -476,7 +475,7 @@ def polars_transform(operation: str, data_source: str) -> str:
                 f"Unknown operation: '{operation}'. "
                 "Supported: filter, groupby, sort, select, head."
             )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"Transform error: {exc!s}"
 
     records = to_records(df.head(100))
@@ -511,13 +510,13 @@ def create_chart(data: str, chart_type: str = "bar", title: str = "") -> str:
     Returns:
         Path to the saved image file, or an error message on failure.
     """
-    import json  # noqa: PLC0415
-    from pathlib import Path  # noqa: PLC0415
+    import json
+    from pathlib import Path
 
     try:
-        import polars as pl  # noqa: PLC0415
+        import polars as pl
 
-        from lightagent.data.polars_utils import save_chart  # noqa: PLC0415
+        from lightagent.data.polars_utils import save_chart
     except ImportError as exc:
         return f"Chart dependencies not available: {exc!s}"
 
@@ -526,7 +525,7 @@ def create_chart(data: str, chart_type: str = "bar", title: str = "") -> str:
         if not rows or not isinstance(rows, list):
             return "data must be a non-empty JSON array of objects."
         df = pl.DataFrame(rows)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"Failed to parse data: {exc!s}"
 
     # Infer x (string) and y (numeric) columns
@@ -546,7 +545,7 @@ def create_chart(data: str, chart_type: str = "bar", title: str = "") -> str:
     try:
         saved = save_chart(df, x_col, y_col, output_path, kind=chart_type, title=title)  # type: ignore[arg-type]
         return f"Chart saved to: {saved}"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"Chart creation error: {exc!s}"
 
 
@@ -594,22 +593,150 @@ def list_mcp_tools(server_name: str = "") -> str:
         return f"Error listing MCP tools: {exc!s}"
 
 
+@tool
+def cron_add(name: str, schedule: str, task: str) -> str:
+    """Schedule a recurring agent task using a cron expression.
+
+    Creates a persistent cron job that will execute the given task description
+    on the specified schedule. The job survives process restarts.
+
+    Args:
+        name: Unique identifier for this scheduled job (e.g. 'daily-brief').
+        schedule: Standard 5-field cron expression (e.g. '0 9 * * *' for 9 AM daily).
+        task: Human-readable description of what the agent should do when the job fires.
+
+    Returns:
+        Confirmation string with next scheduled run time, or error message.
+    """
+    try:
+        from lightagent.scheduler.cron_manager import CronManager
+
+        mgr = CronManager()
+        job = mgr.add(name, schedule, task)
+        if job.next_run:
+            next_run = job.next_run.strftime("%Y-%m-%d %H:%M UTC")
+        else:
+            next_run = "unknown"
+        return f"Scheduled '{name}' ({schedule}). Next run: {next_run}"
+    except Exception as exc:
+        return f"Failed to schedule job: {exc}"
+
+
+@tool
+def cron_list() -> str:
+    """List all scheduled cron jobs with their status and next run time.
+
+    Returns:
+        Formatted table of all cron jobs, or a message if none exist.
+    """
+    try:
+        from lightagent.scheduler.cron_manager import CronManager
+
+        jobs = CronManager().list_jobs()
+        if not jobs:
+            return "No cron jobs scheduled."
+        lines = ["NAME | SCHEDULE | STATUS | NEXT RUN | TASK"]
+        for j in jobs:
+            next_run = j.next_run.strftime("%Y-%m-%d %H:%M") if j.next_run else "\u2014"
+            row = f"{j.name} | {j.schedule} | {j.status} | {next_run} | {j.task}"
+            lines.append(row)
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"Failed to list jobs: {exc}"
+
+
+@tool
+def cron_pause(name: str) -> str:
+    """Pause a scheduled cron job so it stops firing.
+
+    Args:
+        name: The job name to pause.
+
+    Returns:
+        Confirmation or error message.
+    """
+    try:
+        from lightagent.scheduler.cron_manager import CronManager
+
+        CronManager().pause(name)
+        return f"Job '{name}' paused."
+    except KeyError:
+        return f"Job '{name}' not found."
+    except Exception as exc:
+        return f"Failed to pause job: {exc}"
+
+
+@tool
+def cron_resume(name: str) -> str:
+    """Resume a paused cron job.
+
+    Args:
+        name: The job name to resume.
+
+    Returns:
+        Confirmation or error message.
+    """
+    try:
+        from lightagent.scheduler.cron_manager import CronManager
+
+        CronManager().resume(name)
+        return f"Job '{name}' resumed."
+    except KeyError:
+        return f"Job '{name}' not found."
+    except Exception as exc:
+        return f"Failed to resume job: {exc}"
+
+
+@tool
+def cron_remove(name: str) -> str:
+    """Permanently delete a scheduled cron job.
+
+    Args:
+        name: The job name to remove.
+
+    Returns:
+        Confirmation or error message.
+    """
+    try:
+        from lightagent.scheduler.cron_manager import CronManager
+
+        CronManager().remove(name)
+        return f"Job '{name}' removed."
+    except KeyError:
+        return f"Job '{name}' not found."
+    except Exception as exc:
+        return f"Failed to remove job: {exc}"
+
+
 RESEARCHER_TOOLS: list[BaseTool] = [web_search, rag_search, read_file, list_mcp_tools]
 CODER_TOOLS: list[BaseTool] = [code_executor, read_file, write_file]
 RAG_AGENT_TOOLS: list[BaseTool] = [vector_search, doc_index, web_search]
 CRITIC_TOOLS: list[BaseTool] = [evaluate, score]
 DATA_ANALYST_TOOLS: list[BaseTool] = [duckdb_query, polars_transform, create_chart]
 FILE_MANAGER_TOOLS: list[BaseTool] = [read_file, write_file]
+CRON_MANAGER_TOOLS: list[BaseTool] = [
+    cron_add,
+    cron_list,
+    cron_pause,
+    cron_resume,
+    cron_remove,
+]
 
 __all__ = [
     "CODER_TOOLS",
     "CRITIC_TOOLS",
+    "CRON_MANAGER_TOOLS",
     "DATA_ANALYST_TOOLS",
     "FILE_MANAGER_TOOLS",
     "RAG_AGENT_TOOLS",
     "RESEARCHER_TOOLS",
     "code_executor",
     "create_chart",
+    "cron_add",
+    "cron_list",
+    "cron_pause",
+    "cron_remove",
+    "cron_resume",
     "doc_index",
     "duckdb_query",
     "evaluate",

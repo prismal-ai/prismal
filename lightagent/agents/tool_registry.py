@@ -148,6 +148,7 @@ def get_tools_for_agent(agent_name: str) -> list[BaseTool]:
     from lightagent.agents.tools import (
         CODER_TOOLS,
         CRITIC_TOOLS,
+        CRON_MANAGER_TOOLS,
         DATA_ANALYST_TOOLS,
         FILE_MANAGER_TOOLS,
         RAG_AGENT_TOOLS,
@@ -167,7 +168,10 @@ def get_tools_for_agent(agent_name: str) -> list[BaseTool]:
         # Planner needs file I/O to persist generated specs to disk;
         # SDD skill tools (guide, read_reference, validate_specs) are
         # injected automatically via get_skill_tools() when activated.
-        "planner": [read_file, write_file],
+        # Cron management tools are also available to the planner so it
+        # can schedule recurring agent tasks on behalf of the user.
+        "planner": [read_file, write_file, *CRON_MANAGER_TOOLS],
+        "cron_manager": CRON_MANAGER_TOOLS,
     }
 
     mcp_tools = get_mcp_tools()[:_MAX_MCP_TOOLS]  # cap to avoid token explosion
@@ -199,13 +203,13 @@ _MAX_REACT_ITERATIONS: int = 5
 
 async def react_loop(
     llm: object,
-    tools: "list[BaseTool]",
-    messages: "list[object]",
+    tools: list[BaseTool],
+    messages: list[object],
     *,
     agent_name: str = "agent",
     max_iterations: int = _MAX_REACT_ITERATIONS,
     session_id: str | None = None,
-) -> "object":
+) -> object:
     """Execute a ReAct (Reason + Act) tool loop until the LLM returns a final answer.
 
     Calls the LLM, executes any requested tool calls, feeds results back as
@@ -230,9 +234,9 @@ async def react_loop(
         the LLM (either because it had no tool calls, or because the
         iteration cap was reached).
     """
-    from langchain_core.messages import AIMessage, ToolMessage  # noqa: PLC0415
+    from langchain_core.messages import AIMessage, ToolMessage
 
-    tool_map: dict[str, "BaseTool"] = {t.name: t for t in tools}
+    tool_map: dict[str, BaseTool] = {t.name: t for t in tools}
     loop_messages: list[object] = list(messages)
     response = AIMessage(content="")
 
@@ -267,7 +271,7 @@ async def react_loop(
             else:
                 try:
                     result = str(await tool_fn.ainvoke(tc.get("args", {})))
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     result = f"Tool error: {exc}"
             # Cap individual tool results to avoid token explosion
             if len(result) > 4_000:
@@ -285,7 +289,7 @@ async def react_loop(
         # The last `response` still has pending tool_calls and no useful content.
         # Append the last tool results already in loop_messages and ask the LLM
         # to synthesise a final answer from everything gathered so far.
-        from langchain_core.messages import HumanMessage  # noqa: PLC0415
+        from langchain_core.messages import HumanMessage
 
         loop_messages.append(response)
         loop_messages.append(
