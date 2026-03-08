@@ -80,7 +80,9 @@ class CronJob(BaseModel):
     status: CronStatus = "active"
     last_run: datetime | None = None
     next_run: datetime | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
 
 
 # ── Manager ───────────────────────────────────────────────────────────────────
@@ -304,15 +306,13 @@ class CronManager:
             job: The cron job for which to create a deployment.
         """
         try:
-            from lightagent.scheduler.prefect_flows import (
-                agent_run_flow,
-            )
-
             logger.info(
-                "cron_prefect_deployment_registered",
+                "cron_prefect_deployment_skipped",
                 name=job.name,
                 schedule=job.schedule,
-                flow=agent_run_flow.name,
+                reason=(
+                    "Prefect deployment API not yet wired; job persisted in SQLite only"
+                ),
             )
         except Exception as exc:
             logger.warning(

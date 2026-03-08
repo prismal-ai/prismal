@@ -309,7 +309,10 @@ async def test_run_job_calls_graph_and_updates_last_run(
     mock_graph.ainvoke.assert_called_once()
     call_args = mock_graph.ainvoke.call_args
     config = call_args.args[1] if len(call_args.args) > 1 else call_args.kwargs["config"]
-    assert config["configurable"]["thread_id"] == "cron-daily-brief"
+    thread_id = config["configurable"]["thread_id"]
+    # Thread ID format: cron-{name}-{YYYYmmddHHMMSS}
+    assert thread_id.startswith("cron-daily-brief-")
+    assert len(thread_id) == len("cron-daily-brief-") + 14  # 14 digits for timestamp
 
     mock_manager.update_last_run.assert_called_once_with("daily-brief")
 

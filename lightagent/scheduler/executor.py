@@ -27,6 +27,19 @@ from lightagent.scheduler.cron_manager import CronJob, CronManager
 
 logger = structlog.get_logger("lightagent.scheduler.executor")
 
+# Module-level singleton tracking the currently running executor instance.
+_running_executor: CronExecutor | None = None
+
+
+def get_running_executor() -> CronExecutor | None:
+    """Return the currently running CronExecutor instance, or None if not started.
+
+    Returns:
+        The active :class:`CronExecutor` instance, or ``None`` when no executor
+        has been started.
+    """
+    return _running_executor
+
 
 class CronExecutor:
     """APScheduler-backed executor that runs LightAgent cron jobs on schedule.
@@ -78,6 +91,8 @@ class CronExecutor:
             self._register_job(job)
 
         self._scheduler.start()
+        global _running_executor
+        _running_executor = self
         logger.info("cron_executor_started")
 
     async def stop(self) -> None:
@@ -87,9 +102,11 @@ class CronExecutor:
         with ``wait=False`` so the event loop is not blocked while in-flight
         jobs complete.
         """
+        global _running_executor
         if self._scheduler.running:
             self._scheduler.shutdown(wait=False)
             logger.info("cron_executor_stopped")
+        _running_executor = None
 
     # ── Job management ────────────────────────────────────────────────────────
 
@@ -189,14 +206,17 @@ class CronExecutor:
         """
         logger.info("cron_job_starting", name=name, task=task)
         try:
+            from datetime import UTC, datetime
+
             from langchain_core.messages import HumanMessage
 
             from lightagent.agents.graph import get_async_compiled_graph
 
+            thread_id = f"cron-{name}-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
             graph = await get_async_compiled_graph()
             await graph.ainvoke(
                 {"messages": [HumanMessage(content=task)]},
-                config={"configurable": {"thread_id": f"cron-{name}"}},
+                config={"configurable": {"thread_id": thread_id}},
             )
             self._manager.update_last_run(name)
             logger.info("cron_job_completed", name=name)
@@ -208,4 +228,4 @@ class CronExecutor:
             )
 
 
-__all__ = ["CronExecutor"]
+__all__ = ["CronExecutor", "get_running_executor"]

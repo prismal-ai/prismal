@@ -154,7 +154,18 @@ def agent_run_flow(task_description: str) -> str:
         return str(getattr(last, "content", last))
 
     try:
-        result = asyncio.run(_invoke())
+        try:
+            asyncio.get_running_loop()
+            # Already in an async event loop (e.g. Prefect async worker) —
+            # run _invoke() in a separate thread to avoid "loop already running".
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, _invoke())
+                result = future.result()
+        except RuntimeError:
+            # No running event loop — safe to use asyncio.run() directly.
+            result = asyncio.run(_invoke())
         logger.info("prefect_agent_run_done", result=result[:80])
         return result
     except Exception as exc:
