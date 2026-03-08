@@ -22,7 +22,7 @@ from lightagent.scheduler.executor import CronExecutor
 
 def _make_job(name: str = "test-job", status: str = "active") -> CronJob:
     """Return a minimal CronJob with the given name and status."""
-    return CronJob(name=name, schedule="0 9 * * *", task="Run something")  # type: ignore[call-arg]
+    return CronJob(name=name, schedule="0 9 * * *", task="Run something", status=status)
 
 
 def _make_paused_job(name: str = "paused-job") -> CronJob:
@@ -203,7 +203,9 @@ async def test_remove_job_no_op_when_not_found(
     executor: CronExecutor, mock_scheduler: MagicMock
 ) -> None:
     """remove_job() does not raise when the job is not found."""
-    mock_scheduler.remove_job.side_effect = Exception("Job not found")
+    from apscheduler.jobstores.base import JobLookupError as APJobLookupError
+
+    mock_scheduler.remove_job.side_effect = APJobLookupError("nonexistent")
 
     # Must not raise
     await executor.remove_job("nonexistent")
@@ -234,6 +236,30 @@ async def test_resume_job(
     await executor.resume_job("my-job")
 
     mock_scheduler.resume_job.assert_called_once_with("my-job")
+
+
+@pytest.mark.asyncio
+async def test_pause_job_no_op_when_not_found(mock_manager: MagicMock) -> None:
+    """pause_job() logs a warning and does not raise when job is not in scheduler."""
+    from apscheduler.jobstores.base import JobLookupError as APJobLookupError
+
+    executor = CronExecutor(manager=mock_manager)
+    executor._scheduler = MagicMock()
+    executor._scheduler.pause_job.side_effect = APJobLookupError("missing-job")
+    # Should not raise
+    await executor.pause_job("missing-job")
+
+
+@pytest.mark.asyncio
+async def test_resume_job_no_op_when_not_found(mock_manager: MagicMock) -> None:
+    """resume_job() logs a warning and does not raise when job is not in scheduler."""
+    from apscheduler.jobstores.base import JobLookupError as APJobLookupError
+
+    executor = CronExecutor(manager=mock_manager)
+    executor._scheduler = MagicMock()
+    executor._scheduler.resume_job.side_effect = APJobLookupError("missing-job")
+    # Should not raise
+    await executor.resume_job("missing-job")
 
 
 # ---------------------------------------------------------------------------

@@ -19,6 +19,7 @@ Example::
 from __future__ import annotations
 
 import structlog
+from apscheduler.jobstores.base import JobLookupError as APJobLookupError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -117,7 +118,7 @@ class CronExecutor:
         try:
             self._scheduler.remove_job(name)
             logger.info("cron_executor_job_removed", name=name)
-        except Exception:
+        except APJobLookupError:
             logger.debug("cron_executor_job_not_found_on_remove", name=name)
 
     async def pause_job(self, name: str) -> None:
@@ -126,8 +127,11 @@ class CronExecutor:
         Args:
             name: The job name (APScheduler job id) to pause.
         """
-        self._scheduler.pause_job(name)
-        logger.info("cron_executor_job_paused", name=name)
+        try:
+            self._scheduler.pause_job(name)
+            logger.info("cron_executor_job_paused", name=name)
+        except APJobLookupError:
+            logger.warning("cron_executor_pause_job_not_found", name=name)
 
     async def resume_job(self, name: str) -> None:
         """Resume a previously paused job in the running scheduler.
@@ -135,8 +139,11 @@ class CronExecutor:
         Args:
             name: The job name (APScheduler job id) to resume.
         """
-        self._scheduler.resume_job(name)
-        logger.info("cron_executor_job_resumed", name=name)
+        try:
+            self._scheduler.resume_job(name)
+            logger.info("cron_executor_job_resumed", name=name)
+        except APJobLookupError:
+            logger.warning("cron_executor_resume_job_not_found", name=name)
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
