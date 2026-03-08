@@ -24,6 +24,8 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from croniter import croniter
+
 if TYPE_CHECKING:
     from collections.abc import Generator
 from pathlib import Path
@@ -173,17 +175,21 @@ class CronManager:
         if self.get_job(name) is not None:
             raise ValueError(f"Cron job '{name}' already exists")
 
-        job = CronJob(name=name, schedule=schedule, task=task)
+        now = datetime.now(UTC).replace(tzinfo=None)
+        next_dt = croniter(schedule, now).get_next(datetime)
+        job = CronJob(name=name, schedule=schedule, task=task, next_run=next_dt)
         created = job.created_at.strftime(_DT_FMT)
+        next_stamp = next_dt.strftime(_DT_FMT)
 
         with self._conn() as conn:
             conn.execute(
-                "INSERT INTO cron_jobs (name, schedule, task, status, created_at)"
-                " VALUES (?, ?, ?, ?, ?)",
-                (name, schedule, task, job.status, created),
+                "INSERT INTO cron_jobs"
+                " (name, schedule, task, status, created_at, next_run)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (name, schedule, task, job.status, created, next_stamp),
             )
 
-        logger.info("cron_job_added", name=name, schedule=schedule)
+        logger.info("cron_job_added", name=name, schedule=schedule, next_run=next_stamp)
         self._try_create_prefect_deployment(job)
         return job
 
@@ -217,11 +223,17 @@ class CronManager:
         AC-007-4: ``lightagent cron resume NAME`` works.
         """
         self._require_job(name)
+        job = self.get_job(name)
+        assert job is not None  # guaranteed by _require_job above
+        now = datetime.now(UTC).replace(tzinfo=None)
+        next_dt = croniter(job.schedule, now).get_next(datetime)
+        stamp = next_dt.strftime(_DT_FMT)
         with self._conn() as conn:
             conn.execute(
-                "UPDATE cron_jobs SET status = 'active' WHERE name = ?", (name,)
+                "UPDATE cron_jobs SET status = 'active', next_run = ? WHERE name = ?",
+                (stamp, name),
             )
-        logger.info("cron_job_resumed", name=name)
+        logger.info("cron_job_resumed", name=name, next_run=stamp)
 
     def remove(self, name: str) -> None:
         """Permanently delete a cron job.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -38,6 +38,8 @@ def test_add_creates_job(tmp_path: Path) -> None:
     assert job.name == "morning-brief"
     assert job.schedule == "0 9 * * *"
     assert job.status == "active"
+    assert job.next_run is not None
+    assert isinstance(job.next_run, datetime)
 
 
 def test_add_duplicate_raises(tmp_path: Path) -> None:
@@ -53,6 +55,30 @@ def test_add_returns_cron_job_instance(tmp_path: Path) -> None:
     manager = CronManager(db_path=tmp_path / "cron.db")
     result = manager.add("j1", "* * * * *", "Task")
     assert isinstance(result, CronJob)
+    assert result.next_run is not None
+
+
+def test_add_computes_next_run(tmp_path: Path) -> None:
+    """add() computes next_run in the future from the cron expression."""
+    manager = CronManager(db_path=tmp_path / "cron.db")
+    before = datetime.now(UTC).replace(tzinfo=None)
+    job = manager.add("future-job", "0 9 * * *", "Daily job")
+    assert job.next_run is not None
+    assert job.next_run > before
+
+
+def test_resume_updates_next_run(tmp_path: Path) -> None:
+    """resume() recomputes and persists next_run after unpausing."""
+    manager = CronManager(db_path=tmp_path / "cron.db")
+    manager.add("resumable", "0 9 * * *", "Daily job")
+    manager.pause("resumable")
+    before = datetime.now(UTC).replace(tzinfo=None)
+    manager.resume("resumable")
+    job = manager.get_job("resumable")
+    assert job is not None
+    assert job.status == "active"
+    assert job.next_run is not None
+    assert job.next_run > before
 
 
 # ── CronManager.list_jobs ─────────────────────────────────────────────────────
