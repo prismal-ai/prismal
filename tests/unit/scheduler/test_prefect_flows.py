@@ -122,10 +122,23 @@ def test_config_reload_flow_delegates_to_task() -> None:
 
 
 def test_agent_run_flow_returns_string() -> None:
-    """agent_run_flow.fn returns a result string."""
+    """agent_run_flow.fn returns a result string from the graph."""
+    import asyncio as _asyncio
+
     from lightagent.scheduler.prefect_flows import agent_run_flow
 
-    result = agent_run_flow.fn("Summarise quarterly report")
+    def fake_run_drain(coro: object) -> str:  # type: ignore[type-arg]
+        # Close the coroutine so Python doesn't warn about unawaited coroutine.
+        import inspect
+
+        if inspect.iscoroutine(coro):
+            coro.close()  # type: ignore[union-attr]
+        return "Agent response text"
+
+    with patch("lightagent.scheduler.prefect_flows.asyncio.run", side_effect=fake_run_drain) as mock_run:
+        result = agent_run_flow.fn("Summarise quarterly report")
+
+    mock_run.assert_called_once()
     assert isinstance(result, str)
     assert len(result) > 0
 
@@ -136,6 +149,64 @@ def test_agent_run_flow_with_empty_task() -> None:
 
     result = agent_run_flow.fn("")
     assert "no-op" in result
+
+
+def test_agent_run_flow_calls_graph() -> None:
+    """agent_run_flow.fn calls asyncio.run with a coroutine that invokes the graph.
+
+    We patch asyncio.run to capture and execute the coroutine directly using a
+    fresh event loop, while get_async_compiled_graph is patched at its source
+    module so the local import inside agent_run_flow resolves to the mock.
+    """
+    import asyncio as _asyncio
+
+    from lightagent.scheduler.prefect_flows import agent_run_flow
+
+    mock_msg = MagicMock()
+    mock_msg.content = "done"
+    mock_graph = AsyncMock()
+    mock_graph.ainvoke.return_value = {"messages": [mock_msg]}
+    mock_get_graph = AsyncMock(return_value=mock_graph)
+
+    def fake_asyncio_run(coro: object) -> str:  # type: ignore[type-arg]
+        loop = _asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(coro)  # type: ignore[arg-type]
+        finally:
+            loop.close()
+
+    with (
+        patch("lightagent.agents.graph.get_async_compiled_graph", mock_get_graph),
+        patch("lightagent.scheduler.prefect_flows.asyncio.run", side_effect=fake_asyncio_run),
+    ):
+        result = agent_run_flow.fn("fetch latest stock prices")
+
+    assert result == "done"
+    mock_graph.ainvoke.assert_called_once()
+    call_kwargs = mock_graph.ainvoke.call_args[0][0]
+    assert call_kwargs["messages"][0].content == "fetch latest stock prices"
+
+
+def test_agent_run_flow_returns_error_string_on_exception() -> None:
+    """agent_run_flow.fn returns an error string instead of raising on failure."""
+    import inspect
+
+    from lightagent.scheduler.prefect_flows import agent_run_flow
+
+    def fake_run_raise(coro: object) -> str:  # type: ignore[type-arg]
+        if inspect.iscoroutine(coro):
+            coro.close()  # type: ignore[union-attr]
+        raise RuntimeError("graph unavailable")
+
+    with patch(
+        "lightagent.scheduler.prefect_flows.asyncio.run",
+        side_effect=fake_run_raise,
+    ):
+        result = agent_run_flow.fn("do something")
+
+    assert isinstance(result, str)
+    assert result.startswith("error:")
+    assert "graph unavailable" in result
 
 
 # ── Prefect object type checks ────────────────────────────────────────────────

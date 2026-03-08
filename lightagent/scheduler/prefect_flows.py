@@ -123,20 +123,43 @@ def config_reload_flow() -> bool:
 def agent_run_flow(task_description: str) -> str:
     """Execute a generic agent task from a natural language description.
 
+    Runs the LangGraph supervisor graph with the given task description and
+    returns the last message content from the agent's response.
+
     Args:
         task_description: Free-form description of the task to execute.
 
     Returns:
-        Result string from the agent execution.
+        Result string from the agent execution, or an error message if invocation fails.
     """
+    from langchain_core.messages import HumanMessage
+
+    from lightagent.agents.graph import get_async_compiled_graph
+
     logger.info("prefect_agent_run_start", task=task_description[:80])
     if not task_description:
         logger.warning("prefect_agent_run_empty_task")
         return "no-op: empty task description"
-    # Integration point: real implementation calls the LangGraph agent graph
-    result = f"completed:{task_description[:40]}"
-    logger.info("prefect_agent_run_done", result=result)
-    return result
+
+    async def _invoke() -> str:
+        graph = await get_async_compiled_graph()
+        result = await graph.ainvoke(
+            {"messages": [HumanMessage(content=task_description)]},
+            config={"configurable": {"thread_id": f"prefect-{task_description[:20]}"}},
+        )
+        messages = result.get("messages", [])
+        if not messages:
+            return "Agent returned no messages"
+        last = messages[-1]
+        return str(getattr(last, "content", last))
+
+    try:
+        result = asyncio.run(_invoke())
+        logger.info("prefect_agent_run_done", result=result[:80])
+        return result
+    except Exception as exc:
+        logger.error("prefect_agent_run_error", error=str(exc))
+        return f"error: {exc}"
 
 
 __all__ = [
