@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lightagent.scheduler.cron_manager import CronJob, CronManager, CronStatus
+from lightagent.scheduler.cron_manager import CronJob, CronManager, CronRunRecord, CronStatus
 
 
 # ── CronJob model ─────────────────────────────────────────────────────────────
@@ -223,3 +223,94 @@ def test_pause_persists_across_instances(tmp_path: Path) -> None:
     job = mgr2.get_job("reboot-safe")
     assert job is not None
     assert job.status == "paused"
+
+
+# ── CronRunHistory ────────────────────────────────────────────────────────────
+
+
+class TestCronRunHistory:
+    """Tests for cron run history persistence."""
+
+    def test_add_run_record_success(self, tmp_path: Path) -> None:
+        """add_run_record stores a successful run in the DB."""
+        manager = CronManager(db_path=tmp_path / "cron.db")
+        manager.add("hist-job", "* * * * *", "task")
+        started = datetime(2026, 3, 9, 10, 0, 0)
+        finished = datetime(2026, 3, 9, 10, 0, 5)
+        manager.add_run_record(
+            "hist-job",
+            started_at=started,
+            finished_at=finished,
+            outcome="success",
+            output="done",
+        )
+        records = manager.get_run_history("hist-job")
+        assert len(records) == 1
+        r = records[0]
+        assert r.job_name == "hist-job"
+        assert r.outcome == "success"
+        assert r.output == "done"
+        assert r.error is None
+        assert r.duration_seconds == 5.0
+
+    def test_add_run_record_failure(self, tmp_path: Path) -> None:
+        """add_run_record stores a failed run with error message."""
+        manager = CronManager(db_path=tmp_path / "cron.db")
+        manager.add("fail-job", "* * * * *", "task")
+        started = datetime(2026, 3, 9, 10, 0, 0)
+        finished = datetime(2026, 3, 9, 10, 0, 2)
+        manager.add_run_record(
+            "fail-job",
+            started_at=started,
+            finished_at=finished,
+            outcome="failure",
+            error="something went wrong",
+        )
+        records = manager.get_run_history("fail-job")
+        assert len(records) == 1
+        r = records[0]
+        assert r.outcome == "failure"
+        assert r.error == "something went wrong"
+        assert r.output is None
+
+    def test_get_run_history_empty(self, tmp_path: Path) -> None:
+        """get_run_history returns empty list for a job with no runs."""
+        manager = CronManager(db_path=tmp_path / "cron.db")
+        manager.add("no-run-job", "* * * * *", "task")
+        assert manager.get_run_history("no-run-job") == []
+
+    def test_get_run_history_limit(self, tmp_path: Path) -> None:
+        """get_run_history respects limit parameter."""
+        from datetime import timedelta
+
+        manager = CronManager(db_path=tmp_path / "cron.db")
+        manager.add("limit-job", "* * * * *", "task")
+        base = datetime(2026, 3, 9, 10, 0, 0)
+        for i in range(5):
+            manager.add_run_record(
+                "limit-job",
+                started_at=base + timedelta(minutes=i),
+                finished_at=base + timedelta(minutes=i, seconds=1),
+                outcome="success",
+                output=f"run {i}",
+            )
+        records = manager.get_run_history("limit-job", limit=3)
+        assert len(records) == 3
+
+    def test_get_run_history_ordered_newest_first(self, tmp_path: Path) -> None:
+        """get_run_history returns records newest-first."""
+        from datetime import timedelta
+
+        manager = CronManager(db_path=tmp_path / "cron.db")
+        manager.add("order-job", "* * * * *", "task")
+        base = datetime(2026, 3, 9, 10, 0, 0)
+        for i in range(3):
+            manager.add_run_record(
+                "order-job",
+                started_at=base + timedelta(minutes=i),
+                finished_at=base + timedelta(minutes=i, seconds=1),
+                outcome="success",
+                output=f"run {i}",
+            )
+        records = manager.get_run_history("order-job")
+        assert records[0].started_at > records[1].started_at

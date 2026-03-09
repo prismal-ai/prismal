@@ -57,6 +57,43 @@ CREATE TABLE IF NOT EXISTS cron_jobs (
 
 _DT_FMT = "%Y-%m-%dT%H:%M:%S"
 
+_HISTORY_SCHEMA = """
+CREATE TABLE IF NOT EXISTS cron_run_history (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_name    TEXT NOT NULL,
+    started_at  TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    duration_seconds REAL NOT NULL,
+    outcome     TEXT NOT NULL,
+    output      TEXT,
+    error       TEXT
+);
+"""
+
+
+class CronRunRecord(BaseModel):
+    """One execution record for a cron job.
+
+    Attributes:
+        id: Auto-incremented row ID.
+        job_name: Name of the cron job.
+        started_at: UTC timestamp when execution began.
+        finished_at: UTC timestamp when execution ended.
+        duration_seconds: Wall-clock duration in seconds.
+        outcome: ``"success"`` or ``"failure"``.
+        output: Agent response text on success, or ``None``.
+        error: Error message on failure, or ``None``.
+    """
+
+    id: int | None = None
+    job_name: str
+    started_at: datetime
+    finished_at: datetime
+    duration_seconds: float
+    outcome: str
+    output: str | None = None
+    error: str | None = None
+
 
 # ── Model ─────────────────────────────────────────────────────────────────────
 
@@ -130,9 +167,10 @@ class CronManager:
             conn.close()
 
     def _init_db(self) -> None:
-        """Create the cron_jobs table if it does not exist."""
+        """Create the cron_jobs and cron_run_history tables if they do not exist."""
         with self._conn() as conn:
             conn.execute(_SCHEMA)
+            conn.execute(_HISTORY_SCHEMA)
 
     @staticmethod
     def _row_to_job(row: sqlite3.Row) -> CronJob:
@@ -293,6 +331,97 @@ class CronManager:
                 "UPDATE cron_jobs SET last_run = ? WHERE name = ?", (stamp, name)
             )
 
+    def add_run_record(
+        self,
+        job_name: str,
+        started_at: datetime,
+        finished_at: datetime,
+        outcome: str,
+        output: str | None = None,
+        error: str | None = None,
+    ) -> CronRunRecord:
+        """Persist one execution record for a cron job.
+
+        Args:
+            job_name: Name of the job that was executed.
+            started_at: UTC time when the execution started.
+            finished_at: UTC time when the execution ended.
+            outcome: ``"success"`` or ``"failure"``.
+            output: Agent response text (success path), or ``None``.
+            error: Error message (failure path), or ``None``.
+
+        Returns:
+            The persisted :class:`CronRunRecord` with its assigned ``id``.
+        """
+        duration = (finished_at - started_at).total_seconds()
+        with self._conn() as conn:
+            cursor = conn.execute(
+                "INSERT INTO cron_run_history"
+                " (job_name, started_at, finished_at,"
+                " duration_seconds, outcome, output, error)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    job_name,
+                    started_at.strftime(_DT_FMT),
+                    finished_at.strftime(_DT_FMT),
+                    duration,
+                    outcome,
+                    output,
+                    error,
+                ),
+            )
+            row_id = cursor.lastrowid
+        record = CronRunRecord(
+            id=row_id,
+            job_name=job_name,
+            started_at=started_at,
+            finished_at=finished_at,
+            duration_seconds=duration,
+            outcome=outcome,
+            output=output,
+            error=error,
+        )
+        logger.debug(
+            "cron_run_recorded", job=job_name, outcome=outcome, duration=duration
+        )
+        return record
+
+    def get_run_history(self, job_name: str, limit: int = 20) -> list[CronRunRecord]:
+        """Fetch execution history for a cron job, newest first.
+
+        Args:
+            job_name: Name of the cron job.
+            limit: Maximum number of records to return (default 20).
+
+        Returns:
+            List of :class:`CronRunRecord` instances, newest first.
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM cron_run_history"
+                " WHERE job_name = ?"
+                " ORDER BY started_at DESC"
+                " LIMIT ?",
+                (job_name, limit),
+            ).fetchall()
+
+        def _row_to_record(row: sqlite3.Row) -> CronRunRecord:
+            def _parse(s: str) -> datetime:
+                return datetime.strptime(s, _DT_FMT)  # noqa: DTZ007
+
+            return CronRunRecord(
+                id=row["id"],
+                job_name=row["job_name"],
+                started_at=_parse(row["started_at"]),
+                finished_at=_parse(row["finished_at"]),
+                duration_seconds=row["duration_seconds"],
+                outcome=row["outcome"],
+                output=row["output"],
+                error=row["error"],
+            )
+
+        return [_row_to_record(r) for r in rows]
+
     # ── Prefect integration (best-effort) ────────────────────────────────────
 
     @staticmethod
@@ -322,4 +451,4 @@ class CronManager:
             )
 
 
-__all__ = ["CronJob", "CronManager", "CronStatus"]
+__all__ = ["CronJob", "CronManager", "CronRunRecord", "CronStatus"]
