@@ -314,3 +314,49 @@ class TestCronRunHistory:
             )
         records = manager.get_run_history("order-job")
         assert records[0].started_at > records[1].started_at
+
+
+# ── CronManager.get_last_run ──────────────────────────────────────────────────
+
+
+@pytest.fixture()
+def manager(tmp_path: Path) -> CronManager:
+    """Provide a fresh CronManager backed by a temp SQLite DB."""
+    return CronManager(db_path=tmp_path / "cron.db")
+
+
+class TestGetLastRun:
+    """Tests for CronManager.get_last_run."""
+
+    def test_get_last_run_returns_most_recent(self, manager: CronManager) -> None:
+        """get_last_run returns the most recent run record."""
+        from datetime import datetime, timedelta
+        manager.add("lr-job", "* * * * *", "task")
+        base = datetime(2026, 3, 9, 10, 0, 0)
+        manager.add_run_record(
+            "lr-job",
+            started_at=base,
+            finished_at=base + timedelta(seconds=1),
+            outcome="success",
+            output="first",
+        )
+        manager.add_run_record(
+            "lr-job",
+            started_at=base + timedelta(minutes=1),
+            finished_at=base + timedelta(minutes=1, seconds=2),
+            outcome="failure",
+            error="boom",
+        )
+        record = manager.get_last_run("lr-job")
+        assert record is not None
+        assert record.outcome == "failure"
+        assert record.error == "boom"
+
+    def test_get_last_run_none_when_no_history(self, manager: CronManager) -> None:
+        """get_last_run returns None when no runs have been recorded."""
+        manager.add("empty-job", "* * * * *", "task")
+        assert manager.get_last_run("empty-job") is None
+
+    def test_get_last_run_none_for_unknown_job(self, manager: CronManager) -> None:
+        """get_last_run returns None for a job name not in history."""
+        assert manager.get_last_run("nonexistent") is None

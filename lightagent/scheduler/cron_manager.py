@@ -422,6 +422,41 @@ class CronManager:
 
         return [_row_to_record(r) for r in rows]
 
+    def get_last_run(self, job_name: str) -> CronRunRecord | None:
+        """Return the most recent execution record for a job, or ``None``.
+
+        Args:
+            job_name: Name of the cron job.
+
+        Returns:
+            The most recent :class:`CronRunRecord`, or ``None`` if no runs
+            have been recorded for this job.
+        """
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM cron_run_history"
+                " WHERE job_name = ?"
+                " ORDER BY started_at DESC"
+                " LIMIT 1",
+                (job_name,),
+            ).fetchone()
+        if row is None:
+            return None
+
+        def _parse(s: str) -> datetime:
+            return datetime.strptime(s, _DT_FMT)  # noqa: DTZ007
+
+        return CronRunRecord(
+            id=row["id"],
+            job_name=row["job_name"],
+            started_at=_parse(row["started_at"]),
+            finished_at=_parse(row["finished_at"]),
+            duration_seconds=row["duration_seconds"],
+            outcome=row["outcome"],
+            output=row["output"],
+            error=row["error"],
+        )
+
     # ── Prefect integration (best-effort) ────────────────────────────────────
 
     @staticmethod
