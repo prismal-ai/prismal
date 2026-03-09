@@ -24,6 +24,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from lightagent.scheduler.cron_manager import CronJob, CronManager
+from lightagent.scheduler.notifier import CronNotifier
 
 logger = structlog.get_logger("lightagent.scheduler.executor")
 
@@ -56,14 +57,21 @@ class CronExecutor:
             ``CronManager()`` backed by the standard SQLite database.
     """
 
-    def __init__(self, manager: CronManager | None = None) -> None:
-        """Initialise the executor with an optional CronManager.
+    def __init__(
+        self,
+        manager: CronManager | None = None,
+        notifier: CronNotifier | None = None,
+    ) -> None:
+        """Initialise the executor with an optional CronManager and CronNotifier.
 
         Args:
             manager: Optional :class:`CronManager`.  When ``None`` a default
                 instance pointing at ``data/db/cron_jobs.db`` is created.
+            notifier: Optional :class:`CronNotifier`.  When ``None`` a default
+                instance is created from settings (sends to configured targets).
         """
         self._manager: CronManager = manager or CronManager()
+        self._notifier: CronNotifier = notifier or CronNotifier()
         self._scheduler: AsyncIOScheduler = AsyncIOScheduler()
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -253,6 +261,11 @@ class CronExecutor:
                 finished_at=finished_at,
                 outcome="failure",
                 error=str(exc),
+            )
+            await self._notifier.notify_failure(
+                job_name=name,
+                error=str(exc),
+                duration_seconds=(finished_at - started_at).total_seconds(),
             )
 
 

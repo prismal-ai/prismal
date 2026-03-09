@@ -466,3 +466,84 @@ class TestRunJobHistory:
         assert len(records) == 1
         assert records[0].outcome == "failure"
         assert "boom" in (records[0].error or "")
+
+
+# ---------------------------------------------------------------------------
+# TestCronExecutorNotifier — notifier integration
+# ---------------------------------------------------------------------------
+
+
+class TestCronExecutorNotifier:
+    """Tests that CronExecutor calls the notifier on job failure."""
+
+    @pytest.fixture()
+    def manager(self, tmp_path: Path) -> CronManager:
+        """Return a real CronManager backed by a temporary SQLite database."""
+        return CronManager(db_path=tmp_path / "cron_test.db")
+
+    @pytest.mark.asyncio
+    async def test_notifier_called_on_failure(
+        self,
+        manager: CronManager,
+    ) -> None:
+        """notify_failure is called when _run_job raises."""
+        import sys
+        from unittest.mock import AsyncMock, MagicMock
+
+        mock_notifier = MagicMock()
+        mock_notifier.notify_failure = AsyncMock()
+
+        executor = CronExecutor(manager=manager, notifier=mock_notifier)
+        executor._scheduler = MagicMock()
+        manager.add("notify-test", "* * * * *", "task")
+
+        graph_mod = MagicMock()
+        graph_mod.get_async_compiled_graph = AsyncMock(
+            side_effect=RuntimeError("crash")
+        )
+        msgs_mod = _make_messages_module_mock()
+
+        with (
+            patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
+            patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
+        ):
+            await executor._run_job("notify-test", "task")
+
+        mock_notifier.notify_failure.assert_called_once()
+        call_kwargs = mock_notifier.notify_failure.call_args.kwargs
+        assert call_kwargs["job_name"] == "notify-test"
+        assert "crash" in call_kwargs["error"]
+        assert call_kwargs["duration_seconds"] >= 0
+
+    @pytest.mark.asyncio
+    async def test_notifier_not_called_on_success(
+        self,
+        manager: CronManager,
+    ) -> None:
+        """notify_failure is NOT called when _run_job succeeds."""
+        import sys
+        from unittest.mock import AsyncMock, MagicMock
+
+        from langchain_core.messages import AIMessage
+
+        mock_notifier = MagicMock()
+        mock_notifier.notify_failure = AsyncMock()
+
+        executor = CronExecutor(manager=manager, notifier=mock_notifier)
+        executor._scheduler = MagicMock()
+        manager.add("success-notify", "* * * * *", "task")
+
+        mock_graph = AsyncMock()
+        mock_graph.ainvoke = AsyncMock(
+            return_value={"messages": [AIMessage(content="done")]}
+        )
+        graph_mod = _make_graph_module_mock(mock_graph)
+        msgs_mod = _make_messages_module_mock()
+
+        with (
+            patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
+            patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
+        ):
+            await executor._run_job("success-notify", "task")
+
+        mock_notifier.notify_failure.assert_not_called()
