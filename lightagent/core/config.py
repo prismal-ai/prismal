@@ -390,6 +390,22 @@ class Settings(BaseSettings):
         description="Enable/disable the full 8-guard channel security pipeline",
     )
 
+    # ── Cron notifications ────────────────────────────────────────────
+    cron_notify_telegram_chat_id: str = Field(
+        default="",
+        description=(
+            "Telegram chat ID to send cron failure alerts to. "
+            "Uses telegram_bot_token. Empty = disabled."
+        ),
+    )
+    cron_notify_slack_channel: str = Field(
+        default="",
+        description=(
+            "Slack channel name or ID for cron failure alerts (e.g. '#alerts'). "
+            "Uses slack_bot_token. Empty = disabled."
+        ),
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

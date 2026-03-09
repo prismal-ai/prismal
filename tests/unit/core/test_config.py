@@ -97,3 +97,12 @@ def test_settings_env_var_override(monkeypatch: pytest.MonkeyPatch) -> None:
     s = Settings()  # fresh instance, not cached
     assert s.default_model == "gpt-4o"
     get_settings.cache_clear()
+
+
+def test_cron_notify_defaults_empty() -> None:
+    """Cron notification targets default to empty strings (opt-in)."""
+    from lightagent.core.config import Settings
+
+    s = Settings()
+    assert s.cron_notify_telegram_chat_id == ""
+    assert s.cron_notify_slack_channel == ""
