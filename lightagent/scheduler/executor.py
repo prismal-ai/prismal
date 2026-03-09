@@ -188,14 +188,9 @@ class CronExecutor:
     async def _run_job(self, name: str, task: str) -> None:
         """Execute a cron job by invoking the LangGraph agent graph.
 
-        This is the function APScheduler calls on each scheduled tick.  It:
-
-        1. Calls :func:`~lightagent.agents.graph.get_async_compiled_graph` to
-           obtain (or reuse) the compiled LangGraph graph.
-        2. Invokes the graph via ``ainvoke`` with the job ``task`` as the user
-           message and ``cron-{name}`` as the thread id.
-        3. Calls :meth:`~lightagent.scheduler.cron_manager.CronManager.update_last_run`
-           to record the successful execution timestamp.
+        Records each execution (start time, end time, duration, outcome,
+        output or error text) into ``cron_run_history`` via
+        :meth:`~lightagent.scheduler.cron_manager.CronManager.add_run_record`.
 
         Errors are logged but never re-raised so that APScheduler continues
         scheduling future runs.
@@ -204,26 +199,59 @@ class CronExecutor:
             name: The cron job name (used for the thread id and logging).
             task: The human-readable task description sent to the agent graph.
         """
+        from datetime import UTC, datetime
+
+        from langchain_core.messages import HumanMessage
+
+        from lightagent.agents.graph import get_async_compiled_graph
+
         logger.info("cron_job_starting", name=name, task=task)
+        started_at = datetime.now(UTC).replace(tzinfo=None)
+
         try:
-            from datetime import UTC, datetime
-
-            from langchain_core.messages import HumanMessage
-
-            from lightagent.agents.graph import get_async_compiled_graph
-
-            thread_id = f"cron-{name}-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
+            thread_id = f"cron-{name}-{started_at.strftime('%Y%m%d%H%M%S')}"
             graph = await get_async_compiled_graph()
-            await graph.ainvoke(
+            result = await graph.ainvoke(
                 {"messages": [HumanMessage(content=task)]},
                 config={"configurable": {"thread_id": thread_id}},
             )
-            self._manager.update_last_run(name)
+            finished_at = datetime.now(UTC).replace(tzinfo=None)
+
+            # Extract last AI message text as the run output
+            output: str | None = None
+            messages = result.get("messages", [])
+            if messages:
+                last = messages[-1]
+                output = getattr(last, "content", None)
+                if isinstance(output, list):
+                    # Tool-call content can be a list; take first text block
+                    output = next(
+                        (
+                            b.get("text")
+                            for b in output
+                            if isinstance(b, dict) and "text" in b
+                        ),
+                        str(output),
+                    )
+
+            self._manager.update_last_run(name, finished_at)
+            self._manager.add_run_record(
+                job_name=name,
+                started_at=started_at,
+                finished_at=finished_at,
+                outcome="success",
+                output=str(output) if output is not None else None,
+            )
             logger.info("cron_job_completed", name=name)
+
         except Exception as exc:
-            logger.error(
-                "cron_job_failed",
-                name=name,
+            finished_at = datetime.now(UTC).replace(tzinfo=None)
+            logger.error("cron_job_failed", name=name, error=str(exc))
+            self._manager.add_run_record(
+                job_name=name,
+                started_at=started_at,
+                finished_at=finished_at,
+                outcome="failure",
                 error=str(exc),
             )
 

@@ -314,7 +314,9 @@ async def test_run_job_calls_graph_and_updates_last_run(
     assert thread_id.startswith("cron-daily-brief-")
     assert len(thread_id) == len("cron-daily-brief-") + 14  # 14 digits for timestamp
 
-    mock_manager.update_last_run.assert_called_once_with("daily-brief")
+    # update_last_run is now called with (name, finished_at)
+    assert mock_manager.update_last_run.call_count == 1
+    assert mock_manager.update_last_run.call_args.args[0] == "daily-brief"
 
 
 @pytest.mark.asyncio
@@ -388,3 +390,79 @@ async def test_run_job_does_not_update_last_run_on_ainvoke_error(
         await executor._run_job("broken-job", "Run task")
 
     mock_manager.update_last_run.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# TestRunJobHistory — _run_job writes CronRunRecord rows
+# ---------------------------------------------------------------------------
+
+
+class TestRunJobHistory:
+    """Tests that _run_job records execution history via CronManager."""
+
+    @pytest.fixture()
+    def manager(self, tmp_path: Path) -> CronManager:
+        """Return a real CronManager backed by a temporary SQLite database."""
+        return CronManager(db_path=tmp_path / "cron_test.db")
+
+    @pytest.fixture()
+    def executor(self, manager: CronManager) -> CronExecutor:
+        """Return a CronExecutor with a real CronManager and mocked scheduler."""
+        ex = CronExecutor(manager=manager)
+        ex._scheduler = MagicMock()
+        return ex
+
+    @pytest.mark.asyncio
+    async def test_run_job_records_success(
+        self,
+        executor: CronExecutor,
+        manager: CronManager,
+    ) -> None:
+        """Successful run records a 'success' CronRunRecord."""
+        import sys
+
+        manager.add("hist-test", "* * * * *", "some task")
+
+        mock_graph = AsyncMock()
+        mock_graph.ainvoke = AsyncMock(return_value={"messages": []})
+        graph_mod = _make_graph_module_mock(mock_graph)
+        msgs_mod = _make_messages_module_mock()
+
+        with (
+            patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
+            patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
+        ):
+            await executor._run_job("hist-test", "some task")
+
+        records = manager.get_run_history("hist-test")
+        assert len(records) == 1
+        assert records[0].outcome == "success"
+        assert records[0].duration_seconds >= 0
+
+    @pytest.mark.asyncio
+    async def test_run_job_records_failure(
+        self,
+        executor: CronExecutor,
+        manager: CronManager,
+    ) -> None:
+        """Failed run records a 'failure' CronRunRecord with error text."""
+        import sys
+
+        manager.add("fail-hist", "* * * * *", "task")
+
+        graph_mod = MagicMock()
+        graph_mod.get_async_compiled_graph = AsyncMock(
+            side_effect=RuntimeError("boom")
+        )
+        msgs_mod = _make_messages_module_mock()
+
+        with (
+            patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
+            patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
+        ):
+            await executor._run_job("fail-hist", "task")
+
+        records = manager.get_run_history("fail-hist")
+        assert len(records) == 1
+        assert records[0].outcome == "failure"
+        assert "boom" in (records[0].error or "")
