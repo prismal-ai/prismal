@@ -66,7 +66,10 @@ class Settings(BaseSettings):
             "LIGHTAGENT_ANTHROPIC_API_KEY",
             "ANTHROPIC_API_KEY",
         ),
-        description="Anthropic API key (LIGHTAGENT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY)",
+        description=(
+            "Anthropic API key"
+            " (LIGHTAGENT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY)"
+        ),
     )
     openai_api_key: SecretStr = Field(
         default=SecretStr(""),
@@ -214,7 +217,10 @@ class Settings(BaseSettings):
     # ── Monitoring — OpenTelemetry ───────────────────────────────
     otel_enabled: bool = Field(
         default=False,
-        description="Enable OpenTelemetry distributed tracing and metrics (set LIGHTAGENT_OTEL_ENABLED=true in production)",
+        description=(
+            "Enable OpenTelemetry distributed tracing and metrics"
+            " (set LIGHTAGENT_OTEL_ENABLED=true in production)"
+        ),
     )
     otel_exporter: Literal["otlp", "jaeger", "zipkin", "console"] = Field(
         default="console",

@@ -69,11 +69,13 @@ def test_settings_ports() -> None:
     assert s.dashboard_port == 3000
 
 
-def test_settings_shell_disabled_by_default() -> None:
+def test_settings_shell_disabled_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """Shell execution is disabled by default (security)."""
     from lightagent.core.config import Settings
 
-    s = Settings()
+    monkeypatch.delenv("LIGHTAGENT_SHELL_ENABLED", raising=False)
+    # Pass _env_file=None so .env on disk cannot override the default.
+    s = Settings(_env_file=None)  # type: ignore[call-arg]
     assert s.shell_enabled is False
 
 
