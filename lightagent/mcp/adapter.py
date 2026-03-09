@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 import mcp.types
 from langchain_core.tools import BaseTool
-from pydantic import ConfigDict, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, create_model
 
 from lightagent.core.exceptions import MCPToolError
 from lightagent.core.logging import get_logger
@@ -30,6 +30,65 @@ if TYPE_CHECKING:
 
 logger = get_logger("lightagent.mcp.adapter")
 _otel = OTelManager()
+
+# Maps JSON Schema primitive types to Python types used in create_model.
+_JSON_TYPE_MAP: dict[str, type] = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "array": list,
+    "object": dict,
+}
+
+
+def _build_args_schema(mcp_tool: mcp.types.Tool) -> type[BaseModel] | None:
+    """Build a Pydantic ``args_schema`` from an MCP tool's ``inputSchema``.
+
+    Exposes the real MCP parameter names (e.g. ``path``, ``query``) to
+    LangChain so the LLM generates correctly-named arguments.  Without this,
+    LangChain falls back to a generic ``tool_input: str`` parameter and the
+    LLM produces ``{"tool_input": "value"}`` which the adapter can't reliably
+    map to the MCP tool's expected fields.
+
+    Args:
+        mcp_tool: The MCP tool whose ``inputSchema`` is used.
+
+    Returns:
+        A dynamically-created Pydantic ``BaseModel`` subclass, or ``None``
+        when the schema has no properties (zero-argument tools).
+    """
+    schema: dict[str, Any] = mcp_tool.inputSchema or {}  # Any: MCP JSON schema — unavoidable
+    properties: dict[str, Any] = schema.get("properties") or {}
+    required: list[str] = schema.get("required") or []
+
+    if not properties:
+        return None
+
+    fields: dict[str, Any] = {}
+    for field_name, prop in properties.items():
+        if not isinstance(prop, dict):
+            continue
+        raw_type = prop.get("type", "string")
+        py_type: type = _JSON_TYPE_MAP.get(raw_type if isinstance(raw_type, str) else "string", str)
+        description: str = prop.get("description") or ""
+        if field_name in required:
+            fields[field_name] = (py_type, Field(..., description=description))
+        else:
+            fields[field_name] = (py_type | None, Field(default=None, description=description))
+
+    if not fields:
+        return None
+
+    try:
+        return create_model(f"MCPInput_{mcp_tool.name}", **fields)
+    except Exception as exc:  # broad: pydantic create_model can raise for exotic schemas
+        logger.debug(
+            "mcp_adapter_schema_build_failed",
+            tool=mcp_tool.name,
+            error=str(exc),
+        )
+        return None
 
 
 class MCPToolAdapter(BaseTool):
@@ -79,6 +138,7 @@ class MCPToolAdapter(BaseTool):
         super().__init__(
             name=mcp_tool.name,
             description=mcp_tool.description or "",
+            args_schema=_build_args_schema(mcp_tool),
         )
         self._connection = connection
         # Retained for future use (e.g. inputSchema validation).
@@ -108,15 +168,18 @@ class MCPToolAdapter(BaseTool):
 
     async def _arun(
         self,
-        tool_input: str,
+        tool_input: str = "",
         run_manager: Any | None = None,  # noqa: ANN401 ARG002 — LangChain interface
+        **kwargs: Any,  # noqa: ANN401 — catches dict-dispatched args when args_schema is set
     ) -> str:
         """Execute the MCP tool asynchronously.
 
-        Parses ``tool_input`` as JSON to extract an arguments dict.  If the
-        input is not valid JSON (or is not a dict) it is wrapped in
-        ``{"input": tool_input}`` so that downstream tools receive a
-        consistent mapping.
+        When ``args_schema`` is set (the normal case), LangChain validates the
+        LLM's argument dict against the schema and dispatches the fields as
+        ``**kwargs`` — these are passed directly to the MCP server.
+
+        Falls back to parsing ``tool_input`` as JSON for legacy callers that
+        pass a raw string (e.g. direct ``arun("...")`` calls).
 
         If an interceptor is configured its ``on_tool_start`` hook is called
         before the MCP call.  A ``PermissionDeniedError`` from the interceptor
@@ -124,9 +187,11 @@ class MCPToolAdapter(BaseTool):
         called on success; ``on_tool_error`` on failure.
 
         Args:
-            tool_input: JSON string (or plain string) containing the tool
-                arguments.
+            tool_input: Legacy JSON string path.  Empty when LangChain
+                dispatches via ``**kwargs`` (the normal path with args_schema).
             run_manager: Unused async callback manager.
+            **kwargs: MCP tool arguments dispatched by LangChain when
+                ``args_schema`` is set.
 
         Returns:
             The tool result joined from all ``TextContent`` blocks.
@@ -141,11 +206,21 @@ class MCPToolAdapter(BaseTool):
 
         # ── Parse arguments ──────────────────────────────────────────────
         args: dict[str, Any]  # Any: MCP JSON-compatible values — unavoidable
-        try:
-            parsed = json.loads(tool_input)
-            args = parsed if isinstance(parsed, dict) else {"input": tool_input}
-        except json.JSONDecodeError:
-            args = {"input": tool_input}
+        if kwargs:
+            # Primary path: LangChain dispatched validated args_schema fields as **kwargs.
+            # Strip None values — optional fields not provided by the LLM are set to None
+            # by Pydantic defaults but must be omitted entirely from the MCP call (sending
+            # null for a number/string field fails MCP server schema validation).
+            args = {k: v for k, v in kwargs.items() if v is not None}
+        elif tool_input:
+            # Legacy path: raw JSON string (e.g. direct arun("...") calls)
+            try:
+                parsed = json.loads(tool_input)
+                args = parsed if isinstance(parsed, dict) else {"input": tool_input}
+            except json.JSONDecodeError:
+                args = {"input": tool_input}
+        else:
+            args = {}
 
         # ── Interceptor: pre-call hook ───────────────────────────────────
         if self._interceptor is not None:

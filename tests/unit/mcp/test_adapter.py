@@ -590,3 +590,128 @@ class TestRun:
 
         with pytest.raises(NotImplementedError, match="does not support synchronous"):
             adapter._run("{}")
+
+
+# ---------------------------------------------------------------------------
+# args_schema / LLM schema exposure
+# ---------------------------------------------------------------------------
+
+
+class TestArgsSchema:
+    """Tests for dynamic args_schema built from MCP inputSchema."""
+
+    def _make_filesystem_tool(self) -> mcp.types.Tool:
+        """Return a tool that resembles the MCP filesystem server's read_file."""
+        return mcp.types.Tool(
+            name="read_file",
+            description="Read a file",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path"},
+                },
+                "required": ["path"],
+            },
+        )
+
+    def test_args_schema_built_from_inputschema(self) -> None:
+        """args_schema must be set when inputSchema has properties."""
+        conn = _make_mock_connection()
+        adapter = MCPToolAdapter(conn, self._make_filesystem_tool())
+        assert adapter.args_schema is not None
+
+    def test_args_exposes_real_parameter_names(self) -> None:
+        """LLM-facing args must reflect MCP parameter names, not 'tool_input'."""
+        conn = _make_mock_connection()
+        adapter = MCPToolAdapter(conn, self._make_filesystem_tool())
+        assert "path" in adapter.args
+        assert "tool_input" not in adapter.args
+
+    def test_no_args_schema_for_zero_param_tool(self) -> None:
+        """Tools with no properties must have args_schema=None."""
+        conn = _make_mock_connection()
+        tool = mcp.types.Tool(
+            name="noop",
+            description="Does nothing",
+            inputSchema={"type": "object"},
+        )
+        adapter = MCPToolAdapter(conn, tool)
+        assert adapter.args_schema is None
+
+    def test_optional_field_in_schema(self) -> None:
+        """Optional (non-required) fields must appear in args but not be required."""
+        conn = _make_mock_connection()
+        tool = mcp.types.Tool(
+            name="search",
+            description="Search",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "limit": {"type": "integer"},
+                },
+                "required": ["query"],
+            },
+        )
+        adapter = MCPToolAdapter(conn, tool)
+        assert adapter.args_schema is not None
+        assert "query" in adapter.args
+        assert "limit" in adapter.args
+
+    @pytest.mark.asyncio
+    async def test_dict_ainvoke_passes_correct_args_to_mcp(self) -> None:
+        """ainvoke(dict) must pass args with the correct field names to call_tool."""
+        conn = _make_mock_connection()
+        conn.call_tool = AsyncMock(return_value=_make_call_tool_result("content"))
+        adapter = MCPToolAdapter(conn, self._make_filesystem_tool())
+
+        await adapter.ainvoke({"path": "config/mcp_servers.yaml"})
+
+        conn.call_tool.assert_awaited_once_with(
+            name="read_file",
+            arguments={"path": "config/mcp_servers.yaml"},
+        )
+
+    @pytest.mark.asyncio
+    async def test_string_ainvoke_still_works(self) -> None:
+        """Legacy JSON-string invocation must still route path correctly."""
+        conn = _make_mock_connection()
+        conn.call_tool = AsyncMock(return_value=_make_call_tool_result("content"))
+        adapter = MCPToolAdapter(conn, self._make_filesystem_tool())
+
+        await adapter.ainvoke('{"path": "config/mcp_servers.yaml"}')
+
+        conn.call_tool.assert_awaited_once_with(
+            name="read_file",
+            arguments={"path": "config/mcp_servers.yaml"},
+        )
+
+    @pytest.mark.asyncio
+    async def test_optional_none_params_stripped_from_mcp_call(self) -> None:
+        """Optional params not provided by the LLM (Pydantic default=None) must be
+        omitted from the MCP call — passing null for a number field fails MCP schema
+        validation (error -32602 'expected number, received null')."""
+        conn = _make_mock_connection()
+        conn.call_tool = AsyncMock(return_value=_make_call_tool_result("content"))
+        tool = mcp.types.Tool(
+            name="read_text_file",
+            description="Read file",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "tail": {"type": "number"},
+                    "head": {"type": "number"},
+                },
+                "required": ["path"],
+            },
+        )
+        adapter = MCPToolAdapter(conn, tool)
+
+        # LLM only supplies path; tail and head are omitted
+        await adapter.ainvoke({"path": "config/mcp_servers.yaml"})
+
+        conn.call_tool.assert_awaited_once_with(
+            name="read_text_file",
+            arguments={"path": "config/mcp_servers.yaml"},
+        )
