@@ -188,10 +188,20 @@ class CronExecutor:
 
             from apscheduler.triggers.date import DateTrigger
 
-            _dt_fmt = "%Y-%m-%d %H:%M:%S"
-            run_date = datetime.strptime(  # noqa: DTZ007
-                job.schedule[len("once:") :], _dt_fmt
-            )
+            # fromisoformat handles both '2026-03-09 20:51:06' (space) and
+            # '2026-03-09T20:51:06' (T) regardless of how the value was stored.
+            run_date = datetime.fromisoformat(job.schedule[len("once:"):])
+            if run_date <= datetime.now():  # noqa: DTZ005
+                logger.warning(
+                    "cron_executor_skipping_expired_once_job",
+                    name=job.name,
+                    run_date=str(run_date),
+                )
+                import contextlib
+
+                with contextlib.suppress(Exception):
+                    self._manager.remove(job.name)
+                return
             trigger = DateTrigger(run_date=run_date)
         else:
             trigger = CronTrigger.from_crontab(job.schedule)  # type: ignore[assignment]
