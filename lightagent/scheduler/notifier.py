@@ -109,8 +109,13 @@ class CronNotifier:
     ) -> None:
         """Send a success notification to all configured notification channels.
 
-        Only fires when at least one channel (Telegram or Slack) is configured.
-        Errors are caught internally — this method never raises.
+        Sends to Telegram and/or Slack when the corresponding credentials are
+        set.  When neither external channel is configured, prints the
+        notification directly to the terminal (console fallback) so that CLI
+        users always receive their reminders even without external integrations.
+
+        Errors from external channels are caught internally — this method
+        never raises.
 
         Args:
             job_name: Name of the cron job that completed successfully.
@@ -119,10 +124,47 @@ class CronNotifier:
         text = f"Cron reminder: {job_name}"
         if output:
             text += f"\n\n{output}"
+
+        sent_externally = False
         if self._tg_chat_id and self._tg_token:
             await self._send_telegram(text)
+            sent_externally = True
         if self._slack_channel and self._slack_token:
             await self._send_slack(text)
+            sent_externally = True
+
+        # Console fallback — always shown when no external channel is configured
+        # so that CLI users see their reminders in the terminal.
+        if not sent_externally:
+            self._print_console(job_name, output)
+
+    def _print_console(self, job_name: str, output: str | None) -> None:
+        """Print a reminder notification to the terminal.
+
+        Uses Rich when available; falls back to plain ``print`` otherwise.
+        The notification is printed immediately (``flush=True``) so it appears
+        even if the terminal is waiting at the input prompt.
+
+        Args:
+            job_name: Name of the cron job.
+            output: The agent's output, or ``None``.
+        """
+        try:
+            from rich import print as rich_print
+            from rich.rule import Rule
+
+            rich_print("")
+            rich_print(Rule("[bold yellow]⏰ Recordatorio[/bold yellow]"))
+            rich_print(f"[bold cyan]{job_name}[/bold cyan]")
+            if output:
+                rich_print(f"[dim]{output}[/dim]")
+            rich_print(Rule())
+            rich_print("")
+        except ImportError:
+            print(f"\n⏰ Recordatorio: {job_name}", flush=True)
+            if output:
+                print(output, flush=True)
+            print("", flush=True)
 
     async def _send_telegram(self, text: str) -> None:
         """POST a message to the configured Telegram chat.
