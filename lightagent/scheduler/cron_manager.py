@@ -288,6 +288,59 @@ class CronManager:
         self._try_create_prefect_deployment(job)
         return job
 
+    def add_once(
+        self,
+        name: str,
+        run_at: datetime,
+        task: str,
+    ) -> CronJob:
+        """Create and persist a one-time (non-recurring) cron job.
+
+        Stores the schedule as ``"once:<ISO datetime>"`` so that the executor
+        can detect it and use APScheduler's ``date`` trigger rather than a
+        :class:`~apscheduler.triggers.cron.CronTrigger`.
+
+        Args:
+            name: Unique job identifier.
+            run_at: Exact datetime when the job should fire (local time,
+                naive or timezone-aware — stored as-is).
+            task: Human-readable task description sent to the agent.
+
+        Returns:
+            The newly created :class:`CronJob`.
+
+        Raises:
+            ValueError: If a job with ``name`` already exists.
+        """
+        if self.get_job(name) is not None:
+            raise ValueError(f"Cron job '{name}' already exists")
+
+        schedule = f"once:{run_at.strftime(_DT_FMT)}"
+        now_str = datetime.now(UTC).replace(tzinfo=None).strftime(_DT_FMT)
+        run_at_str = run_at.strftime(_DT_FMT)
+
+        job = CronJob(
+            name=name,
+            schedule=schedule,
+            task=task,
+            next_run=run_at,
+        )
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO cron_jobs"
+                " (name, schedule, task, status, created_at, next_run,"
+                "  max_retries, retry_delay_seconds, retry_count)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (name, schedule, task, job.status, now_str, run_at_str, 0, 60, 0),
+            )
+
+        logger.info(
+            "cron_job_once_added",
+            name=name,
+            run_at=run_at_str,
+        )
+        return job
+
     def pause(self, name: str) -> None:
         """Pause an existing cron job.
 

@@ -102,6 +102,28 @@ class CronNotifier:
         if self._slack_channel and self._slack_token:
             await self._send_slack(text)
 
+    async def notify_success(
+        self,
+        job_name: str,
+        output: str | None,
+    ) -> None:
+        """Send a success notification to all configured notification channels.
+
+        Only fires when at least one channel (Telegram or Slack) is configured.
+        Errors are caught internally — this method never raises.
+
+        Args:
+            job_name: Name of the cron job that completed successfully.
+            output: The agent's output message, or ``None`` if unavailable.
+        """
+        text = f"Cron reminder: {job_name}"
+        if output:
+            text += f"\n\n{output}"
+        if self._tg_chat_id and self._tg_token:
+            await self._send_telegram(text)
+        if self._slack_channel and self._slack_token:
+            await self._send_slack(text)
+
     async def _send_telegram(self, text: str) -> None:
         """POST a message to the configured Telegram chat.
 

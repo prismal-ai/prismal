@@ -740,6 +740,51 @@ def get_current_time() -> str:
 
 
 @tool
+def cron_once(name: str, run_at: str, task: str) -> str:
+    """Schedule a one-time (non-recurring) reminder or task at a specific datetime.
+
+    Use this for relative-time requests: "in 5 minutes", "in 2 hours",
+    "tomorrow at 9 AM".  Always call ``get_current_time`` first to know the
+    current local time, then compute the target datetime and pass it here.
+
+    After the job fires, the agent is invoked with ``task`` as the user
+    message and the result is sent to configured notification channels
+    (Telegram / Slack).
+
+    Args:
+        name: Unique job name in snake_case (e.g. ``"email_reminder"``).
+        run_at: Target datetime in ``"YYYY-MM-DD HH:MM:SS"`` format
+            (local time, same timezone returned by ``get_current_time``).
+        task: What to do when the time comes — sent verbatim to the agent
+            (e.g. ``"Send a reminder to write the weekly report"``).
+
+    Returns:
+        Confirmation string with the scheduled time, or an error message.
+    """
+    try:
+        import asyncio
+        from datetime import datetime
+
+        from lightagent.scheduler.cron_manager import CronManager
+        from lightagent.scheduler.executor import get_running_executor
+
+        target = datetime.strptime(run_at, "%Y-%m-%d %H:%M:%S")  # noqa: DTZ007
+        mgr = CronManager()
+        job = mgr.add_once(name, target, task)
+        executor = get_running_executor()
+        if executor is not None:
+            asyncio.get_event_loop().create_task(executor.add_job(job))
+        return (
+            f"One-time reminder '{name}' scheduled for"
+            f" {target.strftime('%Y-%m-%d %H:%M')}."
+        )
+    except ValueError as exc:
+        return f"Invalid datetime — use YYYY-MM-DD HH:MM:SS format. Error: {exc}"
+    except Exception as exc:
+        return f"Failed to schedule one-time reminder: {exc}"
+
+
+@tool
 def cron_remove(name: str) -> str:
     """Permanently delete a scheduled cron job.
 
@@ -775,6 +820,7 @@ DATA_ANALYST_TOOLS: list[BaseTool] = [duckdb_query, polars_transform, create_cha
 FILE_MANAGER_TOOLS: list[BaseTool] = [read_file, write_file]
 CRON_MANAGER_TOOLS: list[BaseTool] = [
     get_current_time,
+    cron_once,
     cron_add,
     cron_list,
     cron_pause,
@@ -794,6 +840,7 @@ __all__ = [
     "create_chart",
     "cron_add",
     "cron_list",
+    "cron_once",
     "cron_pause",
     "cron_remove",
     "cron_resume",

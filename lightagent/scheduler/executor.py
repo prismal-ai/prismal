@@ -175,16 +175,30 @@ class CronExecutor:
     def _register_job(self, job: CronJob) -> None:
         """Register a single CronJob with the APScheduler instance.
 
-        Uses :meth:`~apscheduler.triggers.cron.CronTrigger.from_crontab` to
-        parse the standard 5-field cron expression stored on the job.
+        One-time jobs whose schedule starts with ``"once:"`` use an
+        APScheduler ``date`` trigger; recurring jobs use
+        :meth:`~apscheduler.triggers.cron.CronTrigger.from_crontab`.
 
         Args:
             job: The :class:`~lightagent.scheduler.cron_manager.CronJob` to
                 register.
         """
+        if job.schedule.startswith("once:"):
+            from datetime import datetime
+
+            from apscheduler.triggers.date import DateTrigger
+
+            _dt_fmt = "%Y-%m-%d %H:%M:%S"
+            run_date = datetime.strptime(  # noqa: DTZ007
+                job.schedule[len("once:") :], _dt_fmt
+            )
+            trigger = DateTrigger(run_date=run_date)
+        else:
+            trigger = CronTrigger.from_crontab(job.schedule)  # type: ignore[assignment]
+
         self._scheduler.add_job(
             self._run_job,
-            CronTrigger.from_crontab(job.schedule),
+            trigger,
             id=job.name,
             args=[job.name, job.task],
             replace_existing=True,
@@ -259,6 +273,17 @@ class CronExecutor:
                 output=str(output) if output is not None else None,
             )
             logger.info("cron_job_completed", name=name)
+
+            # Send success notification (no-op when no channels are configured)
+            await self._notifier.notify_success(job_name=name, output=output)
+
+            # Auto-remove one-shot jobs after they fire
+            completed_job = self._manager.get_job(name)
+            if completed_job is not None and completed_job.schedule.startswith("once:"):
+                import contextlib
+
+                with contextlib.suppress(Exception):
+                    self._manager.remove(name)
 
         except Exception as exc:
             finished_at = datetime.now(UTC).replace(tzinfo=None)
