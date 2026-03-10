@@ -129,6 +129,7 @@ async def test_planner_node_returns_current_agent() -> None:
     with patch("lightagent.agents.planner.ProviderRegistry") as mock_reg:
         mock_llm = MagicMock()
         mock_llm.ainvoke = AsyncMock(return_value=AIMessage(content=planner_response))
+        mock_llm.bind_tools.return_value = mock_llm  # bind_tools must return the same mock
         mock_reg.return_value.get_llm_with_fallback.return_value = mock_llm
         result = await planner_node(state)
 

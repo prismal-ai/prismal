@@ -106,6 +106,18 @@ class MCPServerConfig(BaseModel):
         ge=0,
         description="Number of retry attempts on transient connection failures.",
     )
+    priority: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Dispatch priority for this server's tools (higher = preferred). "
+            "When multiple servers offer similar functionality — e.g. two web-search "
+            "providers — the agent sees higher-priority tools first in its tool list "
+            "and their descriptions are annotated with '[Preferred]' or '[Fallback]' "
+            "so the LLM knows which service to use first. "
+            "Default 0 means no special preference over other priority-0 servers."
+        ),
+    )
     description: str | None = Field(
         default=None,
         description="Human-readable description of this server.",
@@ -144,6 +156,10 @@ class MCPServerStatus(BaseModel):
         description="Last error message if the server is unavailable.",
     )
     server_type: str = Field(..., description="Transport type ('stdio' or 'sse').")
+    priority: int = Field(
+        default=0,
+        description="Dispatch priority — higher value means tools from this server appear first.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -214,6 +230,7 @@ class MCPServerConnection:
             tool_count=len(self._cached_tools),
             error=self._last_error,
             server_type=self._config.type,
+            priority=self._config.priority,
         )
 
     # ------------------------------------------------------------------
@@ -384,11 +401,18 @@ class MCPServerConnection:
         return read, write
 
     async def _cleanup_stack(self) -> None:
-        """Close and discard the current AsyncExitStack if present."""
+        """Close and discard the current AsyncExitStack if present.
+
+        Catches ``BaseException`` (which includes ``asyncio.CancelledError``)
+        so that a SIGINT/SIGTERM-triggered cancellation during shutdown does
+        not propagate out and cause uvicorn to print "Application shutdown
+        failed".  The cancellation is logged and then suppressed; cleanup of
+        state variables proceeds in the ``finally`` block regardless.
+        """
         if self._exit_stack is not None:
             try:
                 await self._exit_stack.aclose()
-            except Exception as exc:
+            except BaseException as exc:  # noqa: BLE001 — intentional: includes CancelledError
                 logger.warning(
                     "mcp_stack_cleanup_error",
                     server=self._config.name,

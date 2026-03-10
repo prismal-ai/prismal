@@ -49,7 +49,7 @@ def _make_yaml(servers: list[dict]) -> str:  # type: ignore[type-arg]
 
 
 def _make_connected_mock_conn(
-    name: str = "test-server", tool_count: int = 0
+    name: str = "test-server", tool_count: int = 0, priority: int = 0
 ) -> MagicMock:
     """Return a mock MCPServerConnection that is already connected."""
     conn = MagicMock()
@@ -57,12 +57,14 @@ def _make_connected_mock_conn(
     conn.connect = AsyncMock()
     conn.disconnect = AsyncMock()
     conn.cached_tools = [MagicMock() for _ in range(tool_count)]
+    conn._config.priority = priority  # required by get_all_langchain_tools priority sort
     conn.status = MCPServerStatus(
         name=name,
         connected=True,
         tool_count=tool_count,
         error=None,
         server_type="stdio",
+        priority=priority,
     )
     return conn
 
