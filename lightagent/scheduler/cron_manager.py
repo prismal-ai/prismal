@@ -19,6 +19,7 @@ AC-007-4: cron pause / cron resume work correctly.
 
 from __future__ import annotations
 
+import contextlib
 import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -45,13 +46,16 @@ _DB_DEFAULT = Path(__file__).parent.parent.parent / "data" / "db" / "cron_jobs.d
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS cron_jobs (
-    name        TEXT PRIMARY KEY,
-    schedule    TEXT NOT NULL,
-    task        TEXT NOT NULL,
-    status      TEXT NOT NULL DEFAULT 'active',
-    last_run    TEXT,
-    next_run    TEXT,
-    created_at  TEXT NOT NULL
+    name                TEXT PRIMARY KEY,
+    schedule            TEXT NOT NULL,
+    task                TEXT NOT NULL,
+    status              TEXT NOT NULL DEFAULT 'active',
+    last_run            TEXT,
+    next_run            TEXT,
+    created_at          TEXT NOT NULL,
+    max_retries         INTEGER NOT NULL DEFAULT 0,
+    retry_delay_seconds INTEGER NOT NULL DEFAULT 60,
+    retry_count         INTEGER NOT NULL DEFAULT 0
 );
 """
 
@@ -120,6 +124,15 @@ class CronJob(BaseModel):
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC).replace(tzinfo=None)
     )
+    max_retries: int = Field(
+        default=0, ge=0, description="Max retry attempts on failure."
+    )
+    retry_delay_seconds: int = Field(
+        default=60, ge=1, description="Base delay in seconds for exponential backoff."
+    )
+    retry_count: int = Field(
+        default=0, ge=0, description="Current retry attempt count."
+    )
 
 
 # ── Manager ───────────────────────────────────────────────────────────────────
@@ -167,10 +180,23 @@ class CronManager:
             conn.close()
 
     def _init_db(self) -> None:
-        """Create the cron_jobs and cron_run_history tables if they do not exist."""
+        """Create tables and apply schema migrations for new columns."""
         with self._conn() as conn:
             conn.execute(_SCHEMA)
             conn.execute(_HISTORY_SCHEMA)
+            # Safe migration: add retry columns to existing DBs.
+            # SQLite raises OperationalError on duplicate column — ignore it.
+            _migrations = [
+                "ALTER TABLE cron_jobs"
+                " ADD COLUMN max_retries INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE cron_jobs"
+                " ADD COLUMN retry_delay_seconds INTEGER NOT NULL DEFAULT 60",
+                "ALTER TABLE cron_jobs"
+                " ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
+            ]
+            for sql in _migrations:
+                with contextlib.suppress(sqlite3.OperationalError):
+                    conn.execute(sql)
 
     @staticmethod
     def _row_to_job(row: sqlite3.Row) -> CronJob:
@@ -187,6 +213,9 @@ class CronManager:
             last_run=_parse_dt(row["last_run"]),
             next_run=_parse_dt(row["next_run"]),
             created_at=datetime.strptime(row["created_at"], _DT_FMT),  # noqa: DTZ007
+            max_retries=row["max_retries"] or 0,
+            retry_delay_seconds=row["retry_delay_seconds"] or 60,
+            retry_count=row["retry_count"] or 0,
         )
 
     def _require_job(self, name: str) -> None:
@@ -196,13 +225,22 @@ class CronManager:
 
     # ── public API ───────────────────────────────────────────────────────────
 
-    def add(self, name: str, schedule: str, task: str) -> CronJob:
+    def add(
+        self,
+        name: str,
+        schedule: str,
+        task: str,
+        max_retries: int = 0,
+        retry_delay_seconds: int = 60,
+    ) -> CronJob:
         """Create and persist a new cron job.
 
         Args:
             name: Unique job identifier.
             schedule: Cron expression (e.g. ``"0 9 * * *"``).
             task: Human-readable description or Prefect flow name.
+            max_retries: Maximum retry attempts on failure (default 0 = no retry).
+            retry_delay_seconds: Base backoff delay in seconds (default 60).
 
         Returns:
             The newly created :class:`CronJob`.
@@ -217,19 +255,36 @@ class CronManager:
 
         now = datetime.now(UTC).replace(tzinfo=None)
         next_dt = croniter(schedule, now).get_next(datetime)
-        job = CronJob(name=name, schedule=schedule, task=task, next_run=next_dt)
+        job = CronJob(
+            name=name,
+            schedule=schedule,
+            task=task,
+            next_run=next_dt,
+            max_retries=max_retries,
+            retry_delay_seconds=retry_delay_seconds,
+        )
         created = job.created_at.strftime(_DT_FMT)
         next_stamp = next_dt.strftime(_DT_FMT)
 
         with self._conn() as conn:
             conn.execute(
                 "INSERT INTO cron_jobs"
-                " (name, schedule, task, status, created_at, next_run)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
-                (name, schedule, task, job.status, created, next_stamp),
+                " (name, schedule, task, status, created_at, next_run,"
+                "  max_retries, retry_delay_seconds, retry_count)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    name, schedule, task, job.status, created, next_stamp,
+                    max_retries, retry_delay_seconds, 0,
+                ),
             )
 
-        logger.info("cron_job_added", name=name, schedule=schedule, next_run=next_stamp)
+        logger.info(
+            "cron_job_added",
+            name=name,
+            schedule=schedule,
+            next_run=next_stamp,
+            max_retries=max_retries,
+        )
         self._try_create_prefect_deployment(job)
         return job
 
@@ -330,6 +385,20 @@ class CronManager:
             conn.execute(
                 "UPDATE cron_jobs SET last_run = ? WHERE name = ?", (stamp, name)
             )
+
+    def set_retry_count(self, name: str, count: int) -> None:
+        """Set the current retry attempt counter for a job.
+
+        Args:
+            name: The job name.
+            count: New retry count value (0 = reset after success/final failure).
+        """
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE cron_jobs SET retry_count = ? WHERE name = ?",
+                (count, name),
+            )
+        logger.debug("cron_retry_count_set", name=name, count=count)
 
     def add_run_record(
         self,

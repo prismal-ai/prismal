@@ -360,3 +360,40 @@ class TestGetLastRun:
     def test_get_last_run_none_for_unknown_job(self, manager: CronManager) -> None:
         """get_last_run returns None for a job name not in history."""
         assert manager.get_last_run("nonexistent") is None
+
+
+class TestRetryFields:
+    """Tests for retry policy fields on CronJob."""
+
+    def test_job_has_default_retry_fields(self, manager: CronManager) -> None:
+        """New jobs default to max_retries=0, retry_delay_seconds=60, retry_count=0."""
+        job = manager.add("retry-default", "* * * * *", "task")
+        assert job.max_retries == 0
+        assert job.retry_delay_seconds == 60
+        assert job.retry_count == 0
+
+    def test_job_created_with_custom_retry(self, manager: CronManager) -> None:
+        """Jobs can be created with custom max_retries and retry_delay_seconds."""
+        job = manager.add(
+            "retry-custom", "* * * * *", "task",
+            max_retries=3, retry_delay_seconds=30,
+        )
+        assert job.max_retries == 3
+        assert job.retry_delay_seconds == 30
+
+    def test_set_retry_count(self, manager: CronManager) -> None:
+        """set_retry_count persists the new value to SQLite."""
+        manager.add("count-job", "* * * * *", "task")
+        manager.set_retry_count("count-job", 2)
+        job = manager.get_job("count-job")
+        assert job is not None
+        assert job.retry_count == 2
+
+    def test_reset_retry_count(self, manager: CronManager) -> None:
+        """set_retry_count(name, 0) resets the counter."""
+        manager.add("reset-job", "* * * * *", "task", max_retries=3)
+        manager.set_retry_count("reset-job", 3)
+        manager.set_retry_count("reset-job", 0)
+        job = manager.get_job("reset-job")
+        assert job is not None
+        assert job.retry_count == 0
