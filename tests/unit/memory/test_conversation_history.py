@@ -3,12 +3,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from lightagent.memory.conversation_history import ConversationHistory
 
 
 class TestConversationHistory:
+    """Tests for ConversationHistory append-only markdown writer."""
+
     def test_creates_file_on_first_append(self, tmp_path: Path) -> None:
         """File is created when it does not exist."""
         h = ConversationHistory("sess-001", base_dir=tmp_path)
@@ -54,11 +54,25 @@ class TestConversationHistory:
         h.append("User", "Via CLI", channel="cli")
         h.append("User", "Via Telegram", channel="telegram")
         content = h.path().read_text()
-        assert "cli" in content
-        assert "telegram" in content
+        channels_line = next(
+            (line for line in content.splitlines() if line.startswith("channels:")), ""
+        )
+        assert "cli" in channels_line
+        assert "telegram" in channels_line
 
     def test_write_failure_does_not_raise(self, tmp_path: Path) -> None:
         """append() swallows IOError so the caller is never crashed."""
         h = ConversationHistory("sess-005", base_dir=Path("/nonexistent/path"))
         # Should not raise
         h.append("User", "Hello")
+
+    def test_channels_no_duplicate(self, tmp_path: Path) -> None:
+        """Appending the same channel twice does not create duplicates."""
+        h = ConversationHistory("sess-006", base_dir=tmp_path)
+        h.append("User", "First", channel="cli")
+        h.append("User", "Second", channel="cli")
+        content = h.path().read_text()
+        channels_line = next(
+            (line for line in content.splitlines() if line.startswith("channels:")), ""
+        )
+        assert channels_line.count("cli") == 1

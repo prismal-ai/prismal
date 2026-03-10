@@ -34,7 +34,12 @@ import structlog
 
 logger = structlog.get_logger("lightagent.memory.conversation_history")
 
-_DEFAULT_BASE = Path("data/workspace/conversations")
+_DEFAULT_BASE = (
+    Path(__file__).resolve().parent.parent.parent
+    / "data"
+    / "workspace"
+    / "conversations"
+)
 
 
 class ConversationHistory:
@@ -127,7 +132,7 @@ class ConversationHistory:
                 role=role,
                 channel=channel,
             )
-        except Exception as exc:
+        except Exception as exc:  # intentional: spec says "do not crash"
             logger.warning(
                 "conversation_history.write_error",
                 session_id=self._session_id,
@@ -147,7 +152,10 @@ class ConversationHistory:
         lines = content.split("\n")
         for i, line in enumerate(lines):
             if line.startswith("channels:") and channel not in line:
-                lines[i] = line.rstrip("]") + f", {channel}]"
+                if line.endswith("]"):
+                    lines[i] = line[:-1] + f", {channel}]"
+                else:
+                    lines[i] = line + f", {channel}]"
                 p.write_text("\n".join(lines), encoding="utf-8")
                 break
 
