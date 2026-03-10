@@ -36,6 +36,8 @@ def mock_manager(tmp_path: Path) -> MagicMock:
     manager = MagicMock(spec=CronManager)
     manager.list_jobs.return_value = []
     manager.update_last_run.return_value = None
+    # Return None so the retry policy falls through to the notify-and-reset branch
+    manager.get_job.return_value = None
     return manager
 
 
@@ -547,3 +549,109 @@ class TestCronExecutorNotifier:
             await executor._run_job("success-notify", "task")
 
         mock_notifier.notify_failure.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# TestRetryLogic — exponential backoff retry on failure
+# ---------------------------------------------------------------------------
+
+
+class TestRetryLogic:
+    """Tests for CronExecutor retry-on-failure behaviour."""
+
+    @pytest.fixture()
+    def manager(self, tmp_path: Path) -> CronManager:
+        """Return a real CronManager backed by a temporary SQLite database."""
+        return CronManager(db_path=tmp_path / "cron_test.db")
+
+    @pytest.mark.asyncio
+    async def test_retry_scheduled_on_first_failure(
+        self,
+        manager: CronManager,
+    ) -> None:
+        """A one-shot retry is scheduled when retries remain after failure."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        mock_notifier = MagicMock()
+        mock_notifier.notify_failure = AsyncMock()
+        executor = CronExecutor(manager=manager, notifier=mock_notifier)
+        executor._scheduler = MagicMock()
+
+        manager.add("retry-job", "* * * * *", "task", max_retries=2)
+
+        with patch(
+            "lightagent.agents.graph.get_async_compiled_graph",
+            new=AsyncMock(side_effect=RuntimeError("fail")),
+        ):
+            await executor._run_job("retry-job", "task")
+
+        # retry_count incremented
+        job = manager.get_job("retry-job")
+        assert job is not None
+        assert job.retry_count == 1
+        # A retry job was scheduled in APScheduler
+        executor._scheduler.add_job.assert_called_once()
+        call_args = executor._scheduler.add_job.call_args
+        assert call_args.kwargs.get("id") == "retry-job_retry_1"
+        # Notifier NOT called yet
+        mock_notifier.notify_failure.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_notifier_called_on_final_retry_failure(
+        self,
+        manager: CronManager,
+    ) -> None:
+        """Notifier fires and retry_count resets after exhausting all retries."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        mock_notifier = MagicMock()
+        mock_notifier.notify_failure = AsyncMock()
+        executor = CronExecutor(manager=manager, notifier=mock_notifier)
+        executor._scheduler = MagicMock()
+
+        manager.add("final-job", "* * * * *", "task", max_retries=1)
+        # Simulate already at max retries
+        manager.set_retry_count("final-job", 1)
+
+        with patch(
+            "lightagent.agents.graph.get_async_compiled_graph",
+            new=AsyncMock(side_effect=RuntimeError("final")),
+        ):
+            await executor._run_job("final-job", "task")
+
+        # retry_count reset to 0
+        job = manager.get_job("final-job")
+        assert job is not None
+        assert job.retry_count == 0
+        # No new retry scheduled
+        executor._scheduler.add_job.assert_not_called()
+        # Notifier WAS called
+        mock_notifier.notify_failure.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_retry_count_reset_on_success(
+        self,
+        manager: CronManager,
+    ) -> None:
+        """retry_count is reset to 0 on a successful run."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from langchain_core.messages import AIMessage
+
+        executor = CronExecutor(manager=manager)
+        executor._scheduler = MagicMock()
+        manager.add("success-job", "* * * * *", "task", max_retries=3)
+        manager.set_retry_count("success-job", 2)  # simulate mid-retry
+
+        mock_graph = AsyncMock()
+        mock_graph.ainvoke = AsyncMock(
+            return_value={"messages": [AIMessage(content="done")]}
+        )
+        with patch(
+            "lightagent.agents.graph.get_async_compiled_graph",
+            new=AsyncMock(return_value=mock_graph),
+        ):
+            await executor._run_job("success-job", "task")
+
+        job = manager.get_job("success-job")
+        assert job is not None
+        assert job.retry_count == 0

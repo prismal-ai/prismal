@@ -194,20 +194,28 @@ class CronExecutor:
         )
 
     async def _run_job(self, name: str, task: str) -> None:
-        """Execute a cron job by invoking the LangGraph agent graph.
+        """Execute a cron job and apply the retry policy on failure.
 
-        Records each execution (start time, end time, duration, outcome,
-        output or error text) into ``cron_run_history`` via
-        :meth:`~lightagent.scheduler.cron_manager.CronManager.add_run_record`.
+        On success: records history, resets ``retry_count`` to 0.
 
-        Errors are logged but never re-raised so that APScheduler continues
-        scheduling future runs.
+        On failure:
+
+        - If ``retry_count < max_retries``: increments ``retry_count``,
+          schedules a one-shot APScheduler ``date`` trigger after
+          ``retry_delay_seconds * 2^(retry_count-1)`` seconds, and does NOT
+          send a notification yet.
+        - If retries are exhausted (or ``max_retries == 0``): resets
+          ``retry_count`` to 0, records the run as failed, and fires the
+          :class:`~lightagent.scheduler.notifier.CronNotifier`.
+
+        Errors are never re-raised so APScheduler continues scheduling
+        future runs.
 
         Args:
             name: The cron job name (used for the thread id and logging).
             task: The human-readable task description sent to the agent graph.
         """
-        from datetime import UTC, datetime
+        from datetime import UTC, datetime, timedelta
 
         from langchain_core.messages import HumanMessage
 
@@ -232,7 +240,6 @@ class CronExecutor:
                 last = messages[-1]
                 output = getattr(last, "content", None)
                 if isinstance(output, list):
-                    # Tool-call content can be a list; take first text block
                     output = next(
                         (
                             b.get("text")
@@ -243,6 +250,7 @@ class CronExecutor:
                     )
 
             self._manager.update_last_run(name, finished_at)
+            self._manager.set_retry_count(name, 0)
             self._manager.add_run_record(
                 job_name=name,
                 started_at=started_at,
@@ -254,19 +262,49 @@ class CronExecutor:
 
         except Exception as exc:
             finished_at = datetime.now(UTC).replace(tzinfo=None)
-            logger.error("cron_job_failed", name=name, error=str(exc))
+            error_msg = str(exc)
+            duration = (finished_at - started_at).total_seconds()
+            logger.error("cron_job_failed", name=name, error=error_msg)
+
+            # Always record the failed run
             self._manager.add_run_record(
                 job_name=name,
                 started_at=started_at,
                 finished_at=finished_at,
                 outcome="failure",
-                error=str(exc),
+                error=error_msg,
             )
-            await self._notifier.notify_failure(
-                job_name=name,
-                error=str(exc),
-                duration_seconds=(finished_at - started_at).total_seconds(),
-            )
+
+            # Apply retry policy
+            job = self._manager.get_job(name)
+            if job is not None and job.retry_count < job.max_retries:
+                new_count = job.retry_count + 1
+                delay = job.retry_delay_seconds * (2 ** (new_count - 1))
+                self._manager.set_retry_count(name, new_count)
+                retry_at = datetime.now(UTC) + timedelta(seconds=delay)
+                self._scheduler.add_job(
+                    self._run_job,
+                    trigger="date",
+                    run_date=retry_at,
+                    id=f"{name}_retry_{new_count}",
+                    args=[name, task],
+                    replace_existing=True,
+                )
+                logger.info(
+                    "cron_job_retry_scheduled",
+                    name=name,
+                    attempt=new_count,
+                    max_retries=job.max_retries,
+                    delay_seconds=delay,
+                )
+            else:
+                # Retries exhausted (or max_retries == 0) — notify and reset
+                self._manager.set_retry_count(name, 0)
+                await self._notifier.notify_failure(
+                    job_name=name,
+                    error=error_msg,
+                    duration_seconds=duration,
+                )
 
 
 __all__ = ["CronExecutor", "get_running_executor"]
