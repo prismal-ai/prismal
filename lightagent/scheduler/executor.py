@@ -18,6 +18,8 @@ Example::
 
 from __future__ import annotations
 
+import asyncio
+
 import structlog
 from apscheduler.jobstores.base import JobLookupError as APJobLookupError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -73,6 +75,7 @@ class CronExecutor:
         self._manager: CronManager = manager or CronManager()
         self._notifier: CronNotifier = notifier or CronNotifier()
         self._scheduler: AsyncIOScheduler = AsyncIOScheduler()
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -98,6 +101,7 @@ class CronExecutor:
         for job in active_jobs:
             self._register_job(job)
 
+        self._loop = asyncio.get_running_loop()
         self._scheduler.start()
         global _running_executor
         _running_executor = self
@@ -169,6 +173,25 @@ class CronExecutor:
             logger.info("cron_executor_job_resumed", name=name)
         except APJobLookupError:
             logger.warning("cron_executor_resume_job_not_found", name=name)
+
+    def schedule_coroutine(self, coro: object) -> None:
+        """Submit a coroutine to the executor's event loop from any thread.
+
+        Uses :func:`asyncio.run_coroutine_threadsafe` so that cron tools
+        (which run as sync callables inside a thread-pool executor) can
+        safely hand off async work to the running event loop without needing
+        a reference to the loop themselves.
+
+        If the executor has not been started yet (loop is ``None``) the
+        coroutine is discarded and a warning is logged.
+
+        Args:
+            coro: The coroutine to schedule (e.g. ``executor.add_job(job)``).
+        """
+        if self._loop is None or not self._loop.is_running():
+            logger.warning("cron_executor_schedule_coroutine_no_loop")
+            return
+        asyncio.run_coroutine_threadsafe(coro, self._loop)  # type: ignore[arg-type]
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 

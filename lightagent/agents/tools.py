@@ -609,7 +609,6 @@ def cron_add(name: str, schedule: str, task: str) -> str:
         Confirmation string with next scheduled run time, or error message.
     """
     try:
-        import asyncio
 
         from lightagent.scheduler.cron_manager import CronManager
         from lightagent.scheduler.executor import get_running_executor
@@ -619,7 +618,7 @@ def cron_add(name: str, schedule: str, task: str) -> str:
         # Hot-add to running executor if available
         executor = get_running_executor()
         if executor is not None:
-            asyncio.get_event_loop().create_task(executor.add_job(job))
+            executor.schedule_coroutine(executor.add_job(job))
         if job.next_run:
             next_run = job.next_run.strftime("%Y-%m-%d %H:%M UTC")
         else:
@@ -663,7 +662,6 @@ def cron_pause(name: str) -> str:
         Confirmation or error message.
     """
     try:
-        import asyncio
 
         from lightagent.scheduler.cron_manager import CronManager
         from lightagent.scheduler.executor import get_running_executor
@@ -672,7 +670,7 @@ def cron_pause(name: str) -> str:
         # Notify running executor to pause the job in APScheduler
         executor = get_running_executor()
         if executor is not None:
-            asyncio.get_event_loop().create_task(executor.pause_job(name))
+            executor.schedule_coroutine(executor.pause_job(name))
         return f"Job '{name}' paused."
     except KeyError:
         return f"Job '{name}' not found."
@@ -691,7 +689,6 @@ def cron_resume(name: str) -> str:
         Confirmation or error message.
     """
     try:
-        import asyncio
 
         from lightagent.scheduler.cron_manager import CronManager
         from lightagent.scheduler.executor import get_running_executor
@@ -700,7 +697,7 @@ def cron_resume(name: str) -> str:
         # Notify running executor to resume the job in APScheduler
         executor = get_running_executor()
         if executor is not None:
-            asyncio.get_event_loop().create_task(executor.resume_job(name))
+            executor.schedule_coroutine(executor.resume_job(name))
         return f"Job '{name}' resumed."
     except KeyError:
         return f"Job '{name}' not found."
@@ -762,7 +759,6 @@ def cron_once(name: str, run_at: str, task: str) -> str:
         Confirmation string with the scheduled time, or an error message.
     """
     try:
-        import asyncio
         from datetime import datetime
 
         from lightagent.scheduler.cron_manager import CronManager
@@ -773,7 +769,7 @@ def cron_once(name: str, run_at: str, task: str) -> str:
         job = mgr.add_once(name, target, task)
         executor = get_running_executor()
         if executor is not None:
-            asyncio.get_event_loop().create_task(executor.add_job(job))
+            executor.schedule_coroutine(executor.add_job(job))
         return (
             f"One-time reminder '{name}' scheduled for"
             f" {target.strftime('%Y-%m-%d %H:%M')}."
@@ -795,7 +791,6 @@ def cron_remove(name: str) -> str:
         Confirmation or error message.
     """
     try:
-        import asyncio
 
         from lightagent.scheduler.cron_manager import CronManager
         from lightagent.scheduler.executor import get_running_executor
@@ -804,7 +799,7 @@ def cron_remove(name: str) -> str:
         # Notify running executor to remove the job from APScheduler
         executor = get_running_executor()
         if executor is not None:
-            asyncio.get_event_loop().create_task(executor.remove_job(name))
+            executor.schedule_coroutine(executor.remove_job(name))
         return f"Job '{name}' removed."
     except KeyError:
         return f"Job '{name}' not found."
