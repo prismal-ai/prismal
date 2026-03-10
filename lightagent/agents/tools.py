@@ -709,6 +709,37 @@ def cron_resume(name: str) -> str:
 
 
 @tool
+def get_current_time() -> str:
+    """Return the current local date, time, and timezone of the host machine.
+
+    Use this tool at the start of any scheduling request that involves a
+    relative time reference ("in 5 minutes", "in 2 hours", "tomorrow at 9 AM")
+    so that you can compute the correct absolute cron expression without
+    asking the user for the current time.
+
+    Returns:
+        A string with current ISO datetime, local timezone name, and UTC offset,
+        e.g. "2026-03-09 20:24:45 VET (UTC-04:00)".
+    """
+    from datetime import datetime
+
+    now_local = datetime.now().astimezone()
+    tz_name = now_local.tzname() or "local"
+    utc_offset = now_local.utcoffset()
+    if utc_offset is not None:
+        total_seconds = int(utc_offset.total_seconds())
+        sign = "+" if total_seconds >= 0 else "-"
+        hours, remainder = divmod(abs(total_seconds), 3600)
+        minutes = remainder // 60
+        offset_str = f"UTC{sign}{hours:02d}:{minutes:02d}"
+    else:
+        offset_str = "UTC offset unknown"
+    return (
+        f"{now_local.strftime('%Y-%m-%d %H:%M:%S')} {tz_name} ({offset_str})"
+    )
+
+
+@tool
 def cron_remove(name: str) -> str:
     """Permanently delete a scheduled cron job.
 
@@ -743,6 +774,7 @@ CRITIC_TOOLS: list[BaseTool] = [evaluate, score]
 DATA_ANALYST_TOOLS: list[BaseTool] = [duckdb_query, polars_transform, create_chart]
 FILE_MANAGER_TOOLS: list[BaseTool] = [read_file, write_file]
 CRON_MANAGER_TOOLS: list[BaseTool] = [
+    get_current_time,
     cron_add,
     cron_list,
     cron_pause,
@@ -768,6 +800,7 @@ __all__ = [
     "doc_index",
     "duckdb_query",
     "evaluate",
+    "get_current_time",
     "list_mcp_tools",
     "polars_transform",
     "rag_search",

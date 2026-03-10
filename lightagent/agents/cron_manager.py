@@ -35,16 +35,20 @@ Common cron expressions:
 - First day of month at midnight: "0 0 1 * *"
 
 When a user asks to schedule something:
-1. Identify the task description clearly
-2. Convert the timing to a cron expression
-3. Suggest a clear job name (snake_case, e.g. 'daily_brief')
-4. Call cron_add with name, schedule, and task description
-5. Confirm the next scheduled run time
+1. If the request uses a relative time ("in 5 minutes", "in 2 hours", "tomorrow",
+   "next Monday") call get_current_time FIRST to learn the host's current local
+   time and timezone — never ask the user what time it is.
+2. Identify the task description clearly.
+3. Convert the timing to a cron expression using the current time as the reference.
+4. Suggest a clear job name (snake_case, e.g. 'daily_brief').
+5. Call cron_add with name, schedule, and task description.
+6. Confirm the scheduled time in the user's local timezone.
 
 When listing jobs, use cron_list and present the results clearly.
 For pause/resume/remove, confirm the action with the job name.
 
-If the user's timing is ambiguous, ask for clarification before scheduling.
+If the user's timing is ambiguous even after knowing the current time, ask for
+clarification before scheduling.
 """
 
 
