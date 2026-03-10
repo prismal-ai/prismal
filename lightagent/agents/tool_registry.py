@@ -123,6 +123,12 @@ def get_skill_tools() -> list[BaseTool]:
 # (~15 k tokens) without issue.
 _MAX_MCP_TOOLS: int = 60
 
+# Agents that operate on a fixed, minimal tool set and must NOT receive MCP
+# or skill tools.  Loading 60+ MCP schemas + unbounded skill schemas into
+# these agents causes the prompt to exceed Anthropic's 30 k token/min rate
+# limit.  These agents only need their own stub tools to function correctly.
+_FIXED_TOOL_AGENTS: frozenset[str] = frozenset({"cron_manager", "critic"})
+
 # ---------------------------------------------------------------------------
 # Per-agent tool merge
 # ---------------------------------------------------------------------------
@@ -174,12 +180,25 @@ def get_tools_for_agent(agent_name: str) -> list[BaseTool]:
         "cron_manager": CRON_MANAGER_TOOLS,
     }
 
+    stubs = stub_map.get(agent_name, [])
+
+    # Fixed-tool-set agents skip MCP and skill loading entirely.
+    # Their prompts must stay small to avoid rate-limit errors.
+    if agent_name in _FIXED_TOOL_AGENTS:
+        logger.debug(
+            "tool_registry.tools_resolved",
+            agent=agent_name,
+            live=0,
+            stubs_kept=len(stubs),
+            total=len(stubs),
+        )
+        return stubs
+
     mcp_tools = get_mcp_tools()[:_MAX_MCP_TOOLS]  # cap to avoid token explosion
     skill_tools = get_skill_tools()
     live_tools: list[BaseTool] = mcp_tools + skill_tools
     live_names = {t.name for t in live_tools}
 
-    stubs = stub_map.get(agent_name, [])
     filtered_stubs = [t for t in stubs if t.name not in live_names]
 
     merged = live_tools + filtered_stubs
@@ -308,4 +327,10 @@ async def react_loop(
     return response
 
 
-__all__ = ["get_mcp_tools", "get_skill_tools", "get_tools_for_agent", "init_mcp", "react_loop"]
+__all__ = [
+    "get_mcp_tools",
+    "get_skill_tools",
+    "get_tools_for_agent",
+    "init_mcp",
+    "react_loop",
+]
