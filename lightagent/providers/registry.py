@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import litellm
-from langchain_community.chat_models import ChatLiteLLM
-
+#from langchain_community.chat_models import ChatLiteLLM
+from langchain_litellm import ChatLiteLLM
 from lightagent.core.config import Settings, get_settings
 from lightagent.core.logging import get_logger
 from lightagent.monitoring.langfuse_client import LangfuseManager

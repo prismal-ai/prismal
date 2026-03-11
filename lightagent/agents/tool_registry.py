@@ -290,7 +290,25 @@ async def react_loop(
     _tool_fail_counts: dict[str, int] = {}
 
     for iteration in range(max_iterations):
-        response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+        try:
+            response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+        except Exception as llm_exc:
+            if _RATE_LIMIT_RE.search(str(llm_exc)):
+                logger.warning(
+                    "react_loop.llm_rate_limited",
+                    agent=agent_name,
+                    iteration=iteration,
+                    error=str(llm_exc)[:200],
+                    session_id=session_id,
+                )
+                return AIMessage(
+                    content=(
+                        "I'm sorry, the AI service is temporarily rate-limited "
+                        "(too many tokens per minute). Please wait a moment and "
+                        "try again."
+                    )
+                )
+            raise
 
         tool_calls = getattr(response, "tool_calls", None) or []
         if not tool_calls:
@@ -429,7 +447,24 @@ async def react_loop(
                     )
                 )
             )
-            response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+            try:
+                response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+            except Exception as llm_exc:
+                if _RATE_LIMIT_RE.search(str(llm_exc)):
+                    logger.warning(
+                        "react_loop.llm_rate_limited",
+                        agent=agent_name,
+                        iteration=iteration,
+                        error=str(llm_exc)[:200],
+                        session_id=session_id,
+                    )
+                    return AIMessage(
+                        content=(
+                            "I'm sorry, the AI service is temporarily rate-limited. "
+                            "Please wait a moment and try again."
+                        )
+                    )
+                raise
             break
 
     else:
@@ -454,7 +489,23 @@ async def react_loop(
                 )
             )
         )
-        response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+        try:
+            response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+        except Exception as llm_exc:
+            if _RATE_LIMIT_RE.search(str(llm_exc)):
+                logger.warning(
+                    "react_loop.llm_rate_limited",
+                    agent=agent_name,
+                    error=str(llm_exc)[:200],
+                    session_id=session_id,
+                )
+                return AIMessage(
+                    content=(
+                        "I'm sorry, the AI service is temporarily rate-limited. "
+                        "Please wait a moment and try again."
+                    )
+                )
+            raise
 
     return response
 

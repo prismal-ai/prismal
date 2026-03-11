@@ -31,9 +31,16 @@ logger = get_logger("lightagent.agents.researcher")
 
 # Maximum tool-call iterations per researcher invocation.  Guards against
 # runaway loops when tool results never satisfy the LLM.
-# Set to 8 to give the researcher enough room for browser workflows that
-# require navigate → snapshot → optional follow-up calls (3+ tool rounds).
-_MAX_TOOL_ITERATIONS: int = 8
+# Capped at 4: browser workflows (navigate → snapshot) fit in 3 rounds;
+# 4 leaves one extra round for follow-up.  Higher values risk accumulating
+# enough context to hit Anthropic's 30 k tokens/min rate limit.
+_MAX_TOOL_ITERATIONS: int = 4
+
+# Maximum number of recent messages sent to the LLM per researcher invocation.
+# Long sessions accumulate many turns; sending the full history magnifies
+# token usage when combined with the large system prompt and tool results,
+# easily exceeding the 30 k tokens/min Anthropic rate limit.
+_HISTORY_WINDOW: int = 6
 
 # Absolute path to the MCP servers config — computed once at import time so
 # the researcher can always read the live file regardless of the process CWD.
@@ -141,7 +148,11 @@ async def researcher_node(state: AgentState) -> dict[str, object]:
     llm_with_tools = llm.bind_tools(active_tools)
 
     system = [SystemMessage(content=_SYSTEM_PROMPT)]
-    loop_messages = list(_trim_to_last_human(list(state["messages"])))
+    # Trim to the most recent messages before applying the last-human invariant.
+    # Prevents large conversation histories from exhausting the token-per-minute
+    # budget when combined with the system prompt and tool results.
+    recent = list(state["messages"])[-_HISTORY_WINDOW:]
+    loop_messages = list(_trim_to_last_human(recent))
 
     response = await react_loop(
         llm_with_tools,
