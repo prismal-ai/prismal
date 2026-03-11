@@ -530,6 +530,7 @@ class TestCronExecutorNotifier:
 
         mock_notifier = MagicMock()
         mock_notifier.notify_failure = AsyncMock()
+        mock_notifier.notify_success = AsyncMock()  # must be AsyncMock — _run_job awaits it
 
         executor = CronExecutor(manager=manager, notifier=mock_notifier)
         executor._scheduler = MagicMock()

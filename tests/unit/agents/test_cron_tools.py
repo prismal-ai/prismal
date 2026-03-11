@@ -280,8 +280,12 @@ class TestCronToolsRegistry:
         for expected in ("cron_add", "cron_list", "cron_pause", "cron_resume", "cron_remove"):
             assert expected in tool_names, f"{expected!r} missing from cron_manager tools"
 
-    def test_cron_manager_tools_list_has_5_items(self) -> None:
-        """CRON_MANAGER_TOOLS list must contain exactly 5 tools."""
+    def test_cron_manager_tools_list_has_7_items(self) -> None:
+        """CRON_MANAGER_TOOLS list must contain exactly 7 tools.
+
+        The 7 tools are: get_current_time, cron_once, cron_add, cron_list,
+        cron_pause, cron_resume, cron_remove.
+        """
         from lightagent.agents.tools import CRON_MANAGER_TOOLS
 
-        assert len(CRON_MANAGER_TOOLS) == 5
+        assert len(CRON_MANAGER_TOOLS) == 7

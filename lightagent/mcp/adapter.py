@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import uuid
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import mcp.types
@@ -81,7 +82,17 @@ def _build_args_schema(mcp_tool: mcp.types.Tool) -> type[BaseModel] | None:
         return None
 
     try:
-        return create_model(f"MCPInput_{mcp_tool.name}", **fields)
+        # Suppress "Field name X shadows an attribute in parent BaseModel" warnings
+        # that arise when an MCP tool parameter uses a reserved Pydantic name (e.g.
+        # "json", "dict", "schema").  The model still functions correctly; the
+        # warning is cosmetic and originates from the external tool schema.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=r"Field name .* shadows an attribute in parent",
+                category=UserWarning,
+            )
+            return create_model(f"MCPInput_{mcp_tool.name}", **fields)
     except Exception as exc:  # broad: pydantic create_model can raise for exotic schemas
         logger.debug(
             "mcp_adapter_schema_build_failed",

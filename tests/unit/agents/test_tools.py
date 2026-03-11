@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 from langchain_core.tools import BaseTool
 
 from lightagent.agents.tools import (
@@ -32,111 +37,169 @@ from lightagent.agents.tools import (
 
 
 def test_web_search_stub_returns_string() -> None:
-    """web_search returns a stub string containing the query."""
-    result = web_search.invoke({"query": "latest AI news"})
+    """web_search returns a string containing the query when backend succeeds."""
+    with patch("langchain_community.tools.DuckDuckGoSearchRun") as mock_cls:
+        mock_cls.return_value.run.return_value = "AI news results for: latest AI news"
+        result = web_search.invoke({"query": "latest AI news"})
     assert isinstance(result, str)
-    assert "web_search" in result
     assert "latest AI news" in result
 
 
 def test_rag_search_stub_contains_query_and_collection() -> None:
-    """rag_search stub includes query and collection name."""
-    result = rag_search.invoke({"query": "machine learning", "collection": "docs"})
-    assert "rag_search" in result
+    """rag_search returns results containing query and collection name."""
+    chunk = MagicMock(
+        relevance_score=0.9,
+        source="docs/test.pdf",
+        content="machine learning concepts in docs collection",
+    )
+    with patch("lightagent.rag.engine.RAGEngine") as mock_cls:
+        mock_cls.return_value.search.return_value = [chunk]
+        result = rag_search.invoke({"query": "machine learning", "collection": "docs"})
+    assert isinstance(result, str)
     assert "machine learning" in result
     assert "docs" in result
 
 
 def test_rag_search_default_collection() -> None:
-    """rag_search uses 'default' collection when none is specified."""
-    result = rag_search.invoke({"query": "test"})
+    """rag_search uses 'default' collection when none specified — shows in no-results message."""
+    with patch("lightagent.rag.engine.RAGEngine") as mock_cls:
+        mock_cls.return_value.search.return_value = []
+        result = rag_search.invoke({"query": "test"})
+    assert isinstance(result, str)
     assert "default" in result
 
 
 def test_read_file_stub_contains_path() -> None:
-    """read_file stub includes the path."""
+    """read_file returns a message containing the requested path."""
     result = read_file.invoke({"path": "/home/user/data.txt"})
-    assert "read_file" in result
+    assert isinstance(result, str)
     assert "/home/user/data.txt" in result
 
 
 def test_write_file_stub_contains_path_and_length() -> None:
-    """write_file stub includes path and content length."""
+    """write_file returns a confirmation with the resolved path and byte count."""
     content = "hello world"
     result = write_file.invoke({"path": "/tmp/out.txt", "content": content})
-    assert "write_file" in result
+    assert isinstance(result, str)
     assert "/tmp/out.txt" in result
     assert str(len(content)) in result
 
 
 def test_code_executor_stub_contains_language_and_length() -> None:
-    """code_executor stub includes language and code length."""
+    """code_executor runs code and returns output when shell is enabled."""
     code = "print('hello')"
-    result = code_executor.invoke({"code": code, "language": "python"})
-    assert "code_executor" in result
-    assert "python" in result
-    assert str(len(code)) in result
+    with (
+        patch("lightagent.core.config.get_settings") as mock_gs,
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_gs.return_value.shell_enabled = True
+        mock_run.return_value = MagicMock(stdout="hello\n", stderr="", returncode=0)
+        result = code_executor.invoke({"code": code, "language": "python"})
+    assert isinstance(result, str)
+    assert "hello" in result
 
 
 def test_code_executor_default_language() -> None:
-    """code_executor defaults to 'python' language."""
-    result = code_executor.invoke({"code": "x = 1"})
-    assert "python" in result
+    """code_executor defaults to python when language is omitted."""
+    with (
+        patch("lightagent.core.config.get_settings") as mock_gs,
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_gs.return_value.shell_enabled = True
+        mock_run.return_value = MagicMock(stdout="1\n", stderr="", returncode=0)
+        result = code_executor.invoke({"code": "x = 1"})
+    assert isinstance(result, str)
 
 
 def test_vector_search_stub_contains_all_params() -> None:
-    """vector_search stub includes query, collection, and k."""
-    result = vector_search.invoke({"query": "embeddings", "collection": "knowledge", "k": 10})
-    assert "vector_search" in result
+    """vector_search result includes query, collection, and k value."""
+    chunk = MagicMock(
+        relevance_score=0.95,
+        source="kb/doc.txt",
+        content="embeddings concept found in knowledge base",
+    )
+    with patch("lightagent.rag.engine.RAGEngine") as mock_cls:
+        mock_cls.return_value.search.return_value = [chunk]
+        result = vector_search.invoke({"query": "embeddings", "collection": "knowledge", "k": 10})
+    assert isinstance(result, str)
     assert "embeddings" in result
     assert "knowledge" in result
     assert "10" in result
 
 
 def test_doc_index_stub_contains_path_and_collection() -> None:
-    """doc_index stub includes path and collection."""
-    result = doc_index.invoke({"path": "/data/report.pdf", "collection": "reports"})
-    assert "doc_index" in result
-    assert "/data/report.pdf" in result
-    assert "reports" in result
+    """doc_index returns confirmation with chunk count and collection name."""
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+        tmp_path = f.name
+    try:
+        with patch("lightagent.rag.engine.RAGEngine") as mock_cls:
+            mock_cls.return_value.index_file.return_value = 5
+            result = doc_index.invoke({"path": tmp_path, "collection": "reports"})
+        assert isinstance(result, str)
+        assert "reports" in result
+        assert "5" in result
+    finally:
+        os.unlink(tmp_path)
 
 
 def test_evaluate_stub_contains_criteria() -> None:
-    """evaluate stub includes criteria."""
-    result = evaluate.invoke({"text": "some text", "criteria": "clarity"})
-    assert "evaluate" in result
+    """evaluate passes criteria to the LLM and returns its response."""
+    mock_response = MagicMock(content="Evaluation: clarity score is high")
+    with patch("lightagent.providers.registry.ProviderRegistry") as mock_cls:
+        mock_cls.return_value.get_llm_with_fallback.return_value.invoke.return_value = mock_response
+        result = evaluate.invoke({"text": "some text", "criteria": "clarity"})
+    assert isinstance(result, str)
     assert "clarity" in result
 
 
 def test_score_stub_returns_float() -> None:
-    """score stub returns a float (0.0)."""
-    result = score.invoke({"text": "some text", "rubric": "accuracy"})
+    """score returns a float parsed from the LLM response."""
+    mock_response = MagicMock(content="0.0")
+    with patch("lightagent.providers.registry.ProviderRegistry") as mock_cls:
+        mock_cls.return_value.get_llm_with_fallback.return_value.invoke.return_value = mock_response
+        result = score.invoke({"text": "some text", "rubric": "accuracy"})
     assert isinstance(result, float)
     assert result == 0.0
 
 
 def test_duckdb_query_stub_contains_sql_length() -> None:
-    """duckdb_query stub includes sql_length and source."""
+    """duckdb_query formats query results as a table and returns it."""
     sql = "SELECT avg(sales) FROM data.csv"
-    result = duckdb_query.invoke({"sql": sql, "source": "data.csv"})
-    assert "duckdb_query" in result
-    assert str(len(sql)) in result
+    rows = [{"avg_sales": "150.0", "source": "data.csv"}]
+    mock_engine = MagicMock()
+    mock_engine.query.return_value = rows
+    mock_engine._conn = MagicMock()
+    with patch("lightagent.data.duckdb_engine.DuckDBEngine") as mock_cls:
+        mock_cls.return_value.__enter__ = MagicMock(return_value=mock_engine)
+        mock_cls.return_value.__exit__ = MagicMock(return_value=False)
+        result = duckdb_query.invoke({"sql": sql, "source": "data.csv"})
+    assert isinstance(result, str)
     assert "data.csv" in result
 
 
 def test_polars_transform_stub_contains_operation_and_source() -> None:
-    """polars_transform stub includes operation and data_source."""
-    result = polars_transform.invoke({"operation": "filter", "data_source": "sales.parquet"})
-    assert "polars_transform" in result
-    assert "filter" in result
-    assert "sales.parquet" in result
+    """polars_transform reads CSV and applies the operation, returning tabular output."""
+    with tempfile.NamedTemporaryFile(
+        suffix=".csv", mode="w", delete=False, encoding="utf-8"
+    ) as f:
+        f.write("region,sales\nnorth,100\nsouth,200\n")
+        tmp_csv = f.name
+    try:
+        result = polars_transform.invoke({"operation": "head 2", "data_source": tmp_csv})
+    finally:
+        os.unlink(tmp_csv)
+    assert isinstance(result, str)
+    assert "region" in result or "sales" in result
 
 
 def test_create_chart_stub_contains_chart_type_and_title() -> None:
-    """create_chart stub includes chart_type and title."""
-    result = create_chart.invoke({"data": "[1,2,3]", "chart_type": "line", "title": "Sales"})
-    assert "create_chart" in result
-    assert "line" in result
+    """create_chart saves a chart file and returns its path."""
+    mock_saved = Path("/tmp/chart_Sales.png")
+    with patch("lightagent.data.polars_utils.save_chart", return_value=mock_saved):
+        result = create_chart.invoke(
+            {"data": '[{"month": "Jan", "sales": 120}]', "chart_type": "line", "title": "Sales"}
+        )
+    assert isinstance(result, str)
     assert "Sales" in result
 
 

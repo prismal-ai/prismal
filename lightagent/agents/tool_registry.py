@@ -22,6 +22,7 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -219,6 +220,19 @@ def get_tools_for_agent(agent_name: str) -> list[BaseTool]:
 
 _MAX_REACT_ITERATIONS: int = 5
 
+# After this many consecutive *permanent* failures a tool is considered
+# permanently unavailable for the current session and subsequent LLM requests
+# to use it are answered with an "unavailable" ToolMessage without calling
+# the service.  Rate-limit (429) errors do NOT count toward this budget.
+_MAX_TOOL_FAILURES: int = 2
+
+# Delay (seconds) injected after a rate-limit (429) response to respect the
+# API's back-off window.  Keeps the loop alive without hammering the service.
+_RATE_LIMIT_BACKOFF: float = 1.2
+
+# Pattern to detect rate-limit errors by message content.
+_RATE_LIMIT_RE = re.compile(r"429|rate.?limit|too.many.requests", re.IGNORECASE)
+
 
 async def react_loop(
     llm: object,
@@ -238,6 +252,19 @@ async def react_loop(
     The last message in *messages* must satisfy the provider constraint of
     ending on a ``HumanMessage`` — callers are responsible for this invariant.
 
+    **Failure resilience** — two mechanisms prevent the loop from hammering a
+    permanently broken tool (e.g. Tavily 400 caused by a bad/missing API key):
+
+    1. *Per-tool failure budget* — once a tool has failed
+       ``_MAX_TOOL_FAILURES`` times consecutively it is marked unavailable for
+       the remainder of the session.  Subsequent LLM requests to call it are
+       answered with an "unavailable" ToolMessage without making the real call.
+
+    2. *All-tools-failed early exit* — if every tool call in an iteration
+       fails (success count == 0) the loop terminates immediately and asks
+       the LLM to synthesise a best-effort answer from what it already knows,
+       rather than burning additional iterations against broken services.
+
     Args:
         llm: A LangChain chat model already bound with tools via
             ``llm.bind_tools(tools)``.
@@ -250,17 +277,38 @@ async def react_loop(
 
     Returns:
         The final :class:`~langchain_core.messages.AIMessage` produced by
-        the LLM (either because it had no tool calls, or because the
-        iteration cap was reached).
+        the LLM (either because it had no tool calls, because all tools
+        failed, or because the iteration cap was reached).
     """
-    from langchain_core.messages import AIMessage, ToolMessage
+    from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
     tool_map: dict[str, BaseTool] = {t.name: t for t in tools}
     loop_messages: list[object] = list(messages)
     response = AIMessage(content="")
 
+    # Consecutive failure counter per tool name — reset to 0 on success.
+    _tool_fail_counts: dict[str, int] = {}
+
     for iteration in range(max_iterations):
-        response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+        try:
+            response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+        except Exception as llm_exc:
+            if _RATE_LIMIT_RE.search(str(llm_exc)):
+                logger.warning(
+                    "react_loop.llm_rate_limited",
+                    agent=agent_name,
+                    iteration=iteration,
+                    error=str(llm_exc)[:200],
+                    session_id=session_id,
+                )
+                return AIMessage(
+                    content=(
+                        "I'm sorry, the AI service is temporarily rate-limited "
+                        "(too many tokens per minute). Please wait a moment and "
+                        "try again."
+                    )
+                )
+            raise
 
         tool_calls = getattr(response, "tool_calls", None) or []
         if not tool_calls:
@@ -275,29 +323,150 @@ async def react_loop(
         )
 
         loop_messages.append(response)
+        successful_calls = 0
+
+        # Tools rate-limited within THIS iteration (transient — do not count
+        # toward the permanent failure budget; the service is just throttling).
+        _rate_limited_this_iter: set[str] = set()
 
         for tc in tool_calls:
-            tool_fn = tool_map.get(tc["name"])
+            tool_name: str = tc["name"]
+            tool_fn = tool_map.get(tool_name)
+
             if tool_fn is None:
                 logger.warning(
                     "react_loop.tool_not_found",
                     agent=agent_name,
-                    tool_name=tc["name"],
+                    tool_name=tool_name,
                     available_tools=sorted(tool_map.keys()),
                     session_id=session_id,
                 )
-                result = f"Tool '{tc['name']}' not found."
+                result = f"Tool '{tool_name}' not found."
+
+            elif _tool_fail_counts.get(tool_name, 0) >= _MAX_TOOL_FAILURES:
+                # Tool exhausted its permanent failure budget — skip without calling.
+                logger.warning(
+                    "react_loop.tool_skipped_unavailable",
+                    agent=agent_name,
+                    tool_name=tool_name,
+                    failures=_tool_fail_counts[tool_name],
+                    session_id=session_id,
+                )
+                result = (
+                    f"Tool '{tool_name}' is currently unavailable "
+                    f"(failed on {_tool_fail_counts[tool_name]} previous attempts). "
+                    "Please use a different approach or inform the user that this "
+                    "service cannot be reached right now."
+                )
+
+            elif tool_name in _rate_limited_this_iter:
+                # Already hit the rate limit for this tool in this iteration.
+                # Skip without an API call so we don't keep hammering the quota.
+                logger.debug(
+                    "react_loop.tool_skipped_rate_limited",
+                    agent=agent_name,
+                    tool_name=tool_name,
+                    session_id=session_id,
+                )
+                result = (
+                    f"Tool '{tool_name}' was rate-limited earlier in this step "
+                    "and has been skipped to avoid exceeding the API quota. "
+                    "Please space out search calls or use fewer concurrent queries."
+                )
+
             else:
                 try:
                     result = str(await tool_fn.ainvoke(tc.get("args", {})))
+                    _tool_fail_counts[tool_name] = 0  # reset on success
+                    successful_calls += 1
                 except Exception as exc:
-                    result = f"Tool error: {exc}"
-            # Cap individual tool results to avoid token explosion
+                    if _RATE_LIMIT_RE.search(str(exc)):
+                        # Transient rate-limit (429): mark for this iteration only.
+                        # Do NOT burn the permanent failure budget so the tool
+                        # remains available in the next iteration after the
+                        # back-off window resets.
+                        _rate_limited_this_iter.add(tool_name)
+                        logger.warning(
+                            "react_loop.tool_rate_limited",
+                            agent=agent_name,
+                            tool_name=tool_name,
+                            error=str(exc),
+                            backoff_seconds=_RATE_LIMIT_BACKOFF,
+                            session_id=session_id,
+                        )
+                        await asyncio.sleep(_RATE_LIMIT_BACKOFF)
+                        result = (
+                            f"Tool '{tool_name}' is temporarily rate-limited "
+                            f"(HTTP 429). A {_RATE_LIMIT_BACKOFF}s back-off was "
+                            "applied. Please reduce the number of concurrent "
+                            "requests to this tool in your next step."
+                        )
+                    else:
+                        # Permanent-style failure: increment the failure budget.
+                        _tool_fail_counts[tool_name] = (
+                            _tool_fail_counts.get(tool_name, 0) + 1
+                        )
+                        logger.warning(
+                            "react_loop.tool_error",
+                            agent=agent_name,
+                            tool_name=tool_name,
+                            error=str(exc),
+                            total_failures=_tool_fail_counts[tool_name],
+                            session_id=session_id,
+                        )
+                        result = f"Tool error: {exc}"
+
+            # Cap individual tool results to avoid token explosion.
             if len(result) > 4_000:
                 result = result[:4_000] + "\n…[truncated]"
             loop_messages.append(
                 ToolMessage(content=result, tool_call_id=tc["id"])
             )
+
+        # ── All-tools-failed early exit ───────────────────────────────────
+        # Fire only when every call in this iteration had a *permanent* error
+        # (bad API key, server down, …).  Rate-limit (429) failures are
+        # transient — the service is reachable, just throttling — so they do
+        # not count as a permanent failure and the loop must continue to the
+        # next iteration where the back-off window has likely reset.
+        if successful_calls == 0 and not _rate_limited_this_iter:
+            logger.warning(
+                "react_loop.all_tools_failed",
+                agent=agent_name,
+                iteration=iteration,
+                session_id=session_id,
+            )
+            loop_messages.append(
+                HumanMessage(
+                    content=(
+                        "All tool calls in this step failed — the required external "
+                        "services may be temporarily unavailable or misconfigured. "
+                        "Based on what you already know, please provide your best "
+                        "answer and clearly state which information you could not "
+                        "retrieve and why."
+                    )
+                )
+            )
+            try:
+                response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+            except Exception as llm_exc:
+                if _RATE_LIMIT_RE.search(str(llm_exc)):
+                    logger.warning(
+                        "react_loop.llm_rate_limited",
+                        agent=agent_name,
+                        iteration=iteration,
+                        error=str(llm_exc)[:200],
+                        session_id=session_id,
+                    )
+                    return AIMessage(
+                        content=(
+                            "I'm sorry, the AI service is temporarily rate-limited. "
+                            "Please wait a moment and try again."
+                        )
+                    )
+                raise
+            break
+
     else:
         logger.warning(
             "react_loop.iteration_cap_reached",
@@ -308,8 +477,6 @@ async def react_loop(
         # The last `response` still has pending tool_calls and no useful content.
         # Append the last tool results already in loop_messages and ask the LLM
         # to synthesise a final answer from everything gathered so far.
-        from langchain_core.messages import HumanMessage
-
         loop_messages.append(response)
         loop_messages.append(
             HumanMessage(
@@ -322,7 +489,23 @@ async def react_loop(
                 )
             )
         )
-        response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+        try:
+            response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+        except Exception as llm_exc:
+            if _RATE_LIMIT_RE.search(str(llm_exc)):
+                logger.warning(
+                    "react_loop.llm_rate_limited",
+                    agent=agent_name,
+                    error=str(llm_exc)[:200],
+                    session_id=session_id,
+                )
+                return AIMessage(
+                    content=(
+                        "I'm sorry, the AI service is temporarily rate-limited. "
+                        "Please wait a moment and try again."
+                    )
+                )
+            raise
 
     return response
 

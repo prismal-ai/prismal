@@ -135,6 +135,9 @@ Available agents:
 
 Routing rules:
 - Route to 'END' when you have a complete answer
+- Route to 'END' for greetings ("hola", "hello", "hi", "hey", "buenos días",
+  "buenas tardes", "buenas noches", "qué tal", "cómo estás", etc.) and all
+  casual / small-talk conversation — answer them directly without specialists.
 - Route to 'END' for simple factual questions you can answer directly
 - Route to 'researcher' for ANY query about MCP servers — whether listing them,
   checking which are active/enabled, asking about their capabilities, or getting

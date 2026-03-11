@@ -810,3 +810,58 @@ class TestStatusProperty:
         assert st.connected is True
         assert st.error is None
         assert st.tool_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Graceful shutdown — CancelledError suppression (regression: Ctrl+C fix)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_cleanup_stack_suppresses_cancelled_error() -> None:
+    """_cleanup_stack must swallow CancelledError so Ctrl+C does not crash uvicorn."""
+    conn = MCPServerConnection(_make_stdio_config())
+
+    mock_stack = AsyncMock()
+    mock_stack.aclose = AsyncMock(side_effect=asyncio.CancelledError("test cancel"))
+    conn._exit_stack = mock_stack
+    conn._connected = True
+
+    # Must NOT raise — the CancelledError should be caught and logged.
+    await conn._cleanup_stack()
+
+    assert conn._connected is False
+    assert conn._exit_stack is None
+    assert conn._session is None
+
+
+@pytest.mark.asyncio
+async def test_cleanup_stack_suppresses_base_exception() -> None:
+    """_cleanup_stack must swallow any BaseException during teardown."""
+    conn = MCPServerConnection(_make_stdio_config())
+
+    mock_stack = AsyncMock()
+    mock_stack.aclose = AsyncMock(side_effect=BaseException("unexpected"))
+    conn._exit_stack = mock_stack
+    conn._connected = True
+
+    await conn._cleanup_stack()  # must not raise
+
+    assert conn._connected is False
+
+
+@pytest.mark.asyncio
+async def test_disconnect_suppresses_cancelled_error() -> None:
+    """disconnect() must complete cleanly even when the transport raises CancelledError."""
+    conn = MCPServerConnection(_make_stdio_config())
+
+    mock_stack = AsyncMock()
+    mock_stack.aclose = AsyncMock(side_effect=asyncio.CancelledError("cancel on stop"))
+    conn._exit_stack = mock_stack
+    conn._connected = True
+    conn._cached_tools = [_make_tool("t1")]
+
+    await conn.disconnect()  # must not raise
+
+    assert conn._connected is False
+    assert conn._cached_tools == []

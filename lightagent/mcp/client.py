@@ -293,13 +293,26 @@ class MCPClientManager:
     def get_all_langchain_tools(self) -> list[BaseTool]:
         """Return all MCP tools from connected servers as LangChain BaseTool instances.
 
+        Servers are ordered by their configured ``priority`` (highest first) so
+        that the LLM sees preferred tools at the top of its tool list.  When
+        multiple servers share the same priority tier the original config order
+        is preserved as a stable tiebreaker.
+
+        Tools from servers with ``priority > 0`` receive a description prefix
+        that signals the preferred order to the LLM:
+
+        * ``[Preferred]`` — highest configured priority among connected servers.
+        * ``[Fallback]``  — lower non-zero priority; use only when the preferred
+          tool is unavailable or has been exhausted.
+        * *(no prefix)*  — priority 0; no ordering preference declared.
+
         The ``MCPToolAdapter`` import is deferred to call time so that this
         module does not hard-depend on T-052 at import time.  If the adapter
         module is not yet available an empty list is returned with a warning.
 
         Returns:
-            A flat list of ``BaseTool`` instances, one per (server, tool) pair
-            across all currently connected servers.
+            A flat list of ``BaseTool`` instances, one per (server, tool) pair,
+            sorted highest priority first.
         """
         try:
             # Lazy import — MCPToolAdapter is implemented in T-052.
@@ -311,14 +324,50 @@ class MCPClientManager:
             )
             return []
 
+        # Sort connected servers by priority descending; stable sort preserves
+        # config-file order within the same priority tier.
+        sorted_conns = sorted(
+            (c for c in self._connections.values() if c.connected),
+            key=lambda c: c._config.priority,
+            reverse=True,
+        )
+
+        # Determine the maximum priority among connected servers with priority > 0
+        # to distinguish "preferred" from "fallback" tiers.
+        max_priority: int = max(
+            (c._config.priority for c in sorted_conns if c._config.priority > 0),
+            default=0,
+        )
+
         tools: list[BaseTool] = []
-        for conn in self._connections.values():
-            if not conn.connected:
-                continue
+        for conn in sorted_conns:
+            p = conn._config.priority
+            # Compute the description prefix for this server's priority tier.
+            if p > 0 and p == max_priority:
+                prefix = "[Preferred] "
+            elif p > 0:
+                prefix = "[Fallback — use only when Preferred tool is unavailable] "
+            else:
+                prefix = ""
+
             # cached_tools is populated during connect(); iterate directly to
             # avoid the async list_tools() call from a sync context.
-            for tool in conn.cached_tools:
-                tools.append(MCPToolAdapter(conn, tool))
+            for mcp_tool in conn.cached_tools:
+                adapter = MCPToolAdapter(conn, mcp_tool)
+                if prefix:
+                    adapter.description = f"{prefix}{adapter.description}"
+                tools.append(adapter)
+
+        if max_priority > 0:
+            logger.debug(
+                "mcp_tools_priority_sorted",
+                max_priority=max_priority,
+                servers=[
+                    {"name": c._config.name, "priority": c._config.priority}
+                    for c in sorted_conns
+                    if c._config.priority > 0
+                ],
+            )
 
         return tools
 
@@ -351,10 +400,21 @@ class MCPClientManager:
         Should be called on application shutdown (e.g. FastAPI lifespan
         ``shutdown`` event) to cleanly tear down all MCP subprocess and
         HTTP connections.
+
+        Each server is disconnected inside its own ``try/except`` so that a
+        ``CancelledError`` or other ``BaseException`` raised by one server's
+        transport teardown does not abort the cleanup of the remaining servers.
         """
         names = list(self._connections.keys())
         for name in names:
-            await self.disconnect(name)
+            try:
+                await self.disconnect(name)
+            except BaseException as exc:  # noqa: BLE001 — intentional: includes CancelledError
+                logger.warning(
+                    "mcp_manager_close_error",
+                    server=name,
+                    error=str(exc),
+                )
         logger.info("mcp_manager_closed")
 
 
