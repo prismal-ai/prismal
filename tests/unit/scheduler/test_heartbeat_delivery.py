@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -110,3 +111,29 @@ async def test_send_slack_skipped_when_no_token() -> None:
     with patch("lightagent.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
         await delivery.send("slack", "#ch", "hello")
     mock_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_send_email_skipped_when_no_smtp_config() -> None:
+    """send() skips email delivery silently when smtp_host is not configured."""
+    delivery = HeartbeatDelivery(smtp_host="", smtp_from="")
+    with patch("lightagent.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
+        await delivery.send("email", "user@example.com", "hello")
+    mock_cls.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_send_email_import_error_does_not_raise() -> None:
+    """send() does not raise when aiosmtplib is not installed."""
+    delivery = HeartbeatDelivery(
+        smtp_host="smtp.example.com", smtp_from="bot@example.com"
+    )
+    real_import = builtins.__import__
+
+    def mock_import(name: str, *args: object, **kwargs: object) -> object:
+        if name == "aiosmtplib":
+            raise ImportError("No module named 'aiosmtplib'")
+        return real_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=mock_import):
+        await delivery.send("email", "user@example.com", "test message")
