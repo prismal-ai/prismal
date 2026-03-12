@@ -424,6 +424,48 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Preferences auto-extraction ───────────────────────────────────
+    preferences_auto_extract: bool = Field(
+        default=True,
+        description=(
+            "Enable automatic preference extraction from conversation history. "
+            "When True, the system analyses conversations in the background and "
+            "updates PREFERENCES.md without blocking the chat response."
+        ),
+    )
+    preferences_extract_cooldown_minutes: int = Field(
+        default=30,
+        ge=1,
+        description=(
+            "Minimum minutes between automatic preference extractions per session. "
+            "Extraction also triggers after every 5 new messages."
+        ),
+    )
+
+    # ── Heartbeat — SMTP email delivery ───────────────────────────────
+    heartbeat_smtp_host: str = Field(
+        default="",
+        description="SMTP server hostname for heartbeat email delivery.",
+    )
+    heartbeat_smtp_port: int = Field(
+        default=587,
+        ge=1,
+        le=65535,
+        description="SMTP server port (default 587 for STARTTLS).",
+    )
+    heartbeat_smtp_user: str = Field(
+        default="",
+        description="SMTP authentication username.",
+    )
+    heartbeat_smtp_password: str = Field(
+        default="",
+        description="SMTP authentication password.",
+    )
+    heartbeat_smtp_from: str = Field(
+        default="",
+        description="Sender address for heartbeat email reports.",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
