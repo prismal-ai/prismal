@@ -197,14 +197,26 @@ class Settings(BaseSettings):
     )
     langfuse_host: str = Field(
         default="https://cloud.langfuse.com",
+        validation_alias=AliasChoices(
+            "LIGHTAGENT_LANGFUSE_HOST",
+            "LANGFUSE_HOST",
+        ),
         description="Langfuse server URL",
     )
     langfuse_public_key: SecretStr = Field(
         default=SecretStr(""),
+        validation_alias=AliasChoices(
+            "LIGHTAGENT_LANGFUSE_PUBLIC_KEY",
+            "LANGFUSE_PUBLIC_KEY",
+        ),
         description="Langfuse public key",
     )
     langfuse_secret_key: SecretStr = Field(
         default=SecretStr(""),
+        validation_alias=AliasChoices(
+            "LIGHTAGENT_LANGFUSE_SECRET_KEY",
+            "LANGFUSE_SECRET_KEY",
+        ),
         description="Langfuse secret key",
     )
     langfuse_sample_rate: float = Field(
