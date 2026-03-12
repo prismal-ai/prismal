@@ -637,7 +637,7 @@ def cron_add(
     )
     executor = get_running_executor()
     if executor is not None:
-        executor.add_job(job)
+        executor.schedule_coroutine(executor.add_job(job))
     next_run = (
         job.next_run.strftime("%Y-%m-%d %H:%M UTC") if job.next_run else "unknown"
     )

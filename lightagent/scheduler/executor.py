@@ -317,11 +317,20 @@ class CronExecutor:
                 and completed_job.output_channel
                 and completed_job.output_target
             ):
-                await HeartbeatDelivery().send(
-                    completed_job.output_channel,
-                    completed_job.output_target,
-                    str(output) if output is not None else f"Job '{name}' completed.",
-                )
+                try:
+                    await HeartbeatDelivery().send(
+                        completed_job.output_channel,
+                        completed_job.output_target,
+                        str(output)
+                        if output is not None
+                        else f"Job '{name}' completed.",
+                    )
+                except Exception as delivery_exc:
+                    logger.warning(
+                        "cron_job_delivery_failed",
+                        name=name,
+                        error=str(delivery_exc),
+                    )
 
             # Auto-remove one-shot jobs after they fire
             if completed_job is not None and completed_job.schedule.startswith("once:"):
