@@ -73,29 +73,21 @@ class HeartbeatDelivery:
             else s.slack_bot_token.get_secret_value()
         )
         self._smtp_host: str = (
-            smtp_host
-            if smtp_host is not None
-            else getattr(s, "heartbeat_smtp_host", "")
+            smtp_host if smtp_host is not None else s.heartbeat_smtp_host
         )
         self._smtp_port: int = (
-            smtp_port
-            if smtp_port is not None
-            else getattr(s, "heartbeat_smtp_port", 587)
+            smtp_port if smtp_port is not None else s.heartbeat_smtp_port
         )
         self._smtp_user: str = (
-            smtp_user
-            if smtp_user is not None
-            else getattr(s, "heartbeat_smtp_user", "")
+            smtp_user if smtp_user is not None else s.heartbeat_smtp_user
         )
         self._smtp_password: str = (
             smtp_password
             if smtp_password is not None
-            else getattr(s, "heartbeat_smtp_password", "")
+            else s.heartbeat_smtp_password.get_secret_value()
         )
         self._smtp_from: str = (
-            smtp_from
-            if smtp_from is not None
-            else getattr(s, "heartbeat_smtp_from", "")
+            smtp_from if smtp_from is not None else s.heartbeat_smtp_from
         )
 
     async def send(self, channel: str, target: str, content: str) -> None:

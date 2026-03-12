@@ -457,8 +457,8 @@ class Settings(BaseSettings):
         default="",
         description="SMTP authentication username.",
     )
-    heartbeat_smtp_password: str = Field(
-        default="",
+    heartbeat_smtp_password: SecretStr = Field(
+        default=SecretStr(""),
         description="SMTP authentication password.",
     )
     heartbeat_smtp_from: str = Field(
