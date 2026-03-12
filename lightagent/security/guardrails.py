@@ -22,9 +22,11 @@ import yaml
 import lightagent.core.config as _config_module
 from lightagent.core.logging import get_logger
 from lightagent.monitoring.otel import OTelManager
+from lightagent.security.audit import AuditLogger
 from lightagent.security.sanitizer import InputSanitizer
 
 logger = get_logger("lightagent.security.guardrails")
+_audit_logger = AuditLogger()
 
 _PATTERNS_FILE = Path(__file__).parent / "patterns" / "injection_patterns.yaml"
 _RE_FLAGS = re.IGNORECASE | re.DOTALL | re.MULTILINE
@@ -156,6 +158,11 @@ class GuardrailsEngine:
                     risk_score=risk_score,
                     reasons=reasons,
                     mode=mode,
+                )
+                _audit_logger.log_blocked(
+                    sanitized,
+                    reasons=reasons,
+                    session_id="guardrails",
                 )
 
             span.set_attribute("lightagent.risk_score", risk_score)
