@@ -18,6 +18,7 @@ from lightagent.agents.tools import (
     RESEARCHER_TOOLS,
     code_executor,
     create_chart,
+    cron_add,
     doc_index,
     duckdb_query,
     evaluate,
@@ -299,3 +300,35 @@ def test_tool_groups_are_lists_of_base_tool() -> None:
         assert isinstance(group, list)
         for t in group:
             assert isinstance(t, BaseTool)
+
+
+def test_cron_add_tool_accepts_output_channel() -> None:
+    """cron_add tool passes output_channel and output_target to CronManager."""
+    with patch("lightagent.agents.tools.CronManager") as mock_cls:
+        mock_manager = MagicMock()
+        mock_manager.add.return_value = MagicMock(
+            name="hb",
+            schedule="0 8 * * *",
+            task="Morning check",
+            output_channel="telegram",
+            output_target="12345",
+            next_run=None,
+        )
+        mock_cls.return_value = mock_manager
+
+        result = cron_add.invoke({
+            "name": "hb",
+            "schedule": "0 8 * * *",
+            "task": "Morning check",
+            "output_channel": "telegram",
+            "output_target": "12345",
+        })
+
+    mock_manager.add.assert_called_once_with(
+        "hb",
+        "0 8 * * *",
+        "Morning check",
+        output_channel="telegram",
+        output_target="12345",
+    )
+    assert "telegram" in result

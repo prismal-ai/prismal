@@ -3,24 +3,28 @@
 Fallback tool implementations used when no live MCP or skill tool overrides them.
 
 Every tool here is a real implementation that connects to the actual backend:
-- ``web_search``        — DuckDuckGo via ``langchain-community``
-- ``rag_search``        — ChromaDB via :class:`~lightagent.rag.engine.RAGEngine`
-- ``vector_search``     — ChromaDB nearest-neighbour search
-- ``doc_index``         — RAGEngine file/directory indexer
-- ``read_file``         — Filesystem read (workspace-sandboxed)
-- ``write_file``        — Filesystem write (workspace-sandboxed)
-- ``code_executor``     — Sandboxed Python subprocess (requires ``shell_enabled``)
-- ``evaluate``          — LLM-based qualitative evaluation
-- ``score``             — LLM-based numeric scorer
-- ``duckdb_query``      — :class:`~lightagent.data.duckdb_engine.DuckDBEngine` SQL
-- ``polars_transform``  — Polars DataFrame operations via ``polars_utils``
-- ``create_chart``      — Matplotlib chart via :func:`~lightagent.data.polars_utils.save_chart`
-- ``list_mcp_tools``    — Enumerates connected MCP server tools
+- ``web_search``          — DuckDuckGo via ``langchain-community``
+- ``rag_search``          — ChromaDB via :class:`~lightagent.rag.engine.RAGEngine`
+- ``vector_search``       — ChromaDB nearest-neighbour search
+- ``doc_index``           — RAGEngine file/directory indexer
+- ``read_file``           — Filesystem read (workspace-sandboxed)
+- ``write_file``          — Filesystem write (workspace-sandboxed)
+- ``code_executor``       — Sandboxed Python subprocess (requires ``shell_enabled``)
+- ``evaluate``            — LLM-based qualitative evaluation
+- ``score``               — LLM-based numeric scorer
+- ``duckdb_query``        — :class:`~lightagent.data.duckdb_engine.DuckDBEngine` SQL
+- ``polars_transform``    — Polars DataFrame operations via ``polars_utils``
+- ``create_chart``        — Matplotlib chart via
+  :func:`~lightagent.data.polars_utils.save_chart`
+- ``list_mcp_tools``      — Enumerates connected MCP server tools
+- ``remember_preference`` — Writes a user preference fact to ``PREFERENCES.md``
 """
 
 from __future__ import annotations
 
 from langchain_core.tools import BaseTool, tool
+
+from lightagent.scheduler.cron_manager import CronManager
 
 
 @tool
@@ -594,38 +598,57 @@ def list_mcp_tools(server_name: str = "") -> str:
 
 
 @tool
-def cron_add(name: str, schedule: str, task: str) -> str:
-    """Schedule a recurring agent task using a cron expression.
+def cron_add(
+    name: str,
+    schedule: str,
+    task: str,
+    output_channel: str = "",
+    output_target: str = "",
+) -> str:
+    """Schedule a new recurring cron job.
 
-    Creates a persistent cron job that will execute the given task description
-    on the specified schedule. The job survives process restarts.
+    Use this when the user wants to automate a task on a schedule.
+    Optionally specify an output channel to receive proactive reports.
 
     Args:
-        name: Unique identifier for this scheduled job (e.g. 'daily-brief').
-        schedule: Standard 5-field cron expression (e.g. '0 9 * * *' for 9 AM daily).
-        task: Human-readable description of what the agent should do when the job fires.
+        name: Unique job name.
+        schedule: Cron expression (e.g. '0 9 * * *' for 9 AM daily).
+        task: Natural-language task description the agent will perform.
+        output_channel: Optional delivery channel for the job output.
+            One of: 'telegram', 'slack', 'discord', 'email'.
+            Leave empty to suppress proactive delivery.
+        output_target: Channel-specific destination.
+            telegram -> chat_id, slack -> #channel,
+            discord -> webhook URL, email -> address.
+            Leave empty when output_channel is empty.
 
     Returns:
-        Confirmation string with next scheduled run time, or error message.
+        Confirmation message with the next scheduled run time.
     """
-    try:
+    from lightagent.scheduler.executor import get_running_executor
 
-        from lightagent.scheduler.cron_manager import CronManager
-        from lightagent.scheduler.executor import get_running_executor
-
-        mgr = CronManager()
-        job = mgr.add(name, schedule, task)
-        # Hot-add to running executor if available
-        executor = get_running_executor()
-        if executor is not None:
-            executor.schedule_coroutine(executor.add_job(job))
-        if job.next_run:
-            next_run = job.next_run.strftime("%Y-%m-%d %H:%M UTC")
-        else:
-            next_run = "unknown"
-        return f"Scheduled '{name}' ({schedule}). Next run: {next_run}"
-    except Exception as exc:
-        return f"Failed to schedule job: {exc}"
+    manager = CronManager()
+    job = manager.add(
+        name,
+        schedule,
+        task,
+        output_channel=output_channel or None,
+        output_target=output_target or None,
+    )
+    executor = get_running_executor()
+    if executor is not None:
+        executor.add_job(job)
+    next_run = (
+        job.next_run.strftime("%Y-%m-%d %H:%M UTC") if job.next_run else "unknown"
+    )
+    routing = (
+        f" Output will be delivered to {output_channel}:{output_target}."
+        if output_channel and output_target
+        else ""
+    )
+    return (
+        f"Scheduled job '{name}' ({schedule}). Next run: {next_run}.{routing}"
+    )
 
 
 @tool
@@ -807,6 +830,45 @@ def cron_remove(name: str) -> str:
         return f"Failed to remove job: {exc}"
 
 
+@tool
+def remember_preference(section: str, fact: str) -> str:
+    """Save a user preference fact to PREFERENCES.md immediately.
+
+    Call this tool when the user explicitly states a preference they want
+    remembered (e.g. "remember that I prefer ruff in all projects").
+
+    Valid *section* values:
+    - ``"communication_style"`` — language, tone, verbosity, response format
+    - ``"tech_stack"`` — languages, frameworks, tools, package managers
+    - ``"workflow"`` — planning approach, commit style, testing practices
+    - ``"project_context"`` — project names, directories, team context
+
+    Args:
+        section: Category key — one of the four valid values listed above.
+        fact: Free-text preference to remember (e.g. "Uses ruff in all projects").
+
+    Returns:
+        Confirmation message indicating the fact was saved, or an error
+        description if the section is invalid or a write failure occurs.
+    """
+    try:
+        from lightagent.memory.preferences import PreferencesManager
+
+        mgr = PreferencesManager()
+        mgr.set_fact(section, fact)
+        section_label = {
+            "communication_style": "Estilo de Comunicacion",
+            "tech_stack": "Stack Tecnico",
+            "workflow": "Flujo de Trabajo",
+            "project_context": "Contexto del Proyecto",
+        }.get(section, section)
+        return f"Remembered: \"{fact}\" → {section_label}"
+    except Exception as exc:
+        return f"Failed to save preference: {exc!s}"
+
+
+SUPERVISOR_DIRECT_TOOLS: list[BaseTool] = [remember_preference]
+
 RESEARCHER_TOOLS: list[BaseTool] = [web_search, rag_search, read_file, list_mcp_tools]
 CODER_TOOLS: list[BaseTool] = [code_executor, read_file, write_file]
 RAG_AGENT_TOOLS: list[BaseTool] = [vector_search, doc_index, web_search]
@@ -831,6 +893,7 @@ __all__ = [
     "FILE_MANAGER_TOOLS",
     "RAG_AGENT_TOOLS",
     "RESEARCHER_TOOLS",
+    "SUPERVISOR_DIRECT_TOOLS",
     "code_executor",
     "create_chart",
     "cron_add",
@@ -847,6 +910,7 @@ __all__ = [
     "polars_transform",
     "rag_search",
     "read_file",
+    "remember_preference",
     "score",
     "vector_search",
     "web_search",
