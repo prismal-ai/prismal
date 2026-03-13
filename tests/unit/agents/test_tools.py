@@ -386,4 +386,4 @@ def test_find_files_respects_max_results(tmp_path: Path) -> None:
         (tmp_path / f"file{i}.txt").write_text("x")
     result = find_files.invoke({"root": str(tmp_path), "pattern": "*.txt", "max_results": 5})
     lines = [line for line in result.splitlines() if line.strip()]
-    assert len(lines) <= 6  # at most 5 results + possible header/footer
+    assert len(lines) == 5

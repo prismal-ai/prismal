@@ -190,9 +190,12 @@ def list_dir(path: str) -> str:
         return f"Error: Not a directory: {resolved}"
 
     entries: list[str] = []
-    for entry in sorted(resolved.iterdir()):
-        tag = "[DIR] " if entry.is_dir() else "[FILE]"
-        entries.append(f"{tag} {entry.name}")
+    try:
+        for entry in sorted(resolved.iterdir()):
+            tag = "[DIR] " if entry.is_dir() else "[FILE]"
+            entries.append(f"{tag} {entry.name}")
+    except PermissionError:
+        return f"Error: Permission denied reading directory: {resolved}"
 
     return "\n".join(entries) if entries else "(empty directory)"
 
