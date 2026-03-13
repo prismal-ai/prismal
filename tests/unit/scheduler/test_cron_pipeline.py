@@ -7,7 +7,6 @@ and a *real* ``CronManager`` backed by an isolated SQLite database in
 
 from __future__ import annotations
 
-import sys
 import time
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -24,15 +23,21 @@ from lightagent.scheduler.executor import CronExecutor
 # Helpers
 # ---------------------------------------------------------------------------
 
+_GRAPH_PATCH = "lightagent.scheduler.executor.get_async_compiled_graph"
 
-def _make_graph_mock(*, fail: bool = False) -> MagicMock:
-    """Return a mock module for ``lightagent.agents.graph``.
+
+def _make_compiled_graph_mock(*, fail: bool = False) -> AsyncMock:
+    """Return an ``AsyncMock`` for ``get_async_compiled_graph``.
+
+    The mock returns a graph object whose ``ainvoke`` either succeeds or
+    raises depending on *fail*.
 
     Args:
         fail: When ``True`` the ``ainvoke`` coroutine raises ``RuntimeError``.
 
     Returns:
-        A MagicMock shaped like the ``lightagent.agents.graph`` module.
+        An :class:`~unittest.mock.AsyncMock` that can be used as the
+        ``get_async_compiled_graph`` replacement.
     """
     mock_graph = AsyncMock()
     if fail:
@@ -41,19 +46,7 @@ def _make_graph_mock(*, fail: bool = False) -> MagicMock:
         mock_graph.ainvoke = AsyncMock(
             return_value={"messages": [MagicMock(content="done")]}
         )
-
-    graph_mod = MagicMock()
-    graph_mod.get_async_compiled_graph = AsyncMock(return_value=mock_graph)
-    return graph_mod
-
-
-def _make_messages_mock() -> MagicMock:
-    """Return a mock module for ``langchain_core.messages``."""
-    msgs_mod = MagicMock()
-    msgs_mod.HumanMessage = MagicMock(
-        side_effect=lambda content: MagicMock(content=content)
-    )
-    return msgs_mod
+    return AsyncMock(return_value=mock_graph)
 
 
 # ---------------------------------------------------------------------------
@@ -69,13 +62,7 @@ async def test_run_job_updates_last_run_in_db(tmp_path: Path) -> None:
 
     executor = CronExecutor(manager=manager)
 
-    graph_mod = _make_graph_mock()
-    msgs_mod = _make_messages_mock()
-
-    with (
-        patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
-        patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
-    ):
+    with patch(_GRAPH_PATCH, _make_compiled_graph_mock()):
         await executor._run_job("test-job", "Do something")
 
     job = manager.get_job("test-job")
@@ -91,13 +78,7 @@ async def test_run_job_does_not_update_last_run_on_failure(tmp_path: Path) -> No
 
     executor = CronExecutor(manager=manager)
 
-    graph_mod = _make_graph_mock(fail=True)
-    msgs_mod = _make_messages_mock()
-
-    with (
-        patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
-        patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
-    ):
+    with patch(_GRAPH_PATCH, _make_compiled_graph_mock(fail=True)):
         # Must not raise — APScheduler expects errors to be swallowed
         await executor._run_job("fail-job", "Do something")
 
@@ -115,13 +96,7 @@ async def test_run_job_updates_only_the_targeted_job(tmp_path: Path) -> None:
 
     executor = CronExecutor(manager=manager)
 
-    graph_mod = _make_graph_mock()
-    msgs_mod = _make_messages_mock()
-
-    with (
-        patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
-        patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
-    ):
+    with patch(_GRAPH_PATCH, _make_compiled_graph_mock()):
         await executor._run_job("job-a", "Task A")
 
     job_a = manager.get_job("job-a")
@@ -142,13 +117,7 @@ async def test_run_job_multiple_times_updates_last_run_each_time(
 
     executor = CronExecutor(manager=manager)
 
-    graph_mod = _make_graph_mock()
-    msgs_mod = _make_messages_mock()
-
-    with (
-        patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
-        patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
-    ):
+    with patch(_GRAPH_PATCH, _make_compiled_graph_mock()):
         await executor._run_job("repeat-job", "Run frequently")
         job_after_first = manager.get_job("repeat-job")
         assert job_after_first is not None

@@ -13,6 +13,7 @@ Two responsibilities:
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import uuid
 from datetime import UTC, datetime
@@ -157,6 +158,65 @@ class SessionRegistry:
                 (channel, user_id),
             ).fetchone()
         return row["session_id"] if row else None
+
+    # ── Preference extraction timestamps ──────────────────────────────────
+
+    @property
+    def _extract_ts_file(self) -> Path:
+        """Return the path to the last-extraction timestamp JSON file."""
+        return self._profile_dir / "last_extract.json"
+
+    def get_last_extract_time(self, session_id: str) -> datetime | None:
+        """Return the timestamp of the last preference extraction for a session.
+
+        Args:
+            session_id: The session identifier to look up.
+
+        Returns:
+            :class:`datetime` of the last extraction, or ``None`` if never run.
+        """
+        if not self._extract_ts_file.exists():
+            return None
+        try:
+            data: dict[str, str] = json.loads(
+                self._extract_ts_file.read_text(encoding="utf-8")
+            )
+            ts = data.get(session_id)
+            if ts:
+                return datetime.fromisoformat(ts)
+        except Exception as exc:
+            logger.debug(
+                "session_registry.get_last_extract_time.parse_error",
+                error=str(exc),
+            )
+        return None
+
+    def set_last_extract_time(self, session_id: str) -> None:
+        """Record the current UTC time as the last preference extraction for a session.
+
+        Args:
+            session_id: The session identifier to update.
+        """
+        self._extract_ts_file.parent.mkdir(parents=True, exist_ok=True)
+        data: dict[str, str] = {}
+        if self._extract_ts_file.exists():
+            try:
+                data = json.loads(
+                    self._extract_ts_file.read_text(encoding="utf-8")
+                )
+            except Exception as exc:
+                logger.debug(
+                    "session_registry.set_last_extract_time.parse_error",
+                    error=str(exc),
+                )
+                data = {}
+        data[session_id] = datetime.now(UTC).isoformat()
+        self._extract_ts_file.write_text(
+            json.dumps(data, indent=2), encoding="utf-8"
+        )
+        logger.debug(
+            "session_registry.set_last_extract_time", session_id=session_id
+        )
 
 
 __all__ = ["SessionRegistry"]
