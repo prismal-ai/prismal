@@ -7,6 +7,9 @@ import structlog
 
 logger = structlog.get_logger("lightagent.security.filesystem_guard")
 
+# NOTE: evaluated at import time — relies on HOME being set correctly at startup.
+# In a typical server process this is fine; the process imports once as the
+# intended user and the value remains stable for the lifetime of the process.
 _BLOCKED_PREFIXES: tuple[str, ...] = (
     "/etc/",
     "/boot/",
@@ -72,36 +75,23 @@ class FilesystemGuard:
                 )
                 raise PathViolation(f"Path is blocked: {resolved_str}")
 
-        if self._workspace is not None:
-            try:
-                resolved.relative_to(self._workspace)
-            except ValueError:
-                logger.warning(
-                    "filesystem_guard.outside_workspace",
-                    path=resolved_str,
-                    workspace=str(self._workspace),
-                )
-                raise PathViolation(
-                    f"Path is outside workspace: {resolved_str}"
-                ) from None
+        if self._workspace is not None and not resolved.is_relative_to(self._workspace):
+            logger.warning(
+                "filesystem_guard.outside_workspace",
+                path=resolved_str,
+                workspace=str(self._workspace),
+            )
+            raise PathViolation(f"Path is outside workspace: {resolved_str}")
 
         if write:
             for ro in self._readonly:
-                is_inside = False
-                try:
-                    resolved.relative_to(ro)
-                    is_inside = True
-                except ValueError:
-                    pass
-                if is_inside:
+                if resolved.is_relative_to(ro):
                     logger.warning(
                         "filesystem_guard.write_to_readonly",
                         path=resolved_str,
                         readonly=str(ro),
                     )
-                    raise PathViolation(
-                        f"Path is read-only: {resolved_str}"
-                    )
+                    raise PathViolation(f"Path is read-only: {resolved_str}")
 
         return resolved
 
