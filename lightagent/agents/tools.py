@@ -319,6 +319,51 @@ def delete_path(path: str) -> str:
 
     return f"Deleted: {resolved}"
 
+@tool
+def shell_exec(command: str, timeout: int = 30, workdir: str = "") -> str:
+    """Execute a shell command and return its combined stdout+stderr output.
+
+    Requires ``LIGHTAGENT_SHELL_ENABLED=true``.
+    Timeout is clamped to 1-120 seconds.
+
+    Args:
+        command: The shell command to run (executed via ``bash -c``).
+        timeout: Maximum seconds to wait (default 30, max 120).
+        workdir: Working directory for the command. Defaults to CWD.
+
+    Returns:
+        Combined stdout and stderr output, or an error/timeout message.
+    """
+    import subprocess
+
+    s = get_settings()
+    if not s.shell_enabled:
+        return "Error: shell_exec is not enabled. Set LIGHTAGENT_SHELL_ENABLED=true."
+
+    cmd = command.strip()
+    if not cmd:
+        return "Error: empty command"
+
+    effective_timeout = max(1, min(timeout, 120))
+    cwd = workdir.strip() or None
+
+    try:
+        proc = subprocess.run(  # noqa: S603
+            ["bash", "-c", cmd],  # noqa: S607
+            capture_output=True,
+            text=True,
+            timeout=effective_timeout,
+            cwd=cwd,
+        )
+        output = proc.stdout
+        if proc.stderr:
+            output += ("\n" if output else "") + proc.stderr
+        return output.strip() or "(no output)"
+    except subprocess.TimeoutExpired:
+        return f"Error: Command timed out after {effective_timeout}s"
+    except Exception as exc:  # noqa: BLE001
+        return f"Error executing command: {exc}"
+
 
 @tool
 def code_executor(code: str, language: str = "python") -> str:

@@ -472,3 +472,84 @@ def test_delete_path_blocked_when_disabled(tmp_path: Path, monkeypatch: pytest.M
     result = delete_path.invoke({"path": str(f)})
     assert f.exists()
     assert "not enabled" in result.lower() or "disabled" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# shell_exec tests
+# ---------------------------------------------------------------------------
+
+
+def test_shell_exec_blocked_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shell_exec returns an error when shell_enabled is False."""
+    from lightagent.agents.tools import shell_exec
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=False))
+    result = shell_exec.invoke({"command": "echo hello"})
+    assert "not enabled" in result.lower() or "disabled" in result.lower()
+
+
+def test_shell_exec_returns_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shell_exec returns the stdout of the command."""
+    from lightagent.agents.tools import shell_exec
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
+    result = shell_exec.invoke({"command": "echo hello_world"})
+    assert "hello_world" in result
+
+
+def test_shell_exec_captures_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shell_exec returns stderr content instead of raising."""
+    from lightagent.agents.tools import shell_exec
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
+    result = shell_exec.invoke({"command": "ls /nonexistent_path_xyz_abc_123"})
+    assert isinstance(result, str)
+    assert len(result) > 0
+
+
+def test_shell_exec_timeout_respected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shell_exec returns a timeout error when the command exceeds the limit."""
+    from lightagent.agents.tools import shell_exec
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
+    result = shell_exec.invoke({"command": "sleep 60", "timeout": 1})
+    assert "timeout" in result.lower() or "timed out" in result.lower()
+
+
+def test_shell_exec_rejects_empty_command(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shell_exec returns an error for blank commands."""
+    from lightagent.agents.tools import shell_exec
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
+    result = shell_exec.invoke({"command": "   "})
+    assert "empty" in result.lower() or "error" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# Tool list wire tests (Task 6)
+# ---------------------------------------------------------------------------
+
+
+def test_file_manager_tools_contains_new_tools() -> None:
+    """FILE_MANAGER_TOOLS must include all filesystem tools."""
+    from lightagent.agents.tools import FILE_MANAGER_TOOLS
+    tool_names = {t.name for t in FILE_MANAGER_TOOLS}
+    assert "list_dir" in tool_names
+    assert "find_files" in tool_names
+    assert "create_dir" in tool_names
+    assert "move_path" in tool_names
+    assert "delete_path" in tool_names
+
+
+def test_coder_tools_contains_shell_exec() -> None:
+    """CODER_TOOLS must include shell_exec."""
+    from lightagent.agents.tools import CODER_TOOLS
+    tool_names = {t.name for t in CODER_TOOLS}
+    assert "shell_exec" in tool_names
+
+
+def test_all_exports_new_tools() -> None:
+    """All new tools must appear in __all__."""
+    import lightagent.agents.tools as m
+    for name in ["list_dir", "find_files", "create_dir", "move_path", "delete_path", "shell_exec"]:
+        assert name in m.__all__, f"{name} missing from __all__"
