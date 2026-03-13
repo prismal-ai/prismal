@@ -28,21 +28,24 @@ from lightagent.scheduler.cron_manager import CronManager
 from lightagent.security.filesystem_guard import FilesystemGuard, PathViolation
 
 
-def _get_fs_guard(*, write: bool = False) -> FilesystemGuard:  # noqa: ARG001
+def _get_fs_guard() -> FilesystemGuard:
     """Return a FilesystemGuard configured from current settings.
 
-    Args:
-        write: Whether the guard will be used for a write operation.
-            Currently unused but kept for API symmetry with the validate call.
+    When ``fs_allow_outside_workspace`` is ``True``, the guard is created
+    with ``workspace_root=None`` so no path restriction is applied.
+    Otherwise ``fs_workspace_root`` is used when set.
 
     Returns:
         A :class:`~lightagent.security.filesystem_guard.FilesystemGuard`
-        instance whose ``workspace_root`` is taken from settings when set.
+        instance configured according to current settings.
     """
     from lightagent.core.config import get_settings
 
     s = get_settings()
-    workspace = s.fs_workspace_root if s.fs_workspace_root else None
+    if s.fs_allow_outside_workspace:
+        workspace = None
+    else:
+        workspace = s.fs_workspace_root if s.fs_workspace_root else None
     return FilesystemGuard(workspace_root=workspace)
 
 
@@ -113,7 +116,7 @@ def read_file(path: str) -> str:
         File contents as a string, or an error message on failure.
     """
     try:
-        guard = _get_fs_guard(write=False)
+        guard = _get_fs_guard()
         resolved = guard.validate(path, write=False)
     except PathViolation as exc:
         return f"Error: {exc}"
@@ -153,7 +156,7 @@ def write_file(path: str, content: str) -> str:
         raw = Path("data/workspace") / raw
 
     try:
-        guard = _get_fs_guard(write=True)
+        guard = _get_fs_guard()
         resolved = guard.validate(str(raw), write=True)
     except PathViolation as exc:
         return f"Error: {exc}"
