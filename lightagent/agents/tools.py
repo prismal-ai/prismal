@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from langchain_core.tools import BaseTool, tool
 
+from lightagent.core.config import get_settings
 from lightagent.scheduler.cron_manager import CronManager
 from lightagent.security.filesystem_guard import FilesystemGuard, PathViolation
 
@@ -231,6 +232,92 @@ def find_files(root: str, pattern: str, max_results: int = 100) -> str:
     if not matches:
         return f"No files found matching '{pattern}' under {resolved}"
     return "\n".join(matches)
+
+
+@tool
+def create_dir(path: str) -> str:
+    """Create a directory (and all intermediate parents).
+
+    Args:
+        path: Absolute path of the directory to create.
+
+    Returns:
+        Confirmation string or error message.
+    """
+    try:
+        guard = _get_fs_guard()
+        resolved = guard.validate(path, write=True)
+    except PathViolation as exc:
+        return f"Error: {exc}"
+
+    if resolved.exists():
+        return f"Already exists: {resolved}"
+    resolved.mkdir(parents=True, exist_ok=True)
+    return f"Created directory: {resolved}"
+
+
+@tool
+def move_path(src: str, dst: str) -> str:
+    """Move or rename a file or directory.
+
+    Args:
+        src: Source path (absolute).
+        dst: Destination path (absolute).
+
+    Returns:
+        Confirmation string or error message.
+    """
+    import shutil
+
+    try:
+        guard = _get_fs_guard()
+        src_resolved = guard.validate(src, write=True)
+        dst_resolved = guard.validate(dst, write=True)
+    except PathViolation as exc:
+        return f"Error: {exc}"
+
+    if not src_resolved.exists():
+        return f"Error: Source does not exist: {src_resolved}"
+
+    shutil.move(str(src_resolved), str(dst_resolved))
+    return f"Moved: {src_resolved} → {dst_resolved}"
+
+
+@tool
+def delete_path(path: str) -> str:
+    """Delete a file or directory tree.
+
+    Requires ``LIGHTAGENT_FS_DELETE_ENABLED=true`` in the environment.
+
+    Args:
+        path: Absolute path to delete.
+
+    Returns:
+        Confirmation string or error message.
+    """
+    import shutil
+
+    if not get_settings().fs_delete_enabled:
+        return (
+            "Error: delete_path is not enabled. "
+            "Set LIGHTAGENT_FS_DELETE_ENABLED=true."
+        )
+
+    try:
+        guard = _get_fs_guard()
+        resolved = guard.validate(path, write=True)
+    except PathViolation as exc:
+        return f"Error: {exc}"
+
+    if not resolved.exists():
+        return f"Error: Path does not exist: {resolved}"
+
+    if resolved.is_dir():
+        shutil.rmtree(resolved)
+    else:
+        resolved.unlink()
+
+    return f"Deleted: {resolved}"
 
 
 @tool
@@ -972,12 +1059,14 @@ __all__ = [
     "SUPERVISOR_DIRECT_TOOLS",
     "code_executor",
     "create_chart",
+    "create_dir",
     "cron_add",
     "cron_list",
     "cron_once",
     "cron_pause",
     "cron_remove",
     "cron_resume",
+    "delete_path",
     "doc_index",
     "duckdb_query",
     "evaluate",
@@ -985,6 +1074,7 @@ __all__ = [
     "get_current_time",
     "list_dir",
     "list_mcp_tools",
+    "move_path",
     "polars_transform",
     "rag_search",
     "read_file",

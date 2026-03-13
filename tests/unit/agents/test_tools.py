@@ -7,6 +7,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from langchain_core.tools import BaseTool
 
 from lightagent.agents.tools import (
@@ -387,3 +389,86 @@ def test_find_files_respects_max_results(tmp_path: Path) -> None:
     result = find_files.invoke({"root": str(tmp_path), "pattern": "*.txt", "max_results": 5})
     lines = [line for line in result.splitlines() if line.strip()]
     assert len(lines) == 5
+
+
+# ---------------------------------------------------------------------------
+# create_dir tests
+# ---------------------------------------------------------------------------
+
+
+def test_create_dir_creates_nested(tmp_path: Path) -> None:
+    """create_dir creates a nested directory structure."""
+    from lightagent.agents.tools import create_dir
+    new_dir = tmp_path / "a" / "b" / "c"
+    result = create_dir.invoke({"path": str(new_dir)})
+    assert new_dir.exists()
+    assert "created" in result.lower()
+
+
+def test_create_dir_is_idempotent(tmp_path: Path) -> None:
+    """create_dir on an existing directory does not raise."""
+    from lightagent.agents.tools import create_dir
+    d = tmp_path / "existing"
+    d.mkdir()
+    result = create_dir.invoke({"path": str(d)})
+    assert isinstance(result, str)  # returns something, doesn't raise
+
+
+def test_create_dir_blocks_system_path() -> None:
+    """create_dir returns an error for blocked paths."""
+    from lightagent.agents.tools import create_dir
+    result = create_dir.invoke({"path": "/etc/newdir"})
+    assert "error" in result.lower() or "blocked" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# move_path tests
+# ---------------------------------------------------------------------------
+
+
+def test_move_path_renames_file(tmp_path: Path) -> None:
+    """move_path moves a file from src to dst."""
+    from lightagent.agents.tools import move_path
+    src = tmp_path / "src.txt"
+    dst = tmp_path / "dst.txt"
+    src.write_text("hello")
+    result = move_path.invoke({"src": str(src), "dst": str(dst)})
+    assert dst.exists()
+    assert not src.exists()
+    assert "moved" in result.lower()
+
+
+def test_move_path_returns_error_for_missing_src(tmp_path: Path) -> None:
+    """move_path returns an error if source does not exist."""
+    from lightagent.agents.tools import move_path
+    result = move_path.invoke({"src": str(tmp_path / "missing.txt"), "dst": str(tmp_path / "dst.txt")})
+    assert "error" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# delete_path tests
+# ---------------------------------------------------------------------------
+
+
+def test_delete_path_removes_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """delete_path removes a file when fs_delete_enabled is True."""
+    from lightagent.agents.tools import delete_path
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(fs_delete_enabled=True))
+    f = tmp_path / "todelete.txt"
+    f.write_text("bye")
+    result = delete_path.invoke({"path": str(f)})
+    assert not f.exists()
+    assert "deleted" in result.lower()
+
+
+def test_delete_path_blocked_when_disabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """delete_path returns an error when fs_delete_enabled is False."""
+    from lightagent.agents.tools import delete_path
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(fs_delete_enabled=False))
+    f = tmp_path / "safe.txt"
+    f.write_text("keep")
+    result = delete_path.invoke({"path": str(f)})
+    assert f.exists()
+    assert "not enabled" in result.lower() or "disabled" in result.lower()
