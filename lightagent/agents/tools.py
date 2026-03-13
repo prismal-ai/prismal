@@ -472,10 +472,7 @@ def doc_index(path: str, collection: str = "default") -> str:
 
     try:
         engine = RAGEngine(collection_name=collection)
-        if src.is_dir():
-            count = engine.index_directory(str(src))
-        else:
-            count = engine.index_file(str(src))
+        count = engine.index_directory(src) if src.is_dir() else engine.index_file(src)
         return (
             f"Indexed {count} chunk(s) from '{src}' "
             f"into collection '{collection}'."
@@ -576,10 +573,18 @@ def duckdb_query(sql: str, source: str = "") -> str:
     try:
         from lightagent.data.duckdb_engine import DuckDBEngine
 
-        db_path = source if source and not source.endswith((".csv", ".parquet")) else ":memory:"
+        is_file_source = source and not source.endswith((".csv", ".parquet"))
+        db_path = source if is_file_source else ":memory:"
         with DuckDBEngine(db_path) as engine:
             if source and source.endswith((".csv", ".parquet")):
-                engine._conn.execute(f"CREATE VIEW data AS SELECT * FROM read_csv_auto('{source}')") if source.endswith(".csv") else engine._conn.execute(f"CREATE VIEW data AS SELECT * FROM parquet_scan('{source}')")
+                if source.endswith(".csv"):
+                    engine._conn.execute(
+                        f"CREATE VIEW data AS SELECT * FROM read_csv_auto('{source}')"  # noqa: S608
+                    )
+                else:
+                    engine._conn.execute(
+                        f"CREATE VIEW data AS SELECT * FROM parquet_scan('{source}')"  # noqa: S608
+                    )
             rows = engine.query(sql)
         if not rows:
             return "Query returned no rows."
@@ -635,7 +640,10 @@ def polars_transform(operation: str, data_source: str) -> str:
         return f"Data source not found: {data_source}"
 
     try:
-        df = pl.read_csv(str(src)) if src.suffix == ".csv" else pl.read_parquet(str(src))
+        if src.suffix == ".csv":
+            df = pl.read_csv(str(src))
+        else:
+            df = pl.read_parquet(str(src))
     except Exception as exc:
         return f"Error reading data source: {exc!s}"
 
@@ -657,7 +665,7 @@ def polars_transform(operation: str, data_source: str) -> str:
                     val = val_str.strip("'\"")
             df = filter_rows(df, col, operator, val)  # type: ignore[arg-type]
 
-        elif op.startswith("groupby") or op.startswith("group by"):
+        elif op.startswith(("groupby", "group by")):
             m = re.match(r"group\s*by\s+(\w+)\s+(sum|mean|count|min|max)\s+(\w+)", op)
             if not m:
                 return "groupby syntax: groupby <col> <sum|mean|count> <value_col>"
@@ -667,7 +675,7 @@ def polars_transform(operation: str, data_source: str) -> str:
             m = re.match(r"sort\s+(\w+)(\s+desc)?", op)
             if not m:
                 return "sort syntax: sort <col> [desc]"
-            df = sort_by(df, m.group(1), descending=bool(m.group(2)))
+            df = sort_by(df, m.group(1), ascending=not bool(m.group(2)))
 
         elif op.startswith("select"):
             cols_str = re.sub(r"^select\s+", "", op).strip()
@@ -748,7 +756,8 @@ def create_chart(data: str, chart_type: str = "bar", title: str = "") -> str:
     else:
         x_col, y_col = str_cols[0], num_cols[0]
 
-    output_path = Path("data/workspace") / f"chart_{title.replace(' ', '_') or 'chart'}.png"
+    chart_name = f"chart_{title.replace(' ', '_') or 'chart'}.png"
+    output_path = Path("data/workspace") / chart_name
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
