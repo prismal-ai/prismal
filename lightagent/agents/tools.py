@@ -25,6 +25,25 @@ from __future__ import annotations
 from langchain_core.tools import BaseTool, tool
 
 from lightagent.scheduler.cron_manager import CronManager
+from lightagent.security.filesystem_guard import FilesystemGuard, PathViolation
+
+
+def _get_fs_guard(*, write: bool = False) -> FilesystemGuard:  # noqa: ARG001
+    """Return a FilesystemGuard configured from current settings.
+
+    Args:
+        write: Whether the guard will be used for a write operation.
+            Currently unused but kept for API symmetry with the validate call.
+
+    Returns:
+        A :class:`~lightagent.security.filesystem_guard.FilesystemGuard`
+        instance whose ``workspace_root`` is taken from settings when set.
+    """
+    from lightagent.core.config import get_settings
+
+    s = get_settings()
+    workspace = s.fs_workspace_root if s.fs_workspace_root else None
+    return FilesystemGuard(workspace_root=workspace)
 
 
 @tool
@@ -93,27 +112,19 @@ def read_file(path: str) -> str:
     Returns:
         File contents as a string, or an error message on failure.
     """
-    from pathlib import Path
+    try:
+        guard = _get_fs_guard(write=False)
+        resolved = guard.validate(path, write=False)
+    except PathViolation as exc:
+        return f"Error: {exc}"
 
-    _BLOCKED_PREFIXES = ("/etc/", "/sys/", "/proc/", "/dev/", "/root/", "/boot/")
-
-    src = Path(path).expanduser().resolve()
-    str_src = str(src)
-
-    for prefix in _BLOCKED_PREFIXES:
-        if str_src.startswith(prefix):
-            return f"Access denied: '{path}' is a system path."
-    # Also block .ssh and AWS credentials
-    if ".ssh" in src.parts or ".aws" in src.parts:
-        return f"Access denied: '{path}' contains sensitive directories."
-
-    if not src.exists():
+    if not resolved.exists():
         return f"File not found: {path}"
-    if not src.is_file():
+    if not resolved.is_file():
         return f"Not a file: {path}"
 
     try:
-        content = src.read_text(encoding="utf-8", errors="replace")
+        content = resolved.read_text(encoding="utf-8", errors="replace")
         if len(content) > 20_000:
             content = content[:20_000] + "\n…[file truncated at 20 000 chars]"
         return content
@@ -137,25 +148,20 @@ def write_file(path: str, content: str) -> str:
     """
     from pathlib import Path
 
-    _BLOCKED_PREFIXES = ("/etc/", "/sys/", "/proc/", "/dev/", "/root/", "/boot/")
-
-    dest = Path(path).expanduser()
-    if not dest.is_absolute():
-        dest = Path("data/workspace") / dest
-
-    dest = dest.resolve()
-    str_dest = str(dest)
-
-    for prefix in _BLOCKED_PREFIXES:
-        if str_dest.startswith(prefix):
-            return f"Access denied: '{path}' is a system path."
-    if ".ssh" in dest.parts or ".aws" in dest.parts:
-        return f"Access denied: '{path}' contains sensitive directories."
+    raw = Path(path).expanduser()
+    if not raw.is_absolute():
+        raw = Path("data/workspace") / raw
 
     try:
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(content, encoding="utf-8")
-        return f"File written: {dest} ({len(content)} chars)"
+        guard = _get_fs_guard(write=True)
+        resolved = guard.validate(str(raw), write=True)
+    except PathViolation as exc:
+        return f"Error: {exc}"
+
+    try:
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+        resolved.write_text(content, encoding="utf-8")
+        return f"File written: {resolved} ({len(content)} chars)"
     except Exception as exc:
         return f"Error writing file: {exc!s}"
 
@@ -628,13 +634,16 @@ def cron_add(
     from lightagent.scheduler.executor import get_running_executor
 
     manager = CronManager()
-    job = manager.add(
-        name,
-        schedule,
-        task,
-        output_channel=output_channel or None,
-        output_target=output_target or None,
-    )
+    try:
+        job = manager.add(
+            name,
+            schedule,
+            task,
+            output_channel=output_channel or None,
+            output_target=output_target or None,
+        )
+    except ValueError as exc:
+        return f"Failed to schedule job '{name}': {exc}"
     executor = get_running_executor()
     if executor is not None:
         executor.schedule_coroutine(executor.add_job(job))

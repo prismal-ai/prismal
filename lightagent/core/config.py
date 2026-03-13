@@ -442,6 +442,22 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Filesystem access ─────────────────────────────────────────────
+    fs_workspace_root: str = Field(
+        default="",
+        description=(
+            "Confine agent filesystem access to this directory. Empty = unrestricted."
+        ),
+    )
+    fs_allow_outside_workspace: bool = Field(
+        default=False,
+        description="If True, agent may access paths outside fs_workspace_root.",
+    )
+    fs_delete_enabled: bool = Field(
+        default=False,
+        description="Allow the delete_path tool to remove files/directories.",
+    )
+
     # ── Heartbeat — SMTP email delivery ───────────────────────────────
     heartbeat_smtp_host: str = Field(
         default="",

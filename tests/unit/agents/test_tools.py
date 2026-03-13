@@ -302,6 +302,22 @@ def test_tool_groups_are_lists_of_base_tool() -> None:
             assert isinstance(t, BaseTool)
 
 
+def test_read_file_blocks_system_path() -> None:
+    """read_file must return an error string for blocked paths like /etc/passwd."""
+    from lightagent.agents.tools import read_file
+
+    result = read_file.invoke({"path": "/etc/passwd"})
+    assert "error" in result.lower() or "blocked" in result.lower()
+
+
+def test_write_file_blocks_system_path() -> None:
+    """write_file must return an error string for blocked paths like /etc/evil.txt."""
+    from lightagent.agents.tools import write_file
+
+    result = write_file.invoke({"path": "/etc/evil.txt", "content": "x"})
+    assert "error" in result.lower() or "blocked" in result.lower()
+
+
 def test_cron_add_tool_accepts_output_channel() -> None:
     """cron_add tool passes output_channel and output_target to CronManager."""
     with patch("lightagent.agents.tools.CronManager") as mock_cls:
