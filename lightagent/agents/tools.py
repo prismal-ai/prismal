@@ -348,8 +348,8 @@ def shell_exec(command: str, timeout: int = 30, workdir: str = "") -> str:
     cwd = workdir.strip() or None
 
     try:
-        proc = subprocess.run(  # noqa: S603
-            ["bash", "-c", cmd],  # noqa: S607
+        proc = subprocess.run(
+            ["bash", "-c", cmd],
             capture_output=True,
             text=True,
             timeout=effective_timeout,
@@ -361,7 +361,7 @@ def shell_exec(command: str, timeout: int = 30, workdir: str = "") -> str:
         return output.strip() or "(no output)"
     except subprocess.TimeoutExpired:
         return f"Error: Command timed out after {effective_timeout}s"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"Error executing command: {exc}"
 
 
@@ -1082,7 +1082,9 @@ CODER_TOOLS: list[BaseTool] = [code_executor, read_file, write_file, shell_exec]
 RAG_AGENT_TOOLS: list[BaseTool] = [vector_search, doc_index, web_search]
 CRITIC_TOOLS: list[BaseTool] = [evaluate, score]
 DATA_ANALYST_TOOLS: list[BaseTool] = [duckdb_query, polars_transform, create_chart]
-FILE_MANAGER_TOOLS: list[BaseTool] = [read_file, write_file, list_dir, find_files, create_dir, move_path, delete_path]
+FILE_MANAGER_TOOLS: list[BaseTool] = [
+    read_file, write_file, list_dir, find_files, create_dir, move_path, delete_path
+]
 CRON_MANAGER_TOOLS: list[BaseTool] = [
     get_current_time,
     cron_once,
@@ -1125,8 +1127,8 @@ __all__ = [
     "read_file",
     "remember_preference",
     "score",
+    "shell_exec",
     "vector_search",
     "web_search",
     "write_file",
-    "shell_exec",
 ]
