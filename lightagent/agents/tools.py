@@ -1078,11 +1078,11 @@ def remember_preference(section: str, fact: str) -> str:
 SUPERVISOR_DIRECT_TOOLS: list[BaseTool] = [remember_preference]
 
 RESEARCHER_TOOLS: list[BaseTool] = [web_search, rag_search, read_file, list_mcp_tools]
-CODER_TOOLS: list[BaseTool] = [code_executor, read_file, write_file]
+CODER_TOOLS: list[BaseTool] = [code_executor, read_file, write_file, shell_exec]
 RAG_AGENT_TOOLS: list[BaseTool] = [vector_search, doc_index, web_search]
 CRITIC_TOOLS: list[BaseTool] = [evaluate, score]
 DATA_ANALYST_TOOLS: list[BaseTool] = [duckdb_query, polars_transform, create_chart]
-FILE_MANAGER_TOOLS: list[BaseTool] = [read_file, write_file]
+FILE_MANAGER_TOOLS: list[BaseTool] = [read_file, write_file, list_dir, find_files, create_dir, move_path, delete_path]
 CRON_MANAGER_TOOLS: list[BaseTool] = [
     get_current_time,
     cron_once,
@@ -1128,4 +1128,5 @@ __all__ = [
     "vector_search",
     "web_search",
     "write_file",
+    "shell_exec",
 ]
