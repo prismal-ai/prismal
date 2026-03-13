@@ -348,3 +348,42 @@ def test_cron_add_tool_accepts_output_channel() -> None:
         output_target="12345",
     )
     assert "telegram" in result
+
+
+def test_list_dir_returns_entries(tmp_path: Path) -> None:
+    """list_dir returns [DIR] and [FILE] tagged entries for a directory."""
+    from lightagent.agents.tools import list_dir
+    (tmp_path / "file1.txt").write_text("a")
+    (tmp_path / "subdir").mkdir()
+    result = list_dir.invoke({"path": str(tmp_path)})
+    assert "file1.txt" in result
+    assert "subdir" in result
+
+
+def test_list_dir_blocks_system_path() -> None:
+    """list_dir returns an error for blocked system paths."""
+    from lightagent.agents.tools import list_dir
+    result = list_dir.invoke({"path": "/etc"})
+    assert "error" in result.lower() or "blocked" in result.lower()
+
+
+def test_find_files_finds_by_pattern(tmp_path: Path) -> None:
+    """find_files returns files matching the glob pattern."""
+    from lightagent.agents.tools import find_files
+    (tmp_path / "main.py").write_text("x")
+    (tmp_path / "test_main.py").write_text("y")
+    (tmp_path / "readme.md").write_text("z")
+    result = find_files.invoke({"root": str(tmp_path), "pattern": "*.py"})
+    assert "main.py" in result
+    assert "test_main.py" in result
+    assert "readme.md" not in result
+
+
+def test_find_files_respects_max_results(tmp_path: Path) -> None:
+    """find_files returns at most max_results entries."""
+    from lightagent.agents.tools import find_files
+    for i in range(20):
+        (tmp_path / f"file{i}.txt").write_text("x")
+    result = find_files.invoke({"root": str(tmp_path), "pattern": "*.txt", "max_results": 5})
+    lines = [line for line in result.splitlines() if line.strip()]
+    assert len(lines) <= 6  # at most 5 results + possible header/footer

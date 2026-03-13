@@ -67,7 +67,10 @@ class FilesystemGuard:
         resolved_str = str(resolved)
 
         for prefix in _BLOCKED_PREFIXES:
-            if resolved_str.startswith(prefix):
+            # Match both the prefix root itself and any path underneath it.
+            # e.g. "/etc/" blocks "/etc/passwd" AND "/etc" (the directory itself).
+            normalized = prefix.rstrip("/")
+            if resolved_str == normalized or resolved_str.startswith(prefix):
                 logger.warning(
                     "filesystem_guard.blocked_prefix",
                     path=resolved_str,

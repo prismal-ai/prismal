@@ -170,6 +170,67 @@ def write_file(path: str, content: str) -> str:
 
 
 @tool
+def list_dir(path: str) -> str:
+    """List the contents of a directory.
+
+    Args:
+        path: Absolute path to the directory to list.
+
+    Returns:
+        Newline-separated list of entries with [DIR] / [FILE] prefixes,
+        or an error message if the path is invalid or blocked.
+    """
+    try:
+        guard = _get_fs_guard()
+        resolved = guard.validate(path, write=False)
+    except PathViolation as exc:
+        return f"Error: {exc}"
+
+    if not resolved.is_dir():
+        return f"Error: Not a directory: {resolved}"
+
+    entries: list[str] = []
+    for entry in sorted(resolved.iterdir()):
+        tag = "[DIR] " if entry.is_dir() else "[FILE]"
+        entries.append(f"{tag} {entry.name}")
+
+    return "\n".join(entries) if entries else "(empty directory)"
+
+
+@tool
+def find_files(root: str, pattern: str, max_results: int = 100) -> str:
+    """Recursively find files matching a glob pattern under a root directory.
+
+    Args:
+        root: Absolute path to search root.
+        pattern: Glob pattern, e.g. ``"*.py"`` or ``"**/*.yaml"``.
+        max_results: Maximum number of results to return (default 100).
+
+    Returns:
+        Newline-separated list of relative paths, or an error message.
+    """
+    try:
+        guard = _get_fs_guard()
+        resolved = guard.validate(root, write=False)
+    except PathViolation as exc:
+        return f"Error: {exc}"
+
+    if not resolved.is_dir():
+        return f"Error: Not a directory: {resolved}"
+
+    matches: list[str] = []
+    for p in resolved.rglob(pattern):
+        if p.is_file():
+            matches.append(str(p.relative_to(resolved)))
+            if len(matches) >= max_results:
+                break
+
+    if not matches:
+        return f"No files found matching '{pattern}' under {resolved}"
+    return "\n".join(matches)
+
+
+@tool
 def code_executor(code: str, language: str = "python") -> str:
     """Execute a code snippet in a sandboxed subprocess.
 
@@ -917,7 +978,9 @@ __all__ = [
     "doc_index",
     "duckdb_query",
     "evaluate",
+    "find_files",
     "get_current_time",
+    "list_dir",
     "list_mcp_tools",
     "polars_transform",
     "rag_search",
