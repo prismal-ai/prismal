@@ -19,6 +19,7 @@ import os
 from typing import Any, Literal
 
 import mcp.types
+import psutil
 from mcp.client.sse import sse_client
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from pydantic import BaseModel, Field, model_validator
@@ -26,6 +27,40 @@ from pydantic import BaseModel, Field, model_validator
 from lightagent.core.exceptions import MCPConnectionError, MCPToolError
 from lightagent.core.logging import get_logger
 from mcp import ClientSession
+
+
+def _kill_process_tree(pids: list[int]) -> None:
+    """Terminate a list of PIDs and all their descendants.
+
+    Sends SIGTERM first; after a 2-second wait force-kills survivors with
+    SIGKILL.  Uses ``psutil`` for recursive child discovery.  No-ops silently
+    if any PID has already exited.
+
+    Args:
+        pids: Top-level process IDs to terminate (e.g. the stdio subprocess).
+    """
+    if not pids:
+        return
+    try:
+        procs: list[psutil.Process] = []
+        for pid in pids:
+            with contextlib.suppress(psutil.NoSuchProcess):
+                proc = psutil.Process(pid)
+                # Collect descendants before terminating the parent so they
+                # cannot become orphans that escape the kill list.
+                procs.extend(proc.children(recursive=True))
+                procs.append(proc)
+
+        for proc in procs:
+            with contextlib.suppress(psutil.NoSuchProcess):
+                proc.terminate()
+
+        _, alive = psutil.wait_procs(procs, timeout=2)
+        for proc in alive:
+            with contextlib.suppress(psutil.NoSuchProcess):
+                proc.kill()
+    except Exception:  # noqa: S110 — best-effort cleanup; never raise
+        pass
 
 logger = get_logger("lightagent.mcp.connection")
 
@@ -69,9 +104,12 @@ class MCPServerConfig(BaseModel):
     """
 
     name: str = Field(..., description="Unique identifier for this MCP server.")
-    type: Literal["stdio", "sse"] = Field(
+    type: Literal["stdio", "sse", "streamable-http"] = Field(
         ...,
-        description="Transport type: 'stdio' (subprocess) or 'sse' (HTTP SSE).",
+        description=(
+            "Transport type: 'stdio' (subprocess), 'sse' (HTTP SSE),"
+            " or 'streamable-http' (MCP Streamable HTTP — modern remote servers)."
+        ),
     )
     enabled: bool = Field(
         default=True,
@@ -136,8 +174,11 @@ class MCPServerConfig(BaseModel):
                 "'command' is required for stdio transport."
             )
             raise ValueError(msg)
-        if self.type == "sse" and not self.url:
-            msg = f"MCP server '{self.name}': 'url' is required for sse transport."
+        if self.type in {"sse", "streamable-http"} and not self.url:
+            msg = (
+                f"MCP server '{self.name}': "
+                f"'url' is required for {self.type!r} transport."
+            )
             raise ValueError(msg)
         return self
 
@@ -158,7 +199,10 @@ class MCPServerStatus(BaseModel):
     server_type: str = Field(..., description="Transport type ('stdio' or 'sse').")
     priority: int = Field(
         default=0,
-        description="Dispatch priority — higher value means tools from this server appear first.",
+        description=(
+            "Dispatch priority — higher value means tools from this server"
+            " appear first."
+        ),
     )
 
 
@@ -202,6 +246,9 @@ class MCPServerConnection:
         self._connected: bool = False
         self._last_error: str | None = None
         self._cached_tools: list[mcp.types.Tool] = []
+        # PIDs of stdio subprocesses spawned by this connection (populated in
+        # _open_stdio so they can be force-killed on disconnect/shutdown).
+        self._subprocess_pids: list[int] = []
 
     # ------------------------------------------------------------------
     # Public properties
@@ -330,7 +377,9 @@ class MCPServerConnection:
             return await self._open_stdio(stack)
         if self._config.type == "sse":
             return await self._open_sse(stack)
-        # Defensive: Pydantic Literal["stdio","sse"] makes this unreachable at runtime
+        if self._config.type == "streamable-http":
+            return await self._open_streamable_http(stack)
+        # Defensive: Pydantic Literal prevents this at runtime
         msg = f"Unknown transport type: {self._config.type!r}"
         raise MCPConnectionError(server_name=self._config.name, reason=msg)
 
@@ -339,6 +388,10 @@ class MCPServerConnection:
         stack: contextlib.AsyncExitStack,
     ) -> tuple[Any, Any]:  # Any: anyio streams
         """Open a stdio (subprocess) transport.
+
+        Snapshots the current child-process tree immediately before and after
+        the transport is opened so that the new subprocess PIDs can be recorded
+        in ``_subprocess_pids`` for force-kill on disconnect.
 
         Args:
             stack: The ``AsyncExitStack`` to register the context manager with.
@@ -359,7 +412,20 @@ class MCPServerConnection:
             args=cmd[1:],
             env=resolved_env,
         )
+
+        # Snapshot existing child PIDs so we can identify the new subprocess.
+        with contextlib.suppress(Exception):
+            before_pids: set[int] = {
+                p.pid for p in psutil.Process().children(recursive=True)
+            }
+
         read, write = await stack.enter_async_context(stdio_client(params))
+
+        # Record the new PIDs spawned by this transport for cleanup on shutdown.
+        with contextlib.suppress(Exception):
+            after_pids = {p.pid for p in psutil.Process().children(recursive=True)}
+            self._subprocess_pids = list(after_pids - before_pids)
+
         return read, write
 
     async def _open_sse(
@@ -380,7 +446,8 @@ class MCPServerConnection:
         Returns:
             A ``(read, write)`` tuple.
         """
-        url: str = self._config.url or ""  # validated non-empty by model
+        # Expand ${VAR} / $VAR references so secrets can be stored in env, not YAML.
+        url: str = os.path.expandvars(self._config.url or "")
         headers: dict[str, str] = {}
         if self._config.auth and self._config.auth.type == "bearer":
             token = os.environ.get(self._config.auth.token_env, "")
@@ -400,8 +467,52 @@ class MCPServerConnection:
         )
         return read, write
 
+    async def _open_streamable_http(
+        self,
+        stack: contextlib.AsyncExitStack,
+    ) -> tuple[Any, Any]:  # Any: anyio streams
+        """Open a Streamable HTTP transport (MCP 2025 spec).
+
+        Modern remote MCP servers (e.g. SerpAPI, Claude Desktop remote MCPs)
+        use this transport instead of SSE.  It supports the same optional
+        bearer-token auth as the SSE transport.
+
+        Args:
+            stack: The ``AsyncExitStack`` to register the context manager with.
+
+        Returns:
+            A ``(read, write)`` tuple.
+        """
+        from mcp.client.streamable_http import streamablehttp_client
+
+        url: str = os.path.expandvars(self._config.url or "")
+        headers: dict[str, str] = {}
+        if self._config.auth and self._config.auth.type == "bearer":
+            token = os.environ.get(self._config.auth.token_env, "")
+            if not token:
+                logger.warning(
+                    "mcp_streamable_http_auth_token_missing",
+                    server=self._config.name,
+                    token_env=self._config.auth.token_env,
+                )
+            headers["Authorization"] = f"Bearer {token}"
+        read, write, _ = await stack.enter_async_context(
+            streamablehttp_client(
+                url=url,
+                headers=headers,
+                timeout=float(self._config.timeout_seconds),
+            )
+        )
+        return read, write
+
     async def _cleanup_stack(self) -> None:
         """Close and discard the current AsyncExitStack if present.
+
+        Kills the recorded subprocess tree (``_subprocess_pids``) BEFORE
+        closing the stack so that grandchild processes (e.g. the ``node``
+        process started by ``npm exec``) are terminated before npm exits and
+        they become orphans.  After the kill the stack is closed to release
+        streams and other resources.
 
         Catches ``BaseException`` (which includes ``asyncio.CancelledError``)
         so that a SIGINT/SIGTERM-triggered cancellation during shutdown does
@@ -410,9 +521,16 @@ class MCPServerConnection:
         state variables proceeds in the ``finally`` block regardless.
         """
         if self._exit_stack is not None:
+            # Kill subprocess tree first — before aclose() terminates the parent
+            # process (npm) and grandchildren (node) become orphans that can never
+            # be reached again.
+            pids = self._subprocess_pids
+            self._subprocess_pids = []
+            _kill_process_tree(pids)
+
             try:
                 await self._exit_stack.aclose()
-            except BaseException as exc:  # noqa: BLE001 — intentional: includes CancelledError
+            except BaseException as exc:
                 logger.warning(
                     "mcp_stack_cleanup_error",
                     server=self._config.name,

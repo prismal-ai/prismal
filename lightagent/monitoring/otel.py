@@ -108,14 +108,19 @@ class OTelManager:
             self._tracer = tracer_provider.get_tracer(service_name)
 
             # ── Metric exporter ────────────────────────────────────────
-            metric_reader = self._build_metric_reader(exporter_name, endpoint)
-            meter_provider = MeterProvider(
-                resource=resource, metric_readers=[metric_reader]
-            )
-            metrics.set_meter_provider(meter_provider)
-            self._meter = meter_provider.get_meter(service_name)
-
-            self._register_standard_metrics()
+            # Most trace backends (Jaeger, Zipkin, bare OTLP collectors)
+            # only expose /v1/traces and return 404 on /v1/metrics.
+            # Metric export is therefore opt-in via otel_metrics_enabled.
+            # When disabled we skip MeterProvider setup entirely so no
+            # PeriodicExportingMetricReader is created and no 404 errors appear.
+            if getattr(s, "otel_metrics_enabled", False):
+                metric_reader = self._build_metric_reader(exporter_name, endpoint)
+                meter_provider = MeterProvider(
+                    resource=resource, metric_readers=[metric_reader]
+                )
+                metrics.set_meter_provider(meter_provider)
+                self._meter = meter_provider.get_meter(service_name)
+                self._register_standard_metrics()
             self.enabled = True
             logger.info("otel.initialized", exporter=exporter_name, endpoint=endpoint)
         except Exception as exc:
@@ -167,7 +172,9 @@ class OTelManager:
         Returns:
             An OTEL metric reader instance.
         """
-        if exporter_name == "console":
+        if exporter_name in {"console", "jaeger", "zipkin"}:
+            # jaeger and zipkin only support /v1/traces, not /v1/metrics.
+            # Fall back to console so metric export doesn't log 404 errors.
             from opentelemetry.sdk.metrics.export import (
                 ConsoleMetricExporter,
                 PeriodicExportingMetricReader,
