@@ -20,6 +20,7 @@ class AgentPattern(str, Enum):
         CODEACT: Agent executes Python code as its primary action.
         CRAG: Corrective RAG -- retrieve, grade, fallback to web, generate.
         DEBATE: Multiple agents argue perspectives before consensus.
+        DEV_PIPELINE: Full software development pipeline subgraph (Phase 24).
     """
 
     SUPERVISOR = "supervisor"
@@ -30,6 +31,8 @@ class AgentPattern(str, Enum):
     CODEACT = "codeact"
     CRAG = "crag"
     DEBATE = "debate"
+    # Phase 24: dynamic subgraph (PO → Architect → Developer → Tests → QA → Review)
+    DEV_PIPELINE = "dev_pipeline"
 
 
 __all__ = ["AgentPattern"]

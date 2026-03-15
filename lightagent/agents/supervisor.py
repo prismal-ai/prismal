@@ -50,6 +50,8 @@ MEMBERS: list[str] = [
     "file_manager",
     "skill_manager",
     "cron_manager",
+    # Phase 24: dynamic subgraph (PO → Architect → Developer → Tests → QA → Review)
+    "dev_pipeline",
 ]
 
 _VALID_ROUTES: frozenset[str] = frozenset(MEMBERS) | {"END"}
@@ -131,6 +133,10 @@ Available agents:
   · List, pause, resume, or remove scheduled jobs
   · Use time-based triggers: "every day", "cada hora", "programar", "agendar",
     "cron", "schedule", "recurring", "periodic", "reminder"
+- dev_pipeline: for software development tasks requiring a full pipeline
+  (PO → Architect → Developer → Tests → QA → Review).
+  Route here when the user asks to build a complete software feature or product
+  end-to-end with specification, implementation, testing and quality review.
 - END: Return final answer to the user
 
 Routing rules:
@@ -346,6 +352,7 @@ _RouterLiteral = Literal[
     "file_manager",
     "skill_manager",
     "cron_manager",
+    "dev_pipeline",  # Phase 24: dynamic subgraph
     "__end__",
 ]
 

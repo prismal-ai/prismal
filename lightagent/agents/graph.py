@@ -46,6 +46,7 @@ from lightagent.agents.researcher import researcher_node
 from lightagent.agents.skill_manager import skill_manager_node
 from lightagent.agents.state import AgentState
 from lightagent.agents.supervisor import supervisor_node, supervisor_router
+from lightagent.core.config import get_settings
 from lightagent.core.logging import get_logger
 
 logger = get_logger("lightagent.agents.graph")
@@ -86,6 +87,7 @@ _DEFAULT_CHECKPOINT_PATH: Path = Path("data/db/checkpoints.db")
 def build_supervisor_graph(
     checkpoint_path: Path | None = None,
     checkpointer: Any = None,  # noqa: ANN401 — no common base type for LangGraph checkpointers
+    dev_pipeline_graph: Any = None,  # noqa: ANN401 — CompiledStateGraph for dev_pipeline subgraph (Phase 24)
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Build and compile the LangGraph SUPERVISOR state machine.
@@ -108,6 +110,11 @@ def build_supervisor_graph(
         checkpointer: Optional pre-built checkpointer (e.g. AsyncSqliteSaver
             for async usage).  When provided, ``checkpoint_path`` is ignored
             and no SQLite connection is opened internally.
+        dev_pipeline_graph: Optional pre-compiled dev_pipeline subgraph
+            (Phase 24).  When provided together with ``get_settings().enable_subgraphs``
+            being ``True``, this node is added to the supervisor graph so that
+            the supervisor can route to it.  The caller is responsible for
+            building this asynchronously before calling this function.
 
     Returns:
         A fully compiled :class:`~langgraph.graph.state.CompiledStateGraph`
@@ -137,29 +144,41 @@ def build_supervisor_graph(
     builder.add_node("skill_manager", skill_manager_node)
     builder.add_node("cron_manager", cron_manager_node)
 
+    # Phase 24: dev_pipeline subgraph node (opt-in via enable_subgraphs setting).
+    # The compiled subgraph must be built externally (async) and passed in.
+    _include_dev_pipeline = (
+        get_settings().enable_subgraphs and dev_pipeline_graph is not None
+    )
+    if _include_dev_pipeline:
+        builder.add_node("dev_pipeline", dev_pipeline_graph)
+
     # Entry point
     builder.set_entry_point("supervisor")
 
     # Conditional edges: supervisor → sub-agent or END
+    conditional_edges: dict[str, str | object] = {
+        "researcher": "researcher",
+        "coder": "coder",
+        "rag_agent": "rag_agent",
+        "planner": "planner",
+        "critic": "critic",
+        "data_analyst": "data_analyst",
+        "file_manager": "file_manager",
+        "skill_manager": "skill_manager",
+        "cron_manager": "cron_manager",
+        "__end__": END,
+    }
+    if _include_dev_pipeline:
+        conditional_edges["dev_pipeline"] = "dev_pipeline"
+
     builder.add_conditional_edges(
         "supervisor",
         _supervisor_router,
-        {
-            "researcher": "researcher",
-            "coder": "coder",
-            "rag_agent": "rag_agent",
-            "planner": "planner",
-            "critic": "critic",
-            "data_analyst": "data_analyst",
-            "file_manager": "file_manager",
-            "skill_manager": "skill_manager",
-            "cron_manager": "cron_manager",
-            "__end__": END,
-        },
+        conditional_edges,
     )
 
     # Direct edges: every sub-agent returns to supervisor
-    for member in (
+    base_members = (
         "researcher",
         "coder",
         "rag_agent",
@@ -169,8 +188,12 @@ def build_supervisor_graph(
         "file_manager",
         "skill_manager",
         "cron_manager",
-    ):
+    )
+    for member in base_members:
         builder.add_edge(member, "supervisor")
+
+    if _include_dev_pipeline:
+        builder.add_edge("dev_pipeline", "supervisor")
 
     # ------------------------------------------------------------------ #
     # Compile with checkpointing                                           #
@@ -237,7 +260,20 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     conn = await aiosqlite.connect(str(db_path))
     checkpointer = AsyncSqliteSaver(conn)
     await checkpointer.setup()
-    _async_graph = build_supervisor_graph(checkpointer=checkpointer)
+
+    # Phase 24: build dev_pipeline subgraph asynchronously when enabled.
+    dev_pipeline_graph: Any = None  # ANN401: no common base type for compiled subgraphs
+    if get_settings().enable_subgraphs:
+        from lightagent.agents.subgraphs.dev_pipeline.builder import (
+            get_compiled_dev_pipeline,
+        )
+
+        dev_pipeline_graph = await get_compiled_dev_pipeline()
+
+    _async_graph = build_supervisor_graph(
+        checkpointer=checkpointer,
+        dev_pipeline_graph=dev_pipeline_graph,
+    )
     logger.debug("async_graph_initialized")
     return _async_graph
 
