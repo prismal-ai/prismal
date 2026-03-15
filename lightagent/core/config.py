@@ -242,6 +242,14 @@ class Settings(BaseSettings):
         default="http://localhost:4318",
         description="OTLP exporter endpoint (HTTP)",
     )
+    otel_metrics_enabled: bool = Field(
+        default=False,
+        description=(
+            "Enable OTLP metric export.  Requires a metrics-capable backend"
+            " (e.g. Prometheus + OTEL Collector).  Defaults to False because"
+            " common trace backends like Jaeger return 404 on /v1/metrics."
+        ),
+    )
     otel_service_name: str = Field(
         default="lightagent",
         description="Service name for OTEL resource attributes",

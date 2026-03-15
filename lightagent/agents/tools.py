@@ -3,7 +3,7 @@
 Fallback tool implementations used when no live MCP or skill tool overrides them.
 
 Every tool here is a real implementation that connects to the actual backend:
-- ``web_search``          — DuckDuckGo via ``langchain-community``
+- ``web_search``          — Tavily (primary) / DuckDuckGo (fallback)
 - ``rag_search``          — ChromaDB via :class:`~lightagent.rag.engine.RAGEngine`
 - ``vector_search``       — ChromaDB nearest-neighbour search
 - ``doc_index``           — RAGEngine file/directory indexer
@@ -52,15 +52,45 @@ def _get_fs_guard() -> FilesystemGuard:
 
 @tool
 def web_search(query: str) -> str:
-    """Search the web for up-to-date information using DuckDuckGo.
+    """Search the web for up-to-date information.
+
+    Uses Tavily (primary) when ``TAVILY_API_KEY`` is set, and falls back to
+    DuckDuckGo otherwise.
 
     Args:
         query: The search query string.
 
     Returns:
         Formatted search results with titles, URLs and snippets, or an
-        error message if the search backend is unavailable.
+        error message if both backends are unavailable.
     """
+    import os
+
+    tavily_key = os.environ.get("TAVILY_API_KEY", "")
+    if tavily_key:
+        try:
+            from langchain_community.tools.tavily_search import TavilySearchResults
+
+            results = TavilySearchResults(max_results=5).run(query)
+            if isinstance(results, list):
+                parts = [
+                    (
+                        f"{i + 1}. {r.get('title', '')}\n"
+                        f"   {r.get('url', '')}\n"
+                        f"   {r.get('content', '')[:300]}"
+                    )
+                    for i, r in enumerate(results)
+                ]
+                return (
+                    "\n\n".join(parts) if parts else f"No results found for: {query!r}"
+                )
+            return str(results) if results else f"No results found for: {query!r}"
+        except Exception as exc:
+            # Tavily failed — fall through to DuckDuckGo
+            _tavily_err = str(exc)
+    else:
+        _tavily_err = "TAVILY_API_KEY not set"
+
     try:
         from langchain_community.tools import DuckDuckGoSearchRun
 
@@ -68,8 +98,8 @@ def web_search(query: str) -> str:
         return results if results else f"No results found for: {query!r}"
     except Exception as exc:
         return (
-            f"Web search unavailable: {exc!s}\n"
-            "Tip: install 'duckduckgo-search' or configure a search MCP server."
+            f"Web search unavailable (Tavily: {_tavily_err}; DuckDuckGo: {exc!s}).\n"
+            "Set TAVILY_API_KEY in .env or install 'ddgs'."
         )
 
 
