@@ -8,11 +8,14 @@ from lightagent.agents.subgraphs.artifacts import (
     TestReport,
     UserStory,
 )
+from lightagent.agents.subgraphs.registry import SubgraphDefinition, SubgraphRegistry
 
 __all__ = [
     "CodeArtifact",
     "QAReport",
     "ReviewResult",
+    "SubgraphDefinition",
+    "SubgraphRegistry",
     "TechnicalSpec",
     "TestReport",
     "UserStory",
