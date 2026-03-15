@@ -496,6 +496,16 @@ class Settings(BaseSettings):
         description="Enable dynamic sub-agent orchestration (Phase 24).",
     )
 
+    # Webhooks (Phase 25)
+    webhooks_enabled: bool = Field(
+        default=True,
+        description="Enable webhook delivery system.",
+    )
+    webhooks_signing_key: SecretStr = Field(
+        default=SecretStr("change-me-in-production"),
+        description="Default HMAC signing key for webhook payloads.",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
