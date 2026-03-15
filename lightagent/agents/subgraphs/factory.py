@@ -1,0 +1,130 @@
+"""SubgraphFactory: builds compiled LangGraph subgraphs from definitions.
+
+Each subgraph is a self-contained ``CompiledStateGraph`` that can be added as
+a node to the main supervisor graph via ``builder.add_node(name, compiled)``.
+
+Checkpointing is isolated per-subgraph to prevent state contention.  Pass
+``checkpointer_path=":memory:"`` in unit tests; production uses
+``data/db/checkpoints_subgraph_{name}.db``.
+
+Usage::
+
+    factory = SubgraphFactory()
+    compiled = await factory.build(
+        definition, checkpointer_path=":memory:"
+    )
+    builder.add_node("dev_pipeline", compiled)
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+import aiosqlite
+import structlog
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.constants import END
+from langgraph.graph import StateGraph
+
+from lightagent.agents.state import AgentState
+
+if TYPE_CHECKING:
+    from langgraph.graph.state import CompiledStateGraph
+
+    from lightagent.agents.subgraphs.registry import SubgraphDefinition
+
+logger = structlog.get_logger("lightagent.subgraphs.factory")
+
+
+class SubgraphFactory:
+    """Builds compiled LangGraph subgraphs from :class:`SubgraphDefinition` objects.
+
+    Each call to :meth:`build` produces an independent ``CompiledStateGraph``
+    with its own
+    :class:`~langgraph.checkpoint.sqlite.aio.AsyncSqliteSaver`
+    checkpointer — subgraphs never share checkpoint storage.
+
+    :meth:`build` is an async method because opening the ``aiosqlite``
+    connection and calling ``checkpointer.setup()`` are async operations.
+
+    Example::
+
+        factory = SubgraphFactory()
+        graph = await factory.build(
+            defn,
+            checkpointer_path="data/db/checkpoints_subgraph_dev.db",
+        )
+    """
+
+    async def build(
+        self,
+        definition: SubgraphDefinition,
+        checkpointer_path: str = ":memory:",
+    ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
+        """Compile a subgraph from a definition.
+
+        Registers all nodes, adds linear edges, adds conditional edges,
+        and compiles with an isolated
+        :class:`~langgraph.checkpoint.sqlite.aio.AsyncSqliteSaver`.
+
+        Args:
+            definition: The :class:`SubgraphDefinition` specifying
+                nodes and edges.
+            checkpointer_path: SQLite path for checkpointing.
+                Use ``":memory:"`` in tests; production should use a
+                dedicated file per subgraph.
+
+        Returns:
+            A compiled ``CompiledStateGraph`` ready to be used as a
+            node.
+        """
+        builder: StateGraph[AgentState, Any, Any, Any] = StateGraph(AgentState)
+
+        # Register all nodes
+        for node_name, node_fn in definition.nodes.items():
+            builder.add_node(node_name, node_fn)
+            logger.debug(
+                "subgraph.node_added",
+                subgraph=definition.name,
+                node=node_name,
+            )
+
+        # Set entry point
+        builder.set_entry_point(definition.entry_point)
+
+        # Add linear edges
+        for from_node, to_node in definition.edges:
+            if to_node == "__end__":
+                builder.add_edge(from_node, END)
+            else:
+                builder.add_edge(from_node, to_node)
+
+        # Add conditional edges
+        for source_node, routing_fn in definition.conditional_edges.items():
+            builder.add_conditional_edges(source_node, routing_fn)
+
+        # Nodes with no outgoing edges or conditional edges go to END
+        all_sources = (
+            {f for f, _ in definition.edges}
+            | set(definition.conditional_edges)
+        )
+        for node_name in definition.nodes:
+            if node_name not in all_sources:
+                builder.add_edge(node_name, END)
+
+        conn = await aiosqlite.connect(checkpointer_path)
+        checkpointer = AsyncSqliteSaver(conn)
+        await checkpointer.setup()
+        compiled: CompiledStateGraph[AgentState, Any, Any, Any] = builder.compile(
+            checkpointer=checkpointer
+        )
+        logger.info(
+            "subgraph.compiled",
+            name=definition.name,
+            node_count=len(definition.nodes),
+            checkpointer=checkpointer_path,
+        )
+        return compiled
+
+
+__all__ = ["SubgraphFactory"]
