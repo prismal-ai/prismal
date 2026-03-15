@@ -52,6 +52,8 @@ MEMBERS: list[str] = [
     "cron_manager",
     # Phase 24: dynamic subgraph (PO → Architect → Developer → Tests → QA → Review)
     "dev_pipeline",
+    # Phase 26: ML/DL pipeline (Ingester -> EDA -> Features -> Train -> Evaluate)
+    "ml_pipeline",
 ]
 
 _VALID_ROUTES: frozenset[str] = frozenset(MEMBERS) | {"END"}
@@ -137,6 +139,14 @@ Available agents:
   (PO → Architect → Developer → Tests → QA → Review).
   Route here when the user asks to build a complete software feature or product
   end-to-end with specification, implementation, testing and quality review.
+- ml_pipeline: For machine learning and data science tasks — training ML models,
+  AutoML, classification, regression, clustering, deep learning, model evaluation.
+  Route here when the user asks to:
+  · Train, build, or evaluate a machine learning model
+  · Run AutoML or hyperparameter search
+  · Perform EDA (exploratory data analysis) followed by modeling
+  · Engineer features and prepare datasets for ML
+  · Export or deploy a trained model
 - END: Return final answer to the user
 
 Routing rules:
@@ -353,6 +363,7 @@ _RouterLiteral = Literal[
     "skill_manager",
     "cron_manager",
     "dev_pipeline",  # Phase 24: dynamic subgraph
+    "ml_pipeline",  # Phase 26: ML/DL pipeline
     "__end__",
 ]
 

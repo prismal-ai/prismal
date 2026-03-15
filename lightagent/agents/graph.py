@@ -88,6 +88,7 @@ def build_supervisor_graph(
     checkpoint_path: Path | None = None,
     checkpointer: Any = None,  # noqa: ANN401 — no common base type for LangGraph checkpointers
     dev_pipeline_graph: Any = None,  # noqa: ANN401 — CompiledStateGraph for dev_pipeline subgraph (Phase 24)
+    ml_pipeline_graph: Any = None,  # noqa: ANN401 — CompiledStateGraph for ml_pipeline subgraph (Phase 26)
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Build and compile the LangGraph SUPERVISOR state machine.
@@ -112,6 +113,11 @@ def build_supervisor_graph(
             and no SQLite connection is opened internally.
         dev_pipeline_graph: Optional pre-compiled dev_pipeline subgraph
             (Phase 24).  When provided together with ``get_settings().enable_subgraphs``
+            being ``True``, this node is added to the supervisor graph so that
+            the supervisor can route to it.  The caller is responsible for
+            building this asynchronously before calling this function.
+        ml_pipeline_graph: Optional pre-compiled ml_pipeline subgraph
+            (Phase 26).  When provided together with ``get_settings().enable_subgraphs``
             being ``True``, this node is added to the supervisor graph so that
             the supervisor can route to it.  The caller is responsible for
             building this asynchronously before calling this function.
@@ -152,6 +158,13 @@ def build_supervisor_graph(
     if _include_dev_pipeline:
         builder.add_node("dev_pipeline", dev_pipeline_graph)
 
+    # Phase 26: ml_pipeline subgraph node (opt-in via enable_subgraphs setting).
+    _include_ml_pipeline = (
+        get_settings().enable_subgraphs and ml_pipeline_graph is not None
+    )
+    if _include_ml_pipeline:
+        builder.add_node("ml_pipeline", ml_pipeline_graph)
+
     # Entry point
     builder.set_entry_point("supervisor")
 
@@ -170,6 +183,8 @@ def build_supervisor_graph(
     }
     if _include_dev_pipeline:
         conditional_edges["dev_pipeline"] = "dev_pipeline"
+    if _include_ml_pipeline:
+        conditional_edges["ml_pipeline"] = "ml_pipeline"
 
     builder.add_conditional_edges(
         "supervisor",
@@ -194,6 +209,8 @@ def build_supervisor_graph(
 
     if _include_dev_pipeline:
         builder.add_edge("dev_pipeline", "supervisor")
+    if _include_ml_pipeline:
+        builder.add_edge("ml_pipeline", "supervisor")
 
     # ------------------------------------------------------------------ #
     # Compile with checkpointing                                           #
@@ -263,16 +280,23 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
 
     # Phase 24: build dev_pipeline subgraph asynchronously when enabled.
     dev_pipeline_graph: Any = None  # ANN401: no common base type for compiled subgraphs
+    ml_pipeline_graph: Any = None  # ANN401: no common base type for compiled subgraphs
     if get_settings().enable_subgraphs:
         from lightagent.agents.subgraphs.dev_pipeline.builder import (
             get_compiled_dev_pipeline,
         )
+        from lightagent.agents.subgraphs.ml_pipeline.builder import (
+            get_compiled_ml_pipeline,
+        )
 
         dev_pipeline_graph = await get_compiled_dev_pipeline()
+        # Phase 26: build ml_pipeline subgraph asynchronously when enabled.
+        ml_pipeline_graph = await get_compiled_ml_pipeline()
 
     _async_graph = build_supervisor_graph(
         checkpointer=checkpointer,
         dev_pipeline_graph=dev_pipeline_graph,
+        ml_pipeline_graph=ml_pipeline_graph,
     )
     logger.debug("async_graph_initialized")
     return _async_graph
