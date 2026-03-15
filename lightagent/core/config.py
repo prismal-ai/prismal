@@ -242,6 +242,14 @@ class Settings(BaseSettings):
         default="http://localhost:4318",
         description="OTLP exporter endpoint (HTTP)",
     )
+    otel_metrics_enabled: bool = Field(
+        default=False,
+        description=(
+            "Enable OTLP metric export.  Requires a metrics-capable backend"
+            " (e.g. Prometheus + OTEL Collector).  Defaults to False because"
+            " common trace backends like Jaeger return 404 on /v1/metrics."
+        ),
+    )
     otel_service_name: str = Field(
         default="lightagent",
         description="Service name for OTEL resource attributes",
@@ -422,6 +430,64 @@ class Settings(BaseSettings):
             "Slack channel name or ID for cron failure alerts (e.g. '#alerts'). "
             "Uses slack_bot_token. Empty = disabled."
         ),
+    )
+
+    # ── Preferences auto-extraction ───────────────────────────────────
+    preferences_auto_extract: bool = Field(
+        default=True,
+        description=(
+            "Enable automatic preference extraction from conversation history. "
+            "When True, the system analyses conversations in the background and "
+            "updates PREFERENCES.md without blocking the chat response."
+        ),
+    )
+    preferences_extract_cooldown_minutes: int = Field(
+        default=30,
+        ge=1,
+        description=(
+            "Minimum minutes between automatic preference extractions per session. "
+            "Extraction also triggers after every 5 new messages."
+        ),
+    )
+
+    # ── Filesystem access ─────────────────────────────────────────────
+    fs_workspace_root: str = Field(
+        default="",
+        description=(
+            "Confine agent filesystem access to this directory. Empty = unrestricted."
+        ),
+    )
+    fs_allow_outside_workspace: bool = Field(
+        default=False,
+        description="If True, agent may access paths outside fs_workspace_root.",
+    )
+    fs_delete_enabled: bool = Field(
+        default=False,
+        description="Allow the delete_path tool to remove files/directories.",
+    )
+
+    # ── Heartbeat — SMTP email delivery ───────────────────────────────
+    heartbeat_smtp_host: str = Field(
+        default="",
+        description="SMTP server hostname for heartbeat email delivery.",
+    )
+    heartbeat_smtp_port: int = Field(
+        default=587,
+        ge=1,
+        le=65535,
+        description="SMTP server port (default 587 for STARTTLS).",
+    )
+    heartbeat_smtp_user: str = Field(
+        default="",
+        description="SMTP authentication username.",
+    )
+    heartbeat_smtp_password: SecretStr = Field(
+        default=SecretStr(""),
+        description="SMTP authentication password.",
+    )
+    heartbeat_smtp_from: str = Field(
+        default="",
+        description="Sender address for heartbeat email reports.",
     )
 
 

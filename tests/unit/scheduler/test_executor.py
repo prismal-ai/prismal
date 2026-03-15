@@ -269,42 +269,18 @@ async def test_resume_job_no_op_when_not_found(mock_manager: MagicMock) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_graph_module_mock(mock_graph: AsyncMock) -> MagicMock:
-    """Build a mock for lightagent.agents.graph with get_async_compiled_graph."""
-    graph_mod = MagicMock()
-    graph_mod.get_async_compiled_graph = AsyncMock(return_value=mock_graph)
-    return graph_mod
-
-
-def _make_messages_module_mock(capture: list[str] | None = None) -> MagicMock:
-    """Build a mock for langchain_core.messages with HumanMessage."""
-    msgs_mod = MagicMock()
-
-    def _hm(content: str) -> MagicMock:
-        if capture is not None:
-            capture.append(content)
-        return MagicMock()
-
-    msgs_mod.HumanMessage = _hm
-    return msgs_mod
-
 
 @pytest.mark.asyncio
 async def test_run_job_calls_graph_and_updates_last_run(
     executor: CronExecutor, mock_manager: MagicMock
 ) -> None:
     """_run_job() invokes the LangGraph graph and calls update_last_run on success."""
-    import sys
-
     mock_graph = AsyncMock()
     mock_graph.ainvoke = AsyncMock(return_value={"messages": []})
 
-    graph_mod = _make_graph_module_mock(mock_graph)
-    msgs_mod = _make_messages_module_mock()
-
-    with (
-        patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
-        patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
+    with patch(
+        "lightagent.scheduler.executor.get_async_compiled_graph",
+        new=AsyncMock(return_value=mock_graph),
     ):
         await executor._run_job("daily-brief", "Summarise news")
 
@@ -326,22 +302,29 @@ async def test_run_job_uses_task_as_message(
     executor: CronExecutor, mock_manager: MagicMock
 ) -> None:
     """_run_job() passes the task string as the HumanMessage content."""
-    import sys
-
     mock_graph = AsyncMock()
-    mock_graph.ainvoke = AsyncMock(return_value={})
     captured_content: list[str] = []
 
-    graph_mod = _make_graph_module_mock(mock_graph)
-    msgs_mod = _make_messages_module_mock(capture=captured_content)
+    original_ainvoke = AsyncMock(return_value={})
 
-    with (
-        patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
-        patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
+    async def capturing_ainvoke(state: dict, **kwargs: object) -> dict:
+        """Capture the HumanMessage content passed to ainvoke."""
+        msgs = state.get("messages", [])
+        for msg in msgs:
+            content = getattr(msg, "content", None)
+            if content is not None:
+                captured_content.append(content)
+        return {}
+
+    mock_graph.ainvoke = capturing_ainvoke
+
+    with patch(
+        "lightagent.scheduler.executor.get_async_compiled_graph",
+        new=AsyncMock(return_value=mock_graph),
     ):
         await executor._run_job("job-x", "Fetch daily report")
 
-    assert captured_content == ["Fetch daily report"]
+    assert "Fetch daily report" in captured_content
 
 
 # ---------------------------------------------------------------------------
@@ -354,17 +337,9 @@ async def test_run_job_does_not_raise_on_graph_error(
     executor: CronExecutor, mock_manager: MagicMock
 ) -> None:
     """_run_job() swallows exceptions so APScheduler keeps running future ticks."""
-    import sys
-
-    graph_mod = MagicMock()
-    graph_mod.get_async_compiled_graph = AsyncMock(
-        side_effect=RuntimeError("LLM unavailable")
-    )
-    msgs_mod = _make_messages_module_mock()
-
-    with (
-        patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
-        patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
+    with patch(
+        "lightagent.scheduler.executor.get_async_compiled_graph",
+        new=AsyncMock(side_effect=RuntimeError("LLM unavailable")),
     ):
         # Must NOT raise
         await executor._run_job("failing-job", "Do something")
@@ -378,16 +353,12 @@ async def test_run_job_does_not_update_last_run_on_ainvoke_error(
     executor: CronExecutor, mock_manager: MagicMock
 ) -> None:
     """_run_job() skips update_last_run when ainvoke raises."""
-    import sys
-
     mock_graph = AsyncMock()
     mock_graph.ainvoke = AsyncMock(side_effect=ValueError("Graph error"))
-    graph_mod = _make_graph_module_mock(mock_graph)
-    msgs_mod = _make_messages_module_mock()
 
-    with (
-        patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
-        patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
+    with patch(
+        "lightagent.scheduler.executor.get_async_compiled_graph",
+        new=AsyncMock(return_value=mock_graph),
     ):
         await executor._run_job("broken-job", "Run task")
 
@@ -421,18 +392,14 @@ class TestRunJobHistory:
         manager: CronManager,
     ) -> None:
         """Successful run records a 'success' CronRunRecord."""
-        import sys
-
         manager.add("hist-test", "* * * * *", "some task")
 
         mock_graph = AsyncMock()
         mock_graph.ainvoke = AsyncMock(return_value={"messages": []})
-        graph_mod = _make_graph_module_mock(mock_graph)
-        msgs_mod = _make_messages_module_mock()
 
-        with (
-            patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
-            patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
+        with patch(
+            "lightagent.scheduler.executor.get_async_compiled_graph",
+            new=AsyncMock(return_value=mock_graph),
         ):
             await executor._run_job("hist-test", "some task")
 
@@ -448,19 +415,11 @@ class TestRunJobHistory:
         manager: CronManager,
     ) -> None:
         """Failed run records a 'failure' CronRunRecord with error text."""
-        import sys
-
         manager.add("fail-hist", "* * * * *", "task")
 
-        graph_mod = MagicMock()
-        graph_mod.get_async_compiled_graph = AsyncMock(
-            side_effect=RuntimeError("boom")
-        )
-        msgs_mod = _make_messages_module_mock()
-
-        with (
-            patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
-            patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
+        with patch(
+            "lightagent.scheduler.executor.get_async_compiled_graph",
+            new=AsyncMock(side_effect=RuntimeError("boom")),
         ):
             await executor._run_job("fail-hist", "task")
 
@@ -489,7 +448,6 @@ class TestCronExecutorNotifier:
         manager: CronManager,
     ) -> None:
         """notify_failure is called when _run_job raises."""
-        import sys
         from unittest.mock import AsyncMock, MagicMock
 
         mock_notifier = MagicMock()
@@ -499,15 +457,9 @@ class TestCronExecutorNotifier:
         executor._scheduler = MagicMock()
         manager.add("notify-test", "* * * * *", "task")
 
-        graph_mod = MagicMock()
-        graph_mod.get_async_compiled_graph = AsyncMock(
-            side_effect=RuntimeError("crash")
-        )
-        msgs_mod = _make_messages_module_mock()
-
-        with (
-            patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
-            patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
+        with patch(
+            "lightagent.scheduler.executor.get_async_compiled_graph",
+            new=AsyncMock(side_effect=RuntimeError("crash")),
         ):
             await executor._run_job("notify-test", "task")
 
@@ -523,7 +475,6 @@ class TestCronExecutorNotifier:
         manager: CronManager,
     ) -> None:
         """notify_failure is NOT called when _run_job succeeds."""
-        import sys
         from unittest.mock import AsyncMock, MagicMock
 
         from langchain_core.messages import AIMessage
@@ -540,12 +491,10 @@ class TestCronExecutorNotifier:
         mock_graph.ainvoke = AsyncMock(
             return_value={"messages": [AIMessage(content="done")]}
         )
-        graph_mod = _make_graph_module_mock(mock_graph)
-        msgs_mod = _make_messages_module_mock()
 
-        with (
-            patch.dict(sys.modules, {"lightagent.agents.graph": graph_mod}),
-            patch.dict(sys.modules, {"langchain_core.messages": msgs_mod}),
+        with patch(
+            "lightagent.scheduler.executor.get_async_compiled_graph",
+            new=AsyncMock(return_value=mock_graph),
         ):
             await executor._run_job("success-notify", "task")
 
@@ -581,7 +530,7 @@ class TestRetryLogic:
         manager.add("retry-job", "* * * * *", "task", max_retries=2)
 
         with patch(
-            "lightagent.agents.graph.get_async_compiled_graph",
+            "lightagent.scheduler.executor.get_async_compiled_graph",
             new=AsyncMock(side_effect=RuntimeError("fail")),
         ):
             await executor._run_job("retry-job", "task")
@@ -615,7 +564,7 @@ class TestRetryLogic:
         manager.set_retry_count("final-job", 1)
 
         with patch(
-            "lightagent.agents.graph.get_async_compiled_graph",
+            "lightagent.scheduler.executor.get_async_compiled_graph",
             new=AsyncMock(side_effect=RuntimeError("final")),
         ):
             await executor._run_job("final-job", "task")
@@ -648,7 +597,7 @@ class TestRetryLogic:
             return_value={"messages": [AIMessage(content="done")]}
         )
         with patch(
-            "lightagent.agents.graph.get_async_compiled_graph",
+            "lightagent.scheduler.executor.get_async_compiled_graph",
             new=AsyncMock(return_value=mock_graph),
         ):
             await executor._run_job("success-job", "task")
@@ -656,3 +605,86 @@ class TestRetryLogic:
         job = manager.get_job("success-job")
         assert job is not None
         assert job.retry_count == 0
+
+
+# ---------------------------------------------------------------------------
+# HeartbeatDelivery routing — output_channel / output_target
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_successful_job_with_output_routing_calls_delivery(
+    tmp_path: Path,
+) -> None:
+    """When a job has output_channel set, HeartbeatDelivery.send() is called."""
+    from lightagent.scheduler.cron_manager import CronManager
+    from lightagent.scheduler.executor import CronExecutor
+
+    manager = CronManager(db_path=tmp_path / "test.db")
+    manager.add(
+        "notify-job",
+        "* * * * *",
+        "Check news",
+        output_channel="telegram",
+        output_target="99887766",
+    )
+
+    mock_delivery = AsyncMock()
+
+    with (
+        patch(
+            "lightagent.scheduler.executor.get_async_compiled_graph"
+        ) as mock_graph_fn,
+        patch(
+            "lightagent.scheduler.executor.HeartbeatDelivery",
+            return_value=mock_delivery,
+        ),
+    ):
+        mock_graph = AsyncMock()
+        mock_graph.ainvoke = AsyncMock(
+            return_value={
+                "messages": [MagicMock(content="Here is your report")]
+            }
+        )
+        mock_graph_fn.return_value = mock_graph
+
+        executor = CronExecutor(manager=manager)
+        await executor._run_job("notify-job", "Check news")
+
+    mock_delivery.send.assert_awaited_once_with(
+        "telegram", "99887766", "Here is your report"
+    )
+
+
+@pytest.mark.asyncio
+async def test_job_without_output_routing_does_not_call_delivery(
+    tmp_path: Path,
+) -> None:
+    """When a job has no output_channel, HeartbeatDelivery.send() is NOT called."""
+    from lightagent.scheduler.cron_manager import CronManager
+    from lightagent.scheduler.executor import CronExecutor
+
+    manager = CronManager(db_path=tmp_path / "test.db")
+    manager.add("silent-job", "* * * * *", "Silent task")
+
+    mock_delivery = AsyncMock()
+
+    with (
+        patch(
+            "lightagent.scheduler.executor.get_async_compiled_graph"
+        ) as mock_graph_fn,
+        patch(
+            "lightagent.scheduler.executor.HeartbeatDelivery",
+            return_value=mock_delivery,
+        ),
+    ):
+        mock_graph = AsyncMock()
+        mock_graph.ainvoke = AsyncMock(
+            return_value={"messages": [MagicMock(content="done")]}
+        )
+        mock_graph_fn.return_value = mock_graph
+
+        executor = CronExecutor(manager=manager)
+        await executor._run_job("silent-job", "Silent task")
+
+    mock_delivery.send.assert_not_awaited()

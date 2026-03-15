@@ -7,6 +7,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from langchain_core.tools import BaseTool
 
 from lightagent.agents.tools import (
@@ -18,6 +20,7 @@ from lightagent.agents.tools import (
     RESEARCHER_TOOLS,
     code_executor,
     create_chart,
+    cron_add,
     doc_index,
     duckdb_query,
     evaluate,
@@ -299,3 +302,254 @@ def test_tool_groups_are_lists_of_base_tool() -> None:
         assert isinstance(group, list)
         for t in group:
             assert isinstance(t, BaseTool)
+
+
+def test_read_file_blocks_system_path() -> None:
+    """read_file must return an error string for blocked paths like /etc/passwd."""
+    from lightagent.agents.tools import read_file
+
+    result = read_file.invoke({"path": "/etc/passwd"})
+    assert "error" in result.lower() or "blocked" in result.lower()
+
+
+def test_write_file_blocks_system_path() -> None:
+    """write_file must return an error string for blocked paths like /etc/evil.txt."""
+    from lightagent.agents.tools import write_file
+
+    result = write_file.invoke({"path": "/etc/evil.txt", "content": "x"})
+    assert "error" in result.lower() or "blocked" in result.lower()
+
+
+def test_cron_add_tool_accepts_output_channel() -> None:
+    """cron_add tool passes output_channel and output_target to CronManager."""
+    with patch("lightagent.agents.tools.CronManager") as mock_cls:
+        mock_manager = MagicMock()
+        mock_manager.add.return_value = MagicMock(
+            name="hb",
+            schedule="0 8 * * *",
+            task="Morning check",
+            output_channel="telegram",
+            output_target="12345",
+            next_run=None,
+        )
+        mock_cls.return_value = mock_manager
+
+        result = cron_add.invoke({
+            "name": "hb",
+            "schedule": "0 8 * * *",
+            "task": "Morning check",
+            "output_channel": "telegram",
+            "output_target": "12345",
+        })
+
+    mock_manager.add.assert_called_once_with(
+        "hb",
+        "0 8 * * *",
+        "Morning check",
+        output_channel="telegram",
+        output_target="12345",
+    )
+    assert "telegram" in result
+
+
+def test_list_dir_returns_entries(tmp_path: Path) -> None:
+    """list_dir returns [DIR] and [FILE] tagged entries for a directory."""
+    from lightagent.agents.tools import list_dir
+    (tmp_path / "file1.txt").write_text("a")
+    (tmp_path / "subdir").mkdir()
+    result = list_dir.invoke({"path": str(tmp_path)})
+    assert "file1.txt" in result
+    assert "subdir" in result
+
+
+def test_list_dir_blocks_system_path() -> None:
+    """list_dir returns an error for blocked system paths."""
+    from lightagent.agents.tools import list_dir
+    result = list_dir.invoke({"path": "/etc"})
+    assert "error" in result.lower() or "blocked" in result.lower()
+
+
+def test_find_files_finds_by_pattern(tmp_path: Path) -> None:
+    """find_files returns files matching the glob pattern."""
+    from lightagent.agents.tools import find_files
+    (tmp_path / "main.py").write_text("x")
+    (tmp_path / "test_main.py").write_text("y")
+    (tmp_path / "readme.md").write_text("z")
+    result = find_files.invoke({"root": str(tmp_path), "pattern": "*.py"})
+    assert "main.py" in result
+    assert "test_main.py" in result
+    assert "readme.md" not in result
+
+
+def test_find_files_respects_max_results(tmp_path: Path) -> None:
+    """find_files returns at most max_results entries."""
+    from lightagent.agents.tools import find_files
+    for i in range(20):
+        (tmp_path / f"file{i}.txt").write_text("x")
+    result = find_files.invoke({"root": str(tmp_path), "pattern": "*.txt", "max_results": 5})
+    lines = [line for line in result.splitlines() if line.strip()]
+    assert len(lines) == 5
+
+
+# ---------------------------------------------------------------------------
+# create_dir tests
+# ---------------------------------------------------------------------------
+
+
+def test_create_dir_creates_nested(tmp_path: Path) -> None:
+    """create_dir creates a nested directory structure."""
+    from lightagent.agents.tools import create_dir
+    new_dir = tmp_path / "a" / "b" / "c"
+    result = create_dir.invoke({"path": str(new_dir)})
+    assert new_dir.exists()
+    assert "created" in result.lower()
+
+
+def test_create_dir_is_idempotent(tmp_path: Path) -> None:
+    """create_dir on an existing directory does not raise."""
+    from lightagent.agents.tools import create_dir
+    d = tmp_path / "existing"
+    d.mkdir()
+    result = create_dir.invoke({"path": str(d)})
+    assert isinstance(result, str)  # returns something, doesn't raise
+
+
+def test_create_dir_blocks_system_path() -> None:
+    """create_dir returns an error for blocked paths."""
+    from lightagent.agents.tools import create_dir
+    result = create_dir.invoke({"path": "/etc/newdir"})
+    assert "error" in result.lower() or "blocked" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# move_path tests
+# ---------------------------------------------------------------------------
+
+
+def test_move_path_renames_file(tmp_path: Path) -> None:
+    """move_path moves a file from src to dst."""
+    from lightagent.agents.tools import move_path
+    src = tmp_path / "src.txt"
+    dst = tmp_path / "dst.txt"
+    src.write_text("hello")
+    result = move_path.invoke({"src": str(src), "dst": str(dst)})
+    assert dst.exists()
+    assert not src.exists()
+    assert "moved" in result.lower()
+
+
+def test_move_path_returns_error_for_missing_src(tmp_path: Path) -> None:
+    """move_path returns an error if source does not exist."""
+    from lightagent.agents.tools import move_path
+    result = move_path.invoke({"src": str(tmp_path / "missing.txt"), "dst": str(tmp_path / "dst.txt")})
+    assert "error" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# delete_path tests
+# ---------------------------------------------------------------------------
+
+
+def test_delete_path_removes_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """delete_path removes a file when fs_delete_enabled is True."""
+    from lightagent.agents.tools import delete_path
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(fs_delete_enabled=True))
+    f = tmp_path / "todelete.txt"
+    f.write_text("bye")
+    result = delete_path.invoke({"path": str(f)})
+    assert not f.exists()
+    assert "deleted" in result.lower()
+
+
+def test_delete_path_blocked_when_disabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """delete_path returns an error when fs_delete_enabled is False."""
+    from lightagent.agents.tools import delete_path
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(fs_delete_enabled=False))
+    f = tmp_path / "safe.txt"
+    f.write_text("keep")
+    result = delete_path.invoke({"path": str(f)})
+    assert f.exists()
+    assert "not enabled" in result.lower() or "disabled" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# shell_exec tests
+# ---------------------------------------------------------------------------
+
+
+def test_shell_exec_blocked_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shell_exec returns an error when shell_enabled is False."""
+    from lightagent.agents.tools import shell_exec
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=False))
+    result = shell_exec.invoke({"command": "echo hello"})
+    assert "not enabled" in result.lower() or "disabled" in result.lower()
+
+
+def test_shell_exec_returns_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shell_exec returns the stdout of the command."""
+    from lightagent.agents.tools import shell_exec
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
+    result = shell_exec.invoke({"command": "echo hello_world"})
+    assert "hello_world" in result
+
+
+def test_shell_exec_captures_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shell_exec returns stderr content instead of raising."""
+    from lightagent.agents.tools import shell_exec
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
+    result = shell_exec.invoke({"command": "ls /nonexistent_path_xyz_abc_123"})
+    assert isinstance(result, str)
+    assert len(result) > 0
+
+
+def test_shell_exec_timeout_respected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shell_exec returns a timeout error when the command exceeds the limit."""
+    from lightagent.agents.tools import shell_exec
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
+    result = shell_exec.invoke({"command": "sleep 60", "timeout": 1})
+    assert "timeout" in result.lower() or "timed out" in result.lower()
+
+
+def test_shell_exec_rejects_empty_command(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shell_exec returns an error for blank commands."""
+    from lightagent.agents.tools import shell_exec
+    from lightagent.core.config import Settings
+    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
+    result = shell_exec.invoke({"command": "   "})
+    assert "empty" in result.lower() or "error" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# Tool list wire tests (Task 6)
+# ---------------------------------------------------------------------------
+
+
+def test_file_manager_tools_contains_new_tools() -> None:
+    """FILE_MANAGER_TOOLS must include all filesystem tools."""
+    from lightagent.agents.tools import FILE_MANAGER_TOOLS
+    tool_names = {t.name for t in FILE_MANAGER_TOOLS}
+    assert "list_dir" in tool_names
+    assert "find_files" in tool_names
+    assert "create_dir" in tool_names
+    assert "move_path" in tool_names
+    assert "delete_path" in tool_names
+
+
+def test_coder_tools_contains_shell_exec() -> None:
+    """CODER_TOOLS must include shell_exec."""
+    from lightagent.agents.tools import CODER_TOOLS
+    tool_names = {t.name for t in CODER_TOOLS}
+    assert "shell_exec" in tool_names
+
+
+def test_all_exports_new_tools() -> None:
+    """All new tools must appear in __all__."""
+    import lightagent.agents.tools as m
+    for name in ["list_dir", "find_files", "create_dir", "move_path", "delete_path", "shell_exec"]:
+        assert name in m.__all__, f"{name} missing from __all__"

@@ -397,3 +397,43 @@ class TestRetryFields:
         job = manager.get_job("reset-job")
         assert job is not None
         assert job.retry_count == 0
+
+
+# ── Output routing fields ─────────────────────────────────────────────────────
+
+
+def test_cron_job_has_output_channel_fields() -> None:
+    """CronJob model has output_channel and output_target with None defaults."""
+    job = CronJob(name="x", schedule="* * * * *", task="t")
+    assert job.output_channel is None
+    assert job.output_target is None
+
+
+def test_add_with_output_routing(tmp_path: Path) -> None:
+    """CronManager.add() persists output_channel and output_target."""
+    manager = CronManager(db_path=tmp_path / "test.db")
+    job = manager.add(
+        "notify-job",
+        "0 8 * * *",
+        "Morning check",
+        output_channel="telegram",
+        output_target="123456789",
+    )
+    assert job.output_channel == "telegram"
+    assert job.output_target == "123456789"
+    loaded = manager.get_job("notify-job")
+    assert loaded is not None
+    assert loaded.output_channel == "telegram"
+    assert loaded.output_target == "123456789"
+
+
+def test_add_without_output_routing_defaults_to_none(tmp_path: Path) -> None:
+    """CronManager.add() without output routing stores None for both fields."""
+    manager = CronManager(db_path=tmp_path / "test.db")
+    job = manager.add("silent-job", "0 9 * * *", "Silent task")
+    assert job.output_channel is None
+    assert job.output_target is None
+    loaded = manager.get_job("silent-job")
+    assert loaded is not None
+    assert loaded.output_channel is None
+    assert loaded.output_target is None

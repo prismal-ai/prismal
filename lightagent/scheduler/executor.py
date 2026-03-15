@@ -25,7 +25,9 @@ from apscheduler.jobstores.base import JobLookupError as APJobLookupError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from lightagent.agents.graph import get_async_compiled_graph
 from lightagent.scheduler.cron_manager import CronJob, CronManager
+from lightagent.scheduler.heartbeat_delivery import HeartbeatDelivery
 from lightagent.scheduler.notifier import CronNotifier
 
 logger = structlog.get_logger("lightagent.scheduler.executor")
@@ -266,8 +268,6 @@ class CronExecutor:
 
         from langchain_core.messages import HumanMessage
 
-        from lightagent.agents.graph import get_async_compiled_graph
-
         logger.info("cron_job_starting", name=name, task=task)
         started_at = datetime.now(UTC).replace(tzinfo=None)
 
@@ -310,8 +310,29 @@ class CronExecutor:
             # Send success notification (no-op when no channels are configured)
             await self._notifier.notify_success(job_name=name, output=output)
 
-            # Auto-remove one-shot jobs after they fire
+            # Proactive delivery: send output to the job's configured channel
             completed_job = self._manager.get_job(name)
+            if (
+                completed_job is not None
+                and completed_job.output_channel
+                and completed_job.output_target
+            ):
+                try:
+                    await HeartbeatDelivery().send(
+                        completed_job.output_channel,
+                        completed_job.output_target,
+                        str(output)
+                        if output is not None
+                        else f"Job '{name}' completed.",
+                    )
+                except Exception as delivery_exc:
+                    logger.warning(
+                        "cron_job_delivery_failed",
+                        name=name,
+                        error=str(delivery_exc),
+                    )
+
+            # Auto-remove one-shot jobs after they fire
             if completed_job is not None and completed_job.schedule.startswith("once:"):
                 import contextlib
 
