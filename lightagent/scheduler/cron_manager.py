@@ -55,7 +55,9 @@ CREATE TABLE IF NOT EXISTS cron_jobs (
     created_at          TEXT NOT NULL,
     max_retries         INTEGER NOT NULL DEFAULT 0,
     retry_delay_seconds INTEGER NOT NULL DEFAULT 60,
-    retry_count         INTEGER NOT NULL DEFAULT 0
+    retry_count         INTEGER NOT NULL DEFAULT 0,
+    output_channel      TEXT,
+    output_target       TEXT
 );
 """
 
@@ -133,6 +135,16 @@ class CronJob(BaseModel):
     retry_count: int = Field(
         default=0, ge=0, description="Current retry attempt count."
     )
+    output_channel: str | None = Field(
+        default=None,
+        description=(
+            "Delivery channel for job output (e.g. 'telegram', 'slack', 'email')."
+        ),
+    )
+    output_target: str | None = Field(
+        default=None,
+        description="Channel-specific target (chat_id, #channel, or email address).",
+    )
 
 
 # ── Manager ───────────────────────────────────────────────────────────────────
@@ -162,6 +174,7 @@ class CronManager:
         self._db = db_path or _DB_DEFAULT
         self._db.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
+        self._migrate_db()
 
     # ── private helpers ──────────────────────────────────────────────────────
 
@@ -198,6 +211,22 @@ class CronManager:
                 with contextlib.suppress(sqlite3.OperationalError):
                     conn.execute(sql)
 
+    def _migrate_db(self) -> None:
+        """Apply additive schema migrations for columns added after initial release."""
+        with self._conn() as conn:
+            existing = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(cron_jobs)").fetchall()
+            }
+            if "output_channel" not in existing:
+                conn.execute(
+                    "ALTER TABLE cron_jobs ADD COLUMN output_channel TEXT"
+                )
+            if "output_target" not in existing:
+                conn.execute(
+                    "ALTER TABLE cron_jobs ADD COLUMN output_target TEXT"
+                )
+
     @staticmethod
     def _row_to_job(row: sqlite3.Row) -> CronJob:
         """Convert a SQLite row to a CronJob model."""
@@ -216,6 +245,8 @@ class CronManager:
             max_retries=row["max_retries"] or 0,
             retry_delay_seconds=row["retry_delay_seconds"] or 60,
             retry_count=row["retry_count"] or 0,
+            output_channel=row["output_channel"],
+            output_target=row["output_target"],
         )
 
     def _require_job(self, name: str) -> None:
@@ -232,6 +263,8 @@ class CronManager:
         task: str,
         max_retries: int = 0,
         retry_delay_seconds: int = 60,
+        output_channel: str | None = None,
+        output_target: str | None = None,
     ) -> CronJob:
         """Create and persist a new cron job.
 
@@ -241,6 +274,8 @@ class CronManager:
             task: Human-readable description or Prefect flow name.
             max_retries: Maximum retry attempts on failure (default 0 = no retry).
             retry_delay_seconds: Base backoff delay in seconds (default 60).
+            output_channel: Delivery channel for job output (e.g. ``"telegram"``).
+            output_target: Channel-specific target (chat_id, #channel, email).
 
         Returns:
             The newly created :class:`CronJob`.
@@ -262,6 +297,8 @@ class CronManager:
             next_run=next_dt,
             max_retries=max_retries,
             retry_delay_seconds=retry_delay_seconds,
+            output_channel=output_channel,
+            output_target=output_target,
         )
         created = job.created_at.strftime(_DT_FMT)
         next_stamp = next_dt.strftime(_DT_FMT)
@@ -270,11 +307,13 @@ class CronManager:
             conn.execute(
                 "INSERT INTO cron_jobs"
                 " (name, schedule, task, status, created_at, next_run,"
-                "  max_retries, retry_delay_seconds, retry_count)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "  max_retries, retry_delay_seconds, retry_count,"
+                "  output_channel, output_target)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, schedule, task, job.status, created, next_stamp,
                     max_retries, retry_delay_seconds, 0,
+                    output_channel, output_target,
                 ),
             )
 

@@ -70,7 +70,8 @@ async def test_supervisor_routes_to_end_when_done() -> None:
     state = create_initial_state(session_id="sess-test-end")
     state["messages"] = [HumanMessage(content="What is 2+2?")]
 
-    # First call returns routing decision "END"; second call returns the answer.
+    # First call returns routing decision "END"; second call (via bind_tools)
+    # returns the answer.
     mock_llm = MagicMock()
     mock_llm.ainvoke = AsyncMock(
         side_effect=[
@@ -78,6 +79,8 @@ async def test_supervisor_routes_to_end_when_done() -> None:
             AIMessage(content="2+2 equals 4."),
         ]
     )
+    # bind_tools must return the same mock so its ainvoke AsyncMock is preserved.
+    mock_llm.bind_tools.return_value = mock_llm
 
     with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
         mock_registry.return_value.get_llm_with_fallback.return_value = mock_llm
@@ -101,6 +104,8 @@ async def test_supervisor_handles_invalid_routing() -> None:
             AIMessage(content="I can help with that."),
         ]
     )
+    # bind_tools must return the same mock so its ainvoke AsyncMock is preserved.
+    mock_llm.bind_tools.return_value = mock_llm
 
     with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
         mock_registry.return_value.get_llm_with_fallback.return_value = mock_llm

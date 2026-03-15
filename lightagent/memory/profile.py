@@ -1,13 +1,15 @@
 """
 Agent and user profile management via markdown files.
 
-Follows a three-file markdown architecture:
+Follows a four-file markdown architecture:
 
 - ``SOUL.md``: Agent name, persona, tone, communication style.
   Personalidad pura — puede ser reseteada sin perder capacidades.
 - ``CAPACITIES.md``: Permanent agent capabilities (skills, MCPs, RAG,
   data tools, agents).  Never deleted on reset.
 - ``USER.md``: User identity, name, known facts and preferences.
+- ``PREFERENCES.md``: Learned user preferences (language, stack, workflow,
+  project context).  Written by ``PreferencesManager`` — human-editable.
 
 All files are stored under ``data/workspace/profile/`` and loaded at
 chat startup to build the system prompt.
@@ -83,6 +85,7 @@ class ProfileManager:
         self._soul = self._dir / "SOUL.md"
         self._capacities = self._dir / "CAPACITIES.md"
         self._user = self._dir / "USER.md"
+        self._preferences = self._dir / "PREFERENCES.md"
 
     # ------------------------------------------------------------------
     # Status
@@ -158,14 +161,31 @@ class ProfileManager:
             return ""
         return self._user.read_text(encoding="utf-8")
 
+    def load_preferences(self) -> str:
+        """
+        Return the full PREFERENCES.md content, or empty string if not present.
+
+        PREFERENCES.md contains learned user preferences (communication style,
+        tech stack, workflow, project context).  It is written by
+        :class:`~lightagent.memory.preferences.PreferencesManager` and is also
+        human-editable at any time.
+
+        Returns:
+            Raw markdown text of PREFERENCES.md.
+        """
+        if not self._preferences.exists():
+            return ""
+        return self._preferences.read_text(encoding="utf-8")
+
     def load_system_prompt(self) -> str:
         """
-        Build the complete system prompt by combining SOUL, CAPACITIES and USER.
+        Build the complete system prompt combining SOUL, CAPACITIES, USER, PREFERENCES.
 
         Concatenation order:
           1. SOUL.md — persona and communication style (may be absent after reset)
           2. CAPACITIES.md — permanent capabilities (always present when configured)
           3. USER.md — user context and preferences (may be absent)
+          4. PREFERENCES.md — learned user preferences (may be absent)
 
         Returns:
             Combined markdown string ready to be used as the LLM system prompt.
@@ -181,6 +201,9 @@ class ProfileManager:
         user_ctx = self.load_user_context()
         if user_ctx:
             parts.append(f"## User Context\n\n{user_ctx}")
+        preferences = self.load_preferences()
+        if preferences:
+            parts.append(f"## User Preferences\n\n{preferences}")
         return "\n\n---\n\n".join(parts)
 
     # ------------------------------------------------------------------

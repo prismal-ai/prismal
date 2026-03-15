@@ -283,15 +283,46 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
             if getattr(last, "type", "") == "human":
                 # Build the answer system prompt by combining:
                 #   SOUL.md (persona) + CAPACITIES.md (permanent capabilities)
-                #   + USER.md (user context).
+                #   + USER.md (user context) + PREFERENCES.md (learned prefs).
                 # load_system_prompt() handles the concatenation and falls back
                 # to an empty string when none of the files exist.
                 profile = ProfileManager()
                 answer_system = profile.load_system_prompt() or _ANSWER_SYSTEM_PROMPT
-                answer_resp = await llm.ainvoke(
+
+                # Bind remember_preference so the LLM can call it when the user
+                # makes an explicit "remember that…" request.
+                from lightagent.agents.tools import SUPERVISOR_DIRECT_TOOLS
+
+                llm_with_tools = llm.bind_tools(SUPERVISOR_DIRECT_TOOLS)
+                answer_resp = await llm_with_tools.ainvoke(
                     [SystemMessage(content=answer_system), *trimmed]
                 )
-                response_messages = [AIMessage(content=str(answer_resp.content))]
+
+                # If the LLM decided to call remember_preference, invoke it
+                # and replace the response with a human-readable confirmation.
+                tool_calls = getattr(answer_resp, "tool_calls", None) or []
+                if tool_calls:
+                    tool_results: list[str] = []
+                    for tc in tool_calls:
+                        if tc.get("name") == "remember_preference":
+                            from lightagent.agents.tools import remember_preference
+
+                            result = remember_preference.invoke(tc.get("args", {}))
+                            tool_results.append(str(result))
+                            logger.info(
+                                "supervisor.remember_preference_called",
+                                args=tc.get("args", {}),
+                                result=result,
+                                session_id=session_id,
+                            )
+                    if tool_results:
+                        answer_content = "\n".join(tool_results)
+                    else:
+                        answer_content = str(answer_resp.content)
+                else:
+                    answer_content = str(answer_resp.content)
+
+                response_messages = [AIMessage(content=answer_content)]
 
         return {
             "current_agent": "supervisor",

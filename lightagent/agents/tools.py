@@ -3,37 +3,94 @@
 Fallback tool implementations used when no live MCP or skill tool overrides them.
 
 Every tool here is a real implementation that connects to the actual backend:
-- ``web_search``        — DuckDuckGo via ``langchain-community``
-- ``rag_search``        — ChromaDB via :class:`~lightagent.rag.engine.RAGEngine`
-- ``vector_search``     — ChromaDB nearest-neighbour search
-- ``doc_index``         — RAGEngine file/directory indexer
-- ``read_file``         — Filesystem read (workspace-sandboxed)
-- ``write_file``        — Filesystem write (workspace-sandboxed)
-- ``code_executor``     — Sandboxed Python subprocess (requires ``shell_enabled``)
-- ``evaluate``          — LLM-based qualitative evaluation
-- ``score``             — LLM-based numeric scorer
-- ``duckdb_query``      — :class:`~lightagent.data.duckdb_engine.DuckDBEngine` SQL
-- ``polars_transform``  — Polars DataFrame operations via ``polars_utils``
-- ``create_chart``      — Matplotlib chart via :func:`~lightagent.data.polars_utils.save_chart`
-- ``list_mcp_tools``    — Enumerates connected MCP server tools
+- ``web_search``          — Tavily (primary) / DuckDuckGo (fallback)
+- ``rag_search``          — ChromaDB via :class:`~lightagent.rag.engine.RAGEngine`
+- ``vector_search``       — ChromaDB nearest-neighbour search
+- ``doc_index``           — RAGEngine file/directory indexer
+- ``read_file``           — Filesystem read (workspace-sandboxed)
+- ``write_file``          — Filesystem write (workspace-sandboxed)
+- ``code_executor``       — Sandboxed Python subprocess (requires ``shell_enabled``)
+- ``evaluate``            — LLM-based qualitative evaluation
+- ``score``               — LLM-based numeric scorer
+- ``duckdb_query``        — :class:`~lightagent.data.duckdb_engine.DuckDBEngine` SQL
+- ``polars_transform``    — Polars DataFrame operations via ``polars_utils``
+- ``create_chart``        — Matplotlib chart via
+  :func:`~lightagent.data.polars_utils.save_chart`
+- ``list_mcp_tools``      — Enumerates connected MCP server tools
+- ``remember_preference`` — Writes a user preference fact to ``PREFERENCES.md``
 """
 
 from __future__ import annotations
 
 from langchain_core.tools import BaseTool, tool
 
+from lightagent.core.config import get_settings
+from lightagent.scheduler.cron_manager import CronManager
+from lightagent.security.filesystem_guard import FilesystemGuard, PathViolation
+
+
+def _get_fs_guard() -> FilesystemGuard:
+    """Return a FilesystemGuard configured from current settings.
+
+    When ``fs_allow_outside_workspace`` is ``True``, the guard is created
+    with ``workspace_root=None`` so no path restriction is applied.
+    Otherwise ``fs_workspace_root`` is used when set.
+
+    Returns:
+        A :class:`~lightagent.security.filesystem_guard.FilesystemGuard`
+        instance configured according to current settings.
+    """
+    from lightagent.core.config import get_settings
+
+    s = get_settings()
+    if s.fs_allow_outside_workspace:
+        workspace = None
+    else:
+        workspace = s.fs_workspace_root if s.fs_workspace_root else None
+    return FilesystemGuard(workspace_root=workspace)
+
 
 @tool
 def web_search(query: str) -> str:
-    """Search the web for up-to-date information using DuckDuckGo.
+    """Search the web for up-to-date information.
+
+    Uses Tavily (primary) when ``TAVILY_API_KEY`` is set, and falls back to
+    DuckDuckGo otherwise.
 
     Args:
         query: The search query string.
 
     Returns:
         Formatted search results with titles, URLs and snippets, or an
-        error message if the search backend is unavailable.
+        error message if both backends are unavailable.
     """
+    import os
+
+    tavily_key = os.environ.get("TAVILY_API_KEY", "")
+    if tavily_key:
+        try:
+            from langchain_community.tools.tavily_search import TavilySearchResults
+
+            results = TavilySearchResults(max_results=5).run(query)
+            if isinstance(results, list):
+                parts = [
+                    (
+                        f"{i + 1}. {r.get('title', '')}\n"
+                        f"   {r.get('url', '')}\n"
+                        f"   {r.get('content', '')[:300]}"
+                    )
+                    for i, r in enumerate(results)
+                ]
+                return (
+                    "\n\n".join(parts) if parts else f"No results found for: {query!r}"
+                )
+            return str(results) if results else f"No results found for: {query!r}"
+        except Exception as exc:
+            # Tavily failed — fall through to DuckDuckGo
+            _tavily_err = str(exc)
+    else:
+        _tavily_err = "TAVILY_API_KEY not set"
+
     try:
         from langchain_community.tools import DuckDuckGoSearchRun
 
@@ -41,8 +98,8 @@ def web_search(query: str) -> str:
         return results if results else f"No results found for: {query!r}"
     except Exception as exc:
         return (
-            f"Web search unavailable: {exc!s}\n"
-            "Tip: install 'duckduckgo-search' or configure a search MCP server."
+            f"Web search unavailable (Tavily: {_tavily_err}; DuckDuckGo: {exc!s}).\n"
+            "Set TAVILY_API_KEY in .env or install 'ddgs'."
         )
 
 
@@ -89,27 +146,19 @@ def read_file(path: str) -> str:
     Returns:
         File contents as a string, or an error message on failure.
     """
-    from pathlib import Path
+    try:
+        guard = _get_fs_guard()
+        resolved = guard.validate(path, write=False)
+    except PathViolation as exc:
+        return f"Error: {exc}"
 
-    _BLOCKED_PREFIXES = ("/etc/", "/sys/", "/proc/", "/dev/", "/root/", "/boot/")
-
-    src = Path(path).expanduser().resolve()
-    str_src = str(src)
-
-    for prefix in _BLOCKED_PREFIXES:
-        if str_src.startswith(prefix):
-            return f"Access denied: '{path}' is a system path."
-    # Also block .ssh and AWS credentials
-    if ".ssh" in src.parts or ".aws" in src.parts:
-        return f"Access denied: '{path}' contains sensitive directories."
-
-    if not src.exists():
+    if not resolved.exists():
         return f"File not found: {path}"
-    if not src.is_file():
+    if not resolved.is_file():
         return f"Not a file: {path}"
 
     try:
-        content = src.read_text(encoding="utf-8", errors="replace")
+        content = resolved.read_text(encoding="utf-8", errors="replace")
         if len(content) > 20_000:
             content = content[:20_000] + "\n…[file truncated at 20 000 chars]"
         return content
@@ -133,27 +182,217 @@ def write_file(path: str, content: str) -> str:
     """
     from pathlib import Path
 
-    _BLOCKED_PREFIXES = ("/etc/", "/sys/", "/proc/", "/dev/", "/root/", "/boot/")
-
-    dest = Path(path).expanduser()
-    if not dest.is_absolute():
-        dest = Path("data/workspace") / dest
-
-    dest = dest.resolve()
-    str_dest = str(dest)
-
-    for prefix in _BLOCKED_PREFIXES:
-        if str_dest.startswith(prefix):
-            return f"Access denied: '{path}' is a system path."
-    if ".ssh" in dest.parts or ".aws" in dest.parts:
-        return f"Access denied: '{path}' contains sensitive directories."
+    raw = Path(path).expanduser()
+    if not raw.is_absolute():
+        raw = Path("data/workspace") / raw
 
     try:
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(content, encoding="utf-8")
-        return f"File written: {dest} ({len(content)} chars)"
+        guard = _get_fs_guard()
+        resolved = guard.validate(str(raw), write=True)
+    except PathViolation as exc:
+        return f"Error: {exc}"
+
+    try:
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+        resolved.write_text(content, encoding="utf-8")
+        return f"File written: {resolved} ({len(content)} chars)"
     except Exception as exc:
         return f"Error writing file: {exc!s}"
+
+
+@tool
+def list_dir(path: str) -> str:
+    """List the contents of a directory.
+
+    Args:
+        path: Absolute path to the directory to list.
+
+    Returns:
+        Newline-separated list of entries with [DIR] / [FILE] prefixes,
+        or an error message if the path is invalid or blocked.
+    """
+    try:
+        guard = _get_fs_guard()
+        resolved = guard.validate(path, write=False)
+    except PathViolation as exc:
+        return f"Error: {exc}"
+
+    if not resolved.is_dir():
+        return f"Error: Not a directory: {resolved}"
+
+    entries: list[str] = []
+    try:
+        for entry in sorted(resolved.iterdir()):
+            tag = "[DIR] " if entry.is_dir() else "[FILE]"
+            entries.append(f"{tag} {entry.name}")
+    except PermissionError:
+        return f"Error: Permission denied reading directory: {resolved}"
+
+    return "\n".join(entries) if entries else "(empty directory)"
+
+
+@tool
+def find_files(root: str, pattern: str, max_results: int = 100) -> str:
+    """Recursively find files matching a glob pattern under a root directory.
+
+    Args:
+        root: Absolute path to search root.
+        pattern: Glob pattern, e.g. ``"*.py"`` or ``"**/*.yaml"``.
+        max_results: Maximum number of results to return (default 100).
+
+    Returns:
+        Newline-separated list of relative paths, or an error message.
+    """
+    try:
+        guard = _get_fs_guard()
+        resolved = guard.validate(root, write=False)
+    except PathViolation as exc:
+        return f"Error: {exc}"
+
+    if not resolved.is_dir():
+        return f"Error: Not a directory: {resolved}"
+
+    matches: list[str] = []
+    for p in resolved.rglob(pattern):
+        if p.is_file():
+            matches.append(str(p.relative_to(resolved)))
+            if len(matches) >= max_results:
+                break
+
+    if not matches:
+        return f"No files found matching '{pattern}' under {resolved}"
+    return "\n".join(matches)
+
+
+@tool
+def create_dir(path: str) -> str:
+    """Create a directory (and all intermediate parents).
+
+    Args:
+        path: Absolute path of the directory to create.
+
+    Returns:
+        Confirmation string or error message.
+    """
+    try:
+        guard = _get_fs_guard()
+        resolved = guard.validate(path, write=True)
+    except PathViolation as exc:
+        return f"Error: {exc}"
+
+    if resolved.exists():
+        return f"Already exists: {resolved}"
+    resolved.mkdir(parents=True, exist_ok=True)
+    return f"Created directory: {resolved}"
+
+
+@tool
+def move_path(src: str, dst: str) -> str:
+    """Move or rename a file or directory.
+
+    Args:
+        src: Source path (absolute).
+        dst: Destination path (absolute).
+
+    Returns:
+        Confirmation string or error message.
+    """
+    import shutil
+
+    try:
+        guard = _get_fs_guard()
+        src_resolved = guard.validate(src, write=True)
+        dst_resolved = guard.validate(dst, write=True)
+    except PathViolation as exc:
+        return f"Error: {exc}"
+
+    if not src_resolved.exists():
+        return f"Error: Source does not exist: {src_resolved}"
+
+    shutil.move(str(src_resolved), str(dst_resolved))
+    return f"Moved: {src_resolved} → {dst_resolved}"
+
+
+@tool
+def delete_path(path: str) -> str:
+    """Delete a file or directory tree.
+
+    Requires ``LIGHTAGENT_FS_DELETE_ENABLED=true`` in the environment.
+
+    Args:
+        path: Absolute path to delete.
+
+    Returns:
+        Confirmation string or error message.
+    """
+    import shutil
+
+    if not get_settings().fs_delete_enabled:
+        return (
+            "Error: delete_path is not enabled. "
+            "Set LIGHTAGENT_FS_DELETE_ENABLED=true."
+        )
+
+    try:
+        guard = _get_fs_guard()
+        resolved = guard.validate(path, write=True)
+    except PathViolation as exc:
+        return f"Error: {exc}"
+
+    if not resolved.exists():
+        return f"Error: Path does not exist: {resolved}"
+
+    if resolved.is_dir():
+        shutil.rmtree(resolved)
+    else:
+        resolved.unlink()
+
+    return f"Deleted: {resolved}"
+
+@tool
+def shell_exec(command: str, timeout: int = 30, workdir: str = "") -> str:
+    """Execute a shell command and return its combined stdout+stderr output.
+
+    Requires ``LIGHTAGENT_SHELL_ENABLED=true``.
+    Timeout is clamped to 1-120 seconds.
+
+    Args:
+        command: The shell command to run (executed via ``bash -c``).
+        timeout: Maximum seconds to wait (default 30, max 120).
+        workdir: Working directory for the command. Defaults to CWD.
+
+    Returns:
+        Combined stdout and stderr output, or an error/timeout message.
+    """
+    import subprocess
+
+    s = get_settings()
+    if not s.shell_enabled:
+        return "Error: shell_exec is not enabled. Set LIGHTAGENT_SHELL_ENABLED=true."
+
+    cmd = command.strip()
+    if not cmd:
+        return "Error: empty command"
+
+    effective_timeout = max(1, min(timeout, 120))
+    cwd = workdir.strip() or None
+
+    try:
+        proc = subprocess.run(
+            ["bash", "-c", cmd],
+            capture_output=True,
+            text=True,
+            timeout=effective_timeout,
+            cwd=cwd,
+        )
+        output = proc.stdout
+        if proc.stderr:
+            output += ("\n" if output else "") + proc.stderr
+        return output.strip() or "(no output)"
+    except subprocess.TimeoutExpired:
+        return f"Error: Command timed out after {effective_timeout}s"
+    except Exception as exc:
+        return f"Error executing command: {exc}"
 
 
 @tool
@@ -263,10 +502,7 @@ def doc_index(path: str, collection: str = "default") -> str:
 
     try:
         engine = RAGEngine(collection_name=collection)
-        if src.is_dir():
-            count = engine.index_directory(str(src))
-        else:
-            count = engine.index_file(str(src))
+        count = engine.index_directory(src) if src.is_dir() else engine.index_file(src)
         return (
             f"Indexed {count} chunk(s) from '{src}' "
             f"into collection '{collection}'."
@@ -367,10 +603,18 @@ def duckdb_query(sql: str, source: str = "") -> str:
     try:
         from lightagent.data.duckdb_engine import DuckDBEngine
 
-        db_path = source if source and not source.endswith((".csv", ".parquet")) else ":memory:"
+        is_file_source = source and not source.endswith((".csv", ".parquet"))
+        db_path = source if is_file_source else ":memory:"
         with DuckDBEngine(db_path) as engine:
             if source and source.endswith((".csv", ".parquet")):
-                engine._conn.execute(f"CREATE VIEW data AS SELECT * FROM read_csv_auto('{source}')") if source.endswith(".csv") else engine._conn.execute(f"CREATE VIEW data AS SELECT * FROM parquet_scan('{source}')")
+                if source.endswith(".csv"):
+                    engine._conn.execute(
+                        f"CREATE VIEW data AS SELECT * FROM read_csv_auto('{source}')"  # noqa: S608
+                    )
+                else:
+                    engine._conn.execute(
+                        f"CREATE VIEW data AS SELECT * FROM parquet_scan('{source}')"  # noqa: S608
+                    )
             rows = engine.query(sql)
         if not rows:
             return "Query returned no rows."
@@ -426,7 +670,10 @@ def polars_transform(operation: str, data_source: str) -> str:
         return f"Data source not found: {data_source}"
 
     try:
-        df = pl.read_csv(str(src)) if src.suffix == ".csv" else pl.read_parquet(str(src))
+        if src.suffix == ".csv":
+            df = pl.read_csv(str(src))
+        else:
+            df = pl.read_parquet(str(src))
     except Exception as exc:
         return f"Error reading data source: {exc!s}"
 
@@ -448,7 +695,7 @@ def polars_transform(operation: str, data_source: str) -> str:
                     val = val_str.strip("'\"")
             df = filter_rows(df, col, operator, val)  # type: ignore[arg-type]
 
-        elif op.startswith("groupby") or op.startswith("group by"):
+        elif op.startswith(("groupby", "group by")):
             m = re.match(r"group\s*by\s+(\w+)\s+(sum|mean|count|min|max)\s+(\w+)", op)
             if not m:
                 return "groupby syntax: groupby <col> <sum|mean|count> <value_col>"
@@ -458,7 +705,7 @@ def polars_transform(operation: str, data_source: str) -> str:
             m = re.match(r"sort\s+(\w+)(\s+desc)?", op)
             if not m:
                 return "sort syntax: sort <col> [desc]"
-            df = sort_by(df, m.group(1), descending=bool(m.group(2)))
+            df = sort_by(df, m.group(1), ascending=not bool(m.group(2)))
 
         elif op.startswith("select"):
             cols_str = re.sub(r"^select\s+", "", op).strip()
@@ -539,7 +786,8 @@ def create_chart(data: str, chart_type: str = "bar", title: str = "") -> str:
     else:
         x_col, y_col = str_cols[0], num_cols[0]
 
-    output_path = Path("data/workspace") / f"chart_{title.replace(' ', '_') or 'chart'}.png"
+    chart_name = f"chart_{title.replace(' ', '_') or 'chart'}.png"
+    output_path = Path("data/workspace") / chart_name
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -594,38 +842,60 @@ def list_mcp_tools(server_name: str = "") -> str:
 
 
 @tool
-def cron_add(name: str, schedule: str, task: str) -> str:
-    """Schedule a recurring agent task using a cron expression.
+def cron_add(
+    name: str,
+    schedule: str,
+    task: str,
+    output_channel: str = "",
+    output_target: str = "",
+) -> str:
+    """Schedule a new recurring cron job.
 
-    Creates a persistent cron job that will execute the given task description
-    on the specified schedule. The job survives process restarts.
+    Use this when the user wants to automate a task on a schedule.
+    Optionally specify an output channel to receive proactive reports.
 
     Args:
-        name: Unique identifier for this scheduled job (e.g. 'daily-brief').
-        schedule: Standard 5-field cron expression (e.g. '0 9 * * *' for 9 AM daily).
-        task: Human-readable description of what the agent should do when the job fires.
+        name: Unique job name.
+        schedule: Cron expression (e.g. '0 9 * * *' for 9 AM daily).
+        task: Natural-language task description the agent will perform.
+        output_channel: Optional delivery channel for the job output.
+            One of: 'telegram', 'slack', 'discord', 'email'.
+            Leave empty to suppress proactive delivery.
+        output_target: Channel-specific destination.
+            telegram -> chat_id, slack -> #channel,
+            discord -> webhook URL, email -> address.
+            Leave empty when output_channel is empty.
 
     Returns:
-        Confirmation string with next scheduled run time, or error message.
+        Confirmation message with the next scheduled run time.
     """
+    from lightagent.scheduler.executor import get_running_executor
+
+    manager = CronManager()
     try:
-
-        from lightagent.scheduler.cron_manager import CronManager
-        from lightagent.scheduler.executor import get_running_executor
-
-        mgr = CronManager()
-        job = mgr.add(name, schedule, task)
-        # Hot-add to running executor if available
-        executor = get_running_executor()
-        if executor is not None:
-            executor.schedule_coroutine(executor.add_job(job))
-        if job.next_run:
-            next_run = job.next_run.strftime("%Y-%m-%d %H:%M UTC")
-        else:
-            next_run = "unknown"
-        return f"Scheduled '{name}' ({schedule}). Next run: {next_run}"
-    except Exception as exc:
-        return f"Failed to schedule job: {exc}"
+        job = manager.add(
+            name,
+            schedule,
+            task,
+            output_channel=output_channel or None,
+            output_target=output_target or None,
+        )
+    except ValueError as exc:
+        return f"Failed to schedule job '{name}': {exc}"
+    executor = get_running_executor()
+    if executor is not None:
+        executor.schedule_coroutine(executor.add_job(job))
+    next_run = (
+        job.next_run.strftime("%Y-%m-%d %H:%M UTC") if job.next_run else "unknown"
+    )
+    routing = (
+        f" Output will be delivered to {output_channel}:{output_target}."
+        if output_channel and output_target
+        else ""
+    )
+    return (
+        f"Scheduled job '{name}' ({schedule}). Next run: {next_run}.{routing}"
+    )
 
 
 @tool
@@ -807,12 +1077,53 @@ def cron_remove(name: str) -> str:
         return f"Failed to remove job: {exc}"
 
 
+@tool
+def remember_preference(section: str, fact: str) -> str:
+    """Save a user preference fact to PREFERENCES.md immediately.
+
+    Call this tool when the user explicitly states a preference they want
+    remembered (e.g. "remember that I prefer ruff in all projects").
+
+    Valid *section* values:
+    - ``"communication_style"`` — language, tone, verbosity, response format
+    - ``"tech_stack"`` — languages, frameworks, tools, package managers
+    - ``"workflow"`` — planning approach, commit style, testing practices
+    - ``"project_context"`` — project names, directories, team context
+
+    Args:
+        section: Category key — one of the four valid values listed above.
+        fact: Free-text preference to remember (e.g. "Uses ruff in all projects").
+
+    Returns:
+        Confirmation message indicating the fact was saved, or an error
+        description if the section is invalid or a write failure occurs.
+    """
+    try:
+        from lightagent.memory.preferences import PreferencesManager
+
+        mgr = PreferencesManager()
+        mgr.set_fact(section, fact)
+        section_label = {
+            "communication_style": "Estilo de Comunicacion",
+            "tech_stack": "Stack Tecnico",
+            "workflow": "Flujo de Trabajo",
+            "project_context": "Contexto del Proyecto",
+        }.get(section, section)
+        return f"Remembered: \"{fact}\" → {section_label}"
+    except Exception as exc:
+        return f"Failed to save preference: {exc!s}"
+
+
+SUPERVISOR_DIRECT_TOOLS: list[BaseTool] = [remember_preference]
+
 RESEARCHER_TOOLS: list[BaseTool] = [web_search, rag_search, read_file, list_mcp_tools]
-CODER_TOOLS: list[BaseTool] = [code_executor, read_file, write_file]
+CODER_TOOLS: list[BaseTool] = [code_executor, read_file, write_file, shell_exec]
 RAG_AGENT_TOOLS: list[BaseTool] = [vector_search, doc_index, web_search]
 CRITIC_TOOLS: list[BaseTool] = [evaluate, score]
 DATA_ANALYST_TOOLS: list[BaseTool] = [duckdb_query, polars_transform, create_chart]
-FILE_MANAGER_TOOLS: list[BaseTool] = [read_file, write_file]
+FILE_MANAGER_TOOLS: list[BaseTool] = [
+    read_file, write_file, list_dir, find_files, create_dir, move_path, delete_path
+]
 CRON_MANAGER_TOOLS: list[BaseTool] = [
     get_current_time,
     cron_once,
@@ -831,23 +1142,31 @@ __all__ = [
     "FILE_MANAGER_TOOLS",
     "RAG_AGENT_TOOLS",
     "RESEARCHER_TOOLS",
+    "SUPERVISOR_DIRECT_TOOLS",
     "code_executor",
     "create_chart",
+    "create_dir",
     "cron_add",
     "cron_list",
     "cron_once",
     "cron_pause",
     "cron_remove",
     "cron_resume",
+    "delete_path",
     "doc_index",
     "duckdb_query",
     "evaluate",
+    "find_files",
     "get_current_time",
+    "list_dir",
     "list_mcp_tools",
+    "move_path",
     "polars_transform",
     "rag_search",
     "read_file",
+    "remember_preference",
     "score",
+    "shell_exec",
     "vector_search",
     "web_search",
     "write_file",
