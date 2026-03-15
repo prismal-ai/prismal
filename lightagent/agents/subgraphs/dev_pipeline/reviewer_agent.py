@@ -14,12 +14,14 @@ import structlog
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from lightagent.agents.subgraphs.artifacts import ReviewResult
+from lightagent.monitoring.otel import OTelManager
 from lightagent.providers.registry import ProviderRegistry
 
 if TYPE_CHECKING:
     from lightagent.agents.state import AgentState
 
 logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.reviewer")
+otel = OTelManager()
 
 _SYSTEM = (
     "You are a Senior Code Reviewer. Review all pipeline artifacts.\n"
@@ -39,30 +41,36 @@ async def reviewer_agent_node(state: AgentState) -> dict[str, Any]:
     Returns:
         Partial state update with ReviewResult in metadata.
     """
-    dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
+    with otel.start_span("dev_pipeline.reviewer") as span:
+        span.set_attribute("lightagent.subgraph", "dev_pipeline")
+        span.set_attribute("lightagent.agent", "reviewer")
 
-    llm = ProviderRegistry().get_llm()
-    messages = [
-        SystemMessage(content=_SYSTEM),
-        HumanMessage(content=f"Pipeline artifacts:\n{json.dumps(dp, indent=2)}"),
-    ]
-    response = await llm.ainvoke(messages)
-    content = str(response.content)
+        dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
 
-    try:
-        data = json.loads(content)
-        result = ReviewResult.model_validate(data)
-    except Exception:
-        result = ReviewResult(score=0.0, approved=False, strengths=[], improvements=[])
+        llm = ProviderRegistry().get_llm()
+        messages = [
+            SystemMessage(content=_SYSTEM),
+            HumanMessage(content=f"Pipeline artifacts:\n{json.dumps(dp, indent=2)}"),
+        ]
+        response = await llm.ainvoke(messages)
+        content = str(response.content)
 
-    dp["review_result"] = result.model_dump()
-    logger.info("reviewer.result", score=result.score, approved=result.approved)
+        try:
+            data = json.loads(content)
+            result = ReviewResult.model_validate(data)
+        except Exception:
+            result = ReviewResult(
+                score=0.0, approved=False, strengths=[], improvements=[]
+            )
 
-    verdict = "APPROVED" if result.approved else "NEEDS REVISION"
-    return {
-        "current_agent": "reviewer",
-        "messages": [
-            AIMessage(content=f"Review score: {result.score:.2f} | {verdict}")
-        ],
-        "metadata": {**state.get("metadata", {}), "dev_pipeline": dp},
-    }
+        dp["review_result"] = result.model_dump()
+        logger.info("reviewer.result", score=result.score, approved=result.approved)
+
+        verdict = "APPROVED" if result.approved else "NEEDS REVISION"
+        return {
+            "current_agent": "reviewer",
+            "messages": [
+                AIMessage(content=f"Review score: {result.score:.2f} | {verdict}")
+            ],
+            "metadata": {**state.get("metadata", {}), "dev_pipeline": dp},
+        }

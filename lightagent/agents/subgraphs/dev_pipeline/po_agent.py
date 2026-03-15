@@ -14,12 +14,14 @@ import structlog
 from langchain_core.messages import AIMessage, SystemMessage
 
 from lightagent.agents.subgraphs.artifacts import UserStory
+from lightagent.monitoring.otel import OTelManager
 from lightagent.providers.registry import ProviderRegistry
 
 if TYPE_CHECKING:
     from lightagent.agents.state import AgentState
 
 logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.po_agent")
+otel = OTelManager()
 
 _SYSTEM = (
     "You are a Product Owner. Given a feature request, write a structured user story.\n"
@@ -40,23 +42,27 @@ async def po_agent_node(state: AgentState) -> dict[str, Any]:
     Returns:
         Partial state update with ``current_agent`` and updated ``metadata``.
     """
-    llm = ProviderRegistry().get_llm()
-    messages = [SystemMessage(content=_SYSTEM), *list(state["messages"][-3:])]
-    response = await llm.ainvoke(messages)
-    content = str(response.content)
+    with otel.start_span("dev_pipeline.po_agent") as span:
+        span.set_attribute("lightagent.subgraph", "dev_pipeline")
+        span.set_attribute("lightagent.agent", "po_agent")
 
-    try:
-        data = json.loads(content)
-        story = UserStory.model_validate(data)
-    except Exception:
-        story = UserStory(id="s1", title="Feature", description=content)
+        llm = ProviderRegistry().get_llm()
+        messages = [SystemMessage(content=_SYSTEM), *list(state["messages"][-3:])]
+        response = await llm.ainvoke(messages)
+        content = str(response.content)
 
-    dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
-    dp["user_story"] = story.model_dump()
+        try:
+            data = json.loads(content)
+            story = UserStory.model_validate(data)
+        except Exception:
+            story = UserStory(id="s1", title="Feature", description=content)
 
-    logger.info("po_agent.story_created", story_id=story.id, title=story.title)
-    return {
-        "current_agent": "po_agent",
-        "messages": [AIMessage(content=f"UserStory created: {story.title}")],
-        "metadata": {**state.get("metadata", {}), "dev_pipeline": dp},
-    }
+        dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
+        dp["user_story"] = story.model_dump()
+
+        logger.info("po_agent.story_created", story_id=story.id, title=story.title)
+        return {
+            "current_agent": "po_agent",
+            "messages": [AIMessage(content=f"UserStory created: {story.title}")],
+            "metadata": {**state.get("metadata", {}), "dev_pipeline": dp},
+        }

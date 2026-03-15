@@ -13,12 +13,14 @@ import structlog
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from lightagent.agents.subgraphs.artifacts import TechnicalSpec
+from lightagent.monitoring.otel import OTelManager
 from lightagent.providers.registry import ProviderRegistry
 
 if TYPE_CHECKING:
     from lightagent.agents.state import AgentState
 
 logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.architect")
+otel = OTelManager()
 
 _SYSTEM = (
     "You are a Software Architect. Given a user story, produce a technical"
@@ -38,31 +40,35 @@ async def architect_agent_node(state: AgentState) -> dict[str, Any]:
     Returns:
         Partial state update with TechnicalSpec stored in metadata.
     """
-    dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
-    story_data = dp.get("user_story", {})
+    with otel.start_span("dev_pipeline.architect") as span:
+        span.set_attribute("lightagent.subgraph", "dev_pipeline")
+        span.set_attribute("lightagent.agent", "architect")
 
-    llm = ProviderRegistry().get_llm()
-    messages = [
-        SystemMessage(content=_SYSTEM),
-        HumanMessage(content=f"User story: {json.dumps(story_data)}"),
-    ]
-    response = await llm.ainvoke(messages)
-    content = str(response.content)
+        dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
+        story_data = dp.get("user_story", {})
 
-    try:
-        data = json.loads(content)
-        spec = TechnicalSpec.model_validate(data)
-    except Exception:
-        spec = TechnicalSpec(
-            id="spec1",
-            story_id=story_data.get("id", "s1"),
-            architecture=content,
-        )
+        llm = ProviderRegistry().get_llm()
+        messages = [
+            SystemMessage(content=_SYSTEM),
+            HumanMessage(content=f"User story: {json.dumps(story_data)}"),
+        ]
+        response = await llm.ainvoke(messages)
+        content = str(response.content)
 
-    dp["technical_spec"] = spec.model_dump()
-    logger.info("architect.spec_created", spec_id=spec.id)
-    return {
-        "current_agent": "architect",
-        "messages": [AIMessage(content=f"TechnicalSpec ready: {spec.id}")],
-        "metadata": {**state.get("metadata", {}), "dev_pipeline": dp},
-    }
+        try:
+            data = json.loads(content)
+            spec = TechnicalSpec.model_validate(data)
+        except Exception:
+            spec = TechnicalSpec(
+                id="spec1",
+                story_id=story_data.get("id", "s1"),
+                architecture=content,
+            )
+
+        dp["technical_spec"] = spec.model_dump()
+        logger.info("architect.spec_created", spec_id=spec.id)
+        return {
+            "current_agent": "architect",
+            "messages": [AIMessage(content=f"TechnicalSpec ready: {spec.id}")],
+            "metadata": {**state.get("metadata", {}), "dev_pipeline": dp},
+        }

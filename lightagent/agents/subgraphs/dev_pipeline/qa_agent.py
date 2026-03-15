@@ -14,12 +14,14 @@ import structlog
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from lightagent.agents.subgraphs.artifacts import QAReport
+from lightagent.monitoring.otel import OTelManager
 from lightagent.providers.registry import ProviderRegistry
 
 if TYPE_CHECKING:
     from lightagent.agents.state import AgentState
 
 logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.qa_agent")
+otel = OTelManager()
 
 _SYSTEM = (
     "You are a QA Engineer. Review the code for security issues and integration"
@@ -39,31 +41,35 @@ async def qa_agent_node(state: AgentState) -> dict[str, Any]:
     Returns:
         Partial state update with QAReport in metadata.
     """
-    dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
-    code_data = dp.get("code_artifact", {})
+    with otel.start_span("dev_pipeline.qa_agent") as span:
+        span.set_attribute("lightagent.subgraph", "dev_pipeline")
+        span.set_attribute("lightagent.agent", "qa_agent")
 
-    llm = ProviderRegistry().get_llm()
-    messages = [
-        SystemMessage(content=_SYSTEM),
-        HumanMessage(content=f"Code to review:\n{json.dumps(code_data, indent=2)}"),
-    ]
-    response = await llm.ainvoke(messages)
-    content = str(response.content)
+        dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
+        code_data = dp.get("code_artifact", {})
 
-    try:
-        data = json.loads(content)
-        report = QAReport.model_validate(data)
-    except Exception:
-        report = QAReport(quality_score=0.0, approved=False)
+        llm = ProviderRegistry().get_llm()
+        messages = [
+            SystemMessage(content=_SYSTEM),
+            HumanMessage(content=f"Code to review:\n{json.dumps(code_data, indent=2)}"),
+        ]
+        response = await llm.ainvoke(messages)
+        content = str(response.content)
 
-    dp["qa_report"] = report.model_dump()
-    logger.info(
-        "qa_agent.report_created",
-        quality_score=report.quality_score,
-        approved=report.approved,
-    )
-    return {
-        "current_agent": "qa_agent",
-        "messages": [AIMessage(content=f"QA score: {report.quality_score}/100")],
-        "metadata": {**state.get("metadata", {}), "dev_pipeline": dp},
-    }
+        try:
+            data = json.loads(content)
+            report = QAReport.model_validate(data)
+        except Exception:
+            report = QAReport(quality_score=0.0, approved=False)
+
+        dp["qa_report"] = report.model_dump()
+        logger.info(
+            "qa_agent.report_created",
+            quality_score=report.quality_score,
+            approved=report.approved,
+        )
+        return {
+            "current_agent": "qa_agent",
+            "messages": [AIMessage(content=f"QA score: {report.quality_score}/100")],
+            "metadata": {**state.get("metadata", {}), "dev_pipeline": dp},
+        }
