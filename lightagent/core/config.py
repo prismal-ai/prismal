@@ -490,6 +490,12 @@ class Settings(BaseSettings):
         description="Sender address for heartbeat email reports.",
     )
 
+    # Dynamic Subgraphs (Phase 24)
+    enable_subgraphs: bool = Field(
+        default=False,
+        description="Enable dynamic sub-agent orchestration (Phase 24).",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
