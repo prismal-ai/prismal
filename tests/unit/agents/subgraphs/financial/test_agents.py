@@ -69,3 +69,36 @@ async def test_market_data_collector_graceful_fallback(base_state: dict[str, Any
     fin = result["metadata"]["financial_analyst"]
     assert "market_snapshot" in fin
     assert result["current_agent"] == "market_data_collector"
+
+
+@pytest.mark.asyncio
+async def test_technical_analyst_produces_analysis(base_state: dict[str, Any]) -> None:
+    """technical_analyst stores TechnicalAnalysis in metadata."""
+    from lightagent.agents.subgraphs.financial.technical_analyst import (
+        technical_analyst_node,
+    )
+
+    state = dict(base_state)
+    state["metadata"] = {
+        "financial_analyst": {
+            "market_snapshot": {"symbol": "AAPL", "asset_type": "equity", "current_price": 175.0}
+        }
+    }
+    ta_json = json.dumps({
+        "symbol": "AAPL",
+        "indicators": {"RSI": 62.5, "MACD": 0.42, "SMA_20": 172.1},
+        "signals": ["RSI neutral", "MACD bullish crossover"],
+        "chart_paths": [],
+        "trend": "bullish",
+    })
+    with patch(
+        "lightagent.agents.subgraphs.financial.technical_analyst.ProviderRegistry.get_llm",
+        return_value=type("LLM", (), {"ainvoke": _ai(ta_json)})(),
+    ):
+        result = await technical_analyst_node(state)
+
+    fin = result["metadata"]["financial_analyst"]
+    assert "technical_analysis" in fin
+    assert fin["technical_analysis"]["trend"] == "bullish"
+    assert "RSI" in fin["technical_analysis"]["indicators"]
+    assert result["current_agent"] == "technical_analyst"
