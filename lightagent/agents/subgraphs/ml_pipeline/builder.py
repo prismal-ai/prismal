@@ -1,4 +1,5 @@
-"""Builder for the ML/DL Pipeline subgraph.
+"""
+Builder for the ML/DL Pipeline subgraph.
 
 Assembles the 6-agent ML pipeline:
 data_ingester -> eda_analyst -> feature_engineer -> model_trainer
@@ -56,7 +57,8 @@ _COMPILED_GRAPHS: dict[str, object] = {}
 
 
 def _make_definition() -> SubgraphDefinition:
-    """Build the SubgraphDefinition for the ml_pipeline.
+    """
+    Build the SubgraphDefinition for the ml_pipeline.
 
     Returns:
         A fully configured :class:`SubgraphDefinition`.
@@ -88,7 +90,8 @@ def _make_definition() -> SubgraphDefinition:
 async def register_ml_pipeline(
     checkpointer_path: str = "data/db/checkpoints_subgraph_ml_pipeline.db",
 ) -> None:
-    """Build and register the ml_pipeline subgraph.
+    """
+    Build and register the ml_pipeline subgraph.
 
     Idempotent -- skips registration if already registered.
 
@@ -111,7 +114,8 @@ async def register_ml_pipeline(
 
 
 async def get_compiled_ml_pipeline(checkpointer_path: str = ":memory:") -> object:
-    """Return the compiled ml_pipeline graph (building it if needed).
+    """
+    Return the compiled ml_pipeline graph (building it if needed).
 
     Args:
         checkpointer_path: SQLite path used only on first build.

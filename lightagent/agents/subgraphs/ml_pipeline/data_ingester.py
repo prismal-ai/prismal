@@ -1,4 +1,5 @@
-"""Data Ingester agent node for the ml_pipeline subgraph.
+"""
+Data Ingester agent node for the ml_pipeline subgraph.
 
 Loads and profiles a dataset (CSV, Parquet, JSON, Excel), detects column types,
 counts nulls, identifies the target column, and infers the ML task type.
@@ -45,7 +46,8 @@ _SYSTEM = (
 
 
 async def data_ingester_node(state: AgentState) -> dict[str, Any]:
-    """Load and profile the dataset from the user's request.
+    """
+    Load and profile the dataset from the user's request.
 
     Args:
         state: Current agent state.

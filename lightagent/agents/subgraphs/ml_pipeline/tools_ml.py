@@ -1,4 +1,5 @@
-"""ML/DL pipeline tools for LightAgent sub-agents.
+"""
+ML/DL pipeline tools for LightAgent sub-agents.
 
 All ML library imports (``flaml``, ``sklearn``, ``torch``, ``shap``) are
 lazy-guarded by ``try/except ImportError`` — these extras are optional and
@@ -25,10 +26,11 @@ logger = structlog.get_logger("lightagent.subgraphs.ml_pipeline.tools")
 
 @tool
 def validate_dataset(path: str, max_rows: int = 1_000_000) -> str:
-    """Validate a dataset file and return shape, dtypes, and null counts.
+    """
+    Validate a dataset file and return shape, dtypes, and null counts.
 
-    Supports CSV, Parquet, and JSON formats.
-    Returns a JSON string with rows, columns, column_types, null_counts.
+    Supports CSV, Parquet, and JSON formats. Returns a JSON string with rows, columns,
+    column_types, null_counts.
     """
     p = Path(path)
     if not p.exists():
@@ -56,7 +58,7 @@ def validate_dataset(path: str, max_rows: int = 1_000_000) -> str:
             },
             "null_counts": null_counts,
         })
-    except ImportError:
+    except ImportError:  # pragma: no cover
         try:
             import csv
 
@@ -79,7 +81,8 @@ def validate_dataset(path: str, max_rows: int = 1_000_000) -> str:
 
 @tool
 def statistical_summary(path: str, target_column: str = "") -> str:
-    """Compute descriptive statistics for a dataset.
+    """
+    Compute descriptive statistics for a dataset.
 
     Returns mean, std, min, max for numeric columns plus class distribution
     when ``target_column`` is provided.
@@ -126,7 +129,7 @@ def statistical_summary(path: str, target_column: str = "") -> str:
                 )
             )
         return json.dumps(stats)
-    except ImportError:
+    except ImportError:  # pragma: no cover
         return json.dumps({
             "error": (
                 "polars not installed; run: pip install 'lightagent[ml]'"
@@ -147,7 +150,8 @@ def feature_transform(
     output_path: str,
     operations: str,
 ) -> str:
-    """Apply feature transformation operations to a dataset.
+    """
+    Apply feature transformation operations to a dataset.
 
     ``operations`` is a JSON list of dicts. Supported types:
     ``drop`` (columns list), ``fill_null`` (column, value),
@@ -218,7 +222,7 @@ def feature_transform(
             "cols_after": df.width,
             "output_path": output_path,
         })
-    except ImportError:
+    except ImportError:  # pragma: no cover
         return json.dumps({"error": "polars not installed"})
     except Exception as exc:
         return json.dumps({"error": str(exc)})
@@ -231,7 +235,8 @@ def feature_select(
     method: str = "variance",
     n_features: int = 20,
 ) -> str:
-    """Select the most informative features from a dataset.
+    """
+    Select the most informative features from a dataset.
 
     ``method`` options: ``variance`` (std-based, no sklearn needed),
     ``correlation`` (Pearson |corr| with target),
@@ -298,7 +303,7 @@ def feature_select(
             "method_used": method,
             "n_selected": len(top),
         })
-    except ImportError:
+    except ImportError:  # pragma: no cover
         return json.dumps({"error": "polars not installed"})
     except Exception as exc:
         return json.dumps({"error": str(exc)})
@@ -312,7 +317,8 @@ def apply_sampling(
     method: str = "oversample",
     random_seed: int = 42,
 ) -> str:
-    """Balance a classification dataset using sampling.
+    """
+    Balance a classification dataset using sampling.
 
     ``method`` options: ``oversample`` (duplicate minority class),
     ``undersample`` (truncate majority class), ``smote`` (requires
@@ -381,7 +387,7 @@ def apply_sampling(
             "rows_after": df.height,
             "output_path": output_path,
         })
-    except ImportError:
+    except ImportError:  # pragma: no cover
         return json.dumps({"error": "polars not installed"})
     except Exception as exc:
         return json.dumps({"error": str(exc)})
@@ -401,10 +407,11 @@ def automl_train(
     random_seed: int = 42,
     model_output_dir: str = "data/workspace/ml_models",
 ) -> str:
-    """Train an ML model using FLAML AutoML (requires ``[ml]`` extra).
+    """
+    Train an ML model using FLAML AutoML (requires ``[ml]`` extra).
 
-    Searches LightGBM, XGBoost, RandomForest, and other estimators.
-    Returns the best model, validation score, training time, and model path.
+    Searches LightGBM, XGBoost, RandomForest, and other estimators. Returns the best
+    model, validation score, training time, and model path.
     """
     try:
         import polars as pl
@@ -418,7 +425,7 @@ def automl_train(
         feats = [c for c in df.columns if c != target_column]
         x_train = df.select(feats).to_pandas()
         y = df[target_column].to_pandas()
-        try:
+        try:  # pragma: no cover
             import joblib  # type: ignore[import-untyped]
             from flaml import AutoML  # type: ignore[import-not-found]
 
@@ -475,13 +482,14 @@ def train_dl_model(
     random_seed: int = 42,
     model_output_dir: str = "data/workspace/ml_models",
 ) -> str:
-    """Train a simple MLP using PyTorch (requires ``[ml-dl]`` extra).
+    """
+    Train a simple MLP using PyTorch (requires ``[ml-dl]`` extra).
 
     Falls back gracefully with an "unavailable" status when torch is
     not installed.  Always caps training to ``min(epochs, 10)`` when
     called as a LangChain tool to keep execution times safe.
     """
-    try:
+    try:  # pragma: no cover
         import numpy as np
         import torch
         import torch.nn as nn
@@ -575,7 +583,8 @@ def train_clustering(
     random_seed: int = 42,
     model_output_dir: str = "data/workspace/ml_models",
 ) -> str:
-    """Train a clustering model using scikit-learn (requires ``[ml]`` extra).
+    """
+    Train a clustering model using scikit-learn (requires ``[ml]`` extra).
 
     When ``n_clusters=0`` the optimal k is selected via silhouette score
     (capped at ``max_k``).  Supports ``kmeans`` and ``dbscan`` methods.
@@ -630,7 +639,7 @@ def train_clustering(
             "model_path": model_path,
             "random_seed": random_seed,
         })
-    except ImportError:
+    except ImportError:  # pragma: no cover
         return json.dumps({
             "error": (
                 "sklearn not installed; "
@@ -653,7 +662,8 @@ def evaluate_model(
     target_column: str,
     task: str = "classification",
 ) -> str:
-    """Evaluate a trained joblib model on a dataset.
+    """
+    Evaluate a trained joblib model on a dataset.
 
     Classification: accuracy, precision_macro, recall_macro, f1_macro.
     Regression: MAE, MSE, RMSE, R².
@@ -724,7 +734,7 @@ def evaluate_model(
             "primary_metric": primary_metric,
             "primary_score": round(primary_score, 4),
         })
-    except ImportError as exc:
+    except ImportError as exc:  # pragma: no cover
         return json.dumps({
             "error": (
                 f"Missing dependency: {exc}. "
@@ -742,7 +752,8 @@ def explain_model(
     max_samples: int = 1000,
     output_dir: str = "data/workspace/ml_models",
 ) -> str:
-    """Generate SHAP feature importance for a trained joblib model.
+    """
+    Generate SHAP feature importance for a trained joblib model.
 
     Falls back to ``feature_importances_`` when SHAP is not installed.
     ``max_samples`` caps the rows passed to the SHAP explainer.
@@ -841,7 +852,8 @@ def export_model(
     format: str = "joblib",
     model_name: str = "model",
 ) -> str:
-    """Export a trained model to a deployment-ready format.
+    """
+    Export a trained model to a deployment-ready format.
 
     ``format`` must be ``"joblib"`` or ``"onnx"`` (requires ``onnx`` +
     ``skl2onnx``).  Falls back to joblib when onnx libs are unavailable.
@@ -854,11 +866,11 @@ def export_model(
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     if format == "onnx":
-        try:
+        try:  # pragma: no cover
             import joblib
             from skl2onnx import convert_sklearn  # type: ignore[import-not-found]
-            from skl2onnx.common.data_types import (
-                FloatTensorType,  # type: ignore[import-not-found]
+            from skl2onnx.common.data_types import (  # type: ignore[import-not-found]
+                FloatTensorType,
             )
 
             mdl = joblib.load(model_path)
@@ -894,7 +906,8 @@ def generate_inference_code(
     model_name: str = "model",
     task: str = "classification",
 ) -> str:
-    """Generate a standalone ``predict.py`` inference script.
+    """
+    Generate a standalone ``predict.py`` inference script.
 
     ``input_schema`` is a JSON string mapping feature names to types
     (e.g. ``'{"age": "float", "income": "float"}'``).

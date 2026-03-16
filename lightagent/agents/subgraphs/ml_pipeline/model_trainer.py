@@ -1,4 +1,5 @@
-"""Model Trainer agent node for the ml_pipeline subgraph.
+"""
+Model Trainer agent node for the ml_pipeline subgraph.
 
 Trains an ML model using FLAML AutoML (primary) or scikit-learn (fallback).
 All synchronous training MUST run via ``asyncio.to_thread()`` to avoid
@@ -51,7 +52,8 @@ _SYSTEM = (
 
 
 async def model_trainer_node(state: AgentState) -> dict[str, Any]:
-    """Train an ML model using FLAML AutoML or sklearn.
+    """
+    Train an ML model using FLAML AutoML or sklearn.
 
     The LLM selects the best algorithm and hyperparameters.  In production,
     actual model.fit() calls run inside ``asyncio.to_thread()`` to avoid

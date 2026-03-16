@@ -1,4 +1,5 @@
-"""Feature Engineer agent node for the ml_pipeline subgraph.
+"""
+Feature Engineer agent node for the ml_pipeline subgraph.
 
 Applies feature transformations (encoding, scaling, feature selection, SMOTE for
 class imbalance) and produces a train/test split plan.
@@ -44,7 +45,8 @@ _SYSTEM = (
 
 
 async def feature_engineer_node(state: AgentState) -> dict[str, Any]:
-    """Design and plan feature transformations based on dataset profile and EDA.
+    """
+    Design and plan feature transformations based on dataset profile and EDA.
 
     Args:
         state: Current agent state with ``dataset_profile`` and ``eda_report``.

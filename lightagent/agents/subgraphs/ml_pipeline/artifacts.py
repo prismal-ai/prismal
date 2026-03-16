@@ -1,4 +1,5 @@
-"""Typed Pydantic v2 artifact models for the ML/DL pipeline subgraph.
+"""
+Typed Pydantic v2 artifact models for the ML/DL pipeline subgraph.
 
 Each artifact represents structured data produced by a ml_pipeline agent node
 and stored in ``AgentState.metadata["ml_pipeline"]``.  Agents must never

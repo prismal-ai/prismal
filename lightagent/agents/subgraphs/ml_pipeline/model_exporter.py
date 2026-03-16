@@ -1,4 +1,5 @@
-"""Model Exporter agent node for the ml_pipeline subgraph.
+"""
+Model Exporter agent node for the ml_pipeline subgraph.
 
 Serializes the trained model (joblib/ONNX/TorchScript), generates standalone
 inference code (``predict.py``), and writes a model card.
@@ -51,7 +52,8 @@ _SYSTEM = (
 
 
 async def model_exporter_node(state: AgentState) -> dict[str, Any]:
-    """Export the trained model with inference code and model card.
+    """
+    Export the trained model with inference code and model card.
 
     Args:
         state: Current agent state with ``trained_model`` and

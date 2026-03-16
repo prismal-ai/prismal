@@ -1,4 +1,5 @@
-"""EDA Analyst agent node for the ml_pipeline subgraph.
+"""
+EDA Analyst agent node for the ml_pipeline subgraph.
 
 Performs automated exploratory data analysis: correlations, outlier detection,
 missing value patterns, class balance assessment, and chart generation.
@@ -43,7 +44,8 @@ _SYSTEM = (
 
 
 async def eda_analyst_node(state: AgentState) -> dict[str, Any]:
-    """Analyse the dataset and produce an EDA report.
+    """
+    Analyse the dataset and produce an EDA report.
 
     Args:
         state: Current agent state with ``dataset_profile`` in metadata.

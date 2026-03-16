@@ -1,4 +1,5 @@
-"""Model Evaluator agent node for the ml_pipeline subgraph.
+"""
+Model Evaluator agent node for the ml_pipeline subgraph.
 
 Evaluates the trained model on the test set, computes metrics (F1, AUC, RMSE,
 etc.), generates charts (ROC curve, confusion matrix, SHAP summary), and
@@ -54,7 +55,8 @@ _SYSTEM = (
 
 
 async def model_evaluator_node(state: AgentState) -> dict[str, Any]:
-    """Evaluate the trained model and produce metrics and charts.
+    """
+    Evaluate the trained model and produce metrics and charts.
 
     The ``primary_score`` in the returned ``EvaluationReport`` is read by the
     model quality gate to decide whether to proceed to ``model_exporter`` or
