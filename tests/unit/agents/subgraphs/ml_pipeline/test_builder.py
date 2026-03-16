@@ -21,7 +21,6 @@ async def test_register_ml_pipeline_idempotent() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_get_compiled_ml_pipeline_returns_graph() -> None:
     """get_compiled_ml_pipeline() returns a compiled graph object."""
     from lightagent.agents.subgraphs.ml_pipeline.builder import (
