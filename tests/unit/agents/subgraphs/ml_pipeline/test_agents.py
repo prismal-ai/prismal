@@ -85,12 +85,16 @@ async def test_eda_analyst_produces_eda_report() -> None:
 @pytest.mark.asyncio
 async def test_feature_engineer_produces_feature_set() -> None:
     """feature_engineer node populates ml_pipeline.feature_set in metadata."""
-    from lightagent.agents.subgraphs.ml_pipeline.feature_engineer import feature_engineer_node
+    from lightagent.agents.subgraphs.ml_pipeline.feature_engineer import (
+        feature_engineer_node,
+    )
 
     mock_response = AIMessage(content=(
         '{"original_features": ["tenure", "monthly_charges", "contract_type"], '
-        '"engineered_features": ["tenure", "monthly_charges", "contract_type_encoded"], '
-        '"selected_features": ["tenure", "monthly_charges", "contract_type_encoded"], '
+        '"engineered_features": ["tenure", "monthly_charges", '
+        '"contract_type_encoded"], '
+        '"selected_features": ["tenure", "monthly_charges", '
+        '"contract_type_encoded"], '
         '"encoding_map": {"contract_type": "one-hot"}, '
         '"scaling_method": "StandardScaler", '
         '"train_shape": [4, 3], '
@@ -142,7 +146,8 @@ async def test_model_trainer_produces_trained_model() -> None:
         "feature_set": {
             "original_features": ["tenure"], "engineered_features": ["tenure"],
             "selected_features": ["tenure"], "encoding_map": {},
-            "scaling_method": "StandardScaler", "train_shape": [4, 1], "test_shape": [1, 1],
+            "scaling_method": "StandardScaler",
+            "train_shape": [4, 1], "test_shape": [1, 1],
         },
     }
     with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
@@ -190,7 +195,9 @@ async def test_model_trainer_enforces_random_seed() -> None:
 @pytest.mark.asyncio
 async def test_model_evaluator_produces_evaluation_report() -> None:
     """model_evaluator node populates ml_pipeline.evaluation_report in metadata."""
-    from lightagent.agents.subgraphs.ml_pipeline.model_evaluator import model_evaluator_node
+    from lightagent.agents.subgraphs.ml_pipeline.model_evaluator import (
+        model_evaluator_node,
+    )
 
     mock_response = AIMessage(content=(
         '{"metrics": {"f1": 0.85, "auc": 0.91, "accuracy": 0.87}, '
@@ -228,7 +235,9 @@ async def test_model_evaluator_produces_evaluation_report() -> None:
 @pytest.mark.asyncio
 async def test_model_evaluator_low_score_recommends_retrain() -> None:
     """model_evaluator sets recommendation=retrain when score is low."""
-    from lightagent.agents.subgraphs.ml_pipeline.model_evaluator import model_evaluator_node
+    from lightagent.agents.subgraphs.ml_pipeline.model_evaluator import (
+        model_evaluator_node,
+    )
 
     mock_response = AIMessage(content=(
         '{"metrics": {"f1": 0.50}, "primary_metric": "f1", '
@@ -260,7 +269,9 @@ async def test_model_evaluator_low_score_recommends_retrain() -> None:
 @pytest.mark.asyncio
 async def test_model_exporter_produces_model_package() -> None:
     """model_exporter node populates ml_pipeline.model_package in metadata."""
-    from lightagent.agents.subgraphs.ml_pipeline.model_exporter import model_exporter_node
+    from lightagent.agents.subgraphs.ml_pipeline.model_exporter import (
+        model_exporter_node,
+    )
 
     mock_response = AIMessage(content=(
         '{"model_path": "data/workspace/ml_models/churn/model.joblib", '

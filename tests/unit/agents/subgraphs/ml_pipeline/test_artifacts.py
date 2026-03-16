@@ -1,5 +1,7 @@
 """Unit tests for ML pipeline typed artifacts."""
 import pytest
+from pydantic import ValidationError
+
 from lightagent.agents.subgraphs.ml_pipeline.artifacts import (
     DatasetProfile,
     EDAReport,
@@ -27,7 +29,7 @@ def test_dataset_profile_requires_fields() -> None:
 
 def test_dataset_profile_invalid_task_type() -> None:
     """DatasetProfile rejects invalid task_type."""
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         DatasetProfile(
             name="x", path="x.csv", rows=10, columns=2,
             column_types={}, null_counts={}, task_type="invalid_task",  # type: ignore[arg-type]
