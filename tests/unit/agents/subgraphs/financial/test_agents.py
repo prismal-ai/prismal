@@ -130,3 +130,35 @@ async def test_fundamental_analyst_produces_analysis(base_state: dict[str, Any])
     assert "fundamental_analysis" in fin
     assert fin["fundamental_analysis"]["fundamental_score"] == 0.72
     assert result["current_agent"] == "fundamental_analyst"
+
+
+@pytest.mark.asyncio
+async def test_risk_sentiment_analyst_produces_report(base_state: dict[str, Any]) -> None:
+    """risk_sentiment_analyst stores RiskSentimentReport in metadata."""
+    from lightagent.agents.subgraphs.financial.risk_sentiment_analyst import (
+        risk_sentiment_analyst_node,
+    )
+    state = dict(base_state)
+    state["metadata"] = {"financial_analyst": {"market_snapshot": {"symbol": "AAPL", "asset_type": "equity"}}}
+    rs_json = json.dumps({
+        "symbol": "AAPL",
+        "volatility_annual": 0.25,
+        "sharpe_ratio": 1.3,
+        "max_drawdown": 0.18,
+        "var_95": 0.021,
+        "sentiment_score": 0.65,
+        "sentiment_sources": ["news"],
+        "correlation_assets": {"SPY": 0.82},
+        "risk_level": "medium",
+    })
+    with patch(
+        "lightagent.agents.subgraphs.financial.risk_sentiment_analyst.ProviderRegistry.get_llm",
+        return_value=type("LLM", (), {"ainvoke": _ai(rs_json)})(),
+    ):
+        result = await risk_sentiment_analyst_node(state)
+
+    fin = result["metadata"]["financial_analyst"]
+    assert "risk_sentiment_report" in fin
+    assert fin["risk_sentiment_report"]["risk_level"] == "medium"
+    assert 0.0 <= fin["risk_sentiment_report"]["sentiment_score"] <= 1.0
+    assert result["current_agent"] == "risk_sentiment_analyst"
