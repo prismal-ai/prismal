@@ -162,3 +162,57 @@ async def test_risk_sentiment_analyst_produces_report(base_state: dict[str, Any]
     assert fin["risk_sentiment_report"]["risk_level"] == "medium"
     assert 0.0 <= fin["risk_sentiment_report"]["sentiment_score"] <= 1.0
     assert result["current_agent"] == "risk_sentiment_analyst"
+
+
+@pytest.mark.asyncio
+async def test_report_generator_always_has_disclaimer(base_state: dict[str, Any]) -> None:
+    """report_generator stores FinancialReport with disclaimer in metadata."""
+    from lightagent.agents.subgraphs.financial.report_generator import (
+        report_generator_node,
+    )
+    state = dict(base_state)
+    state["metadata"] = {
+        "financial_analyst": {
+            "market_snapshot": {"symbol": "AAPL", "asset_type": "equity", "current_price": 175.0},
+            "technical_analysis": {"symbol": "AAPL", "trend": "bullish", "indicators": {}, "signals": []},
+            "fundamental_analysis": {"symbol": "AAPL", "asset_type": "equity", "metrics": {}, "fundamental_score": 0.7},
+            "risk_sentiment_report": {"symbol": "AAPL", "risk_level": "medium", "sentiment_score": 0.6, "volatility_annual": 0.22},
+        }
+    }
+    report_json = json.dumps({
+        "symbol": "AAPL",
+        "report_mode": "single_asset",
+        "executive_summary": "AAPL shows strong fundamentals with bullish trend.",
+        "sections": {"technical": "RSI neutral", "risk": "Medium risk"},
+        "chart_paths": [],
+        "disclaimer": "This analysis is for informational purposes only and does not constitute financial advice.",
+    })
+    with patch(
+        "lightagent.agents.subgraphs.financial.report_generator.ProviderRegistry.get_llm",
+        return_value=type("LLM", (), {"ainvoke": _ai(report_json)})(),
+    ):
+        result = await report_generator_node(state)
+
+    fin = result["metadata"]["financial_analyst"]
+    assert "financial_report" in fin
+    assert "informational purposes only" in fin["financial_report"]["disclaimer"]
+    assert fin["financial_report"]["symbol"] == "AAPL"
+    assert result["current_agent"] == "report_generator"
+
+
+@pytest.mark.asyncio
+async def test_report_generator_disclaimer_injected_on_bad_llm_json(base_state: dict[str, Any]) -> None:
+    """Even when LLM returns garbage JSON, disclaimer must be present."""
+    from lightagent.agents.subgraphs.financial.report_generator import (
+        report_generator_node,
+    )
+    state = dict(base_state)
+    state["metadata"] = {"financial_analyst": {"market_snapshot": {"symbol": "BTC-USD", "asset_type": "crypto"}}}
+    with patch(
+        "lightagent.agents.subgraphs.financial.report_generator.ProviderRegistry.get_llm",
+        return_value=type("LLM", (), {"ainvoke": _ai("not json at all")})(),
+    ):
+        result = await report_generator_node(state)
+
+    fin = result["metadata"]["financial_analyst"]
+    assert "informational purposes only" in fin["financial_report"]["disclaimer"]
