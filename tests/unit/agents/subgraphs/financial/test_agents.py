@@ -102,3 +102,31 @@ async def test_technical_analyst_produces_analysis(base_state: dict[str, Any]) -
     assert fin["technical_analysis"]["trend"] == "bullish"
     assert "RSI" in fin["technical_analysis"]["indicators"]
     assert result["current_agent"] == "technical_analyst"
+
+
+@pytest.mark.asyncio
+async def test_fundamental_analyst_produces_analysis(base_state: dict[str, Any]) -> None:
+    """fundamental_analyst stores FundamentalAnalysis in metadata."""
+    from lightagent.agents.subgraphs.financial.fundamental_analyst import (
+        fundamental_analyst_node,
+    )
+    state = dict(base_state)
+    state["metadata"] = {"financial_analyst": {"market_snapshot": {"symbol": "AAPL", "asset_type": "equity"}}}
+    fa_json = json.dumps({
+        "symbol": "AAPL",
+        "asset_type": "equity",
+        "metrics": {"trailingPE": 28.5, "priceToBook": 42.1, "revenueGrowth": 0.09},
+        "peer_comparison": {},
+        "fundamental_score": 0.72,
+        "data_source": "yfinance",
+    })
+    with patch(
+        "lightagent.agents.subgraphs.financial.fundamental_analyst.ProviderRegistry.get_llm",
+        return_value=type("LLM", (), {"ainvoke": _ai(fa_json)})(),
+    ):
+        result = await fundamental_analyst_node(state)
+
+    fin = result["metadata"]["financial_analyst"]
+    assert "fundamental_analysis" in fin
+    assert fin["fundamental_analysis"]["fundamental_score"] == 0.72
+    assert result["current_agent"] == "fundamental_analyst"
