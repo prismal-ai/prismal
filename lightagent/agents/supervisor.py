@@ -54,6 +54,8 @@ MEMBERS: list[str] = [
     "dev_pipeline",
     # Phase 26: ML/DL pipeline (Ingester -> EDA -> Features -> Train -> Evaluate)
     "ml_pipeline",
+    # Phase 27: Financial Analysis pipeline (read-only)
+    "financial_analyst",
 ]
 
 _VALID_ROUTES: frozenset[str] = frozenset(MEMBERS) | {"END"}
@@ -147,6 +149,21 @@ Available agents:
   · Perform EDA (exploratory data analysis) followed by modeling
   · Engineer features and prepare datasets for ML
   · Export or deploy a trained model
+- financial_analyst: For financial analysis and market research — equity analysis,
+  crypto analysis, technical indicators, fundamental valuation, risk assessment,
+  financial reports.
+  Route here when the user asks to:
+  · Analyze a stock, crypto asset, or forex pair
+  · Get technical analysis (RSI, MACD, Bollinger Bands, signals, trend)
+  · Get fundamental analysis (P/E ratio, revenue growth, earnings, valuation)
+  · Assess risk (volatility, Sharpe ratio, VaR, drawdown, correlation)
+  · Generate a financial analysis report for a ticker
+  · Analyze market sentiment for a ticker or asset
+  · Keywords: "analiza", "análisis financiero", "stock analysis", "crypto analysis",
+    "technical analysis", "fundamental", "RSI", "MACD", "P/E ratio", "volatility",
+    "Sharpe", "VaR", "financial report", "market sentiment"
+  IMPORTANT: financial_analyst is READ-ONLY — it never executes trades.
+  Every output includes a mandatory legal disclaimer.
 - END: Return final answer to the user
 
 Routing rules:
@@ -364,6 +381,7 @@ _RouterLiteral = Literal[
     "cron_manager",
     "dev_pipeline",  # Phase 24: dynamic subgraph
     "ml_pipeline",  # Phase 26: ML/DL pipeline
+    "financial_analyst",  # Phase 27: Financial Analysis pipeline
     "__end__",
 ]
 

@@ -89,6 +89,7 @@ def build_supervisor_graph(
     checkpointer: Any = None,  # noqa: ANN401 — no common base type for LangGraph checkpointers
     dev_pipeline_graph: Any = None,  # noqa: ANN401 — CompiledStateGraph for dev_pipeline subgraph (Phase 24)
     ml_pipeline_graph: Any = None,  # noqa: ANN401 — CompiledStateGraph for ml_pipeline subgraph (Phase 26)
+    financial_analyst_graph: Any = None,  # noqa: ANN401 — CompiledStateGraph for financial_analyst subgraph (Phase 27)
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Build and compile the LangGraph SUPERVISOR state machine.
@@ -118,6 +119,11 @@ def build_supervisor_graph(
             building this asynchronously before calling this function.
         ml_pipeline_graph: Optional pre-compiled ml_pipeline subgraph
             (Phase 26).  When provided together with ``get_settings().enable_subgraphs``
+            being ``True``, this node is added to the supervisor graph so that
+            the supervisor can route to it.  The caller is responsible for
+            building this asynchronously before calling this function.
+        financial_analyst_graph: Optional pre-compiled financial_analyst subgraph
+            (Phase 27).  When provided together with ``get_settings().enable_subgraphs``
             being ``True``, this node is added to the supervisor graph so that
             the supervisor can route to it.  The caller is responsible for
             building this asynchronously before calling this function.
@@ -165,6 +171,13 @@ def build_supervisor_graph(
     if _include_ml_pipeline:
         builder.add_node("ml_pipeline", ml_pipeline_graph)
 
+    # Phase 27: financial_analyst subgraph node (opt-in via enable_subgraphs setting).
+    _include_financial_analyst = (
+        get_settings().enable_subgraphs and financial_analyst_graph is not None
+    )
+    if _include_financial_analyst:
+        builder.add_node("financial_analyst", financial_analyst_graph)
+
     # Entry point
     builder.set_entry_point("supervisor")
 
@@ -185,6 +198,8 @@ def build_supervisor_graph(
         conditional_edges["dev_pipeline"] = "dev_pipeline"
     if _include_ml_pipeline:
         conditional_edges["ml_pipeline"] = "ml_pipeline"
+    if _include_financial_analyst:
+        conditional_edges["financial_analyst"] = "financial_analyst"
 
     builder.add_conditional_edges(
         "supervisor",
@@ -211,6 +226,8 @@ def build_supervisor_graph(
         builder.add_edge("dev_pipeline", "supervisor")
     if _include_ml_pipeline:
         builder.add_edge("ml_pipeline", "supervisor")
+    if _include_financial_analyst:
+        builder.add_edge("financial_analyst", "supervisor")
 
     # ------------------------------------------------------------------ #
     # Compile with checkpointing                                           #
@@ -281,6 +298,7 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     # Phase 24: build dev_pipeline subgraph asynchronously when enabled.
     dev_pipeline_graph: Any = None  # ANN401: no common base type for compiled subgraphs
     ml_pipeline_graph: Any = None  # ANN401: no common base type for compiled subgraphs
+    financial_analyst_graph: Any = None  # ANN401: no common base type
     if get_settings().enable_subgraphs:
         from lightagent.agents.subgraphs.dev_pipeline.builder import (
             get_compiled_dev_pipeline,
@@ -292,11 +310,18 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
         dev_pipeline_graph = await get_compiled_dev_pipeline()
         # Phase 26: build ml_pipeline subgraph asynchronously when enabled.
         ml_pipeline_graph = await get_compiled_ml_pipeline()
+        # Phase 27: build financial_analyst subgraph asynchronously when enabled.
+        from lightagent.agents.subgraphs.financial.builder import (
+            get_compiled_financial_analyst,
+        )
+
+        financial_analyst_graph = await get_compiled_financial_analyst()
 
     _async_graph = build_supervisor_graph(
         checkpointer=checkpointer,
         dev_pipeline_graph=dev_pipeline_graph,
         ml_pipeline_graph=ml_pipeline_graph,
+        financial_analyst_graph=financial_analyst_graph,
     )
     logger.debug("async_graph_initialized")
     return _async_graph

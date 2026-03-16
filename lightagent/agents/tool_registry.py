@@ -189,6 +189,12 @@ def get_tools_for_agent(agent_name: str) -> list[BaseTool]:
         "model_trainer": ML_PIPELINE_TOOLS,
         "model_evaluator": ML_PIPELINE_TOOLS,
         "model_exporter": ML_PIPELINE_TOOLS,
+        # financial_analyst subgraph agents — LLM-only nodes (no dedicated tools)
+        "market_data_collector": [],
+        "technical_analyst": [],
+        "fundamental_analyst": [],
+        "risk_sentiment_analyst": [],
+        "report_generator": [],
     }
 
     stubs = stub_map.get(agent_name, [])
