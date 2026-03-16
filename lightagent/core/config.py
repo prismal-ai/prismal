@@ -536,6 +536,37 @@ class Settings(BaseSettings):
         default=1000, gt=0, description="Max background samples for SHAP explainer"
     )
 
+    # ---------------------------------------------------------------------------
+    # Financial Analysis (Phase 27)
+    # ---------------------------------------------------------------------------
+    financial_default_provider: str = Field(
+        default="yfinance",
+        description="Primary market data provider (yfinance | openbb | ccxt)",
+    )
+    financial_cache_ttl_ticker: int = Field(
+        default=30,
+        ge=1,
+        description="TTL in seconds for ticker/price cache",
+    )
+    financial_cache_ttl_ohlcv: int = Field(
+        default=300,
+        ge=1,
+        description="TTL in seconds for OHLCV bar cache (5 minutes)",
+    )
+    financial_cache_ttl_fundamentals: int = Field(
+        default=86400,
+        ge=1,
+        description="TTL in seconds for fundamentals cache (24 hours)",
+    )
+    financial_workspace_path: str = Field(
+        default="data/workspace/financial",
+        description="Root directory for financial output files",
+    )
+    financial_trade_execution_enabled: bool = Field(
+        default=False,
+        description="Phase 27 is read-only — trade execution must always be False",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
