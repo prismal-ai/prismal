@@ -244,9 +244,8 @@ def test_start_span_records_exception_and_reraises() -> None:
     # Return False so the exception propagates
     ctx.__exit__ = MagicMock(return_value=False)
 
-    with pytest.raises(ValueError, match="boom"):
-        with mgr.start_span("fail.op"):
-            raise ValueError("boom")
+    with pytest.raises(ValueError, match="boom"), mgr.start_span("fail.op"):
+        raise ValueError("boom")
 
     mock_span.record_exception.assert_called_once()
 
@@ -313,3 +312,68 @@ def test_shutdown_when_enabled() -> None:
 
     mock_tp.shutdown.assert_called_once()
     mock_mp.shutdown.assert_called_once()
+
+
+# ── _probe_endpoint ────────────────────────────────────────────────────────────
+
+
+def test_probe_endpoint_returns_true_when_reachable() -> None:
+    """_probe_endpoint() returns True when the TCP connection succeeds."""
+    from unittest.mock import MagicMock, patch
+
+    _reset_singleton()
+    mgr = OTelManager.__new__(OTelManager)
+    mgr._initialized = True  # type: ignore[attr-defined]
+    mgr.enabled = False  # type: ignore[attr-defined]
+
+    mock_sock = MagicMock()
+    mock_sock.__enter__ = MagicMock(return_value=mock_sock)
+    mock_sock.__exit__ = MagicMock(return_value=False)
+
+    with patch(
+        "lightagent.monitoring.otel.socket.create_connection",
+        return_value=mock_sock,
+    ):
+        assert mgr._probe_endpoint("http://localhost:4318") is True
+
+
+def test_probe_endpoint_returns_false_when_refused() -> None:
+    """_probe_endpoint() returns False when connection is refused."""
+    from unittest.mock import patch
+
+    _reset_singleton()
+    mgr = OTelManager.__new__(OTelManager)
+    mgr._initialized = True  # type: ignore[attr-defined]
+    mgr.enabled = False  # type: ignore[attr-defined]
+
+    with patch(
+        "lightagent.monitoring.otel.socket.create_connection",
+        side_effect=OSError(111, "Connection refused"),
+    ):
+        assert mgr._probe_endpoint("http://localhost:4318") is False
+
+
+def test_setup_disables_otel_when_endpoint_unreachable() -> None:
+    """OTelManager stays disabled when OTLP endpoint is unreachable."""
+    from unittest.mock import MagicMock, patch
+
+    _reset_singleton()
+    with (
+        patch(
+            "lightagent.monitoring._settings_proxy.get_monitoring_settings"
+        ) as mock_settings,
+        patch(
+            "lightagent.monitoring.otel.socket.create_connection",
+            side_effect=OSError(111, "Connection refused"),
+        ),
+    ):
+        s = MagicMock()
+        s.otel_enabled = True
+        s.otel_exporter = "otlp"
+        s.otel_endpoint = "http://localhost:4318"
+        s.otel_service_name = "lightagent"
+        s.otel_metrics_enabled = False
+        mock_settings.return_value = s
+        mgr = OTelManager()
+
+    assert not mgr.enabled
