@@ -103,6 +103,16 @@ class WebhookDispatcher:
             {"event": event, "payload": payload, "timestamp": time.time()}
         )
         secret = webhook.get("secret", "")
+        if not secret:
+            logger.warning(
+                "webhook_dispatcher.empty_secret_skipped",
+                webhook_id=webhook["id"],
+                detail=(
+                    "webhook has no secret — delivery skipped; "
+                    "re-register with a strong secret (≥32 chars)"
+                ),
+            )
+            return
         sig = self._sign(body, secret)
 
         async with httpx.AsyncClient(timeout=10.0) as http:
@@ -166,11 +176,16 @@ class WebhookDispatcher:
 
         Args:
             body: JSON-serialized payload string.
-            secret: HMAC signing secret.
+            secret: HMAC signing secret (must be non-empty).
 
         Returns:
             Hex-encoded HMAC-SHA256 digest.
+
+        Raises:
+            ValueError: If ``secret`` is empty.
         """
+        if not secret:
+            raise ValueError("webhook secret must not be empty")
         return hmac.new(
             secret.encode(),
             body.encode(),
