@@ -11,8 +11,10 @@ unavailable, :meth:`start_span` returns a no-op context manager.
 
 from __future__ import annotations
 
+import socket
 from contextlib import contextmanager, suppress
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -99,6 +101,15 @@ class OTelManager:
 
             resource = Resource.create({"service.name": service_name})
 
+            # ── Connectivity probe (skip setup if collector unreachable) ──
+            if exporter_name != "console" and not self._probe_endpoint(endpoint):
+                logger.warning(
+                    "otel.endpoint_unreachable",
+                    endpoint=endpoint,
+                    hint="Start an OTLP collector or set LIGHTAGENT_OTEL_ENABLED=false",
+                )
+                return
+
             # ── Span exporter ──────────────────────────────────────────
             span_exporter = self._build_span_exporter(exporter_name, endpoint)
 
@@ -126,6 +137,25 @@ class OTelManager:
         except Exception as exc:
             logger.warning("otel.init_failed", error=str(exc))
             self.enabled = False
+
+    def _probe_endpoint(self, endpoint: str, timeout: float = 2.0) -> bool:
+        """Return True if the OTLP endpoint accepts TCP connections.
+
+        Args:
+            endpoint: Full URL of the OTLP collector (e.g. ``http://localhost:4318``).
+            timeout: Connection timeout in seconds.
+
+        Returns:
+            ``True`` if the host/port is reachable, ``False`` otherwise.
+        """
+        parsed = urlparse(endpoint)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or (443 if parsed.scheme == "https" else 4318)
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except OSError:
+            return False
 
     def _build_span_exporter(self, exporter_name: str, endpoint: str) -> Any:  # noqa: ANN401
         """Build and return the appropriate span exporter.

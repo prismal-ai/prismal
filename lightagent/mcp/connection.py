@@ -352,7 +352,11 @@ class MCPServerConnection:
             # Pre-populate the tool cache so callers can immediately introspect.
             await self._refresh_tools()
         except Exception as exc:
-            await stack.aclose()
+            # Suppress any error from stack cleanup (e.g. ProcessLookupError
+            # when the stdio subprocess already exited due to a timeout) so
+            # that only the original MCPConnectionError is propagated.
+            with contextlib.suppress(Exception):
+                await stack.aclose()
             raise MCPConnectionError(
                 server_name=self._config.name,
                 reason=str(exc),
@@ -508,28 +512,32 @@ class MCPServerConnection:
     async def _cleanup_stack(self) -> None:
         """Close and discard the current AsyncExitStack if present.
 
-        Kills the recorded subprocess tree (``_subprocess_pids``) BEFORE
-        closing the stack so that grandchild processes (e.g. the ``node``
-        process started by ``npm exec``) are terminated before npm exits and
-        they become orphans.  After the kill the stack is closed to release
-        streams and other resources.
+        Closes the stack first (with a 5-second timeout) so that anyio's
+        ``create_task_group()`` inside ``stdio_client`` can exit cleanly from
+        the same asyncio task that entered it.  Killing the subprocess BEFORE
+        ``aclose()`` would break the stdin/stdout pipes while background tasks
+        are still running, causing anyio to raise ``RuntimeError: Attempted to
+        exit cancel scope in a different task than it was entered in``.
+
+        After ``aclose()`` completes (or times out), ``_kill_process_tree`` is
+        called as a safety net to terminate any surviving processes.  Because
+        ``_open_stdio`` records ALL new PIDs recursively (including ``node``
+        grandchildren of ``npm``), these can still be killed by PID even after
+        they have been reparented to init.
 
         Catches ``BaseException`` (which includes ``asyncio.CancelledError``)
         so that a SIGINT/SIGTERM-triggered cancellation during shutdown does
-        not propagate out and cause uvicorn to print "Application shutdown
-        failed".  The cancellation is logged and then suppressed; cleanup of
-        state variables proceeds in the ``finally`` block regardless.
+        not propagate out.  Cleanup of state variables proceeds in the
+        ``finally`` block regardless.
         """
         if self._exit_stack is not None:
-            # Kill subprocess tree first — before aclose() terminates the parent
-            # process (npm) and grandchildren (node) become orphans that can never
-            # be reached again.
             pids = self._subprocess_pids
             self._subprocess_pids = []
-            _kill_process_tree(pids)
 
             try:
-                await self._exit_stack.aclose()
+                # aclose() first — lets anyio task group exit from the correct
+                # task and cancels background stdin/stdout tasks gracefully.
+                await asyncio.wait_for(self._exit_stack.aclose(), timeout=5.0)
             except BaseException as exc:
                 logger.warning(
                     "mcp_stack_cleanup_error",
@@ -537,6 +545,8 @@ class MCPServerConnection:
                     error=str(exc),
                 )
             finally:
+                # Kill any surviving processes after the stack is closed.
+                _kill_process_tree(pids)
                 self._exit_stack = None
                 self._session = None
                 self._connected = False

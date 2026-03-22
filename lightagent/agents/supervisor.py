@@ -50,6 +50,12 @@ MEMBERS: list[str] = [
     "file_manager",
     "skill_manager",
     "cron_manager",
+    # Phase 24: dynamic subgraph (PO → Architect → Developer → Tests → QA → Review)
+    "dev_pipeline",
+    # Phase 26: ML/DL pipeline (Ingester -> EDA -> Features -> Train -> Evaluate)
+    "ml_pipeline",
+    # Phase 27: Financial Analysis pipeline (read-only)
+    "financial_analyst",
 ]
 
 _VALID_ROUTES: frozenset[str] = frozenset(MEMBERS) | {"END"}
@@ -131,6 +137,33 @@ Available agents:
   · List, pause, resume, or remove scheduled jobs
   · Use time-based triggers: "every day", "cada hora", "programar", "agendar",
     "cron", "schedule", "recurring", "periodic", "reminder"
+- dev_pipeline: for software development tasks requiring a full pipeline
+  (PO → Architect → Developer → Tests → QA → Review).
+  Route here when the user asks to build a complete software feature or product
+  end-to-end with specification, implementation, testing and quality review.
+- ml_pipeline: For machine learning and data science tasks — training ML models,
+  AutoML, classification, regression, clustering, deep learning, model evaluation.
+  Route here when the user asks to:
+  · Train, build, or evaluate a machine learning model
+  · Run AutoML or hyperparameter search
+  · Perform EDA (exploratory data analysis) followed by modeling
+  · Engineer features and prepare datasets for ML
+  · Export or deploy a trained model
+- financial_analyst: For financial analysis and market research — equity analysis,
+  crypto analysis, technical indicators, fundamental valuation, risk assessment,
+  financial reports.
+  Route here when the user asks to:
+  · Analyze a stock, crypto asset, or forex pair
+  · Get technical analysis (RSI, MACD, Bollinger Bands, signals, trend)
+  · Get fundamental analysis (P/E ratio, revenue growth, earnings, valuation)
+  · Assess risk (volatility, Sharpe ratio, VaR, drawdown, correlation)
+  · Generate a financial analysis report for a ticker
+  · Analyze market sentiment for a ticker or asset
+  · Keywords: "analiza", "análisis financiero", "stock analysis", "crypto analysis",
+    "technical analysis", "fundamental", "RSI", "MACD", "P/E ratio", "volatility",
+    "Sharpe", "VaR", "financial report", "market sentiment"
+  IMPORTANT: financial_analyst is READ-ONLY — it never executes trades.
+  Every output includes a mandatory legal disclaimer.
 - END: Return final answer to the user
 
 Routing rules:
@@ -346,6 +379,9 @@ _RouterLiteral = Literal[
     "file_manager",
     "skill_manager",
     "cron_manager",
+    "dev_pipeline",  # Phase 24: dynamic subgraph
+    "ml_pipeline",  # Phase 26: ML/DL pipeline
+    "financial_analyst",  # Phase 27: Financial Analysis pipeline
     "__end__",
 ]
 
