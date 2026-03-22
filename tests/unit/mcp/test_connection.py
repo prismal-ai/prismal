@@ -865,3 +865,111 @@ async def test_disconnect_suppresses_cancelled_error() -> None:
 
     assert conn._connected is False
     assert conn._cached_tools == []
+
+
+@pytest.mark.asyncio
+async def test_cleanup_stack_suppresses_anyio_cross_task_runtime_error() -> None:
+    """_cleanup_stack swallows anyio cross-task cancel scope RuntimeError.
+
+    Reproduces the OpenBB scenario: killing the subprocess before aclose()
+    used to leave anyio background tasks in a broken-pipe state, causing
+    RuntimeError: 'Attempted to exit cancel scope in a different task'.
+    The new order (aclose first, kill after) avoids the root cause, but
+    the suppression guard must still handle it if it occurs.
+    """
+    conn = MCPServerConnection(_make_stdio_config())
+
+    mock_stack = AsyncMock()
+    mock_stack.aclose = AsyncMock(
+        side_effect=RuntimeError(
+            "Attempted to exit cancel scope in a different task than it was entered in"
+        )
+    )
+    conn._exit_stack = mock_stack
+    conn._connected = True
+
+    await conn._cleanup_stack()  # must not raise
+
+    assert conn._connected is False
+    assert conn._exit_stack is None
+
+
+@pytest.mark.asyncio
+async def test_cleanup_stack_kills_processes_after_aclose() -> None:
+    """_cleanup_stack calls _kill_process_tree AFTER aclose(), not before.
+
+    Ensures the order is: aclose() → kill, so anyio task groups can exit
+    cleanly before their subprocess is terminated.
+    """
+    from unittest.mock import patch
+
+    conn = MCPServerConnection(_make_stdio_config())
+    conn._subprocess_pids = [1234, 5678]
+
+    call_order: list[str] = []
+
+    async def _tracked_aclose() -> None:
+        call_order.append("aclose")
+
+    mock_stack = AsyncMock()
+    mock_stack.aclose = _tracked_aclose
+    conn._exit_stack = mock_stack
+    conn._connected = True
+
+    with patch(
+        "lightagent.mcp.connection._kill_process_tree",
+        side_effect=lambda _pids: call_order.append("kill"),
+    ):
+        await conn._cleanup_stack()
+
+    assert call_order == ["aclose", "kill"], (
+        f"Expected aclose() before kill, got: {call_order}"
+    )
+    assert conn._connected is False
+
+
+@pytest.mark.asyncio
+async def test_do_connect_timeout_with_process_lookup_error_on_cleanup() -> None:
+    """_do_connect suppresses ProcessLookupError from stack.aclose() on timeout.
+
+    Reproduces the context7 scenario: session.initialize() times out, then
+    the MCP SDK's stdio_client cleanup calls terminate_posix_process_tree on
+    an already-dead process, raising ProcessLookupError.  Only MCPConnectionError
+    should be raised to the caller — the chained ProcessLookupError must be
+    suppressed.
+    """
+    from contextlib import asynccontextmanager
+
+    cfg = _make_stdio_config(timeout_seconds=1, retry_attempts=1)
+    conn = MCPServerConnection(cfg)
+
+    @asynccontextmanager
+    async def _timeout_client(_params: object):  # type: ignore[override]
+        """Simulate a stdio_client that raises TimeoutError on initialize, then
+        ProcessLookupError during cleanup (process already dead)."""
+        mock_stack = AsyncMock()
+        mock_stack.aclose = AsyncMock(
+            side_effect=ProcessLookupError(3, "No such process")
+        )
+        yield (AsyncMock(), AsyncMock())
+
+    timeout_session = AsyncMock()
+    timeout_session.initialize = AsyncMock(side_effect=TimeoutError("timed out"))
+
+    with (
+        patch("lightagent.mcp.connection.stdio_client", _timeout_client),
+        patch(
+            "lightagent.mcp.connection.ClientSession",
+            return_value=AsyncMock(
+                __aenter__=AsyncMock(return_value=timeout_session),
+                __aexit__=AsyncMock(
+                    side_effect=ProcessLookupError(3, "No such process")
+                ),
+            ),
+        ),
+    ):
+        # connect() must NOT raise — errors are contained (AC-004-5)
+        await conn.connect()
+
+    assert conn.connected is False
+    assert conn.status.error is not None

@@ -63,9 +63,13 @@ def test_factory_build_codeact_pattern(tmp_path: Path) -> None:
     assert isinstance(graph, CompiledStateGraph)
 
 
-@pytest.mark.parametrize("pattern", list(AgentPattern))
+@pytest.mark.parametrize(
+    "pattern",
+    # DEV_PIPELINE is a dynamic subgraph (Phase 24) — not built by AgentFactory
+    [p for p in AgentPattern if p != AgentPattern.DEV_PIPELINE],
+)
 def test_factory_supports_all_patterns(tmp_path: Path, pattern: AgentPattern) -> None:
-    """Every AgentPattern must build successfully without raising."""
+    """Every AgentFactory-managed pattern must build successfully without raising."""
     factory = AgentFactory()
     graph = factory.build(pattern, checkpoint_path=tmp_path / f"{pattern.value}.db")
     assert isinstance(graph, CompiledStateGraph)

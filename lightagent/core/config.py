@@ -490,6 +490,83 @@ class Settings(BaseSettings):
         description="Sender address for heartbeat email reports.",
     )
 
+    # Dynamic Subgraphs (Phase 24)
+    enable_subgraphs: bool = Field(
+        default=False,
+        description="Enable dynamic sub-agent orchestration (Phase 24).",
+    )
+
+    # Webhooks (Phase 25)
+    webhooks_enabled: bool = Field(
+        default=True,
+        description="Enable webhook delivery system.",
+    )
+    webhooks_signing_key: SecretStr = Field(
+        default=SecretStr("change-me-in-production"),
+        description="Default HMAC signing key for webhook payloads.",
+    )
+
+    # ML/DL Pipeline (Phase 26)
+    ml_enabled: bool = Field(default=True, description="Enable ML/DL pipeline subgraph")
+    ml_time_budget: int = Field(
+        default=120, gt=0, description="FLAML AutoML time budget in seconds"
+    )
+    ml_quality_threshold: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Minimum primary_score to pass model quality gate",
+    )
+    ml_max_iterations: int = Field(
+        default=3, ge=1, description="Max retrain iterations on quality gate failure"
+    )
+    ml_workspace_root: str = Field(
+        default="data/workspace/ml_models",
+        description="Root directory for ML model outputs",
+    )
+    ml_max_rows: int = Field(
+        default=1_000_000,
+        gt=0,
+        description="Maximum dataset rows allowed (safety limit)",
+    )
+    ml_random_seed: int = Field(
+        default=42, description="Global random seed for reproducibility"
+    )
+    ml_shap_max_samples: int = Field(
+        default=1000, gt=0, description="Max background samples for SHAP explainer"
+    )
+
+    # ---------------------------------------------------------------------------
+    # Financial Analysis (Phase 27)
+    # ---------------------------------------------------------------------------
+    financial_default_provider: str = Field(
+        default="yfinance",
+        description="Primary market data provider (yfinance | openbb | ccxt)",
+    )
+    financial_cache_ttl_ticker: int = Field(
+        default=30,
+        ge=1,
+        description="TTL in seconds for ticker/price cache",
+    )
+    financial_cache_ttl_ohlcv: int = Field(
+        default=300,
+        ge=1,
+        description="TTL in seconds for OHLCV bar cache (5 minutes)",
+    )
+    financial_cache_ttl_fundamentals: int = Field(
+        default=86400,
+        ge=1,
+        description="TTL in seconds for fundamentals cache (24 hours)",
+    )
+    financial_workspace_path: str = Field(
+        default="data/workspace/financial",
+        description="Root directory for financial output files",
+    )
+    financial_trade_execution_enabled: bool = Field(
+        default=False,
+        description="Phase 27 is read-only — trade execution must always be False",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

@@ -152,6 +152,9 @@ def get_tools_for_agent(agent_name: str) -> list[BaseTool]:
     Returns:
         Deduplicated list of ``BaseTool`` instances.
     """
+    from lightagent.agents.subgraphs.ml_pipeline.tools_ml import (
+        ML_PIPELINE_TOOLS,
+    )
     from lightagent.agents.tools import (
         CODER_TOOLS,
         CRITIC_TOOLS,
@@ -179,6 +182,19 @@ def get_tools_for_agent(agent_name: str) -> list[BaseTool]:
         # can schedule recurring agent tasks on behalf of the user.
         "planner": [read_file, write_file, *CRON_MANAGER_TOOLS],
         "cron_manager": CRON_MANAGER_TOOLS,
+        # ml_pipeline subgraph agents share the same ML tool set.
+        "data_ingester": ML_PIPELINE_TOOLS,
+        "eda_analyst": ML_PIPELINE_TOOLS,
+        "feature_engineer": ML_PIPELINE_TOOLS,
+        "model_trainer": ML_PIPELINE_TOOLS,
+        "model_evaluator": ML_PIPELINE_TOOLS,
+        "model_exporter": ML_PIPELINE_TOOLS,
+        # financial_analyst subgraph agents — LLM-only nodes (no dedicated tools)
+        "market_data_collector": [],
+        "technical_analyst": [],
+        "fundamental_analyst": [],
+        "risk_sentiment_analyst": [],
+        "report_generator": [],
     }
 
     stubs = stub_map.get(agent_name, [])

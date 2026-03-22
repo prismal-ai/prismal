@@ -10,9 +10,9 @@ def test_agent_pattern_is_str_enum() -> None:
     assert issubclass(AgentPattern, str)
 
 
-def test_agent_pattern_has_eight_values() -> None:
-    """AgentPattern must define exactly 8 patterns."""
-    assert len(AgentPattern) == 8
+def test_agent_pattern_has_nine_values() -> None:
+    """AgentPattern must define exactly 9 patterns (8 original + DEV_PIPELINE)."""
+    assert len(AgentPattern) == 9
 
 
 def test_supervisor_value() -> None:
@@ -54,6 +54,12 @@ def test_crag_value() -> None:
 def test_debate_value() -> None:
     """DEBATE must have string value 'debate'."""
     assert AgentPattern.DEBATE == "debate"
+
+
+def test_dev_pipeline_value() -> None:
+    """DEV_PIPELINE must have string value 'dev_pipeline' (Phase 24)."""
+    assert AgentPattern.DEV_PIPELINE == "dev_pipeline"
+    assert AgentPattern.DEV_PIPELINE.value == "dev_pipeline"
 
 
 def test_pattern_lookup_by_value() -> None:
