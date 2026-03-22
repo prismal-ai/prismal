@@ -96,6 +96,15 @@ class SessionRegistry:
         logger.info("session_registry.created_persistent_session", session_id=sid)
         return sid
 
+    def set_persistent_session(self, session_id: str) -> None:
+        """Overwrite the persistent session file with a new session ID.
+
+        Args:
+            session_id: The new session ID to persist.
+        """
+        self._profile_dir.mkdir(parents=True, exist_ok=True)
+        (self._profile_dir / "session_id").write_text(session_id, encoding="utf-8")
+
     # ── Channel linking ────────────────────────────────────────────────────
 
     def link(self, channel: str, user_id: str, session_id: str) -> None:
