@@ -25,9 +25,8 @@ from apscheduler.jobstores.base import JobLookupError as APJobLookupError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from lightagent.agents.graph import get_async_compiled_graph
 from lightagent.scheduler.cron_manager import CronJob, CronManager
-from lightagent.scheduler.heartbeat_delivery import HeartbeatDelivery
+from lightagent.scheduler.datetime_service import DateTimeService
 from lightagent.scheduler.notifier import CronNotifier
 
 logger = structlog.get_logger("lightagent.scheduler.executor")
@@ -76,7 +75,9 @@ class CronExecutor:
         """
         self._manager: CronManager = manager or CronManager()
         self._notifier: CronNotifier = notifier or CronNotifier()
-        self._scheduler: AsyncIOScheduler = AsyncIOScheduler()
+        self._dts: DateTimeService = DateTimeService.get()
+        scheduler_tz = self._dts.get_scheduler_tz()
+        self._scheduler: AsyncIOScheduler = AsyncIOScheduler(timezone=scheduler_tz)
         self._loop: asyncio.AbstractEventLoop | None = None
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -204,10 +205,20 @@ class CronExecutor:
         APScheduler ``date`` trigger; recurring jobs use
         :meth:`~apscheduler.triggers.cron.CronTrigger.from_crontab`.
 
+        Both trigger types receive an explicit timezone so APScheduler never
+        silently inherits the OS locale (Phase 28 / CLAUDE.md rule).
+
         Args:
             job: The :class:`~lightagent.scheduler.cron_manager.CronJob` to
                 register.
         """
+        # Resolve the operative timezone for this job: per-job → system chain.
+        job_tz = (
+            self._dts.resolve_timezone(job.timezone)
+            if job.timezone
+            else self._dts.get_scheduler_tz()
+        )
+
         if job.schedule.startswith("once:"):
             from datetime import datetime
 
@@ -215,8 +226,12 @@ class CronExecutor:
 
             # fromisoformat handles both '2026-03-09 20:51:06' (space) and
             # '2026-03-09T20:51:06' (T) regardless of how the value was stored.
-            run_date = datetime.fromisoformat(job.schedule[len("once:"):])
-            if run_date <= datetime.now():  # noqa: DTZ005
+            naive_run_date = datetime.fromisoformat(job.schedule[len("once:"):])
+            # Attach the job timezone so APScheduler fires at the right instant.
+            # BUG-001 fix: attach timezone before comparing — using UTC-aware now()
+            # prevents wrong expiry decisions when the OS clock is not in UTC.
+            run_date = naive_run_date.replace(tzinfo=job_tz)
+            if run_date <= self._dts.now(job_tz):
                 logger.warning(
                     "cron_executor_skipping_expired_once_job",
                     name=job.name,
@@ -229,7 +244,7 @@ class CronExecutor:
                 return
             trigger = DateTrigger(run_date=run_date)
         else:
-            trigger = CronTrigger.from_crontab(job.schedule)  # type: ignore[assignment]
+            trigger = CronTrigger.from_crontab(job.schedule, timezone=job_tz)
 
         self._scheduler.add_job(
             self._run_job,
@@ -267,6 +282,9 @@ class CronExecutor:
         from datetime import UTC, datetime, timedelta
 
         from langchain_core.messages import HumanMessage
+
+        from lightagent.agents.graph import get_async_compiled_graph
+        from lightagent.scheduler.heartbeat_delivery import HeartbeatDelivery
 
         logger.info("cron_job_starting", name=name, task=task)
         started_at = datetime.now(UTC).replace(tzinfo=None)

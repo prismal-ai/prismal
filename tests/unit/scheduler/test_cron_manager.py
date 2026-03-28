@@ -437,3 +437,118 @@ def test_add_without_output_routing_defaults_to_none(tmp_path: Path) -> None:
     assert loaded is not None
     assert loaded.output_channel is None
     assert loaded.output_target is None
+
+
+# ── Timezone field (Phase 28) ─────────────────────────────────────────────────
+
+
+def test_cron_job_timezone_default_empty() -> None:
+    """CronJob.timezone defaults to empty string."""
+    job = CronJob(name="x", schedule="* * * * *", task="t")
+    assert job.timezone == ""
+
+
+def test_cron_job_timezone_stored() -> None:
+    """CronJob.timezone stores an IANA name."""
+    job = CronJob(name="x", schedule="* * * * *", task="t", timezone="America/Caracas")
+    assert job.timezone == "America/Caracas"
+
+
+def test_add_with_timezone_persists(tmp_path: Path) -> None:
+    """CronManager.add() stores and retrieves the timezone field."""
+    manager = CronManager(db_path=tmp_path / "tz.db")
+    job = manager.add(
+        "tz-job",
+        "0 9 * * *",
+        "Morning job",
+        timezone="America/Caracas",
+    )
+    assert job.timezone == "America/Caracas"
+    loaded = manager.get_job("tz-job")
+    assert loaded is not None
+    assert loaded.timezone == "America/Caracas"
+
+
+def test_add_without_timezone_defaults_to_empty(tmp_path: Path) -> None:
+    """CronManager.add() without timezone stores empty string."""
+    manager = CronManager(db_path=tmp_path / "tz.db")
+    job = manager.add("no-tz-job", "0 9 * * *", "Task")
+    assert job.timezone == ""
+    loaded = manager.get_job("no-tz-job")
+    assert loaded is not None
+    assert loaded.timezone == ""
+
+
+def test_add_once_with_timezone_persists(tmp_path: Path) -> None:
+    """CronManager.add_once() stores and retrieves the timezone field."""
+    manager = CronManager(db_path=tmp_path / "tz.db")
+    run_at = datetime(2026, 6, 1, 9, 0, 0)
+    job = manager.add_once(
+        "tz-once",
+        run_at=run_at,
+        task="One-shot",
+        timezone="Europe/Berlin",
+    )
+    assert job.timezone == "Europe/Berlin"
+    loaded = manager.get_job("tz-once")
+    assert loaded is not None
+    assert loaded.timezone == "Europe/Berlin"
+
+
+def test_resume_with_timezone_recomputes_next_run(tmp_path: Path) -> None:
+    """resume() uses the job's timezone when recomputing next_run."""
+    manager = CronManager(db_path=tmp_path / "tz.db")
+    manager.add("tz-resume", "0 9 * * *", "Task", timezone="America/Caracas")
+    manager.pause("tz-resume")
+    manager.resume("tz-resume")
+    job = manager.get_job("tz-resume")
+    assert job is not None
+    assert job.status == "active"
+    assert job.next_run is not None
+
+
+def test_timezone_survives_migration(tmp_path: Path) -> None:
+    """A DB without the timezone column gets it added via _migrate_db()."""
+    import sqlite3
+
+    db = tmp_path / "legacy.db"
+    # Create a DB without the timezone column (simulating pre-T-290 schema)
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE cron_jobs ("
+        " name TEXT PRIMARY KEY,"
+        " schedule TEXT NOT NULL,"
+        " task TEXT NOT NULL,"
+        " status TEXT NOT NULL DEFAULT 'active',"
+        " last_run TEXT,"
+        " next_run TEXT,"
+        " created_at TEXT NOT NULL,"
+        " max_retries INTEGER NOT NULL DEFAULT 0,"
+        " retry_delay_seconds INTEGER NOT NULL DEFAULT 60,"
+        " retry_count INTEGER NOT NULL DEFAULT 0,"
+        " output_channel TEXT,"
+        " output_target TEXT"
+        ")"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS cron_run_history ("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " job_name TEXT NOT NULL,"
+        " started_at TEXT NOT NULL,"
+        " finished_at TEXT NOT NULL,"
+        " duration_seconds REAL NOT NULL,"
+        " outcome TEXT NOT NULL,"
+        " output TEXT,"
+        " error TEXT"
+        ")"
+    )
+    conn.commit()
+    conn.close()
+
+    # Opening the DB via CronManager must succeed and add the timezone column
+    manager = CronManager(db_path=db)
+    job = manager.add("legacy-job", "0 9 * * *", "Task")
+    assert job.timezone == ""
+    loaded = manager.get_job("legacy-job")
+    assert loaded is not None
+    assert loaded.timezone == ""

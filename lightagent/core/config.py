@@ -7,8 +7,9 @@ configuration is validated at startup.
 
 from functools import lru_cache
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AliasChoices, Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -566,6 +567,57 @@ class Settings(BaseSettings):
         default=False,
         description="Phase 27 is read-only — trade execution must always be False",
     )
+
+    # ── DateTime & Timezone (Phase 28) ────────────────────────────────
+    timezone: str = Field(
+        default="",
+        description=(
+            "IANA timezone for the process (e.g. 'America/Caracas'). "
+            "Empty = auto-detect from OS via tzlocal."
+        ),
+    )
+    cron_timezone: str = Field(
+        default="",
+        description=(
+            "Default IANA timezone for all cron jobs. "
+            "Empty = inherit from 'timezone' field."
+        ),
+    )
+    ntp_enabled: bool = Field(
+        default=False,
+        description="Enable NTP clock drift check.",
+    )
+    ntp_server: str = Field(
+        default="pool.ntp.org",
+        description="NTP server hostname. Only used when ntp_enabled=True.",
+    )
+    ntp_sync_interval_seconds: int = Field(
+        default=3600,
+        ge=60,
+        description="Seconds between NTP re-sync. Minimum 60.",
+    )
+    ntp_warn_threshold_seconds: int = Field(
+        default=5,
+        ge=1,
+        description="Log WARNING if NTP offset exceeds this many seconds.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_iana_timezones(self) -> "Settings":
+        """Validate that timezone and cron_timezone are valid IANA names if set."""
+        for field_name, value in (
+            ("timezone", self.timezone),
+            ("cron_timezone", self.cron_timezone),
+        ):
+            if value:
+                try:
+                    ZoneInfo(value)
+                except (ZoneInfoNotFoundError, KeyError) as exc:
+                    raise ValueError(
+                        f"{value} is not a valid IANA timezone"
+                        f" (field: LIGHTAGENT_{field_name.upper()})"
+                    ) from exc
+        return self
 
 
 @lru_cache(maxsize=1)

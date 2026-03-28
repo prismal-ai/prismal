@@ -23,7 +23,7 @@ from lightagent.scheduler.executor import CronExecutor
 # Helpers
 # ---------------------------------------------------------------------------
 
-_GRAPH_PATCH = "lightagent.scheduler.executor.get_async_compiled_graph"
+_GRAPH_PATCH = "lightagent.agents.graph.get_async_compiled_graph"
 
 
 def _make_compiled_graph_mock(*, fail: bool = False) -> AsyncMock:
