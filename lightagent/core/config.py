@@ -13,6 +13,61 @@ from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+class MaintenanceSettings(BaseSettings):
+    """Package security and maintenance configuration (SPEC-031/032).
+
+    All fields are readable from environment variables with the
+    ``LIGHTAGENT_MAINTENANCE_`` prefix (e.g.
+    ``LIGHTAGENT_MAINTENANCE_CONFIRM=false``).
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="LIGHTAGENT_MAINTENANCE_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    confirm: bool = Field(
+        default=True,
+        description=(
+            "Require interactive confirmation before applying any package update. "
+            "Set to false for CI/CD pipelines (LIGHTAGENT_MAINTENANCE_CONFIRM=false)."
+        ),
+    )
+    backup_dir: str = Field(
+        default="data/backups",
+        description=(
+            "Directory for pyproject.toml backups created before each write. "
+            "Created on demand."
+        ),
+    )
+    reports_dir: str = Field(
+        default="data/logs",
+        description=(
+            "Directory where JSON audit reports are saved "
+            "(``security_audit_YYYYMMDDHHMMSS.json``). Created on demand."
+        ),
+    )
+    osv_concurrency: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+        description="Maximum concurrent OSV API requests during a full package scan.",
+    )
+    uv_timeout: int = Field(
+        default=120,
+        ge=10,
+        description="Timeout in seconds for each ``uv pip install`` subprocess.",
+    )
+    pypi_timeout: int = Field(
+        default=10,
+        ge=3,
+        description="Timeout in seconds for PyPI JSON API HTTP requests.",
+    )
+
+
 class Settings(BaseSettings):
     """
     LightAgent application settings.
@@ -104,6 +159,19 @@ class Settings(BaseSettings):
         default=False,
         description="Allow shell execution via ActionInterceptor (dangerous)",
     )
+
+    # ── Maintenance (read-only property — env prefix LIGHTAGENT_MAINTENANCE_) ──
+    @property
+    def maintenance(self) -> MaintenanceSettings:
+        """Return the package maintenance sub-settings.
+
+        Delegates to :func:`get_maintenance_settings` so that the same
+        ``lru_cache``d instance is reused across the application lifetime.
+
+        Returns:
+            Cached :class:`MaintenanceSettings` loaded from env / .env file.
+        """
+        return get_maintenance_settings()
 
     # ── Skills ────────────────────────────────────────────────────────
     external_skills_dirs: list[str] = Field(
@@ -365,6 +433,49 @@ class Settings(BaseSettings):
         description="Telegram Bot API token",
     )
 
+    # Telegram — Webhook transport (optional, Phase 29)
+    telegram_webhook_enabled: bool = Field(
+        default=False,
+        description="If True, use webhook instead of long-polling.",
+    )
+    telegram_webhook_url: str = Field(
+        default="",
+        description="Full HTTPS URL for Telegram webhook. Required when webhook_enabled=True.",
+    )
+    telegram_webhook_secret: SecretStr = Field(
+        default=SecretStr(""),
+        description="Secret token for X-Telegram-Bot-Api-Secret-Token header validation.",
+    )
+    telegram_max_connections: int = Field(
+        default=40,
+        ge=1,
+        le=100,
+        description="Max concurrent connections for webhook (1-100).",
+    )
+
+    # Telegram — Session controls (Phase 29)
+    telegram_session_inline_keyboard: bool = Field(
+        default=True,
+        description="Append [New Chat] [Reset] inline buttons to every agent response.",
+    )
+    telegram_max_sessions_per_user: int = Field(
+        default=10,
+        ge=1,
+        description="Max archived sessions per (chat_id, user_id) pair.",
+    )
+
+    # Telegram — Message tracking (Phase 29)
+    telegram_message_track: bool = Field(
+        default=True,
+        description="Record bot-sent message IDs in SQLite for later deletion.",
+    )
+
+    # Telegram — Formatting (Phase 29)
+    telegram_parse_mode: str = Field(
+        default="HTML",
+        description="Telegram parse mode: 'HTML' or 'MarkdownV2'.",
+    )
+
     # Slack
     slack_bot_token: SecretStr = Field(
         default=SecretStr(""),
@@ -603,6 +714,20 @@ class Settings(BaseSettings):
     )
 
     @model_validator(mode="after")
+    def _validate_telegram_webhook(self) -> "Settings":
+        """Validate webhook config when telegram_webhook_enabled is True."""
+        if self.telegram_webhook_enabled:
+            if not self.telegram_webhook_url.startswith("https://"):
+                raise ValueError(
+                    "LIGHTAGENT_TELEGRAM_WEBHOOK_URL must be an HTTPS URL"
+                )
+            if not self.telegram_webhook_secret.get_secret_value():
+                raise ValueError(
+                    "LIGHTAGENT_TELEGRAM_WEBHOOK_SECRET must be set when webhook is enabled"
+                )
+        return self
+
+    @model_validator(mode="after")
     def _validate_iana_timezones(self) -> "Settings":
         """Validate that timezone and cron_timezone are valid IANA names if set."""
         for field_name, value in (
@@ -632,3 +757,16 @@ def get_settings() -> Settings:
         The singleton Settings instance loaded from env / .env file.
     """
     return Settings()
+
+
+@lru_cache(maxsize=1)
+def get_maintenance_settings() -> MaintenanceSettings:
+    """Return the cached :class:`MaintenanceSettings` instance.
+
+    Uses ``lru_cache`` so the same object is reused across the application
+    lifetime.  Also exposed via :attr:`Settings.maintenance` for convenience.
+
+    Returns:
+        Singleton :class:`MaintenanceSettings` loaded from env / .env file.
+    """
+    return MaintenanceSettings()
