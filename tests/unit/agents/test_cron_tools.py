@@ -85,6 +85,158 @@ class TestCronAdd:
 
         assert "unknown" in result
 
+    def test_cron_add_passes_timezone_to_manager(self) -> None:
+        """cron_add forwards the timezone parameter to CronManager.add()."""
+        from lightagent.agents.tools import cron_add
+
+        job = _make_job(name="tz-job")
+
+        with patch(
+            "lightagent.scheduler.cron_manager.CronManager.add", return_value=job
+        ) as mock_add:
+            cron_add.invoke({
+                "name": "tz-job",
+                "schedule": "0 9 * * *",
+                "task": "Do something",
+                "timezone": "America/Caracas",
+            })
+
+        mock_add.assert_called_once_with(
+            "tz-job",
+            "0 9 * * *",
+            "Do something",
+            output_channel=None,
+            output_target=None,
+            timezone="America/Caracas",
+        )
+
+    def test_cron_add_includes_timezone_in_confirmation(self) -> None:
+        """cron_add confirmation message includes timezone when provided."""
+        from lightagent.agents.tools import cron_add
+
+        job = _make_job(name="tz-job")
+
+        with patch(
+            "lightagent.scheduler.cron_manager.CronManager.add", return_value=job
+        ):
+            result = cron_add.invoke({
+                "name": "tz-job",
+                "schedule": "0 9 * * *",
+                "task": "Do something",
+                "timezone": "Europe/Madrid",
+            })
+
+        assert "Europe/Madrid" in result
+
+    def test_cron_add_default_timezone_is_empty_string(self) -> None:
+        """cron_add passes empty-string timezone when parameter is omitted."""
+        from lightagent.agents.tools import cron_add
+
+        job = _make_job(name="no-tz-job")
+
+        with patch(
+            "lightagent.scheduler.cron_manager.CronManager.add", return_value=job
+        ) as mock_add:
+            cron_add.invoke({
+                "name": "no-tz-job",
+                "schedule": "0 9 * * *",
+                "task": "Task without tz",
+            })
+
+        assert mock_add.call_args.kwargs.get("timezone", "") == ""
+
+
+# ---------------------------------------------------------------------------
+# cron_once
+# ---------------------------------------------------------------------------
+
+
+class TestCronOnce:
+    """Tests for the cron_once tool."""
+
+    def test_cron_once_success(self) -> None:
+        """cron_once returns a confirmation with the scheduled time."""
+        from lightagent.agents.tools import cron_once
+
+        job = _make_job(name="once-job", schedule="once:2099-12-01T10:00:00")
+
+        with patch(
+            "lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job
+        ):
+            result = cron_once.invoke({
+                "name": "once-job",
+                "run_at": "2099-12-01 10:00:00",
+                "task": "Send reminder",
+            })
+
+        assert "once-job" in result
+        assert "2099-12-01" in result
+
+    def test_cron_once_invalid_datetime_returns_error(self) -> None:
+        """cron_once returns an error message for invalid datetime format."""
+        from lightagent.agents.tools import cron_once
+
+        result = cron_once.invoke({
+            "name": "bad-job",
+            "run_at": "not-a-date",
+            "task": "irrelevant",
+        })
+
+        assert "Invalid datetime" in result
+
+    def test_cron_once_passes_timezone_to_manager(self) -> None:
+        """cron_once forwards the timezone parameter to CronManager.add_once()."""
+        from lightagent.agents.tools import cron_once
+
+        job = _make_job(name="tz-once", schedule="once:2099-12-01T10:00:00")
+
+        with patch(
+            "lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job
+        ) as mock_add_once:
+            cron_once.invoke({
+                "name": "tz-once",
+                "run_at": "2099-12-01 10:00:00",
+                "task": "Ping",
+                "timezone": "America/New_York",
+            })
+
+        assert mock_add_once.call_args.kwargs.get("timezone") == "America/New_York"
+
+    def test_cron_once_includes_timezone_in_confirmation(self) -> None:
+        """cron_once confirmation message includes timezone when provided."""
+        from lightagent.agents.tools import cron_once
+
+        job = _make_job(name="tz-once", schedule="once:2099-12-01T10:00:00")
+
+        with patch(
+            "lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job
+        ):
+            result = cron_once.invoke({
+                "name": "tz-once",
+                "run_at": "2099-12-01 10:00:00",
+                "task": "Alert",
+                "timezone": "Asia/Tokyo",
+            })
+
+        assert "Asia/Tokyo" in result
+
+    def test_cron_once_default_timezone_is_empty_string(self) -> None:
+        """cron_once passes empty-string timezone when parameter is omitted."""
+        from lightagent.agents.tools import cron_once
+
+        job = _make_job(name="no-tz-once", schedule="once:2099-12-01T10:00:00")
+
+        with patch(
+            "lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job
+        ) as mock_add_once:
+            cron_once.invoke({
+                "name": "no-tz-once",
+                "run_at": "2099-12-01 10:00:00",
+                "task": "Task without tz",
+            })
+
+        assert mock_add_once.call_args.kwargs.get("timezone", "") == ""
+
 
 # ---------------------------------------------------------------------------
 # cron_list

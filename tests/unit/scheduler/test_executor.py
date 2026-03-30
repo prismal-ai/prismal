@@ -279,7 +279,7 @@ async def test_run_job_calls_graph_and_updates_last_run(
     mock_graph.ainvoke = AsyncMock(return_value={"messages": []})
 
     with patch(
-        "lightagent.scheduler.executor.get_async_compiled_graph",
+        "lightagent.agents.graph.get_async_compiled_graph",
         new=AsyncMock(return_value=mock_graph),
     ):
         await executor._run_job("daily-brief", "Summarise news")
@@ -319,7 +319,7 @@ async def test_run_job_uses_task_as_message(
     mock_graph.ainvoke = capturing_ainvoke
 
     with patch(
-        "lightagent.scheduler.executor.get_async_compiled_graph",
+        "lightagent.agents.graph.get_async_compiled_graph",
         new=AsyncMock(return_value=mock_graph),
     ):
         await executor._run_job("job-x", "Fetch daily report")
@@ -338,7 +338,7 @@ async def test_run_job_does_not_raise_on_graph_error(
 ) -> None:
     """_run_job() swallows exceptions so APScheduler keeps running future ticks."""
     with patch(
-        "lightagent.scheduler.executor.get_async_compiled_graph",
+        "lightagent.agents.graph.get_async_compiled_graph",
         new=AsyncMock(side_effect=RuntimeError("LLM unavailable")),
     ):
         # Must NOT raise
@@ -357,7 +357,7 @@ async def test_run_job_does_not_update_last_run_on_ainvoke_error(
     mock_graph.ainvoke = AsyncMock(side_effect=ValueError("Graph error"))
 
     with patch(
-        "lightagent.scheduler.executor.get_async_compiled_graph",
+        "lightagent.agents.graph.get_async_compiled_graph",
         new=AsyncMock(return_value=mock_graph),
     ):
         await executor._run_job("broken-job", "Run task")
@@ -398,7 +398,7 @@ class TestRunJobHistory:
         mock_graph.ainvoke = AsyncMock(return_value={"messages": []})
 
         with patch(
-            "lightagent.scheduler.executor.get_async_compiled_graph",
+            "lightagent.agents.graph.get_async_compiled_graph",
             new=AsyncMock(return_value=mock_graph),
         ):
             await executor._run_job("hist-test", "some task")
@@ -418,7 +418,7 @@ class TestRunJobHistory:
         manager.add("fail-hist", "* * * * *", "task")
 
         with patch(
-            "lightagent.scheduler.executor.get_async_compiled_graph",
+            "lightagent.agents.graph.get_async_compiled_graph",
             new=AsyncMock(side_effect=RuntimeError("boom")),
         ):
             await executor._run_job("fail-hist", "task")
@@ -458,7 +458,7 @@ class TestCronExecutorNotifier:
         manager.add("notify-test", "* * * * *", "task")
 
         with patch(
-            "lightagent.scheduler.executor.get_async_compiled_graph",
+            "lightagent.agents.graph.get_async_compiled_graph",
             new=AsyncMock(side_effect=RuntimeError("crash")),
         ):
             await executor._run_job("notify-test", "task")
@@ -493,7 +493,7 @@ class TestCronExecutorNotifier:
         )
 
         with patch(
-            "lightagent.scheduler.executor.get_async_compiled_graph",
+            "lightagent.agents.graph.get_async_compiled_graph",
             new=AsyncMock(return_value=mock_graph),
         ):
             await executor._run_job("success-notify", "task")
@@ -530,7 +530,7 @@ class TestRetryLogic:
         manager.add("retry-job", "* * * * *", "task", max_retries=2)
 
         with patch(
-            "lightagent.scheduler.executor.get_async_compiled_graph",
+            "lightagent.agents.graph.get_async_compiled_graph",
             new=AsyncMock(side_effect=RuntimeError("fail")),
         ):
             await executor._run_job("retry-job", "task")
@@ -564,7 +564,7 @@ class TestRetryLogic:
         manager.set_retry_count("final-job", 1)
 
         with patch(
-            "lightagent.scheduler.executor.get_async_compiled_graph",
+            "lightagent.agents.graph.get_async_compiled_graph",
             new=AsyncMock(side_effect=RuntimeError("final")),
         ):
             await executor._run_job("final-job", "task")
@@ -597,7 +597,7 @@ class TestRetryLogic:
             return_value={"messages": [AIMessage(content="done")]}
         )
         with patch(
-            "lightagent.scheduler.executor.get_async_compiled_graph",
+            "lightagent.agents.graph.get_async_compiled_graph",
             new=AsyncMock(return_value=mock_graph),
         ):
             await executor._run_job("success-job", "task")
@@ -633,10 +633,10 @@ async def test_successful_job_with_output_routing_calls_delivery(
 
     with (
         patch(
-            "lightagent.scheduler.executor.get_async_compiled_graph"
+            "lightagent.agents.graph.get_async_compiled_graph"
         ) as mock_graph_fn,
         patch(
-            "lightagent.scheduler.executor.HeartbeatDelivery",
+            "lightagent.scheduler.heartbeat_delivery.HeartbeatDelivery",
             return_value=mock_delivery,
         ),
     ):
@@ -671,10 +671,10 @@ async def test_job_without_output_routing_does_not_call_delivery(
 
     with (
         patch(
-            "lightagent.scheduler.executor.get_async_compiled_graph"
+            "lightagent.agents.graph.get_async_compiled_graph"
         ) as mock_graph_fn,
         patch(
-            "lightagent.scheduler.executor.HeartbeatDelivery",
+            "lightagent.scheduler.heartbeat_delivery.HeartbeatDelivery",
             return_value=mock_delivery,
         ),
     ):
@@ -688,3 +688,117 @@ async def test_job_without_output_routing_does_not_call_delivery(
         await executor._run_job("silent-job", "Silent task")
 
     mock_delivery.send.assert_not_awaited()
+
+
+# ── Timezone-aware scheduler init (Phase 28) ──────────────────────────────────
+
+
+def test_executor_scheduler_receives_timezone() -> None:
+    """CronExecutor passes a timezone to AsyncIOScheduler on construction."""
+    from zoneinfo import ZoneInfo
+
+    from lightagent.scheduler.executor import CronExecutor
+
+    with patch(
+        "lightagent.scheduler.executor.AsyncIOScheduler"
+    ) as mock_scheduler_cls:
+        mock_scheduler_cls.return_value = MagicMock()
+        ex = CronExecutor()
+        # AsyncIOScheduler must be called with a timezone kwarg
+        call_kwargs = mock_scheduler_cls.call_args.kwargs
+        assert "timezone" in call_kwargs
+        assert isinstance(call_kwargs["timezone"], ZoneInfo)
+        _ = ex  # suppress unused-variable warning
+
+
+def test_executor_scheduler_timezone_is_utc_by_default() -> None:
+    """When no env vars are set, the scheduler timezone resolves to UTC."""
+    import os
+    from zoneinfo import ZoneInfo
+
+    from lightagent.scheduler.datetime_service import DateTimeService
+    from lightagent.scheduler.executor import CronExecutor
+
+    DateTimeService._instance = None
+    env = {"LIGHTAGENT_TIMEZONE": "", "LIGHTAGENT_CRON_TIMEZONE": ""}
+    with (
+        patch.dict(os.environ, env, clear=False),
+        patch("lightagent.scheduler.executor.AsyncIOScheduler") as mock_scheduler_cls,
+        patch("tzlocal.get_localzone", return_value=ZoneInfo("UTC")),
+    ):
+        mock_scheduler_cls.return_value = MagicMock()
+        DateTimeService._instance = None
+        _ex = CronExecutor()
+        tz = mock_scheduler_cls.call_args.kwargs["timezone"]
+        assert tz == ZoneInfo("UTC")
+    DateTimeService._instance = None
+
+
+# ── _register_job timezone (Phase 28) ────────────────────────────────────────
+
+
+def test_register_job_passes_timezone_to_cron_trigger(mock_manager: MagicMock) -> None:
+    """_register_job passes the job's timezone to CronTrigger.from_crontab."""
+    from lightagent.scheduler.executor import CronExecutor
+
+    job = CronJob(name="tz-job", schedule="0 9 * * *", task="t", timezone="America/Caracas")
+    ex = CronExecutor(manager=mock_manager)
+
+    with patch(
+        "lightagent.scheduler.executor.CronTrigger"
+    ) as mock_trigger_cls:
+        mock_trigger_cls.from_crontab.return_value = MagicMock()
+        ex._register_job(job)
+        mock_trigger_cls.from_crontab.assert_called_once()
+        call_kwargs = mock_trigger_cls.from_crontab.call_args.kwargs
+        assert "timezone" in call_kwargs
+        assert str(call_kwargs["timezone"]) == "America/Caracas"
+
+
+def test_register_once_job_with_future_date_uses_aware_run_date(
+    mock_manager: MagicMock,
+) -> None:
+    """_register_job attaches timezone to run_date for 'once:' jobs (BUG-001 fix)."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from lightagent.scheduler.executor import CronExecutor
+
+    future = datetime.now() + timedelta(hours=1)  # noqa: DTZ005
+    schedule = f"once:{future.strftime('%Y-%m-%dT%H:%M:%S')}"
+    job = CronJob(name="once-tz", schedule=schedule, task="t", timezone="America/Caracas")
+
+    ex = CronExecutor(manager=mock_manager)
+
+    # Patch DateTrigger inside the executor module so we can inspect the call args
+    with (
+        patch("apscheduler.triggers.date.DateTrigger") as mock_date_trigger_cls,
+        patch.object(ex._scheduler, "add_job"),
+    ):
+        mock_date_trigger_cls.return_value = MagicMock()
+        ex._register_job(job)
+        # DateTrigger must be instantiated with an aware run_date in Caracas TZ
+        mock_date_trigger_cls.assert_called_once()
+        run_date_arg = mock_date_trigger_cls.call_args.kwargs["run_date"]
+        assert run_date_arg.tzinfo == ZoneInfo("America/Caracas")
+
+
+def test_register_expired_once_job_is_skipped_and_removed(
+    mock_manager: MagicMock,
+) -> None:
+    """Expired 'once:' jobs are skipped and removed from the DB (BUG-001 fix)."""
+    from datetime import datetime, timedelta
+
+    from lightagent.scheduler.executor import CronExecutor
+
+    past = datetime.now() - timedelta(hours=1)  # noqa: DTZ005
+    schedule = f"once:{past.strftime('%Y-%m-%dT%H:%M:%S')}"
+    job = CronJob(name="expired-once", schedule=schedule, task="t")
+
+    ex = CronExecutor(manager=mock_manager)
+    mock_manager.remove.return_value = None
+
+    with patch.object(ex._scheduler, "add_job") as mock_add_job:
+        ex._register_job(job)
+        mock_add_job.assert_not_called()
+        mock_manager.remove.assert_called_once_with("expired-once")

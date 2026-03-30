@@ -23,16 +23,14 @@ import contextlib
 import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
 
-from croniter import croniter
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from collections.abc import Generator
-from pathlib import Path
-from typing import Literal
-
-from pydantic import BaseModel, Field
+    from zoneinfo import ZoneInfo
 
 from lightagent.core.logging import get_logger
 
@@ -57,7 +55,8 @@ CREATE TABLE IF NOT EXISTS cron_jobs (
     retry_delay_seconds INTEGER NOT NULL DEFAULT 60,
     retry_count         INTEGER NOT NULL DEFAULT 0,
     output_channel      TEXT,
-    output_target       TEXT
+    output_target       TEXT,
+    timezone            TEXT NOT NULL DEFAULT ''
 );
 """
 
@@ -145,6 +144,13 @@ class CronJob(BaseModel):
         default=None,
         description="Channel-specific target (chat_id, #channel, or email address).",
     )
+    timezone: str = Field(
+        default="",
+        description=(
+            "IANA timezone name for this job (e.g. 'America/Caracas'). "
+            "Empty string means use the system-wide timezone resolution chain."
+        ),
+    )
 
 
 # ── Manager ───────────────────────────────────────────────────────────────────
@@ -226,6 +232,11 @@ class CronManager:
                 conn.execute(
                     "ALTER TABLE cron_jobs ADD COLUMN output_target TEXT"
                 )
+            if "timezone" not in existing:
+                conn.execute(
+                    "ALTER TABLE cron_jobs"
+                    " ADD COLUMN timezone TEXT NOT NULL DEFAULT ''"
+                )
 
     @staticmethod
     def _row_to_job(row: sqlite3.Row) -> CronJob:
@@ -247,6 +258,7 @@ class CronManager:
             retry_count=row["retry_count"] or 0,
             output_channel=row["output_channel"],
             output_target=row["output_target"],
+            timezone=row["timezone"] or "",
         )
 
     def _require_job(self, name: str) -> None:
@@ -265,6 +277,7 @@ class CronManager:
         retry_delay_seconds: int = 60,
         output_channel: str | None = None,
         output_target: str | None = None,
+        timezone: str = "",
     ) -> CronJob:
         """Create and persist a new cron job.
 
@@ -276,6 +289,8 @@ class CronManager:
             retry_delay_seconds: Base backoff delay in seconds (default 60).
             output_channel: Delivery channel for job output (e.g. ``"telegram"``).
             output_target: Channel-specific target (chat_id, #channel, email).
+            timezone: IANA timezone name for this job (e.g. ``"America/Caracas"``).
+                Empty string uses the system-wide timezone resolution chain.
 
         Returns:
             The newly created :class:`CronJob`.
@@ -288,32 +303,38 @@ class CronManager:
         if self.get_job(name) is not None:
             raise ValueError(f"Cron job '{name}' already exists")
 
-        now = datetime.now(UTC).replace(tzinfo=None)
-        next_dt = croniter(schedule, now).get_next(datetime)
+        from lightagent.scheduler.datetime_service import DateTimeService
+
+        dts = DateTimeService.get()
+        tz: ZoneInfo | None = dts.resolve_timezone(timezone) if timezone else None
+        next_dt = dts.next_run(schedule, tz)
+        next_naive = dts.to_utc_naive(next_dt)
+
         job = CronJob(
             name=name,
             schedule=schedule,
             task=task,
-            next_run=next_dt,
+            next_run=next_naive,
             max_retries=max_retries,
             retry_delay_seconds=retry_delay_seconds,
             output_channel=output_channel,
             output_target=output_target,
+            timezone=timezone,
         )
         created = job.created_at.strftime(_DT_FMT)
-        next_stamp = next_dt.strftime(_DT_FMT)
+        next_stamp = next_naive.strftime(_DT_FMT)
 
         with self._conn() as conn:
             conn.execute(
                 "INSERT INTO cron_jobs"
                 " (name, schedule, task, status, created_at, next_run,"
                 "  max_retries, retry_delay_seconds, retry_count,"
-                "  output_channel, output_target)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "  output_channel, output_target, timezone)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, schedule, task, job.status, created, next_stamp,
                     max_retries, retry_delay_seconds, 0,
-                    output_channel, output_target,
+                    output_channel, output_target, timezone,
                 ),
             )
 
@@ -322,6 +343,7 @@ class CronManager:
             name=name,
             schedule=schedule,
             next_run=next_stamp,
+            timezone=timezone or "(resolved)",
             max_retries=max_retries,
         )
         self._try_create_prefect_deployment(job)
@@ -332,6 +354,7 @@ class CronManager:
         name: str,
         run_at: datetime,
         task: str,
+        timezone: str = "",
     ) -> CronJob:
         """Create and persist a one-time (non-recurring) cron job.
 
@@ -341,9 +364,11 @@ class CronManager:
 
         Args:
             name: Unique job identifier.
-            run_at: Exact datetime when the job should fire (local time,
-                naive or timezone-aware — stored as-is).
+            run_at: Exact datetime when the job should fire.  If naive, it is
+                interpreted in *timezone* (or the resolved default TZ when empty).
             task: Human-readable task description sent to the agent.
+            timezone: IANA timezone name for this job (e.g. ``"America/Caracas"``).
+                Empty string uses the system-wide timezone resolution chain.
 
         Returns:
             The newly created :class:`CronJob`.
@@ -363,20 +388,23 @@ class CronManager:
             schedule=schedule,
             task=task,
             next_run=run_at,
+            timezone=timezone,
         )
         with self._conn() as conn:
             conn.execute(
                 "INSERT INTO cron_jobs"
                 " (name, schedule, task, status, created_at, next_run,"
-                "  max_retries, retry_delay_seconds, retry_count)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (name, schedule, task, job.status, now_str, run_at_str, 0, 60, 0),
+                "  max_retries, retry_delay_seconds, retry_count, timezone)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (name, schedule, task, job.status, now_str, run_at_str, 0, 60, 0,
+                 timezone),
             )
 
         logger.info(
             "cron_job_once_added",
             name=name,
             run_at=run_at_str,
+            timezone=timezone or "(resolved)",
         )
         return job
 
@@ -412,9 +440,17 @@ class CronManager:
         self._require_job(name)
         job = self.get_job(name)
         assert job is not None  # guaranteed by _require_job above
-        now = datetime.now(UTC).replace(tzinfo=None)
-        next_dt = croniter(job.schedule, now).get_next(datetime)
-        stamp = next_dt.strftime(_DT_FMT)
+
+        from lightagent.scheduler.datetime_service import DateTimeService
+
+        dts = DateTimeService.get()
+        tz: ZoneInfo | None = (
+            dts.resolve_timezone(job.timezone) if job.timezone else None
+        )
+        next_aware = dts.next_run(job.schedule, tz)
+        next_naive = dts.to_utc_naive(next_aware)
+        stamp = next_naive.strftime(_DT_FMT)
+
         with self._conn() as conn:
             conn.execute(
                 "UPDATE cron_jobs SET status = 'active', next_run = ? WHERE name = ?",
@@ -464,6 +500,25 @@ class CronManager:
                 "SELECT * FROM cron_jobs WHERE name = ?", (name,)
             ).fetchone()
         return self._row_to_job(row) if row else None
+
+    def update_timezone(self, name: str, timezone: str) -> None:
+        """Update the IANA timezone for an existing cron job.
+
+        Args:
+            name: The job name to update.
+            timezone: New IANA timezone (e.g. ``"America/Caracas"``).
+                Empty string resets to the global timezone resolution chain.
+
+        Raises:
+            KeyError: If the job does not exist.
+        """
+        self._require_job(name)
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE cron_jobs SET timezone = ? WHERE name = ?",
+                (timezone, name),
+            )
+        logger.info("cron_job_timezone_updated", name=name, timezone=timezone)
 
     def update_last_run(self, name: str, ts: datetime | None = None) -> None:
         """Record a successful execution timestamp for a job.
