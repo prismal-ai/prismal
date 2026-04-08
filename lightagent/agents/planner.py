@@ -8,11 +8,15 @@ methodology.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import json
+import re
+from typing import TYPE_CHECKING, cast
 
-from langchain_core.messages import BaseMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
+from lightagent.agents.patterns.reflection import reflection_loop
 from lightagent.agents.tool_registry import get_tools_for_agent, react_loop
+from lightagent.core.config import get_settings
 from lightagent.core.logging import get_logger
 from lightagent.providers.registry import ProviderRegistry
 
@@ -161,9 +165,67 @@ loaded via `spec_driven_design__read_reference`, with every MUST requirement
 mapped to an acceptance criterion and every DB column typed explicitly.
 """
 
+_PLAN_CRITIQUE_PROMPT = """You are a strict quality reviewer for planner outputs.
+
+You will receive a candidate plan produced by an AI planner agent. Evaluate it
+against three criteria, each scored in [0.0, 1.0]:
+
+1. **Completeness** — every explicit sub-goal in the user's request is addressed
+   by at least one step / section.
+2. **Consistency** — step ordering respects data dependencies (research before
+   analysis, analysis before coding, coding before review).
+3. **Actionability** — every step is atomic (one agent, one verb, one artifact),
+   uses a valid agent name from {researcher, coder, rag_agent, critic,
+   data_analyst, file_manager}, and follows the format
+   `N. [agent: <agent_name>] <Task description>`. SDD documents must have all
+   sections filled with concrete content (no TODO placeholders).
+
+Respond with ONLY a single JSON object — no prose, no markdown fences:
+{
+  "completeness": <float in [0,1]>,
+  "consistency": <float in [0,1]>,
+  "actionability": <float in [0,1]>,
+  "score": <float in [0,1] = average of the three>,
+  "feedback": "<one paragraph explaining the lowest-scoring criterion and what to fix>"
+}
+"""
+
+
+_JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
+
+
+def _parse_critique_response(content: str) -> tuple[str, float]:
+    """Extract ``(feedback, score)`` from a critique LLM response.
+
+    The critique LLM is instructed to return raw JSON, but real models
+    sometimes wrap it in markdown fences or add prose.  This helper finds the
+    first JSON object in the content and parses it defensively.  When parsing
+    fails the function returns a sentinel score of ``1.0`` so the reflection
+    loop does not reject otherwise-valid plans because of a critique
+    formatting glitch (the failure is logged at WARNING level).
+
+    Args:
+        content: Raw text returned by the critique LLM.
+
+    Returns:
+        ``(feedback, score)`` extracted from the JSON payload.
+    """
+    match = _JSON_OBJECT_RE.search(content)
+    if match is None:
+        logger.warning("planner_critique_no_json", content_preview=content[:200])
+        return ("critique response contained no JSON object", 1.0)
+    try:
+        data = json.loads(match.group(0))
+        score = float(data.get("score", 0.0))
+        feedback = str(data.get("feedback", ""))
+        return feedback, max(0.0, min(1.0, score))
+    except (json.JSONDecodeError, ValueError, TypeError) as exc:
+        logger.warning("planner_critique_parse_failed", error=str(exc))
+        return (f"critique response failed to parse: {exc}", 1.0)
+
 
 async def planner_node(state: AgentState) -> dict[str, object]:
-    """Execute the planner sub-agent node with a ReAct tool loop.
+    """Execute the planner sub-agent node with a reflection-wrapped ReAct loop.
 
     Handles two modes:
 
@@ -173,6 +235,12 @@ async def planner_node(state: AgentState) -> dict[str, object]:
       (guide, templates, validator) to generate software specification
       documents (PRD, API Spec, Tech Design, Data Model, Implementation Plan).
 
+    The generated draft is passed through :func:`reflection_loop` so that the
+    plan is critiqued for completeness, consistency, and actionability before
+    being routed back to the supervisor.  Reflection is bounded by
+    ``settings.reflection_default_threshold`` (default ``0.85``) and a hard
+    cap of ``2`` iterations (one initial draft + one optional refinement).
+
     Args:
         state: Current agent state from LangGraph.
 
@@ -180,27 +248,92 @@ async def planner_node(state: AgentState) -> dict[str, object]:
         Updated state dict with ``current_agent`` set to ``'planner'``,
         new ``messages`` containing the plan or spec, ``task_plan`` as a
         list of step strings (lines starting with a digit), ``pending_tasks``
-        set to the same list, and ``completed_tasks`` reset to an empty list.
+        set to the same list, ``completed_tasks`` reset to an empty list, and
+        ``metadata['planner']`` populated with reflection score and iteration
+        count.
     """
     session_id = state.get("session_id")
     logger.debug("planner_node_called", session_id=session_id)
 
     registry = ProviderRegistry()
     llm = registry.get_llm_with_fallback()
+    critique_llm = registry.get_llm_with_fallback()
     tools = get_tools_for_agent("planner")
     llm_with_tools = llm.bind_tools(tools) if tools else llm
 
-    messages = [SystemMessage(content=_SYSTEM_PROMPT), *state["messages"]]
-    response: BaseMessage = await react_loop(
-        llm_with_tools,
-        tools,
-        messages,
-        agent_name="planner",
-        session_id=str(session_id) if session_id else None,
+    # Counter and last-response holder mutated by ``_generate_plan`` so we can
+    # persist iteration count and recover the original BaseMessage afterwards.
+    iteration_count: int = 0
+    last_response: BaseMessage | None = None
+
+    async def _generate_plan(
+        s: AgentState,
+        previous_draft: str | None = None,
+        critique: str | None = None,
+    ) -> str:
+        nonlocal iteration_count, last_response
+        iteration_count += 1
+        messages: list[BaseMessage] = [
+            SystemMessage(content=_SYSTEM_PROMPT),
+            *s["messages"],
+        ]
+        if previous_draft is not None:
+            messages.append(
+                HumanMessage(
+                    content=(
+                        "Your previous plan did not pass quality review.\n\n"
+                        f"=== Previous draft ===\n{previous_draft}\n\n"
+                        f"=== Critique ===\n{critique or '(no feedback provided)'}\n\n"
+                        "Produce a revised plan that addresses the critique. "
+                        "Keep the same output format."
+                    )
+                )
+            )
+        response = cast(
+            "BaseMessage",
+            await react_loop(
+                llm_with_tools,
+                tools,
+                list(messages),
+                agent_name="planner",
+                session_id=str(session_id) if session_id else None,
+            ),
+        )
+        last_response = response
+        return str(response.content)
+
+    async def _critique_plan(draft: str, _s: AgentState) -> tuple[str, float]:
+        critique_response = await critique_llm.ainvoke(
+            [
+                SystemMessage(content=_PLAN_CRITIQUE_PROMPT),
+                HumanMessage(content=f"Plan to evaluate:\n{draft}"),
+            ]
+        )
+        return _parse_critique_response(str(critique_response.content))
+
+    settings = get_settings()
+    final_plan, score = await reflection_loop(
+        generate_fn=_generate_plan,
+        critique_fn=_critique_plan,
+        state=state,
+        threshold=settings.reflection_default_threshold,
+        max_iterations=2,
     )
 
-    # Parse numbered steps from the response text (task decomposition mode)
-    raw_content: str = str(response.content)
+    # Recover the BaseMessage produced during the winning iteration so we keep
+    # tool-call metadata intact when appending to the conversation history.
+    response_msg: BaseMessage
+    if last_response is not None and str(last_response.content) == final_plan:
+        response_msg = last_response
+    else:
+        # Fallback: synthesise a plain AIMessage when the best draft does not
+        # match the most recent response (rare — only when iteration 1 scored
+        # higher than iteration 2 and the loop returned the older draft).
+        from langchain_core.messages import AIMessage  # local import to avoid cycle
+
+        response_msg = AIMessage(content=final_plan)
+
+    raw_content: str = final_plan
     task_plan: list[str] = [
         line.strip()
         for line in raw_content.splitlines()
@@ -211,13 +344,21 @@ async def planner_node(state: AgentState) -> dict[str, object]:
         "planner_complete",
         session_id=session_id,
         task_count=len(task_plan),
+        reflection_score=score,
+        reflection_iterations=iteration_count,
     )
+
+    planner_meta = {
+        "reflection_score": score,
+        "reflection_iterations": iteration_count,
+    }
     return {
         "current_agent": "planner",
-        "messages": [response],
+        "messages": [response_msg],
         "task_plan": task_plan,
         "pending_tasks": task_plan,
         "completed_tasks": [],
+        "metadata": {**state.get("metadata", {}), "planner": planner_meta},
     }
 
 

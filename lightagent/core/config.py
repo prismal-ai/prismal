@@ -602,6 +602,24 @@ class Settings(BaseSettings):
         description="Sender address for heartbeat email reports.",
     )
 
+    # ── Reflection Loop Framework (Phase 33) ──────────────────────────
+    reflection_enabled: bool = Field(
+        default=True,
+        description="Global toggle for the generate-critique-refine reflection loop.",
+    )
+    reflection_default_threshold: float = Field(
+        default=0.85,
+        ge=0.0,
+        le=1.0,
+        description="Default score threshold that ends a reflection loop early.",
+    )
+    reflection_max_iterations: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Hard cap on reflection generate iterations.",
+    )
+
     # Dynamic Subgraphs (Phase 24)
     enable_subgraphs: bool = Field(
         default=False,
