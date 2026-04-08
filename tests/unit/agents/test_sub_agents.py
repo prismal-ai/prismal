@@ -103,8 +103,12 @@ async def test_rag_agent_node_returns_current_agent() -> None:
 
     assert result["current_agent"] == "rag_agent"
     assert "messages" in result
-    assert "retrieved_docs" in result
-    assert "doc_grades" in result
+    # Phase 34: rag_agent no longer echoes retrieved_docs/doc_grades because
+    # ``retrieved_docs`` now uses an ``operator.add`` reducer (returning the
+    # existing list would duplicate it).  LangGraph preserves the fields
+    # automatically when they are absent from the partial update.
+    assert "retrieved_docs" not in result
+    assert "doc_grades" not in result
 
 
 # ---------------------------------------------------------------------------

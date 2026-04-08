@@ -44,6 +44,7 @@ def _make_state(text: str) -> AgentState:
         doc_grades=[],
         tool_results=[],
         tool_errors=[],
+        parallel_results=[],
         risk_score=0.0,
         permissions_granted=[],
         security_flags=[],

@@ -218,10 +218,13 @@ async def rag_agent_node(state: AgentState) -> dict[str, object]:
 
     Returns:
         Updated state dict with ``current_agent`` set to ``'rag_agent'``,
-        new ``messages`` containing the grounded answer, the existing
-        ``retrieved_docs`` and ``doc_grades`` fields preserved, and
+        new ``messages`` containing the grounded answer, and
         ``metadata['rag_agent']`` populated with reflection score and
-        iteration count.
+        iteration count.  ``retrieved_docs`` and ``doc_grades`` are NOT
+        echoed back — Phase 34 added an ``operator.add`` reducer to
+        ``retrieved_docs`` so re-emitting the existing list would duplicate
+        it; LangGraph preserves the fields automatically when absent from
+        the partial update.
     """
     session_id = state.get("session_id")
     logger.debug("rag_agent_node_called", session_id=session_id)
@@ -309,9 +312,6 @@ async def rag_agent_node(state: AgentState) -> dict[str, object]:
 
         response_msg = AIMessage(content=final_answer)
 
-    retrieved_docs: list[dict[str, Any]] = state.get("retrieved_docs", [])
-    doc_grades: list[float] = state.get("doc_grades", [])
-
     logger.info(
         "rag_agent_complete",
         session_id=session_id,
@@ -319,6 +319,11 @@ async def rag_agent_node(state: AgentState) -> dict[str, object]:
         reflection_iterations=iteration_count,
     )
 
+    # NOTE: ``retrieved_docs`` and ``doc_grades`` are intentionally NOT echoed
+    # back here.  Phase 34 added an ``operator.add`` reducer to ``retrieved_docs``
+    # so returning the existing list would *append* it, doubling the contents.
+    # The fields are preserved unchanged because LangGraph leaves untouched
+    # state keys alone.
     rag_meta = {
         "reflection_score": score,
         "reflection_iterations": iteration_count,
@@ -326,8 +331,6 @@ async def rag_agent_node(state: AgentState) -> dict[str, object]:
     return {
         "current_agent": "rag_agent",
         "messages": [response_msg],
-        "retrieved_docs": retrieved_docs,
-        "doc_grades": doc_grades,
         "metadata": {**state.get("metadata", {}), "rag_agent": rag_meta},
     }
 
