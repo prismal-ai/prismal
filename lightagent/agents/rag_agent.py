@@ -7,11 +7,15 @@ to web search when necessary, and generate a grounded answer with citations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import json
+import re
+from typing import TYPE_CHECKING, Any, cast
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
+from lightagent.agents.patterns.reflection import reflection_loop
 from lightagent.agents.tool_registry import get_tools_for_agent, react_loop
+from lightagent.core.config import get_settings
 from lightagent.core.logging import get_logger
 from lightagent.providers.registry import ProviderRegistry
 
@@ -19,6 +23,76 @@ if TYPE_CHECKING:
     from lightagent.agents.state import AgentState
 
 logger = get_logger("lightagent.agents.rag_agent")
+
+# Groundedness threshold matches AC-035-3 (0.8) and is intentionally lower
+# than the planner's default (0.85) because RAG answers tolerate some
+# extrapolation when the corpus is sparse.
+_GROUNDEDNESS_THRESHOLD = 0.8
+
+_RAG_CRITIQUE_PROMPT = """You are a strict groundedness reviewer for RAG answers.
+
+You will receive (1) an answer produced by a Corrective RAG agent and (2) a
+list of source documents that were retrieved.  Your task is to check that
+EVERY factual claim in the answer is supported by at least one of the source
+documents.  Score the answer in [0.0, 1.0]:
+
+- 1.0 — every claim is directly supported by a cited source.
+- 0.7 — most claims are supported but at least one inline citation is
+  missing or one minor claim is unsupported.
+- 0.4 — several claims are unsupported or sources are mis-cited.
+- 0.0 — the answer is largely fabricated relative to the sources.
+
+When the source list is empty, an answer that explicitly says "no information
+found" scores 1.0; an answer that fabricates content scores 0.0.
+
+Respond with ONLY a single JSON object — no prose, no markdown fences:
+{
+  "score": <float in [0,1]>,
+  "feedback": "<one paragraph listing unsupported claims and required citations>"
+}
+"""
+
+_JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
+
+
+def _parse_critique_response(content: str) -> tuple[str, float]:
+    """Extract ``(feedback, score)`` from a critique LLM response.
+
+    Mirrors the planner critique parser: defensively extracts the first JSON
+    object from ``content`` and falls back to a sentinel score of ``1.0`` when
+    parsing fails so the reflection loop does not reject answers because of
+    critique formatting glitches.
+
+    Args:
+        content: Raw text returned by the critique LLM.
+
+    Returns:
+        ``(feedback, score)`` extracted from the JSON payload.
+    """
+    match = _JSON_OBJECT_RE.search(content)
+    if match is None:
+        logger.warning("rag_critique_no_json", content_preview=content[:200])
+        return ("critique response contained no JSON object", 1.0)
+    try:
+        data = json.loads(match.group(0))
+        score = float(data.get("score", 0.0))
+        feedback = str(data.get("feedback", ""))
+        return feedback, max(0.0, min(1.0, score))
+    except (json.JSONDecodeError, ValueError, TypeError) as exc:
+        logger.warning("rag_critique_parse_failed", error=str(exc))
+        return (f"critique response failed to parse: {exc}", 1.0)
+
+
+def _format_sources(docs: list[dict[str, Any]]) -> str:
+    """Render retrieved documents into a compact text block for the critic."""
+    if not docs:
+        return "(no source documents retrieved)"
+    lines: list[str] = []
+    for idx, doc in enumerate(docs, start=1):
+        title = doc.get("title") or doc.get("source") or doc.get("id") or f"doc-{idx}"
+        content = str(doc.get("content", ""))[:1500]
+        lines.append(f"[{idx}] {title}\n{content}")
+    return "\n\n".join(lines)
 
 _SYSTEM_PROMPT = """You are a knowledge base specialist that uses Corrective RAG (CRAG).
 
@@ -133,42 +207,128 @@ async def rag_agent_node(state: AgentState) -> dict[str, object]:
 
     Runs a ReAct loop with vector search, document indexing and web search
     tools so the LLM can iteratively retrieve, grade and fall back to the
-    web until it has enough information to generate a grounded answer.
+    web until it has enough information to generate a grounded answer.  The
+    final draft is then passed through :func:`reflection_loop` to verify that
+    each factual claim is supported by the retrieved documents
+    (groundedness).  Drafts scoring below ``0.8`` are refined with explicit
+    citation requirements and re-checked, up to ``2`` iterations.
 
     Args:
         state: Current agent state from LangGraph.
 
     Returns:
         Updated state dict with ``current_agent`` set to ``'rag_agent'``,
-        new ``messages`` containing the grounded answer, and the existing
-        ``retrieved_docs`` and ``doc_grades`` fields preserved.
+        new ``messages`` containing the grounded answer, the existing
+        ``retrieved_docs`` and ``doc_grades`` fields preserved, and
+        ``metadata['rag_agent']`` populated with reflection score and
+        iteration count.
     """
     session_id = state.get("session_id")
     logger.debug("rag_agent_node_called", session_id=session_id)
 
     registry = ProviderRegistry()
     llm = registry.get_llm_with_fallback()
+    critique_llm = registry.get_llm_with_fallback()
     tools = get_tools_for_agent("rag_agent")
     llm_with_tools = llm.bind_tools(tools)
 
-    messages = [SystemMessage(content=_SYSTEM_PROMPT), *state["messages"]]
-    response = await react_loop(
-        llm_with_tools,
-        tools,
-        messages,
-        agent_name="rag_agent",
-        session_id=str(session_id) if session_id else None,
+    iteration_count: int = 0
+    last_response: BaseMessage | None = None
+
+    async def _generate_answer(
+        s: AgentState,
+        previous_draft: str | None = None,
+        critique: str | None = None,
+    ) -> str:
+        nonlocal iteration_count, last_response
+        iteration_count += 1
+        messages: list[BaseMessage] = [
+            SystemMessage(content=_SYSTEM_PROMPT),
+            *s["messages"],
+        ]
+        if previous_draft is not None:
+            messages.append(
+                HumanMessage(
+                    content=(
+                        "Your previous answer failed the groundedness check.\n\n"
+                        f"=== Previous answer ===\n{previous_draft}\n\n"
+                        f"=== Critique ===\n{critique or '(no feedback provided)'}\n\n"
+                        "Produce a revised answer where every factual claim has "
+                        "an explicit inline citation [n] mapped to a Sources entry. "
+                        "If a claim cannot be supported by the retrieved documents, "
+                        "either remove it or replace it with an explicit caveat."
+                    )
+                )
+            )
+        response = cast(
+            "BaseMessage",
+            await react_loop(
+                llm_with_tools,
+                tools,
+                list(messages),
+                agent_name="rag_agent",
+                session_id=str(session_id) if session_id else None,
+            ),
+        )
+        last_response = response
+        return str(response.content)
+
+    async def _critique_answer(draft: str, s: AgentState) -> tuple[str, float]:
+        docs = s.get("retrieved_docs", [])
+        sources_block = _format_sources(docs)
+        critique_response = await critique_llm.ainvoke(
+            [
+                SystemMessage(content=_RAG_CRITIQUE_PROMPT),
+                HumanMessage(
+                    content=(
+                        f"=== Answer to evaluate ===\n{draft}\n\n"
+                        f"=== Source documents ===\n{sources_block}"
+                    )
+                ),
+            ]
+        )
+        return _parse_critique_response(str(critique_response.content))
+
+    settings = get_settings()
+    # Honour the global default but never relax below the spec-mandated 0.8
+    # groundedness floor: take the stricter of the two.
+    threshold = max(_GROUNDEDNESS_THRESHOLD, settings.reflection_default_threshold)
+    final_answer, score = await reflection_loop(
+        generate_fn=_generate_answer,
+        critique_fn=_critique_answer,
+        state=state,
+        threshold=threshold,
+        max_iterations=2,
     )
+
+    response_msg: BaseMessage
+    if last_response is not None and str(last_response.content) == final_answer:
+        response_msg = last_response
+    else:
+        from langchain_core.messages import AIMessage  # local import to avoid cycle
+
+        response_msg = AIMessage(content=final_answer)
 
     retrieved_docs: list[dict[str, Any]] = state.get("retrieved_docs", [])
     doc_grades: list[float] = state.get("doc_grades", [])
 
-    logger.info("rag_agent_complete", session_id=session_id)
+    logger.info(
+        "rag_agent_complete",
+        session_id=session_id,
+        reflection_score=score,
+        reflection_iterations=iteration_count,
+    )
+
+    rag_meta = {
+        "reflection_score": score,
+        "reflection_iterations": iteration_count,
+    }
     return {
         "current_agent": "rag_agent",
-        "messages": [response],
+        "messages": [response_msg],
         "retrieved_docs": retrieved_docs,
         "doc_grades": doc_grades,
+        "metadata": {**state.get("metadata", {}), "rag_agent": rag_meta},
     }
 
 
