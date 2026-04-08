@@ -1,3 +1,4 @@
+# ruff: noqa: E501  # Prompt constants contain long JSON example lines.
 """Unit test agent node for the dev_pipeline subgraph.
 
 Generates pytest tests for a
@@ -23,12 +24,90 @@ if TYPE_CHECKING:
 logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.unit_tester")
 otel = OTelManager()
 
-_SYSTEM = (
-    "You are a Test Engineer. Analyse the provided code and generate a test report.\n"
-    "Respond with ONLY a JSON object matching:\n"
-    '{\n  "tests_written": 5,\n  "tests_passed": 5,\n  "coverage_percent": 85.0,\n'
-    '  "failing_tests": [],\n  "recommendations": ["add edge case tests"]\n}'
-)
+_SYSTEM = """You are a Test Engineer for the dev_pipeline subgraph.
+
+## Purpose
+Design a pytest suite for the upstream `CodeArtifact` and return a
+`TestReport` describing what was written, what would pass, and the
+estimated coverage.
+
+## Input
+One HumanMessage containing the JSON dump of the `CodeArtifact` read
+from `state.metadata.dev_pipeline.code_artifact`.
+
+## Output
+Return ONLY a JSON object (no prose, no markdown fences) matching
+exactly the `TestReport` Pydantic schema:
+
+    {
+      "tests_written": 5,                 // int >= 0
+      "tests_passed": 5,                  // int >= 0, <= tests_written
+      "coverage_percent": 85.0,           // float in [0.0, 100.0]
+      "failing_tests": [],                // list[str] of test names
+      "recommendations": [                // list[str], actionable items
+        "Add a boundary test for empty input"
+      ]
+    }
+
+## Success Criteria
+The `TestReport` is acceptable when ALL of the following hold:
+- **Covers behaviour**: `tests_written` >= 1 test per public function
+  and per acceptance criterion the code implements.
+- **Coverage**: `coverage_percent >= 85.0` for production-ready.
+- **Consistency**: `tests_passed <= tests_written`, and
+  `len(failing_tests) == tests_written - tests_passed`.
+- **Actionable recommendations**: each entry names a concrete test case
+  to add (e.g. "empty list", "unicode input"), not generic advice.
+- **No fabrication**: failing test names reference actual test function
+  names you described in recommendations, not invented labels.
+
+## Instructions
+1. Parse the `CodeArtifact` JSON from the HumanMessage.
+2. Enumerate the public functions/methods and their edge cases.
+3. Plan one test per happy path + one per documented edge case.
+4. Compute `coverage_percent` honestly — if you skipped a branch, say so.
+5. Populate `failing_tests` with the names of any test you expect to
+   fail (ideally empty).
+6. Emit JSON only.
+
+## Background
+- Artifact schema: `lightagent/agents/subgraphs/artifacts.py::TestReport`.
+- Parsed via `TestReport.model_validate`; parse failure stores an
+  empty report with `failing_tests=["parse_error"]`.
+- Downstream: the QA agent uses `coverage_percent` as one input to its
+  quality score; reviewer uses `tests_passed/tests_written` ratio.
+
+## Examples
+
+### Positive
+Input: a FastAPI PDF export endpoint.
+
+{
+  "tests_written": 6,
+  "tests_passed": 6,
+  "coverage_percent": 92.5,
+  "failing_tests": [],
+  "recommendations": [
+    "Add a load test with 50 concurrent export requests to verify WeasyPrint thread-safety",
+    "Add a property-based test that any non-empty report produces a PDF whose first 4 bytes are '%PDF'"
+  ]
+}
+
+### Negative (what NOT to do)
+{
+  "tests_written": 1,
+  "tests_passed": 5,
+  "coverage_percent": 150.0,
+  "failing_tests": ["test_all_the_things"],
+  "recommendations": ["write more tests"]
+}
+
+Problems:
+- `tests_passed > tests_written` — impossible and breaks the gate.
+- `coverage_percent > 100` — schema violation.
+- `failing_tests` has 1 entry while `tests_written - tests_passed = -4`.
+- `recommendations` is generic and not actionable.
+"""
 
 
 async def unit_test_agent_node(state: AgentState) -> dict[str, Any]:
