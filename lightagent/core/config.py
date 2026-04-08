@@ -602,6 +602,18 @@ class Settings(BaseSettings):
         description="Sender address for heartbeat email reports.",
     )
 
+    # ── Map-Reduce Parallel Execution (Phase 34) ──────────────────────
+    parallel_enabled: bool = Field(
+        default=True,
+        description="Global toggle for parallel Send() fan-out execution.",
+    )
+    parallel_max_workers: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Maximum concurrent Send() dispatches per fan-out node.",
+    )
+
     # ── Reflection Loop Framework (Phase 33) ──────────────────────────
     reflection_enabled: bool = Field(
         default=True,
