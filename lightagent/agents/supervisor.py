@@ -22,12 +22,18 @@ Example::
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import TYPE_CHECKING, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from lightagent.core.config import get_settings
 from lightagent.core.logging import get_logger
+from lightagent.memory.long_term_store import (
+    LongTermMemoryStore,
+    preferences_namespace,
+)
 from lightagent.memory.profile import ProfileManager
 from lightagent.monitoring.otel import OTelManager
 from lightagent.providers.registry import ProviderRegistry
@@ -194,6 +200,163 @@ Routing rules:
 Respond with ONLY the agent name (e.g. "researcher" or "END"). No explanation."""
 
 # ---------------------------------------------------------------------------
+# Long-term memory helpers (SPEC-039 AC-039-3 / AC-039-4)
+# ---------------------------------------------------------------------------
+
+# Module-level store so recall + extraction share the same backend
+# instance across supervisor invocations in a given process. In tests
+# this can be replaced by monkey-patching ``_memory_store_singleton`` or
+# by patching :func:`_get_memory_store`.
+_memory_store_singleton: LongTermMemoryStore | None = None
+
+# Keep strong references to in-flight extraction tasks so they are not
+# garbage-collected mid-run (ruff RUF006).
+_memory_extraction_tasks: set[asyncio.Task[None]] = set()
+
+_MEMORY_EXTRACTION_PROMPT: str = (
+    "You are extracting durable user preferences for long-term memory. "
+    "Review the conversation and emit up to 5 SHORT facts or preferences "
+    "that will still be useful in FUTURE sessions (language, tone, "
+    "recurring goals, domain interests). Exclude greetings, ephemeral "
+    "chat, and details specific to the current task. Respond with one "
+    "fact per line — no numbering, no explanations. If there are no "
+    "durable facts, respond with an empty message."
+)
+
+
+def _get_memory_store() -> LongTermMemoryStore:
+    """Return the process-wide long-term memory store singleton."""
+    global _memory_store_singleton
+    if _memory_store_singleton is None:
+        _memory_store_singleton = LongTermMemoryStore()
+    return _memory_store_singleton
+
+
+def _derive_user_id(state: AgentState) -> str:
+    """Extract a stable user identifier from ``state["session_id"]``.
+
+    LightAgent session IDs follow the shape ``{user}-{timestamp}``; this
+    helper returns the leading segment so long-term memory is keyed per
+    user rather than per session. Falls back to ``"unknown"`` when no
+    session ID is present.
+    """
+    session_id = str(state.get("session_id", "") or "")
+    head = session_id.split("-", 1)[0]
+    return head or "unknown"
+
+
+async def _recall_memory_context(state: AgentState) -> str:
+    """Recall user preferences and format them as a system-prompt suffix.
+
+    Returns an empty string (not an exception) when recall is disabled,
+    when the store is unavailable, or when no facts are stored yet — the
+    supervisor continues without memory context per SPEC-039 AC-039-4.
+
+    The query used for semantic ranking is the most recent human message
+    in the conversation, or an empty query when no such message exists.
+    """
+    settings = get_settings()
+    if settings.memory_recall_limit <= 0:
+        return ""
+
+    query = ""
+    for msg in reversed(state.get("messages", [])):
+        if getattr(msg, "type", "") == "human":
+            query = str(getattr(msg, "content", ""))
+            break
+
+    try:
+        store = _get_memory_store()
+        facts = await store.recall_facts(
+            preferences_namespace(_derive_user_id(state)),
+            query=query,
+            limit=settings.memory_recall_limit,
+        )
+    except Exception as exc:
+        # Defensive: LongTermMemoryStore already swallows errors in
+        # recall_facts, but the factory itself may raise if a misconfig
+        # prevents instantiation. Graceful degradation always wins.
+        logger.debug("memory_recall_skipped", error=str(exc))
+        return ""
+
+    if not facts:
+        return ""
+
+    bullets = "\n".join(
+        f"- {fact['value']}" for fact in facts if fact.get("value")
+    )
+    if not bullets:
+        return ""
+    return (
+        "\n\n## Known User Preferences (from prior sessions)\n"
+        f"{bullets}\n"
+        "Use these preferences to tailor your routing decision when "
+        "relevant, but do not mention them unless the user asks."
+    )
+
+
+async def _extract_and_store_memory(state: AgentState) -> None:
+    """Extract up to 5 durable facts from the session and persist them.
+
+    Called as a fire-and-forget task at session end (supervisor routes
+    to END). All exceptions are caught and logged at WARNING level so a
+    memory-extraction failure never impacts the user-facing response.
+    The underlying :meth:`LongTermMemoryStore.store_fact` enforces PII
+    sanitization — this function intentionally does NOT log the raw fact
+    values anywhere.
+    """
+    try:
+        settings = get_settings()
+        if not settings.memory_extraction_enabled:
+            return
+
+        messages = state.get("messages", [])
+        if not messages:
+            return
+
+        # Only look at the tail of the conversation: older context is
+        # already covered by prior extraction runs.
+        recent = messages[-10:]
+
+        llm = ProviderRegistry().get_llm_with_fallback()
+        response = await llm.ainvoke(
+            [SystemMessage(content=_MEMORY_EXTRACTION_PROMPT), *recent]
+        )
+
+        raw = str(getattr(response, "content", "")).strip()
+        if not raw:
+            return
+
+        candidate_lines = [
+            line.lstrip("-*0123456789. ").strip()
+            for line in raw.splitlines()
+        ]
+        facts = [line for line in candidate_lines if line][:5]
+        if not facts:
+            return
+
+        user_id = _derive_user_id(state)
+        namespace = preferences_namespace(user_id)
+        store = _get_memory_store()
+        ts_ms = int(time.time() * 1000)
+        for idx, fact in enumerate(facts):
+            await store.store_fact(
+                user_id=user_id,
+                namespace=namespace,
+                key=f"fact_{ts_ms}_{idx}",
+                value=fact,
+                ttl_days=settings.memory_default_ttl_days,
+            )
+        logger.info(
+            "memory_extraction_completed",
+            user_id=user_id,
+            fact_count=len(facts),
+        )
+    except Exception as exc:
+        logger.warning("memory_extraction_failed", error=str(exc))
+
+
+# ---------------------------------------------------------------------------
 # Supervisor node
 # ---------------------------------------------------------------------------
 
@@ -266,8 +429,13 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
                     "messages": [],
                 }
 
+        # SPEC-039 AC-039-4: recall up to ``memory_recall_limit`` durable
+        # preferences for the current user and append them to the system
+        # prompt. Degrades gracefully to an empty suffix on any failure.
+        memory_context = await _recall_memory_context(state)
+
         routing_messages = [
-            SystemMessage(content=_SYSTEM_PROMPT),
+            SystemMessage(content=_SYSTEM_PROMPT + memory_context),
             *trimmed,
             HumanMessage(
                 content=(
@@ -376,6 +544,21 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
                     answer_content = str(answer_resp.content)
 
                 response_messages = [AIMessage(content=answer_content)]
+
+        # SPEC-039 AC-039-3: when the session is ending (next_agent is
+        # None) fire memory extraction as a background task so the user
+        # response is returned immediately. ``create_task`` swallows its
+        # own exceptions via ``_extract_and_store_memory`` which wraps
+        # the entire body in try/except.
+        if next_agent is None and get_settings().memory_extraction_enabled:
+            try:
+                task = asyncio.create_task(_extract_and_store_memory(state))
+                _memory_extraction_tasks.add(task)
+                task.add_done_callback(_memory_extraction_tasks.discard)
+            except RuntimeError as exc:
+                # No running loop (unlikely inside an async node) —
+                # best-effort skip so the graph still returns cleanly.
+                logger.debug("memory_extraction_task_skipped", error=str(exc))
 
         return {
             "current_agent": "supervisor",
