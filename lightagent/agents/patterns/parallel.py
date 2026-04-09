@@ -107,7 +107,12 @@ def make_parallel_dispatcher(
     if not tasks_field:
         raise ValueError("tasks_field must be a non-empty state key")
 
-    def dispatcher(state: AgentState) -> list[Send] | str:
+    # NOTE: the inner annotation uses ``dict[str, Any]`` instead of
+    # ``AgentState`` so that LangGraph's ``typing.get_type_hints()`` call in
+    # ``add_conditional_edges`` resolves cleanly — ``AgentState`` lives behind
+    # ``TYPE_CHECKING`` in this module so the forward reference would fail at
+    # runtime.  At dispatch time the dict-shape is identical to the TypedDict.
+    def dispatcher(state: dict[str, Any]) -> list[Send] | str:
         settings = get_settings()
         if not settings.parallel_enabled:
             logger.debug(
