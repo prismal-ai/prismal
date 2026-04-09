@@ -35,6 +35,7 @@ from langgraph.graph import StateGraph
 if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph
 
+from lightagent.agents.codeact_agent import codeact_node
 from lightagent.agents.coder import coder_node
 from lightagent.agents.critic import critic_node
 from lightagent.agents.cron_manager import cron_manager_node
@@ -257,6 +258,10 @@ def build_supervisor_graph(
     builder.add_node("supervisor", supervisor_node)
     builder.add_node("researcher", researcher_node)
     builder.add_node("coder", coder_node)
+    # Phase 38: CodeAct agent — direct Python code generation with
+    # auto-correction. Runs alongside the classic ``coder`` node; the
+    # supervisor picks between them based on task complexity.
+    builder.add_node("codeact", codeact_node)
     builder.add_node("rag_agent", rag_agent_node)
     builder.add_node("planner", planner_node)
     builder.add_node("critic", critic_node)
@@ -303,6 +308,7 @@ def build_supervisor_graph(
     conditional_edges: dict[str, str | object] = {
         "researcher": "researcher",
         "coder": "coder",
+        "codeact": "codeact",
         "rag_agent": "rag_agent",
         "planner": "planner",
         "critic": "critic",
@@ -330,6 +336,7 @@ def build_supervisor_graph(
     base_members = (
         "researcher",
         "coder",
+        "codeact",
         "rag_agent",
         "planner",
         "critic",

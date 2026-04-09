@@ -50,6 +50,7 @@ logger = get_logger("lightagent.agents.supervisor")
 MEMBERS: list[str] = [
     "researcher",
     "coder",
+    "codeact",
     "rag_agent",
     "planner",
     "critic",
@@ -88,7 +89,20 @@ Your role is to:
 
 Available agents:
 - researcher: Web search, RAG queries, reading files
-- coder: Writing and executing code, reading/writing code files
+- coder: Writing and executing code, reading/writing code files.
+  Route here for SIMPLE, narrow code tasks: "fix this line", "explain this
+  function", "add a docstring", "rename a variable", "write a small helper",
+  code review, quick snippets without a full iteration loop.
+- codeact: Executes Python code DIRECTLY in an isolated sandbox with an
+  auto-correction loop (generate → run → read stderr → fix). Uses ~30%
+  fewer tokens than 'coder' on multi-step coding tasks.
+  Route here for COMPLEX multi-step coding: "refactor this module",
+  "implement full X", "write and test Y", "complete implementation",
+  "build a script that does A, B and C", anything that benefits from
+  iterative self-correction against real sandbox output.
+  Prefer 'coder' when the task is a single surgical edit or a pure
+  explanation; prefer 'codeact' when the task requires running code,
+  handling errors, and iterating.
 - rag_agent: Internal document knowledge base Q&A
 - planner: Decompose complex multi-step tasks AND create software specifications
   using Spec-Driven Design (SDD). Route here when the user asks to:
@@ -469,6 +483,17 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
 
         next_agent: str | None = None if matched == "END" else matched
 
+        # Phase 38: respect the CodeAct feature flag — if the LLM picked
+        # ``codeact`` while the toggle is off, downgrade to the classic
+        # ``coder`` agent so the user still gets a response.
+        if next_agent == "codeact" and not get_settings().codeact_enabled:
+            logger.info(
+                "supervisor_codeact_downgrade_to_coder",
+                session_id=session_id,
+            )
+            next_agent = "coder"
+            matched = "coder"
+
         # Phase 34: heuristic upgrade — when the LLM picked ``researcher`` and
         # the planner has already enqueued more than one independent task in
         # ``pending_tasks``, switch to the parallel research dispatcher so the
@@ -575,6 +600,7 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
 _RouterLiteral = Literal[
     "researcher",
     "coder",
+    "codeact",
     "rag_agent",
     "planner",
     "critic",
