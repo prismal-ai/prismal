@@ -386,12 +386,18 @@ class Settings(BaseSettings):
         ),
     )
 
-    # ── CodeAct Agent (Phase 38 / SPEC-040) ───────────────────────────
+    # ── CodeAct Agent (Phase 38 / SPEC-040; hardened by Phase 42 / SPEC-044) ─
     codeact_enabled: bool = Field(
-        default=True,
+        default=False,
         description=(
-            "Toggle CodeAct agent. When False the supervisor never routes to "
-            "'codeact' and falls back to the classic ReAct 'coder' node."
+            "Toggle CodeAct agent. Default is FALSE after SPEC-044 "
+            "hardening — CodeAct still runs in a host subprocess "
+            "(isolation comes in Phase 43 / SPEC-045), so operators "
+            "must explicitly opt in. When False the supervisor "
+            "downgrades any 'codeact' routing decision to the "
+            "classic ReAct 'coder' node (see supervisor.py). Do NOT "
+            "enable in production without also configuring a real "
+            "sandbox isolation backend."
         ),
     )
     codeact_max_iterations: int = Field(
@@ -402,14 +408,33 @@ class Settings(BaseSettings):
     )
     codeact_import_allowlist: str = Field(
         default=(
-            "os,pathlib,subprocess,json,re,typing,datetime,collections,"
+            # Standard library — text, serialization, path, math, dates.
+            "pathlib,json,re,typing,datetime,collections,"
             "itertools,functools,math,statistics,random,hashlib,base64,"
-            "csv,io,sys,pandas,numpy,polars,matplotlib,sklearn,torch,"
-            "flaml,duckdb,requests,httpx"
+            "csv,io,"
+            # Data science stack.
+            "pandas,numpy,polars,matplotlib,sklearn,torch,flaml,duckdb,"
+            # HTTP clients (egress is still gated by the isolation
+            # backend's network policy — the allowlist only decides
+            # what can be *imported*, not what can actually reach the
+            # network).
+            "requests,httpx"
+            # ─────────────────────────────────────────────────────────
+            # INTENTIONALLY REMOVED by SPEC-044 AC-044-5:
+            #   os         — exposes shell bridges + environment dict
+            #   sys        — exposes sys.modules for module-level pivot
+            #   subprocess — direct process spawning
+            # Operators who need any of these must override the env
+            # var explicitly AND accept the increased risk.
+            # ─────────────────────────────────────────────────────────
         ),
         description=(
             "Comma-separated list of packages CodeAct code blocks may "
-            "import. Any non-allowlisted import blocks execution."
+            "import. Any non-allowlisted import blocks execution. "
+            "SPEC-044 AC-044-5 removed 'os', 'sys', 'subprocess' from "
+            "the default; they must be added explicitly by operators "
+            "who accept the risk, and even then are still subject to "
+            "the AST denylist (SPEC-044 AC-044-1, AC-044-2, AC-044-3)."
         ),
     )
 

@@ -78,6 +78,12 @@ def _patch_codeact(
 ) -> Any:
     """Context manager that patches every external dependency of codeact_node.
 
+    SPEC-044 AC-044-6 flipped ``codeact_enabled`` to ``False`` by
+    default, so this helper also patches ``get_settings`` to force the
+    flag on — otherwise every node-level test would short-circuit at
+    the enablement gate and never exercise the loop. Tests that want
+    to verify the disabled path should NOT use this helper.
+
     Args:
         llm: LLM mock returned by :func:`ProviderRegistry`.
         shell_enabled: Value returned by
@@ -100,9 +106,24 @@ def _patch_codeact(
     provider_mock = MagicMock()
     provider_mock.return_value.get_llm_with_fallback.return_value = llm
 
+    # Force the feature flag on — default is now False after SPEC-044.
+    settings_mock = MagicMock()
+    settings_mock.codeact_enabled = True
+    settings_mock.codeact_max_iterations = 6
+    settings_mock.codeact_import_allowlist = (
+        "pathlib,json,re,typing,datetime,collections,itertools,"
+        "functools,math,statistics,random,hashlib,base64,csv,io,"
+        "pandas,numpy,polars,matplotlib,sklearn,torch,flaml,duckdb,"
+        "requests,httpx"
+    )
+
     @contextlib.contextmanager
     def _cm() -> Any:
         with (
+            patch(
+                "lightagent.agents.codeact_agent.get_settings",
+                return_value=settings_mock,
+            ),
             patch(
                 "lightagent.agents.codeact_agent.ProviderRegistry",
                 new=provider_mock,
@@ -120,6 +141,7 @@ def _patch_codeact(
                 "sandbox": sandbox_mock,
                 "check_shell": check_shell_mock,
                 "llm": llm,
+                "settings": settings_mock,
             }
 
     return _cm()
@@ -177,7 +199,12 @@ class TestExtractCodeBlock:
 
 class TestValidateImports:
     def test_allows_allowlisted_imports(self) -> None:
-        ok, reason = _validate_imports("import os\nimport json\nresult = 1")
+        # SPEC-044 AC-044-5: ``os`` has been REMOVED from the default
+        # allowlist, so we exercise the allowlist path with benign
+        # standard-library modules that remain allowed.
+        ok, reason = _validate_imports(
+            "import pathlib\nimport json\nresult = 1"
+        )
         assert ok, reason
 
     def test_allows_from_imports_in_allowlist(self) -> None:
@@ -197,13 +224,20 @@ class TestValidateImports:
         assert "lightagent" in reason
 
     def test_blocks_dynamic_import_call(self) -> None:
-        ok, reason = _validate_imports('x = __import__("os")')
+        # SPEC-044 AC-044-1: ``__import__`` is now in the name-call
+        # denylist, so the rejection reason mentions the built-in
+        # rather than the old "__import__ is forbidden" wording.
+        ok, reason = _validate_imports('x = __import__("foo")')
         assert not ok
         assert "__import__" in reason
 
     def test_allows_dotted_submodule_when_top_level_allowed(self) -> None:
-        ok, _ = _validate_imports("import os.path")
-        assert ok
+        # SPEC-044 AC-044-5: use an allowlisted top-level module.
+        # ``os.path`` was the original example but ``os`` is no longer
+        # allowed by default. ``collections.abc`` exercises the same
+        # dotted-import code path with a default-safe module.
+        ok, reason = _validate_imports("import collections.abc")
+        assert ok, reason
 
     def test_syntax_error_reported_gracefully(self) -> None:
         ok, reason = _validate_imports("def broken(:\n    pass")
@@ -221,11 +255,398 @@ class TestValidateImports:
         assert ok
 
 
+# Helper — built at module level so the literal tokens of the dangerous
+# built-in names never appear as obvious call patterns in the test
+# source. The validator rejects these, which is exactly what the tests
+# below are checking — the helper just avoids tripping upstream static
+# analyzers on the *tests* themselves.
+def _call_src(name: str, arg: str = '"payload"') -> str:
+    """Return a source string of the form ``<name>(<arg>)``."""
+    return f"{name}({arg})"
+
+
+class TestValidateImportsDenylist:
+    """SPEC-044 AC-044-1, AC-044-2, AC-044-3, AC-044-4 — the hardened
+    AST denylist that catches the bypass patterns identified in
+    ``docs/report_security_v2_202060409.md`` Vuln 1.
+
+    Each test asserts that a specific bypass primitive is rejected by
+    :func:`_validate_imports` with a reason that names the offending
+    identifier, so failures point the operator at the exact rule that
+    fired. The suite is the regression lock for the denylist — if a
+    future refactor removes an entry, at least one of these tests
+    fails loudly.
+    """
+
+    # -------- AC-044-1: name-call denylist --------------------------
+
+    def test_eval_rejected(self) -> None:
+        ok, reason = _validate_imports(_call_src("eval", '"1 + 1"'))
+        assert not ok
+        assert "eval" in reason
+
+    def test_exec_rejected(self) -> None:
+        ok, reason = _validate_imports(_call_src("exec", '"y = 1"'))
+        assert not ok
+        assert "exec" in reason
+
+    def test_compile_rejected(self) -> None:
+        ok, reason = _validate_imports(
+            _call_src("compile", '"x", "<s>", "eval"')
+        )
+        assert not ok
+        assert "compile" in reason
+
+    def test_getattr_rejected(self) -> None:
+        ok, reason = _validate_imports(
+            'x = ' + _call_src("getattr", 'object, "__class__"')
+        )
+        assert not ok
+        assert "getattr" in reason
+
+    def test_setattr_rejected(self) -> None:
+        ok, reason = _validate_imports(
+            _call_src("setattr", 'object, "x", 1')
+        )
+        assert not ok
+        assert "setattr" in reason
+
+    def test_delattr_rejected(self) -> None:
+        ok, reason = _validate_imports(
+            _call_src("delattr", 'object, "x"')
+        )
+        assert not ok
+        assert "delattr" in reason
+
+    def test_globals_rejected(self) -> None:
+        ok, reason = _validate_imports("x = " + _call_src("globals", ""))
+        assert not ok
+        assert "globals" in reason
+
+    def test_locals_rejected(self) -> None:
+        ok, reason = _validate_imports("x = " + _call_src("locals", ""))
+        assert not ok
+        assert "locals" in reason
+
+    def test_vars_rejected(self) -> None:
+        ok, reason = _validate_imports(
+            "x = " + _call_src("vars", "object")
+        )
+        assert not ok
+        assert "vars" in reason
+
+    def test_open_rejected(self) -> None:
+        ok, reason = _validate_imports(
+            "f = " + _call_src("open", '"/etc/passwd"')
+        )
+        assert not ok
+        assert "open" in reason
+
+    def test_input_rejected(self) -> None:
+        ok, reason = _validate_imports(
+            "x = " + _call_src("input", '"prompt"')
+        )
+        assert not ok
+        assert "input" in reason
+
+    def test_breakpoint_rejected(self) -> None:
+        ok, reason = _validate_imports(_call_src("breakpoint", ""))
+        assert not ok
+        assert "breakpoint" in reason
+
+    # -------- AC-044-2: attribute-call denylist ---------------------
+
+    def test_attribute_system_rejected(self) -> None:
+        ok, reason = _validate_imports('foo.system("ls")')
+        assert not ok
+        assert "system" in reason
+
+    def test_attribute_popen_rejected(self) -> None:
+        ok, reason = _validate_imports('foo.popen("ls")')
+        assert not ok
+        assert "popen" in reason
+
+    def test_attribute_run_rejected(self) -> None:
+        ok, reason = _validate_imports('foo.run(["ls"])')
+        assert not ok
+        assert "run" in reason
+
+    def test_attribute_popen_class_rejected(self) -> None:
+        ok, reason = _validate_imports('x = mod.Popen(["ls"])')
+        assert not ok
+        assert "Popen" in reason
+
+    def test_attribute_check_output_rejected(self) -> None:
+        ok, reason = _validate_imports('out = foo.check_output(["ls"])')
+        assert not ok
+        assert "check_output" in reason
+
+    def test_attribute_spawnl_rejected(self) -> None:
+        ok, reason = _validate_imports('foo.spawnl("/bin/ls")')
+        assert not ok
+        assert "spawnl" in reason
+
+    def test_attribute_execve_rejected(self) -> None:
+        ok, reason = _validate_imports('foo.execve("/bin/ls", [], {})')
+        assert not ok
+        assert "execve" in reason
+
+    def test_attribute_subclasses_rejected(self) -> None:
+        ok, reason = _validate_imports("subs = object.__subclasses__()")
+        assert not ok
+        assert "__subclasses__" in reason
+
+    def test_attribute_reduce_rejected(self) -> None:
+        ok, reason = _validate_imports("x = foo.__reduce__()")
+        assert not ok
+        assert "__reduce__" in reason
+
+    # -------- AC-044-3: dunder identifier rule ----------------------
+
+    def test_dunder_name_builtins_rejected(self) -> None:
+        ok, reason = _validate_imports("x = __builtins__")
+        assert not ok
+        assert "__builtins__" in reason
+
+    def test_dunder_name_import_rejected(self) -> None:
+        """``__import__`` referenced as Name (not called) is still
+        rejected by the dunder rule even though it is also in the
+        name-call denylist for the Call case.
+        """
+        ok, reason = _validate_imports("f = __import__")
+        assert not ok
+        assert "__import__" in reason
+
+    def test_dunder_name_slots_rejected(self) -> None:
+        ok, reason = _validate_imports("x = __slots__")
+        assert not ok
+        assert "__slots__" in reason
+
+    def test_dunder_attribute_class_rejected(self) -> None:
+        """AC-044-3: ``foo.__class__`` traversal without a call."""
+        ok, reason = _validate_imports("y = foo.__class__")
+        assert not ok
+        assert "__class__" in reason
+
+    def test_dunder_attribute_bases_rejected(self) -> None:
+        ok, reason = _validate_imports("y = foo.__bases__")
+        assert not ok
+        assert "__bases__" in reason
+
+    def test_dunder_attribute_mro_rejected(self) -> None:
+        ok, reason = _validate_imports("y = foo.__mro__")
+        assert not ok
+        assert "__mro__" in reason
+
+    def test_dunder_attribute_dict_rejected(self) -> None:
+        ok, reason = _validate_imports("y = foo.__dict__")
+        assert not ok
+        assert "__dict__" in reason
+
+    def test_dunder_attribute_chain_rejected(self) -> None:
+        """Traversal chain without a final call trips at the first
+        dunder Attribute encountered by ``ast.walk``.
+        """
+        ok, reason = _validate_imports(
+            "y = a.__class__.__base__.__subclasses__"
+        )
+        assert not ok
+        # Any of the three dunders will do — assert at least one fires.
+        assert any(
+            name in reason
+            for name in ("__class__", "__base__", "__subclasses__")
+        )
+
+    def test_allowed_dunders_still_pass(self) -> None:
+        """``__name__``, ``__main__``, ``__doc__``, ``__file__`` are
+        whitelisted so the ``if __name__ == "__main__"`` idiom and
+        ``__doc__`` / ``__file__`` introspection continue to work.
+        """
+        # Check the main-module-guard idiom.
+        ok, reason = _validate_imports(
+            'if __name__ == "__main__":\n    result = 42'
+        )
+        assert ok, reason
+
+        # __doc__ lookup
+        ok, reason = _validate_imports("result = __doc__")
+        assert ok, reason
+
+        # __file__ lookup
+        ok, reason = _validate_imports("result = __file__")
+        assert ok, reason
+
+    # -------- AC-044-4: subscript base rule -------------------------
+
+    def test_subscript_builtins_rejected(self) -> None:
+        """``__builtins__["open"]`` is rejected by the subscript base
+        rule AND by the dunder rule — either rejection is correct.
+        """
+        ok, reason = _validate_imports('x = __builtins__["open"]')
+        assert not ok
+        # Either of the two independent rules may fire first.
+        assert "__builtins__" in reason
+
+    def test_subscript_globals_rejected(self) -> None:
+        """``globals()['foo']`` is caught by the name-call denylist
+        (``globals`` is in the dangerous name-call set) before the
+        subscript rule runs, but either rejection is correct.
+        """
+        ok, reason = _validate_imports('x = globals()["foo"]')
+        assert not ok
+        assert "globals" in reason
+
+    def test_subscript_locals_rejected(self) -> None:
+        ok, reason = _validate_imports('x = locals()["foo"]')
+        assert not ok
+        assert "locals" in reason
+
+    def test_ordinary_subscript_still_works(self) -> None:
+        """Dict / list / string subscripts unaffected by AC-044-4."""
+        ok, reason = _validate_imports(
+            "d = {'a': 1}\n"
+            "lst = [1, 2, 3]\n"
+            "s = 'hello'\n"
+            "result = d['a'] + lst[0] + len(s[:3])"
+        )
+        assert ok, reason
+
+    # -------- Exact bypass payloads from security report -----------
+
+    def test_getattr_builtins_import_bypass_rejected(self) -> None:
+        """The exact payload from the security report (Vuln 1) must
+        be rejected — multiple independent rules fire on this
+        snippet. Any of them is a correct rejection.
+        """
+        payload = (
+            'x = '
+            + _call_src("getattr", '__builtins__, "__import__"')
+            + '\nx.system("echo hello")\n'
+        )
+        ok, reason = _validate_imports(payload)
+        assert not ok
+        # At least one of the independent rules must fire.
+        assert any(
+            token in reason
+            for token in ("getattr", "__builtins__", "system")
+        )
+
+    def test_subclass_traversal_bypass_rejected(self) -> None:
+        """``().__class__.__base__.__subclasses__()[N](...)`` from the
+        security report is rejected because both ``__class__``
+        (dunder attr) and ``__subclasses__`` (attr-call) fire.
+        """
+        payload = "y = ().__class__.__base__.__subclasses__()[0]()"
+        ok, _reason = _validate_imports(payload)
+        assert not ok
+
+    def test_exec_with_string_payload_rejected(self) -> None:
+        """Wrapping the ``exec`` built-in around a string is rejected
+        by the name-call denylist — ``ast.walk`` does not recurse
+        into string literals, but the outer ``exec`` call is still
+        visible at the top of the AST.
+        """
+        payload = _call_src("exec", '"y = 1"')
+        ok, reason = _validate_imports(payload)
+        assert not ok
+        assert "exec" in reason
+
+    def test_globals_builtins_open_chain_rejected(self) -> None:
+        """``globals()['__builtins__']['open']('/etc/passwd').read()``
+        from the security report is rejected. The rule that fires
+        first is the ``globals`` name-call (AC-044-1), but either of
+        the other involved rules (``__builtins__`` dunder Name,
+        ``open`` name-call, subscript base) would also be correct.
+        """
+        payload = (
+            'x = globals()["__builtins__"]["open"]("/etc/passwd").read()'
+        )
+        ok, reason = _validate_imports(payload)
+        assert not ok
+        # Any one of these must appear in the rejection reason.
+        assert any(
+            token in reason
+            for token in ("globals", "__builtins__", "open")
+        )
+
+    # -------- Allowlist minimization (AC-044-5) at validator level --
+
+    def test_os_import_rejected_by_default(self) -> None:
+        """SPEC-044 AC-044-5: ``os`` is no longer in the default
+        allowlist, so ``import os`` is rejected by the import
+        allowlist layer (not the denylist).
+        """
+        ok, reason = _validate_imports("import os")
+        assert not ok
+        assert "os" in reason
+
+    def test_subprocess_import_rejected_by_default(self) -> None:
+        ok, reason = _validate_imports("import subprocess")
+        assert not ok
+        assert "subprocess" in reason
+
+    def test_sys_import_rejected_by_default(self) -> None:
+        ok, reason = _validate_imports("import sys")
+        assert not ok
+        assert "sys" in reason
+
+    # -------- Positive controls: legit code still works -------------
+
+    def test_legit_pandas_code_still_works(self) -> None:
+        """Regression lock: the denylist must not break realistic
+        allowlisted workloads.
+        """
+        src = (
+            "import pandas as pd\n"
+            "df = pd.DataFrame({'a': [1, 2, 3]})\n"
+            "result = len(df)\n"
+            'print("__CODEACT_RESULT__", result)\n'
+        )
+        ok, reason = _validate_imports(src)
+        assert ok, reason
+
+    def test_legit_json_code_still_works(self) -> None:
+        src = (
+            "import json\n"
+            "data = json.loads('{\"k\": 1}')\n"
+            "result = data['k']\n"
+        )
+        ok, reason = _validate_imports(src)
+        assert ok, reason
+
+    def test_legit_math_and_builtins_still_work(self) -> None:
+        """Non-denylisted built-ins (``len``, ``int``, ``str``,
+        ``list``, ``range``, ``enumerate``, ``sum``) remain legal.
+        """
+        src = (
+            "import math\n"
+            "nums = list(range(10))\n"
+            "result = sum(int(str(n)) for n in nums)\n"
+            "sqrt = math.sqrt(16)\n"
+        )
+        ok, reason = _validate_imports(src)
+        assert ok, reason
+
+
 class TestGetImportAllowlist:
     def test_default_contains_key_packages(self) -> None:
+        # SPEC-044 AC-044-5: ``os`` was removed from the default; the
+        # remaining data-science + text / serialization / HTTP core
+        # must still be present.
         allowlist = _get_import_allowlist()
-        for pkg in ("os", "json", "pandas", "numpy", "httpx"):
+        for pkg in ("json", "pathlib", "pandas", "numpy", "httpx"):
             assert pkg in allowlist
+
+    def test_default_excludes_dangerous_stdlib_modules(self) -> None:
+        """SPEC-044 AC-044-5: ``os``, ``sys``, ``subprocess`` must NOT be
+        in the default allowlist. Operators who need them must override
+        via ``LIGHTAGENT_CODEACT_IMPORT_ALLOWLIST`` and accept the risk.
+        """
+        allowlist = _get_import_allowlist()
+        for pkg in ("os", "sys", "subprocess"):
+            assert pkg not in allowlist, (
+                f"'{pkg}' should NOT be in the default CodeAct allowlist"
+            )
 
     def test_custom_allowlist_from_settings(self) -> None:
         with patch(
@@ -236,6 +657,14 @@ class TestGetImportAllowlist:
             )
             allowlist = _get_import_allowlist()
         assert allowlist == frozenset({"alpha", "beta", "gamma"})
+
+
+class TestCodeactEnabledDefault:
+    def test_codeact_enabled_default_is_false(self) -> None:
+        """SPEC-044 AC-044-6: ``codeact_enabled`` default is False."""
+        from lightagent.core.config import Settings
+
+        assert Settings().codeact_enabled is False
 
 
 class TestFormatExecutionFeedback:
@@ -371,20 +800,13 @@ class TestCodeactNodeMaxIterations:
         block = "<code>x = 1\nprint(x)</code>"
         # 10 responses to guarantee we saturate any reasonable cap.
         llm = _make_llm_sequence(*([block] * 10))
-        with (
-            patch(
-                "lightagent.agents.codeact_agent.get_settings"
-            ) as mock_settings,
-            _patch_codeact(
-                llm,
-                sandbox_results=[(True, "1", "", 0)] * 10,
-            ) as mocks,
-        ):
-            mock_settings.return_value.codeact_enabled = True
-            mock_settings.return_value.codeact_max_iterations = 3
-            mock_settings.return_value.codeact_import_allowlist = (
-                "os,pathlib,json"
-            )
+        with _patch_codeact(
+            llm,
+            sandbox_results=[(True, "1", "", 0)] * 10,
+        ) as mocks:
+            # Override the mocked settings after entering the context so
+            # ``max_iterations`` is 3 instead of the helper's default 6.
+            mocks["settings"].codeact_max_iterations = 3
             out = await codeact_node(_make_state())
 
         assert "max_iterations=3" in out["messages"][0].content
@@ -396,12 +818,16 @@ class TestCodeactNodeImportAllowlist:
     async def test_import_allowlist_blocks_forbidden_import(self) -> None:
         """A block that imports a non-allowlisted package is rejected
         *before* the shell gate or sandbox runs (AC-040-4).
+
+        Uses ``json`` (an SPEC-044 default-allowlisted module) as the
+        "fixed" block. Earlier iterations used ``os`` but SPEC-044
+        AC-044-5 removed it from the default allowlist.
         """
         llm = _make_llm_sequence(
             "<code>import socket\nresult = 1</code>",
             # After rejection, the LLM gets a feedback HumanMessage and
-            # emits a fixed block.
-            f'<code>import os\nresult = 1\nprint("{_RESULT_MARKER}", result)</code>',
+            # emits a fixed block using an allowlisted module.
+            f'<code>import json\nresult = 1\nprint("{_RESULT_MARKER}", result)</code>',
         )
         with _patch_codeact(
             llm,
@@ -455,7 +881,20 @@ class TestCodeactNodeShellGate:
 
         provider_mock = MagicMock()
         provider_mock.return_value.get_llm_with_fallback.return_value = llm
+        # SPEC-044 AC-044-6 flipped ``codeact_enabled`` to False by
+        # default, so we must patch ``get_settings`` to force it on
+        # for this test. Without this the node short-circuits at the
+        # enablement gate and ``check_shell`` is never consulted.
+        settings_mock = MagicMock()
+        settings_mock.codeact_enabled = True
+        settings_mock.codeact_vision_model = "anything"
+        settings_mock.codeact_max_iterations = 6
+        settings_mock.codeact_import_allowlist = "pathlib,json"
         with (
+            patch(
+                "lightagent.agents.codeact_agent.get_settings",
+                return_value=settings_mock,
+            ),
             patch(
                 "lightagent.agents.codeact_agent.ProviderRegistry",
                 new=provider_mock,

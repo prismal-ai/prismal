@@ -1,32 +1,68 @@
 """CodeAct agent — direct Python code generation with auto-correction.
 
-SPEC-040 / Phase 38. Unlike the classic :mod:`lightagent.agents.coder`
-node which uses a ReAct tool-calling loop (``sandbox_exec`` JSON tool
-calls processed by :func:`react_loop`), CodeAct asks the LLM to emit
-executable Python directly wrapped in ``<code>...</code>`` tags. A
-single block can combine I/O, computation and validation, cutting token
-usage by ~30 % on multi-step coding tasks (arxiv:2402.01030).
+SPEC-040 / Phase 38, hardened by SPEC-044 / Phase 42. Unlike the
+classic :mod:`lightagent.agents.coder` node which uses a ReAct
+tool-calling loop (``sandbox_exec`` JSON tool calls processed by
+:func:`react_loop`), CodeAct asks the LLM to emit executable Python
+directly wrapped in ``<code>...</code>`` tags. A single block can
+combine I/O, computation and validation, cutting token usage by ~30 %
+on multi-step coding tasks (arxiv:2402.01030).
 
-Safety pipeline (hard requirements from CLAUDE.md Phase 38 rules):
+.. warning::
+
+   **The current runtime is NOT an isolated sandbox.**
+
+   :class:`~lightagent.sandbox.executor.SandboxExecutor` writes the
+   code to a temporary ``.py`` file and spawns a plain host subprocess
+   with the LightAgent process's full privileges — no container, no
+   ``chroot``, no seccomp, no network namespace, no cgroup limits.
+   The ``sandbox`` name in this module is historical.
+
+   Real process isolation is tracked under SPEC-045 (Phase 43,
+   ``lightagent/sandbox/isolation.py``). Until that lands, CodeAct
+   should be treated as *"run arbitrary Python as the LightAgent
+   user"*: any prompt-injection path that reaches the CodeAct LLM can
+   achieve host code execution. For that reason
+   ``LIGHTAGENT_CODEACT_ENABLED`` defaults to ``False`` after SPEC-044
+   and the supervisor downgrades any ``codeact`` routing decision to
+   the classic ``coder`` node when the flag is off.
+
+   Operators running in environments where SPEC-045 is not yet active
+   must keep the flag off. Once SPEC-045 ships a working backend,
+   ``codeact_enabled=true`` is safe again — see
+   ``docs/report_security_v2_202060409.md`` for the full threat
+   analysis.
+
+Safety pipeline (hard requirements from CLAUDE.md Phases 38 + 42
+rules):
 
 1. Parse the first ``<code>...</code>`` block from the LLM response.
-2. :func:`_validate_imports` rejects any non-allowlisted ``import`` or
-   ``from ... import`` statement before anything reaches the sandbox —
-   a lightweight AST walk, not a regex, so comments / strings don't
-   false positive.
+2. :func:`_validate_imports` enforces a six-layer AST check
+   (SPEC-044 AC-044-1..6): name-call denylist, attribute-call
+   denylist, dunder identifier rule, subscript base rule, import
+   allowlist, and syntax validation. The denylist layers catch every
+   known single-step bypass pattern documented in the security
+   report (``getattr(__builtins__, "__import__")``, subclass
+   traversal via ``__subclasses__``, dynamic-evaluation built-ins
+   wrapped around string literals, ``globals()["__builtins__"]``).
+   None of this is a substitute for real process isolation — it is
+   defense-in-depth layered on top of SPEC-045.
 3. :meth:`ActionInterceptor.check_shell` gates execution on
    ``LIGHTAGENT_SHELL_ENABLED``. When the gate is closed we return a
-   graceful ``AIMessage`` explaining how to enable it instead of silently
-   failing.
+   graceful ``AIMessage`` explaining how to enable it instead of
+   silently failing.
 4. Code runs in the existing :class:`SandboxExecutor` (via
-   ``asyncio.to_thread`` because ``run_code`` is sync and performs real
-   subprocess I/O — we must never block the event loop).
-5. Stdout, stderr and exit code are appended to the running message list
-   so the next iteration can auto-correct errors. The loop bails out on
-   a clean run with the special marker ``__CODEACT_RESULT__`` present in
-   stdout, when no further ``<code>`` block is emitted, when
-   ``max_iterations`` is reached, or after ``_MAX_CONSECUTIVE_FAILURES``
-   failures on the same request.
+   ``asyncio.to_thread`` because ``run_code`` is sync and performs
+   real subprocess I/O — we must never block the event loop). See
+   the warning above: the executor is a host subprocess runner
+   today, not a sandbox.
+5. Stdout, stderr and exit code are appended to the running message
+   list so the next iteration can auto-correct errors. The loop
+   bails out on a clean run with the special marker
+   ``__CODEACT_RESULT__`` present in stdout, when no further
+   ``<code>`` block is emitted, when ``max_iterations`` is reached,
+   or after ``_MAX_CONSECUTIVE_FAILURES`` failures on the same
+   request.
 """
 
 from __future__ import annotations
@@ -77,8 +113,9 @@ runs Python code directly instead of calling tools.
 
 ## Purpose
 Solve the user's coding task by writing executable Python code blocks. Each
-block is run in an isolated sandbox and its stdout/stderr is fed back to you
-as the next message, so you can iterate, validate, and self-correct.
+block is run in a restricted Python subprocess and its stdout/stderr is fed
+back to you as the next message, so you can iterate, validate, and
+self-correct.
 
 ## Output Format (MANDATORY)
 Wrap every block of runnable Python in <code>...</code> tags. You may include
@@ -96,10 +133,26 @@ task is fully solved, that print is your termination signal.
 Only the packages listed in ``LIGHTAGENT_CODEACT_IMPORT_ALLOWLIST`` may be
 imported. Attempting to import anything else will reject the block before it
 runs. Never try to ``import lightagent`` or reach into project internals —
-you run in an isolated sandbox.
+the restricted runtime actively rejects imports of the project source tree.
+
+## Forbidden Calls (will be rejected before execution)
+The AST validator blocks every known sandbox-escape pattern before the code
+runs. Do NOT attempt to use any of these; the validator will reject the
+block and you will need to emit a fixed version:
+- Dynamic evaluation built-ins (``eval``, ``exec``, ``compile``)
+- Reflection built-ins (``getattr``, ``setattr``, ``delattr``)
+- Scope escape (``globals``, ``locals``, ``vars``)
+- File I/O built-in (``open``)
+- Dynamic import (``__import__``)
+- Dunder attribute traversal (``.__class__``, ``.__bases__``,
+  ``.__subclasses__``, ``.__globals__``, ``.__builtins__``,
+  ``.__reduce__``, ``.__dict__``, ``.__mro__``)
+- Shell / subprocess bridges (``.system``, ``.popen``, ``subprocess.Popen``
+  and friends)
+- Subscript on ``__builtins__`` / ``globals()`` / ``locals()``
 
 ## Iteration Rules
-- If the sandbox returns stdout/stderr indicating an error, analyse it and
+- If the runtime returns stdout/stderr indicating an error, analyse it and
   emit a fixed <code> block in your next response.
 - If the task is complete, respond with a short natural-language summary and
   NO <code> block — that signals the end of the loop.
@@ -110,8 +163,11 @@ you run in an isolated sandbox.
 
 _SHELL_DISABLED_REPLY: str = (
     "CodeAct cannot run code because `LIGHTAGENT_SHELL_ENABLED=false`. "
-    "Set `LIGHTAGENT_SHELL_ENABLED=true` in your environment to enable the "
-    "sandbox, or route this task to a non-execution agent."
+    "Set `LIGHTAGENT_SHELL_ENABLED=true` in your environment to enable "
+    "the restricted host runtime, or route this task to a non-execution "
+    "agent. Note that SPEC-045 (Phase 43) will replace the current "
+    "host-subprocess runtime with a real isolation backend — until "
+    "then CodeAct should stay disabled in production."
 )
 
 
@@ -128,20 +184,155 @@ def _get_import_allowlist() -> frozenset[str]:
     )
 
 
-def _validate_imports(code: str) -> tuple[bool, str]:
-    """Walk the AST and reject any non-allowlisted import.
+# ---------------------------------------------------------------------------
+# Phase 42 / SPEC-044 AC-044-1, AC-044-2 — denylists
+# ---------------------------------------------------------------------------
 
-    Checking with ``ast.parse`` (rather than a regex) means comments,
-    strings and docstrings containing the word ``import`` don't trigger
-    false positives, and keeps the allowlist honest against tricks like
-    ``__import__("os")`` which we also reject because it does not appear
-    as an ``Import`` / ``ImportFrom`` node in the AST but as a ``Call``.
+#: Built-in identifiers that must never appear as the *callee* of an
+#: ``ast.Call`` with a bare ``ast.Name`` head. Covers every known single-
+#: step bypass of the import allowlist: dynamic evaluation
+#: (``eval``/``exec``/``compile``), attribute reflection
+#: (``getattr``/``setattr``/``delattr``), scope escape
+#: (``globals``/``locals``/``vars``), arbitrary file I/O (``open``),
+#: dynamic import (``__import__``), interactive UI hooks
+#: (``input``/``breakpoint``). Rejected regardless of the allowlist
+#: contents — these calls are categorically forbidden in CodeAct blocks.
+_DANGEROUS_NAME_CALLS: frozenset[str] = frozenset(
+    {
+        "eval",
+        "exec",
+        "compile",
+        "getattr",
+        "setattr",
+        "delattr",
+        "globals",
+        "locals",
+        "vars",
+        "open",
+        "__import__",
+        "input",
+        "breakpoint",
+    }
+)
+
+#: Dunder identifiers that remain legal inside a CodeAct block. The
+#: broader dunder rule (AC-044-3) rejects every ``ast.Name`` /
+#: ``ast.Attribute`` whose identifier starts with double underscore,
+#: so this allowlist whitelists the handful of benign dunders that
+#: real code still needs: ``__name__`` for ``if __name__ == "__main__"``
+#: idioms, ``__doc__`` for introspection of the current module, and
+#: ``__file__`` for path resolution relative to the code block's
+#: source file. ``__main__`` is included so a comparison against the
+#: string-equivalent Name (if the LLM produces one) still passes,
+#: though string-literal ``"__main__"`` already bypasses the dunder
+#: check because it is an ``ast.Constant``, not an ``ast.Name``.
+_ALLOWED_DUNDERS: frozenset[str] = frozenset(
+    {
+        "__name__",
+        "__main__",
+        "__doc__",
+        "__file__",
+    }
+)
+
+#: Method names that must never be called via attribute access. Covers
+#: shell bridges on modules (``system``/``popen``), the whole
+#: ``subprocess`` family (``run``/``call``/``check_output``/
+#: ``check_call``/``Popen``), the ``os.spawn*`` and ``os.exec*`` suites,
+#: classic Python sandbox-escape primitives
+#: (``__subclasses__``/``__bases__``/``__class__``), globals / builtins
+#: reflection (``__globals__``/``__builtins__``/``__import__``), and
+#: serialization reduce hooks (``__reduce__``/``__reduce_ex__``). The
+#: check fires regardless of the receiver — even ``"foo".__class__`` is
+#: blocked because ``__class__`` alone is enough to pivot into subclass
+#: traversal.
+_DANGEROUS_ATTR_CALLS: frozenset[str] = frozenset(
+    {
+        "system",
+        "popen",
+        "call",
+        "run",
+        "check_output",
+        "check_call",
+        "Popen",
+        "spawnl",
+        "spawnv",
+        "spawnve",
+        "execve",
+        "execvp",
+        "execvpe",
+        "__subclasses__",
+        "__bases__",
+        "__class__",
+        "__globals__",
+        "__builtins__",
+        "__import__",
+        "__reduce__",
+        "__reduce_ex__",
+        "__getattribute__",
+    }
+)
+
+
+def _validate_imports(code: str) -> tuple[bool, str]:
+    """Walk the AST and reject unsafe CodeAct code blocks.
+
+    Enforces six rejection layers (Phase 42 / SPEC-044 hardening), in
+    order of precedence:
+
+    1. **Name-call denylist** (AC-044-1): any ``ast.Call`` whose
+       ``func`` is a bare ``ast.Name`` with ``id`` in
+       :data:`_DANGEROUS_NAME_CALLS` is rejected outright. Covers
+       ``eval``/``exec``/``compile``, reflection built-ins
+       (``getattr``/``setattr``/``delattr``), scope escape
+       (``globals``/``locals``/``vars``), file I/O (``open``),
+       dynamic import (``__import__``), and interactive hooks
+       (``input``/``breakpoint``).
+    2. **Attribute-call denylist** (AC-044-2): any ``ast.Call`` whose
+       ``func`` is an ``ast.Attribute`` with ``attr`` in
+       :data:`_DANGEROUS_ATTR_CALLS` is rejected regardless of the
+       receiver. Covers shell bridges, the ``subprocess`` family,
+       ``os.spawn*`` / ``os.exec*``, and classic sandbox-escape
+       pivots like ``__subclasses__``/``__class__``.
+    3. **Dunder identifier rule** (AC-044-3): any ``ast.Name`` or
+       ``ast.Attribute`` whose identifier starts with double
+       underscore and is not in :data:`_ALLOWED_DUNDERS` is rejected.
+       Catches dunder *traversal* patterns (``foo.__class__.__bases__``)
+       that the Call-based layers miss because the dunder is not the
+       head of a call — it is only walked through on the way to
+       something else. The allowlist (``__name__``, ``__main__``,
+       ``__doc__``, ``__file__``) preserves the common
+       ``if __name__ == "__main__"`` idiom.
+    4. **Subscript base rule** (AC-044-4): any ``ast.Subscript`` whose
+       ``value`` is ``Name(id="__builtins__")``, ``Call(func=Name("globals"))``
+       or ``Call(func=Name("locals"))`` is rejected. Closes the
+       ``__builtins__["open"]`` / ``globals()['__builtins__']`` family
+       of bypasses. Ordinary dict / list subscripts are unaffected.
+    5. **Import allowlist**: ``ast.Import`` and ``ast.ImportFrom``
+       nodes must reference top-level modules listed in
+       ``LIGHTAGENT_CODEACT_IMPORT_ALLOWLIST``.
+    6. **Syntax**: ``ast.parse`` failures are wrapped as a rejection
+       with the raw ``SyntaxError`` message for operator visibility.
+
+    The denylist layers (1) and (2) run **before** any allowlist
+    decision so a banned call wrapped around otherwise-allowlisted
+    identifiers is still rejected. The AST-based approach avoids
+    false positives on comments, docstrings, and string literals
+    that merely contain the word ``import`` — at the cost of also
+    being unable to see ``import`` statements *inside* string
+    literals fed to the dynamic-eval built-ins. That blind spot is
+    closed by rule (1) which rejects those built-ins categorically.
+
+    This validator is defense-in-depth layered on top of the Phase 43
+    process isolation (SPEC-045). When isolation is unavailable
+    CodeAct should be disabled (``LIGHTAGENT_CODEACT_ENABLED=false``);
+    the denylist is not a substitute for real sandboxing.
 
     Args:
         code: The Python source extracted from a ``<code>`` block.
 
     Returns:
-        ``(True, "")`` when every import is allowlisted, otherwise
+        ``(True, "")`` when every layer passes, otherwise
         ``(False, "<reason>")`` with a human-readable rejection.
     """
     try:
@@ -170,12 +361,83 @@ def _validate_imports(code: str) -> tuple[bool, str]:
                     f"{', '.join(sorted(allowlist))}."
                 )
         elif isinstance(node, ast.Call):
-            # Block __import__("foo") — would otherwise slip past the
-            # Import/ImportFrom AST checks.
+            # Phase 42 / SPEC-044 AC-044-1 + AC-044-2 — deny dangerous
+            # calls regardless of the allowlist. These rules run ahead
+            # of any allowlist decision so a banned call (e.g. ``eval``
+            # wrapped around a string literal) is rejected even when
+            # every surrounding identifier is allowlisted.
             func = node.func
-            if isinstance(func, ast.Name) and func.id == "__import__":
+            if (
+                isinstance(func, ast.Name)
+                and func.id in _DANGEROUS_NAME_CALLS
+            ):
                 return False, (
-                    "Calls to `__import__()` are forbidden in CodeAct blocks."
+                    f"Call to built-in '{func.id}()' is forbidden "
+                    f"in CodeAct blocks. This bypasses the import "
+                    f"allowlist and is categorically denied."
+                )
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr in _DANGEROUS_ATTR_CALLS
+            ):
+                return False, (
+                    f"Call to attribute '.{func.attr}()' is "
+                    f"forbidden in CodeAct blocks. This is a known "
+                    f"sandbox-escape pivot and is categorically "
+                    f"denied regardless of the receiver."
+                )
+        elif isinstance(node, ast.Name):
+            # AC-044-3: reject dunder *identifiers* referenced as
+            # Name. Catches ``foo = __builtins__`` and similar cases
+            # where the dunder is traversed but never directly called
+            # — the Call-based checks above only see dunders when
+            # they are the head of an ``ast.Call``. The small allow-
+            # list (``__name__``, ``__main__``, ``__doc__``,
+            # ``__file__``) preserves the ``if __name__ == "__main__"``
+            # idiom which is harmless.
+            if (
+                node.id.startswith("__")
+                and node.id not in _ALLOWED_DUNDERS
+            ):
+                return False, (
+                    f"Dunder identifier '{node.id}' is forbidden "
+                    f"in CodeAct blocks. Dunder access is a known "
+                    f"sandbox-escape primitive; only "
+                    f"{sorted(_ALLOWED_DUNDERS)} are allowed."
+                )
+        elif isinstance(node, ast.Attribute):
+            # AC-044-3: same rule for attribute access. Catches
+            # ``foo.__class__.__bases__`` and every other chain that
+            # traverses dunder attributes without calling them.
+            if (
+                node.attr.startswith("__")
+                and node.attr not in _ALLOWED_DUNDERS
+            ):
+                return False, (
+                    f"Dunder attribute access '.{node.attr}' is "
+                    f"forbidden in CodeAct blocks. Dunder traversal "
+                    f"is a known sandbox-escape primitive."
+                )
+        elif isinstance(node, ast.Subscript):
+            # AC-044-4: reject subscripts whose base resolves to one
+            # of the three known pivots into ``__builtins__``. Other
+            # subscripts (``my_dict["key"]``, ``my_list[0]``) are
+            # completely unaffected — only the specific bases below
+            # are denied.
+            base = node.value
+            if isinstance(base, ast.Name) and base.id == "__builtins__":
+                return False, (
+                    "Subscript on '__builtins__' is forbidden "
+                    "in CodeAct blocks."
+                )
+            if (
+                isinstance(base, ast.Call)
+                and isinstance(base.func, ast.Name)
+                and base.func.id in {"globals", "locals"}
+            ):
+                return False, (
+                    f"Subscript on '{base.func.id}()' is forbidden "
+                    f"in CodeAct blocks."
                 )
 
     return True, ""
@@ -191,17 +453,29 @@ def _extract_code_block(content: str) -> str | None:
 
 
 async def _run_code_in_sandbox(code: str) -> tuple[bool, str, str, int]:
-    """Run ``code`` in the project sandbox on a worker thread.
+    """Run ``code`` in the LightAgent code runtime on a worker thread.
+
+    .. warning::
+
+       As of SPEC-044 (Phase 42), the "sandbox" name is historical.
+       :class:`~lightagent.sandbox.executor.SandboxExecutor` currently
+       runs the supplied code in a plain host subprocess with the
+       LightAgent process's full privileges — no container, no
+       seccomp, no network namespace. Real isolation is tracked under
+       SPEC-045 (Phase 43). The function name is kept for backward
+       compatibility with the existing call sites; the underlying
+       behaviour will change transparently once the isolation backend
+       lands.
 
     ``SandboxExecutor.run_code`` is synchronous and spawns real
     subprocesses, so we offload it to ``asyncio.to_thread`` to avoid
-    stalling the event loop. Any unexpected exception is normalised into
-    a failed :class:`tuple` so callers can surface the error to the LLM
-    as feedback without crashing the graph.
+    stalling the event loop. Any unexpected exception is normalised
+    into a failed :class:`tuple` so callers can surface the error to
+    the LLM as feedback without crashing the graph.
 
     Returns:
-        ``(success, stdout, stderr, exit_code)``. ``success`` is ``True``
-        when ``exit_code == 0``.
+        ``(success, stdout, stderr, exit_code)``. ``success`` is
+        ``True`` when ``exit_code == 0``.
     """
     from lightagent.sandbox.executor import SandboxExecutor
 
@@ -222,7 +496,7 @@ async def _run_code_in_sandbox(code: str) -> tuple[bool, str, str, int]:
 def _format_execution_feedback(
     stdout: str, stderr: str, exit_code: int
 ) -> str:
-    """Render sandbox output as a message the LLM can act on."""
+    """Render runtime output as a message the LLM can act on."""
     parts: list[str] = [f"Execution finished with exit code {exit_code}."]
     if stdout.strip():
         parts.append(f"stdout:\n{stdout.strip()}")
