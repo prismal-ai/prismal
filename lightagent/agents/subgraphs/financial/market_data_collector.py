@@ -25,6 +25,72 @@ if TYPE_CHECKING:
 logger = structlog.get_logger("lightagent.subgraphs.financial.market_data_collector")
 otel = OTelManager()
 
+# Phase 39 / SPEC-041 AC-041-1: the set of MarketSnapshot fields the
+# downstream quality gate treats as "expected". ``symbol`` and
+# ``asset_type`` are deliberately excluded because they are model-
+# required and always present; including them would inflate the
+# confidence score and defeat the purpose of the gate.
+_EXPECTED_MARKET_FIELDS: tuple[str, ...] = (
+    "current_price",
+    "currency",
+    "ohlcv_path",
+    "data_provider",
+    "data_points_count",
+    "market_cap",
+    "volume_24h",
+)
+
+
+def _score_market_snapshot(
+    snapshot: MarketSnapshot,
+) -> tuple[float, list[str]]:
+    """Compute ``data_confidence`` and ``missing_fields`` for a snapshot.
+
+    The score is the ratio of *populated* expected fields over the
+    total count of expected fields (7). A field counts as populated
+    when it is not ``None`` and not a placeholder default: numeric
+    fields must be strictly positive (``current_price > 0``,
+    ``data_points_count > 0``) and string fields must be non-empty
+    and not equal to ``"UNKNOWN"``. ``market_cap`` and ``volume_24h``
+    are optional by schema but still count toward the score — an asset
+    that lacks both is inherently less trustworthy than one with both.
+
+    Args:
+        snapshot: The :class:`MarketSnapshot` just returned by the LLM
+            (before this helper writes ``data_confidence`` /
+            ``missing_fields`` back into it).
+
+    Returns:
+        ``(data_confidence, missing_fields)`` where
+        ``data_confidence`` is in ``[0.0, 1.0]`` and ``missing_fields``
+        lists the field names that failed the populated check.
+    """
+    missing: list[str] = []
+
+    def _populated(name: str) -> bool:
+        value = getattr(snapshot, name, None)
+        if value is None:
+            return False
+        if name == "current_price":
+            return isinstance(value, (int, float)) and value > 0
+        if name == "data_points_count":
+            return isinstance(value, int) and value > 0
+        if name in {"currency", "data_provider", "ohlcv_path"}:
+            return isinstance(value, str) and value.strip() not in {
+                "",
+                "UNKNOWN",
+            }
+        # market_cap / volume_24h: any positive numeric value counts.
+        return isinstance(value, (int, float)) and value > 0
+
+    for field in _EXPECTED_MARKET_FIELDS:
+        if not _populated(field):
+            missing.append(field)
+
+    populated = len(_EXPECTED_MARKET_FIELDS) - len(missing)
+    confidence = populated / len(_EXPECTED_MARKET_FIELDS)
+    return confidence, missing
+
 _SYSTEM = """You are a Market Data Collector for the financial subgraph.
 
 ## Purpose
@@ -153,6 +219,18 @@ async def market_data_collector_node(state: AgentState) -> dict[str, Any]:
         except Exception:
             snapshot = MarketSnapshot(symbol="UNKNOWN", asset_type="equity")
 
+        # Phase 39 / SPEC-041 AC-041-1: stamp the snapshot with
+        # ``data_confidence`` and ``missing_fields`` so the downstream
+        # market-data gate in the builder can decide whether to
+        # continue the pipeline or abort to ``insufficient_data_report``.
+        confidence, missing_fields = _score_market_snapshot(snapshot)
+        snapshot = snapshot.model_copy(
+            update={
+                "data_confidence": confidence,
+                "missing_fields": missing_fields,
+            }
+        )
+
         fin: dict[str, Any] = dict(
             state.get("metadata", {}).get("financial_analyst", {})
         )
@@ -164,6 +242,8 @@ async def market_data_collector_node(state: AgentState) -> dict[str, Any]:
             price=snapshot.current_price,
             provider=snapshot.data_provider,
             data_points=snapshot.data_points_count,
+            data_confidence=confidence,
+            missing_fields=missing_fields,
         )
         span.set_attribute("lightagent.financial.symbol", snapshot.symbol)
         span.set_attribute("lightagent.financial.provider", snapshot.data_provider)

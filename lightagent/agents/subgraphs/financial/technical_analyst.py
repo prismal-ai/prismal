@@ -25,6 +25,53 @@ if TYPE_CHECKING:
 logger = structlog.get_logger("lightagent.subgraphs.financial.technical_analyst")
 otel = OTelManager()
 
+# Phase 39 / SPEC-041 AC-041-1: the seven canonical indicator families
+# used to compute ``TechnicalAnalysis.data_confidence``. Each tuple is a
+# group of substrings that all match the same family — we count a
+# family as "present" when ANY of its substrings is found as a prefix
+# of an indicator key (case-insensitive). This tolerates the LLM
+# emitting ``BB_upper``/``BB_lower`` (two entries, one family) or
+# ``MACD``/``MACD_signal`` without inflating the score.
+_TECHNICAL_INDICATOR_FAMILIES: tuple[tuple[str, ...], ...] = (
+    ("rsi",),
+    ("macd",),
+    ("bb", "bollinger"),
+    ("sma",),
+    ("ema",),
+    ("stoch",),
+    ("adx",),
+)
+
+
+def _score_technical_indicators(indicators: dict[str, float]) -> float:
+    """Return ``data_confidence`` as the fraction of indicator families present.
+
+    The denominator is fixed at 7 — one per family in
+    :data:`_TECHNICAL_INDICATOR_FAMILIES` — so an empty ``indicators``
+    dict scores 0.0 and a dict covering all seven families scores 1.0.
+    Extra indicators beyond the canonical set do not increase the
+    score; the goal is to reward *breadth*, not quantity.
+
+    Args:
+        indicators: The ``TechnicalAnalysis.indicators`` mapping just
+            produced by the LLM.
+
+    Returns:
+        A confidence score in ``[0.0, 1.0]``.
+    """
+    if not indicators:
+        return 0.0
+
+    lowered_keys = [key.lower() for key in indicators]
+    present_families = 0
+    for family_aliases in _TECHNICAL_INDICATOR_FAMILIES:
+        for alias in family_aliases:
+            if any(key.startswith(alias) for key in lowered_keys):
+                present_families += 1
+                break
+
+    return present_families / len(_TECHNICAL_INDICATOR_FAMILIES)
+
 _SYSTEM = """You are a Technical Analyst for the financial subgraph.
 
 ## Purpose
@@ -170,6 +217,15 @@ async def technical_analyst_node(state: AgentState) -> dict[str, Any]:
         except Exception:
             analysis = TechnicalAnalysis(symbol=symbol)
 
+        # Phase 39 / SPEC-041 AC-041-1: stamp the analysis with
+        # ``data_confidence`` so the builder's technical-confidence
+        # gate can decide whether to run fundamental analysis or skip
+        # straight to risk/sentiment with a limited-data disclaimer.
+        confidence = _score_technical_indicators(analysis.indicators)
+        analysis = analysis.model_copy(
+            update={"data_confidence": confidence}
+        )
+
         fin["technical_analysis"] = analysis.model_dump()
 
         logger.info(
@@ -178,6 +234,7 @@ async def technical_analyst_node(state: AgentState) -> dict[str, Any]:
             trend=analysis.trend,
             indicator_count=len(analysis.indicators),
             signal_count=len(analysis.signals),
+            data_confidence=confidence,
         )
         span.set_attribute("lightagent.financial.symbol", analysis.symbol)
         span.set_attribute("lightagent.financial.trend", analysis.trend)
