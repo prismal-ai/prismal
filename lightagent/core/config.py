@@ -386,6 +386,33 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── CodeAct Agent (Phase 38 / SPEC-040) ───────────────────────────
+    codeact_enabled: bool = Field(
+        default=True,
+        description=(
+            "Toggle CodeAct agent. When False the supervisor never routes to "
+            "'codeact' and falls back to the classic ReAct 'coder' node."
+        ),
+    )
+    codeact_max_iterations: int = Field(
+        default=6,
+        ge=1,
+        le=20,
+        description="Max generate/correct cycles per CodeAct invocation.",
+    )
+    codeact_import_allowlist: str = Field(
+        default=(
+            "os,pathlib,subprocess,json,re,typing,datetime,collections,"
+            "itertools,functools,math,statistics,random,hashlib,base64,"
+            "csv,io,sys,pandas,numpy,polars,matplotlib,sklearn,torch,"
+            "flaml,duckdb,requests,httpx"
+        ),
+        description=(
+            "Comma-separated list of packages CodeAct code blocks may "
+            "import. Any non-allowlisted import blocks execution."
+        ),
+    )
+
     # ── API ───────────────────────────────────────────────────────────
     api_key: SecretStr = Field(
         default=SecretStr(""),
