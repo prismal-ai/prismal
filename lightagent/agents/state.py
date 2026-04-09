@@ -62,6 +62,13 @@ class AgentState(TypedDict):
             (Phase 34).  Uses an ``operator.add`` reducer so each ``Send``
             target can emit a partial result that is appended to the merged
             list visible to downstream aggregator nodes.
+        dev_pipeline_modules: Optional list of module dicts populated by the
+            dev_pipeline ``developer_agent`` when it produces multi-module
+            code (Phase 34, T-313).  Consumed by the ``module_dispatcher``
+            inside the dev_pipeline subgraph to fan out unit testing across
+            modules in parallel.  An empty list means the developer produced
+            a single-module artifact and the sequential ``unit_tester`` path
+            is used instead.
         risk_score: Aggregate risk score (0.0-100.0) set by the Security
             Gateway; values >= ``settings.risk_threshold`` block execution.
         permissions_granted: Permission tokens approved for the current turn.
@@ -85,6 +92,7 @@ class AgentState(TypedDict):
     tool_results: Annotated[list[dict[str, Any]], operator.add]
     tool_errors: list[dict[str, Any]]
     parallel_results: Annotated[list[dict[str, Any]], operator.add]
+    dev_pipeline_modules: list[dict[str, Any]]
     risk_score: float
     permissions_granted: list[str]
     security_flags: list[str]
@@ -131,6 +139,7 @@ def create_initial_state(session_id: str) -> AgentState:
         tool_results=[],
         tool_errors=[],
         parallel_results=[],
+        dev_pipeline_modules=[],
         risk_score=0.0,
         permissions_granted=[],
         security_flags=[],

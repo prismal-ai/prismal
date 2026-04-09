@@ -126,9 +126,25 @@ async def developer_agent_node(state: AgentState) -> dict[str, Any]:
         response = await llm.ainvoke(messages)
         content = str(response.content)
 
+        # Phase 34: detect multi-module output.  When the LLM returns a JSON
+        # object with a top-level ``modules`` key (a list of CodeArtifact-like
+        # dicts) we keep the first one as the canonical ``code_artifact`` for
+        # backwards compatibility AND populate ``dev_pipeline_modules`` so the
+        # downstream module dispatcher can fan out unit testing in parallel.
+        # Single-module output (the common case) leaves
+        # ``dev_pipeline_modules`` empty and uses the existing serial path.
+        modules: list[dict[str, Any]] = []
         try:
             data = json.loads(content)
-            artifact = CodeArtifact.model_validate(data)
+            if isinstance(data, dict) and isinstance(data.get("modules"), list):
+                raw_modules = data["modules"]
+                modules = [m for m in raw_modules if isinstance(m, dict)]
+                if modules:
+                    artifact = CodeArtifact.model_validate(modules[0])
+                else:
+                    artifact = CodeArtifact.model_validate(data)
+            else:
+                artifact = CodeArtifact.model_validate(data)
         except Exception:
             artifact = CodeArtifact(
                 file_path="generated/code.py",
@@ -136,10 +152,22 @@ async def developer_agent_node(state: AgentState) -> dict[str, Any]:
             )
 
         dp["code_artifact"] = artifact.model_dump()
-        logger.info("developer.code_created", file_path=artifact.file_path)
+        if len(modules) > 1:
+            logger.info(
+                "developer.multi_module_detected",
+                module_count=len(modules),
+                first_file=artifact.file_path,
+            )
+        else:
+            logger.info("developer.code_created", file_path=artifact.file_path)
+
         return {
             "current_agent": "developer",
             "messages": [AIMessage(content=f"Code written: {artifact.file_path}")],
             "metadata": {**state.get("metadata", {}), "dev_pipeline": dp},
+            # Only populate the modules list when there are >= 2 modules so the
+            # dispatcher's ``on_empty`` fallback routes single-module runs to
+            # the existing sequential ``unit_tester``.
+            "dev_pipeline_modules": modules if len(modules) > 1 else [],
             "iteration_count": state.get("iteration_count", 0) + 1,
         }
