@@ -39,6 +39,7 @@ from lightagent.agents.codeact_agent import codeact_node
 from lightagent.agents.coder import coder_node
 from lightagent.agents.critic import critic_node
 from lightagent.agents.cron_manager import cron_manager_node
+from lightagent.agents.cua_agent import cua_node
 from lightagent.agents.data_analyst import data_analyst_node
 from lightagent.agents.file_manager import file_manager_node
 from lightagent.agents.parallel_research import (
@@ -262,6 +263,15 @@ def build_supervisor_graph(
     # auto-correction. Runs alongside the classic ``coder`` node; the
     # supervisor picks between them based on task complexity.
     builder.add_node("codeact", codeact_node)
+    # Phase 41: Computer Use Agent — VLM + Playwright for UI
+    # automation with HITL on HIGH_RISK actions. Registered
+    # conditionally on ``cua_enabled`` to avoid loading the node
+    # when the feature is off; the supervisor downgrades to
+    # ``researcher`` at routing time so the flat graph keeps
+    # working either way.
+    _include_cua = get_settings().cua_enabled
+    if _include_cua:
+        builder.add_node("cua", cua_node)
     builder.add_node("rag_agent", rag_agent_node)
     builder.add_node("planner", planner_node)
     builder.add_node("critic", critic_node)
@@ -310,6 +320,7 @@ def build_supervisor_graph(
         "coder": "coder",
         "codeact": "codeact",
         "rag_agent": "rag_agent",
+        **({"cua": "cua"} if _include_cua else {}),
         "planner": "planner",
         "critic": "critic",
         "data_analyst": "data_analyst",
@@ -337,6 +348,7 @@ def build_supervisor_graph(
         "researcher",
         "coder",
         "codeact",
+        *(("cua",) if _include_cua else ()),
         "rag_agent",
         "planner",
         "critic",
@@ -429,6 +441,14 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     if _async_graph is not None:
         return _async_graph
 
+    # Phase 40 / SPEC-042 AC-042-4: flat mode is the default; hierarchical
+    # mode is opt-in via ``LIGHTAGENT_HIERARCHICAL_MODE=true``. The two
+    # topologies share the same checkpointer backend and caching
+    # mechanism so callers never need to care which one is active.
+    if get_settings().hierarchical_mode:
+        _async_graph = await _build_hierarchical_graph()
+        return _async_graph
+
     # Phase 36: the checkpointer backend is now selected from
     # ``settings.db_url`` via ``build_checkpointer()``. For the default
     # SQLite configuration this behaves identically to the previous
@@ -468,6 +488,116 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     return _async_graph
 
 
+# ---------------------------------------------------------------------------
+# Hierarchical graph construction (Phase 40 / SPEC-042 AC-042-2)
+# ---------------------------------------------------------------------------
+
+
+def _hierarchical_router(state: AgentState) -> str:
+    """Conditional-edge router for the hierarchical root supervisor.
+
+    Reads ``state["next_agent"]`` (written by
+    :func:`hierarchical_supervisor_node`) and dispatches to a domain
+    orchestrator, to ``cron_manager``, or to ``__end__``. Keeps the
+    dispatch surface tiny — the root supervisor is only ever allowed
+    to pick between 4 targets plus END.
+    """
+    next_agent = state.get("next_agent")
+    if next_agent is None or next_agent == "END":
+        return "__end__"
+    return str(next_agent)
+
+
+async def _build_hierarchical_graph() -> (
+    CompiledStateGraph[AgentState, Any, Any, Any]
+):
+    """Build the 3-level hierarchical graph (SPEC-042 AC-042-2).
+
+    Topology::
+
+        hierarchical_supervisor ──┬──► research_orchestrator  ──┐
+                                  ├──► engineering_orchestrator ─┤
+                                  ├──► analysis_orchestrator   ──┼──► supervisor
+                                  ├──► cron_manager            ──┘
+                                  └──► __end__
+
+    Each domain orchestrator is itself a compiled ``CompiledStateGraph``
+    produced by the builders in ``subgraphs/{research,engineering,
+    analysis}_orchestrator/``. The root supervisor never sees the leaf
+    agents directly — its routing LLM prompt only lists 4 targets,
+    which keeps prompt accuracy predictable as more agents are added.
+
+    The analysis orchestrator internally wraps the existing pipeline
+    subgraphs (``dev_pipeline``, ``ml_pipeline``, ``financial_analyst``)
+    so callers do not need to pass them explicitly — the orchestrator
+    builder awaits its own ``get_compiled_*`` helpers.
+
+    Returns:
+        A compiled hierarchical graph backed by the same checkpointer
+        build pipeline (``build_checkpointer(settings.db_url)``) the
+        flat mode uses.
+    """
+    from lightagent.agents.subgraphs.analysis_orchestrator.builder import (
+        get_compiled_analysis_orchestrator,
+    )
+    from lightagent.agents.subgraphs.engineering_orchestrator.builder import (
+        get_compiled_engineering_orchestrator,
+    )
+    from lightagent.agents.subgraphs.research_orchestrator.builder import (
+        get_compiled_research_orchestrator,
+    )
+    from lightagent.agents.supervisor import hierarchical_supervisor_node
+
+    logger.info("building_hierarchical_graph")
+
+    checkpointer = await build_checkpointer(get_settings().db_url)
+
+    research = await get_compiled_research_orchestrator()
+    engineering = await get_compiled_engineering_orchestrator()
+    analysis = await get_compiled_analysis_orchestrator()
+
+    builder: StateGraph[AgentState, Any, Any, Any] = StateGraph(AgentState)
+
+    # Root supervisor + 4 routing targets (3 orchestrators + cron).
+    builder.add_node("supervisor", hierarchical_supervisor_node)
+    builder.add_node("research_orchestrator", research)
+    builder.add_node("engineering_orchestrator", engineering)
+    builder.add_node("analysis_orchestrator", analysis)
+    builder.add_node("cron_manager", cron_manager_node)
+
+    builder.set_entry_point("supervisor")
+
+    hierarchical_conditional_edges: dict[str, str | object] = {
+        "research_orchestrator": "research_orchestrator",
+        "engineering_orchestrator": "engineering_orchestrator",
+        "analysis_orchestrator": "analysis_orchestrator",
+        "cron_manager": "cron_manager",
+        "__end__": END,
+    }
+    builder.add_conditional_edges(
+        "supervisor",
+        _hierarchical_router,
+        hierarchical_conditional_edges,  # type: ignore[arg-type]
+    )
+
+    # Return edges — every routing target loops back to the root
+    # supervisor so its loop-breaker can terminate the turn after one
+    # specialist response.
+    for target in (
+        "research_orchestrator",
+        "engineering_orchestrator",
+        "analysis_orchestrator",
+        "cron_manager",
+    ):
+        builder.add_edge(target, "supervisor")
+
+    compiled: CompiledStateGraph[AgentState, Any, Any, Any] = builder.compile(
+        checkpointer=checkpointer
+    )
+    logger.info("hierarchical_graph_compiled")
+    return compiled
+
+
 def list_session_ids() -> list[str]:
     """
     Return all distinct thread IDs from the LangGraph SQLite checkpointer.
@@ -492,6 +622,8 @@ def list_session_ids() -> list[str]:
 
 
 __all__ = [
+    "_build_hierarchical_graph",
+    "_hierarchical_router",
     "build_checkpointer",
     "build_supervisor_graph",
     "get_async_compiled_graph",

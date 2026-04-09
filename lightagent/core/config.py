@@ -413,6 +413,58 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Hierarchical Multi-Agent Architecture (Phase 40 / SPEC-042) ───
+    hierarchical_mode: bool = Field(
+        default=False,
+        description=(
+            "Enable 3-level hierarchical agent graph. When True, "
+            "``get_async_compiled_graph()`` builds a root supervisor "
+            "that routes to 3 domain orchestrators (research, "
+            "engineering, analysis) + cron_manager instead of the "
+            "flat 12-agent topology. Default is False for full "
+            "backward compatibility — see SPEC-042 AC-042-4."
+        ),
+    )
+
+    # ── Computer Use Agent / CUA (Phase 41 / SPEC-043) ────────────────
+    cua_enabled: bool = Field(
+        default=False,
+        description=(
+            "Enable the Computer Use Agent. Requires a vision-capable "
+            "model configured via ``LIGHTAGENT_CUA_VISION_MODEL`` and "
+            "Playwright installed. Default is False because CUA "
+            "executes UI actions in a real browser and HIGH_RISK "
+            "actions require HITL approval."
+        ),
+    )
+    cua_vision_model: str = Field(
+        default="",
+        description=(
+            "Vision-capable model string used by the CUA agent to "
+            "perceive browser screenshots (e.g. 'claude-opus-4-6'). "
+            "Empty string disables CUA even when cua_enabled=True — "
+            "the node returns a graceful error message in that case."
+        ),
+    )
+    cua_max_actions: int = Field(
+        default=20,
+        ge=1,
+        le=200,
+        description=(
+            "Max browser actions per CUA task before forced stop. "
+            "Prevents runaway agents when the VLM fails to emit a "
+            "'finish' action."
+        ),
+    )
+    cua_screenshot_interval_ms: int = Field(
+        default=500,
+        ge=0,
+        description=(
+            "Milliseconds to wait between screenshots in the CUA "
+            "action loop. Lowered to 0 in tests."
+        ),
+    )
+
     # ── API ───────────────────────────────────────────────────────────
     api_key: SecretStr = Field(
         default=SecretStr(""),

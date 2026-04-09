@@ -36,8 +36,15 @@ class SubgraphDefinition(BaseModel):
     name: str = Field(..., description="Unique subgraph identifier")
     description: str = Field(..., description="Human-readable purpose")
     entry_point: str = Field(..., description="Name of the entry node")
-    nodes: dict[str, Callable[..., Any]] = Field(
-        ..., description="Mapping node_name → async node function"
+    nodes: dict[str, Any] = Field(
+        ...,
+        description=(
+            "Mapping node_name → LangGraph node. Accepts either an "
+            "async node function (``Callable[[AgentState], Awaitable[dict]]``) "
+            "or a pre-compiled ``CompiledStateGraph`` — the latter lets "
+            "domain orchestrators embed existing pipeline subgraphs as "
+            "nested nodes without wrapping them in a passthrough."
+        ),
     )
     edges: list[tuple[str, str]] = Field(
         default_factory=list, description="List of (from, to) node pairs"
