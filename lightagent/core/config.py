@@ -782,6 +782,42 @@ class Settings(BaseSettings):
         description="Phase 27 is read-only — trade execution must always be False",
     )
 
+    # ── Phase 39 / SPEC-041 — Financial Pipeline Quality Gates ────────
+    financial_min_confidence: float = Field(
+        default=0.4,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Minimum MarketSnapshot.data_confidence required for the "
+            "financial pipeline to continue past data collection. When "
+            "missing_fields is non-empty AND data_confidence is below "
+            "this threshold, the pipeline routes to END with an error "
+            "FinancialReport. SPEC-041 AC-041-2."
+        ),
+    )
+    financial_technical_min_confidence: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Minimum TechnicalAnalysis.data_confidence required to run "
+            "fundamental analysis. Below this threshold the pipeline "
+            "skips fundamental_analyst and jumps straight to "
+            "risk_sentiment_analyst, and the final report is tagged "
+            "with a 'limited data' disclaimer. SPEC-041 AC-041-3."
+        ),
+    )
+    financial_hitl_enabled: bool = Field(
+        default=False,
+        description=(
+            "Enable a HITL approval gate before delivering financial "
+            "reports to the user. When True the report_generator's "
+            "output is surfaced through hitl_gate() for human review; "
+            "when False the pipeline ends as soon as the report is "
+            "produced. SPEC-041 AC-041-4."
+        ),
+    )
+
     # ── DateTime & Timezone (Phase 28) ────────────────────────────────
     timezone: str = Field(
         default="",

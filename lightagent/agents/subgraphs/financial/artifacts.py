@@ -45,6 +45,29 @@ class MarketSnapshot(BaseModel):
         default=None, description="24-hour trading volume"
     )
 
+    # ── Phase 39 / SPEC-041 AC-041-1: data quality gates ──────────────
+    data_confidence: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Quality score [0.0-1.0] reflecting data completeness, "
+            "freshness and source reliability. Computed as the ratio of "
+            "successfully populated expected fields over total expected "
+            "fields. Used by the financial pipeline data gate to abort "
+            "downstream analysis when the snapshot is too thin to trust."
+        ),
+    )
+    missing_fields: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Names of expected snapshot fields that could not be "
+            "populated (e.g. 'current_price', 'volume_24h'). A "
+            "non-empty list combined with a low ``data_confidence`` "
+            "routes the pipeline to END via the failure gate."
+        ),
+    )
+
 
 class TechnicalAnalysis(BaseModel):
     """Technical analyst artifact: computed indicators and trading signals."""
@@ -74,6 +97,21 @@ class TechnicalAnalysis(BaseModel):
         default=None, description="Nearest resistance price"
     )
 
+    # ── Phase 39 / SPEC-041 AC-041-1 ──────────────────────────────────
+    data_confidence: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Technical analysis confidence [0.0-1.0]. Populated by the "
+            "technical_analyst agent as the ratio of successfully "
+            "computed indicators (RSI, MACD, Bollinger, SMA, EMA, "
+            "Stochastic, ADX) over the 7 expected indicators. Used by "
+            "the pipeline score gate to skip fundamental analysis when "
+            "the technical picture is too noisy to be informative."
+        ),
+    )
+
 
 class FundamentalAnalysis(BaseModel):
     """Fundamental analyst artifact: valuation and financial health metrics."""
@@ -101,6 +139,31 @@ class FundamentalAnalysis(BaseModel):
     )
     data_source: str = Field(
         default="yfinance", description="Primary data source used"
+    )
+
+    # ── Phase 39 / SPEC-041 AC-041-1 ──────────────────────────────────
+    completeness_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Fraction [0.0-1.0] of expected fundamental metrics that "
+            "were successfully retrieved. A fundamentals-light asset "
+            "(e.g. most crypto) will naturally score lower than a "
+            "large-cap equity with SEC filings."
+        ),
+    )
+    data_confidence: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Overall fundamental analysis confidence derived from "
+            "``completeness_score`` and the reliability of the data "
+            "source. Kept as a separate field from ``completeness_score`` "
+            "so downstream consumers can distinguish 'missing data' from "
+            "'unreliable data'."
+        ),
     )
 
 
