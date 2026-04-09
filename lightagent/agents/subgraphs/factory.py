@@ -59,20 +59,33 @@ class SubgraphFactory:
     async def build(
         self,
         definition: SubgraphDefinition,
-        checkpointer_path: str = ":memory:",
+        checkpointer_path: str | None = ":memory:",
     ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
         """Compile a subgraph from a definition.
 
         Registers all nodes, adds linear edges, adds conditional edges,
-        and compiles with an isolated
-        :class:`~langgraph.checkpoint.sqlite.aio.AsyncSqliteSaver`.
+        and compiles with an isolated checkpointer.
+
+        When ``checkpointer_path`` is an explicit string (the current
+        default ``":memory:"`` or a dedicated file path such as
+        ``data/db/checkpoints_subgraph_dev.db``) the factory creates an
+        :class:`~langgraph.checkpoint.sqlite.aio.AsyncSqliteSaver` bound
+        to that path — this preserves the pre-Phase-36 behaviour where
+        every subgraph owns an isolated SQLite checkpoint file.
+
+        When ``checkpointer_path`` is ``None`` the factory delegates to
+        :func:`lightagent.agents.graph.build_checkpointer` which selects
+        the backend from ``settings.db_url`` (SQLite or PostgreSQL).
+        This is required for production multi-worker deployments where
+        HITL workflows must be resumable across processes (AC-038-3).
 
         Args:
             definition: The :class:`SubgraphDefinition` specifying
                 nodes and edges.
-            checkpointer_path: SQLite path for checkpointing.
-                Use ``":memory:"`` in tests; production should use a
-                dedicated file per subgraph.
+            checkpointer_path: SQLite path for checkpointing. Use
+                ``":memory:"`` in tests; pass a dedicated file path for
+                the legacy isolated-per-subgraph behaviour, or ``None``
+                to use the globally-configured checkpointer backend.
 
         Returns:
             A compiled ``CompiledStateGraph`` ready to be used as a
@@ -126,9 +139,20 @@ class SubgraphFactory:
             if node_name not in all_sources:
                 builder.add_edge(node_name, END)
 
-        conn = await aiosqlite.connect(checkpointer_path)
-        checkpointer = AsyncSqliteSaver(conn)
-        await checkpointer.setup()
+        if checkpointer_path is None:
+            # Phase 36: delegate to the global checkpointer factory so the
+            # backend is driven by ``settings.db_url`` (SQLite or Postgres).
+            # Import lazily to avoid a circular import at module load time.
+            from lightagent.agents.graph import build_checkpointer
+
+            checkpointer = await build_checkpointer()
+            checkpointer_label = "build_checkpointer(settings.db_url)"
+        else:
+            conn = await aiosqlite.connect(checkpointer_path)
+            checkpointer = AsyncSqliteSaver(conn)
+            await checkpointer.setup()
+            checkpointer_label = checkpointer_path
+
         compiled: CompiledStateGraph[AgentState, Any, Any, Any] = builder.compile(
             checkpointer=checkpointer
         )
@@ -136,7 +160,7 @@ class SubgraphFactory:
             "subgraph.compiled",
             name=definition.name,
             node_count=len(definition.nodes),
-            checkpointer=checkpointer_path,
+            checkpointer=checkpointer_label,
         )
         return compiled
 

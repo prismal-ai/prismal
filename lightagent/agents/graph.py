@@ -107,6 +107,91 @@ def _research_dispatcher(state: AgentState) -> Any:  # noqa: ANN401 -- Send | st
 # Default path for the SQLite checkpoint database
 _DEFAULT_CHECKPOINT_PATH: Path = Path("data/db/checkpoints.db")
 
+# Keep a module-level reference to any async context managers opened by
+# ``build_checkpointer()`` so that the underlying connections remain alive
+# for the lifetime of the process. LangGraph's ``from_conn_string`` helpers
+# are async context managers; if we drop the CM the connection closes and
+# subsequent checkpoint operations would raise.
+_checkpointer_cms: list[Any] = []
+
+
+def _extract_sqlite_path(db_url: str) -> str:
+    """Extract the filesystem path from a SQLAlchemy-style sqlite URL.
+
+    Supports both ``sqlite:///path/to.db`` and
+    ``sqlite+aiosqlite:///path/to.db``. Returns ``":memory:"`` for an empty
+    path or when the URL is not a sqlite URL.
+
+    Args:
+        db_url: The DB URL to parse.
+
+    Returns:
+        The extracted filesystem path or ``":memory:"``.
+    """
+    for prefix in ("sqlite+aiosqlite:///", "sqlite:///"):
+        if db_url.startswith(prefix):
+            path = db_url.removeprefix(prefix)
+            return path or ":memory:"
+    return ":memory:"
+
+
+async def build_checkpointer(db_url: str | None = None) -> Any:  # noqa: ANN401 — no common base type
+    """Build an async checkpointer based on the configured DB URL.
+
+    Selects between ``AsyncPostgresSaver`` (for ``postgresql://``-prefixed
+    URLs) and ``AsyncSqliteSaver`` (for ``sqlite:///``-prefixed URLs, or as
+    an in-memory fallback). The returned checkpointer has already had
+    ``setup()`` invoked so LangGraph's checkpoint tables are guaranteed to
+    exist before the first write.
+
+    Args:
+        db_url: Optional explicit DB URL. When ``None``, the value from
+            ``get_settings().db_url`` is used.
+
+    Returns:
+        A fully-initialized async checkpointer ready to pass to
+        ``StateGraph.compile(checkpointer=...)``.
+
+    Raises:
+        ImportError: If ``db_url`` selects the PostgreSQL backend but
+            ``langgraph-checkpoint-postgres`` is not installed.
+    """
+    url = db_url if db_url is not None else (get_settings().db_url or "")
+
+    if url.startswith(("postgresql://", "postgresql+asyncpg://", "postgres://")):
+        try:
+            from langgraph.checkpoint.postgres.aio import (  # type: ignore[import-not-found]
+                AsyncPostgresSaver,
+            )
+        except ImportError as e:  # pragma: no cover — exercised via mocked tests
+            raise ImportError(
+                "PostgreSQL checkpointer backend requires the optional "
+                "'langgraph-checkpoint-postgres' package. Install it with "
+                "`uv pip install langgraph-checkpoint-postgres`."
+            ) from e
+
+        # AsyncPostgresSaver accepts plain ``postgresql://`` URIs (psycopg).
+        normalized = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        cm = AsyncPostgresSaver.from_conn_string(normalized)
+        saver = await cm.__aenter__()
+        await saver.setup()
+        _checkpointer_cms.append(cm)
+        logger.info("checkpointer_built", backend="postgresql")
+        return saver
+
+    # SQLite branch (also the fallback for empty/unknown URLs).
+    import aiosqlite
+
+    sqlite_path = _extract_sqlite_path(url)
+    if sqlite_path != ":memory:":
+        Path(sqlite_path).parent.mkdir(parents=True, exist_ok=True)
+
+    conn = await aiosqlite.connect(sqlite_path)
+    saver = AsyncSqliteSaver(conn)
+    await saver.setup()
+    logger.info("checkpointer_built", backend="sqlite", path=sqlite_path)
+    return saver
+
 
 def build_supervisor_graph(
     checkpoint_path: Path | None = None,
@@ -337,13 +422,12 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     if _async_graph is not None:
         return _async_graph
 
-    import aiosqlite
-
-    db_path = _DEFAULT_CHECKPOINT_PATH
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = await aiosqlite.connect(str(db_path))
-    checkpointer = AsyncSqliteSaver(conn)
-    await checkpointer.setup()
+    # Phase 36: the checkpointer backend is now selected from
+    # ``settings.db_url`` via ``build_checkpointer()``. For the default
+    # SQLite configuration this behaves identically to the previous
+    # hardcoded path; for ``postgresql://`` URLs it returns an
+    # ``AsyncPostgresSaver`` with its tables already created.
+    checkpointer = await build_checkpointer(get_settings().db_url)
 
     # Phase 24: build dev_pipeline subgraph asynchronously when enabled.
     dev_pipeline_graph: Any = None  # ANN401: no common base type for compiled subgraphs
@@ -401,6 +485,7 @@ def list_session_ids() -> list[str]:
 
 
 __all__ = [
+    "build_checkpointer",
     "build_supervisor_graph",
     "get_async_compiled_graph",
     "get_compiled_graph",
