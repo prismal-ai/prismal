@@ -356,6 +356,35 @@ class Settings(BaseSettings):
         ge=1,
         description="Days before long-term memory entries expire (AC-011-6)",
     )
+    memory_backend: str = Field(
+        default="memory",
+        description=(
+            "Long-term memory store backend: 'memory' (InMemoryStore, dev), "
+            "'sqlite' (aiosqlite-backed), or 'postgresql' (AsyncPostgresStore). "
+            "SPEC-039 AC-039-1."
+        ),
+    )
+    memory_extraction_enabled: bool = Field(
+        default=True,
+        description=(
+            "Toggle LLM-based memory extraction at session end. "
+            "When False, sessions complete without firing the extraction task."
+        ),
+    )
+    memory_recall_limit: int = Field(
+        default=5,
+        ge=0,
+        le=50,
+        description="Max long-term facts retrieved per supervisor invocation.",
+    )
+    memory_default_ttl_days: int = Field(
+        default=90,
+        ge=0,
+        description=(
+            "Default TTL for stored facts in days. 0 disables expiration. "
+            "SPEC-039 AC-039-6."
+        ),
+    )
 
     # ── API ───────────────────────────────────────────────────────────
     api_key: SecretStr = Field(
