@@ -23,7 +23,15 @@ from pydantic import BaseModel, Field
 
 
 class SubgraphDefinition(BaseModel):
-    """Definition of a dynamic subgraph."""
+    """Definition of a dynamic subgraph.
+
+    Phase 34 added the ``send_edges`` field, which lets a subgraph declare
+    map-reduce fan-out edges built on top of LangGraph's ``Send`` primitive.
+    Each entry pairs a source node with a dispatcher callable (typically
+    produced by
+    :func:`~lightagent.agents.patterns.parallel.make_parallel_dispatcher`)
+    that returns either a list of ``Send`` objects or a fallback node name.
+    """
 
     name: str = Field(..., description="Unique subgraph identifier")
     description: str = Field(..., description="Human-readable purpose")
@@ -37,6 +45,14 @@ class SubgraphDefinition(BaseModel):
     conditional_edges: dict[str, Callable[..., str]] = Field(
         default_factory=dict,
         description="source_node → routing function returning next node name",
+    )
+    send_edges: list[tuple[str, Callable[..., Any]]] = Field(
+        default_factory=list,
+        description=(
+            "Phase 34: list of (source_node, dispatcher_fn) pairs. Each "
+            "dispatcher returns ``list[Send]`` for parallel fan-out or a "
+            "string node name for the empty/disabled case."
+        ),
     )
 
     model_config = {"arbitrary_types_allowed": True}

@@ -103,10 +103,24 @@ class SubgraphFactory:
         for source_node, routing_fn in definition.conditional_edges.items():
             builder.add_conditional_edges(source_node, routing_fn)
 
+        # Phase 34: add Send-based fan-out edges.  Each dispatcher_fn returns
+        # either a list of ``Send`` objects (one per parallel worker) or a
+        # string fallback node name; both forms are valid return types for
+        # ``add_conditional_edges``.
+        for source_node, dispatcher_fn in definition.send_edges:
+            builder.add_conditional_edges(source_node, dispatcher_fn)
+            logger.debug(
+                "subgraph.send_edge_added",
+                subgraph=definition.name,
+                source=source_node,
+                dispatcher=getattr(dispatcher_fn, "__name__", "<dispatcher>"),
+            )
+
         # Nodes with no outgoing edges or conditional edges go to END
         all_sources = (
             {f for f, _ in definition.edges}
             | set(definition.conditional_edges)
+            | {src for src, _ in definition.send_edges}
         )
         for node_name in definition.nodes:
             if node_name not in all_sources:
