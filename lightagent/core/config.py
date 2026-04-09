@@ -602,6 +602,23 @@ class Settings(BaseSettings):
         description="Sender address for heartbeat email reports.",
     )
 
+    # ── Human-in-the-Loop (Phase 35) ──────────────────────────────────
+    hitl_enabled: bool = Field(
+        default=True,
+        description=(
+            "Global toggle for HITL approval gates. Set false in CI/CD to "
+            "bypass all interrupt() calls and route directly to on_approve."
+        ),
+    )
+    hitl_timeout_seconds: int = Field(
+        default=86400,
+        ge=0,
+        description=(
+            "Maximum seconds to wait before auto-rejecting a suspended "
+            "workflow (0 = no timeout). Used by housekeeping jobs."
+        ),
+    )
+
     # ── Map-Reduce Parallel Execution (Phase 34) ──────────────────────
     parallel_enabled: bool = Field(
         default=True,
