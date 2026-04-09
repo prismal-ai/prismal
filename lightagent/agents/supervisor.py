@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from lightagent.core.config import get_settings
 from lightagent.core.logging import get_logger
 from lightagent.memory.profile import ProfileManager
 from lightagent.monitoring.otel import OTelManager
@@ -56,6 +57,8 @@ MEMBERS: list[str] = [
     "ml_pipeline",
     # Phase 27: Financial Analysis pipeline (read-only)
     "financial_analyst",
+    # Phase 34: map-reduce parallel research dispatcher.
+    "parallel_researcher",
 ]
 
 _VALID_ROUTES: frozenset[str] = frozenset(MEMBERS) | {"END"}
@@ -298,6 +301,23 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
 
         next_agent: str | None = None if matched == "END" else matched
 
+        # Phase 34: heuristic upgrade — when the LLM picked ``researcher`` and
+        # the planner has already enqueued more than one independent task in
+        # ``pending_tasks``, switch to the parallel research dispatcher so the
+        # tasks fan out concurrently instead of running serially.
+        if (
+            next_agent == "researcher"
+            and len(state.get("pending_tasks", [])) > 1
+            and get_settings().parallel_enabled
+        ):
+            logger.info(
+                "supervisor_routing_upgraded_to_parallel",
+                pending_count=len(state.get("pending_tasks", [])),
+                session_id=session_id,
+            )
+            next_agent = "parallel_researcher"
+            matched = "parallel_researcher"
+
         span.set_attribute("lightagent.routing_decision", matched)
 
         logger.info(
@@ -382,6 +402,7 @@ _RouterLiteral = Literal[
     "dev_pipeline",  # Phase 24: dynamic subgraph
     "ml_pipeline",  # Phase 26: ML/DL pipeline
     "financial_analyst",  # Phase 27: Financial Analysis pipeline
+    "parallel_researcher",  # Phase 34: map-reduce parallel research
     "__end__",
 ]
 

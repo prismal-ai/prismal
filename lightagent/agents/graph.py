@@ -40,6 +40,12 @@ from lightagent.agents.critic import critic_node
 from lightagent.agents.cron_manager import cron_manager_node
 from lightagent.agents.data_analyst import data_analyst_node
 from lightagent.agents.file_manager import file_manager_node
+from lightagent.agents.parallel_research import (
+    parallel_researcher_node,
+    parallel_researcher_worker,
+    research_aggregator_node,
+    research_dispatcher,
+)
 from lightagent.agents.planner import planner_node
 from lightagent.agents.rag_agent import rag_agent_node
 from lightagent.agents.researcher import researcher_node
@@ -78,6 +84,24 @@ def _supervisor_router(state: AgentState) -> str:
         The next node name or ``"__end__"``.
     """
     return supervisor_router(state)
+
+
+def _research_dispatcher(state: AgentState) -> Any:  # noqa: ANN401 -- Send | str return
+    """Forward to the parallel research dispatcher with AgentState in scope.
+
+    Same pattern as :func:`_supervisor_router` — LangGraph calls
+    ``typing.get_type_hints()`` on the routing function and the underlying
+    dispatcher's annotation references ``AgentState`` via a forward
+    reference that only resolves in this module.
+
+    Args:
+        state: Current agent state.
+
+    Returns:
+        Either a list of ``Send`` objects (one per parallel worker) or the
+        ``on_empty`` node name as a string.
+    """
+    return research_dispatcher(state)
 
 
 # Default path for the SQLite checkpoint database
@@ -156,6 +180,15 @@ def build_supervisor_graph(
     builder.add_node("skill_manager", skill_manager_node)
     builder.add_node("cron_manager", cron_manager_node)
 
+    # Phase 34: parallel research fan-out / fan-in.
+    # ``parallel_researcher`` is a passthrough that anchors the conditional
+    # dispatcher edges; ``parallel_researcher_worker`` runs concurrently for
+    # each pending task; ``research_aggregator`` merges the results once all
+    # workers have finished.
+    builder.add_node("parallel_researcher", parallel_researcher_node)
+    builder.add_node("parallel_researcher_worker", parallel_researcher_worker)
+    builder.add_node("research_aggregator", research_aggregator_node)
+
     # Phase 24: dev_pipeline subgraph node (opt-in via enable_subgraphs setting).
     # The compiled subgraph must be built externally (async) and passed in.
     _include_dev_pipeline = (
@@ -192,6 +225,7 @@ def build_supervisor_graph(
         "file_manager": "file_manager",
         "skill_manager": "skill_manager",
         "cron_manager": "cron_manager",
+        "parallel_researcher": "parallel_researcher",
         "__end__": END,
     }
     if _include_dev_pipeline:
@@ -221,6 +255,22 @@ def build_supervisor_graph(
     )
     for member in base_members:
         builder.add_edge(member, "supervisor")
+
+    # Phase 34: parallel research wiring.
+    # ``parallel_researcher`` fans out via Send() to ``parallel_researcher_worker``;
+    # if there are no pending tasks the dispatcher routes straight to
+    # ``research_aggregator`` (its ``on_empty`` target).  Each worker invocation
+    # then converges back on ``research_aggregator``, which routes to supervisor.
+    builder.add_conditional_edges(
+        "parallel_researcher",
+        _research_dispatcher,
+        {
+            "parallel_researcher_worker": "parallel_researcher_worker",
+            "research_aggregator": "research_aggregator",
+        },
+    )
+    builder.add_edge("parallel_researcher_worker", "research_aggregator")
+    builder.add_edge("research_aggregator", "supervisor")
 
     if _include_dev_pipeline:
         builder.add_edge("dev_pipeline", "supervisor")
