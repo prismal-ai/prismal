@@ -18,6 +18,7 @@ Example::
 
 from __future__ import annotations
 
+import operator
 from datetime import UTC, datetime
 from typing import Annotated, Any, TypedDict
 
@@ -49,11 +50,25 @@ class AgentState(TypedDict):
         completed_tasks: Tasks that have been successfully finished.
         pending_tasks: Tasks that are queued but not yet started.
         retrieved_docs: Raw documents returned from the RAG pipeline, each
-            represented as a metadata + content dict.
+            represented as a metadata + content dict.  Uses an
+            ``operator.add`` reducer so multiple parallel nodes can append
+            results without overwriting each other (Phase 34).
         doc_grades: Relevance scores (0.0-1.0) for each retrieved document,
             aligned by index with ``retrieved_docs``.
-        tool_results: Serialised outputs from tool calls.
+        tool_results: Serialised outputs from tool calls.  Uses an
+            ``operator.add`` reducer for parallel fan-in (Phase 34).
         tool_errors: Serialised errors from failed tool calls.
+        parallel_results: Generic aggregation field for parallel worker nodes
+            (Phase 34).  Uses an ``operator.add`` reducer so each ``Send``
+            target can emit a partial result that is appended to the merged
+            list visible to downstream aggregator nodes.
+        dev_pipeline_modules: Optional list of module dicts populated by the
+            dev_pipeline ``developer_agent`` when it produces multi-module
+            code (Phase 34, T-313).  Consumed by the ``module_dispatcher``
+            inside the dev_pipeline subgraph to fan out unit testing across
+            modules in parallel.  An empty list means the developer produced
+            a single-module artifact and the sequential ``unit_tester`` path
+            is used instead.
         risk_score: Aggregate risk score (0.0-100.0) set by the Security
             Gateway; values >= ``settings.risk_threshold`` block execution.
         permissions_granted: Permission tokens approved for the current turn.
@@ -72,10 +87,12 @@ class AgentState(TypedDict):
     task_plan: list[str]
     completed_tasks: list[str]
     pending_tasks: list[str]
-    retrieved_docs: list[dict[str, Any]]
+    retrieved_docs: Annotated[list[dict[str, Any]], operator.add]
     doc_grades: list[float]
-    tool_results: list[dict[str, Any]]
+    tool_results: Annotated[list[dict[str, Any]], operator.add]
     tool_errors: list[dict[str, Any]]
+    parallel_results: Annotated[list[dict[str, Any]], operator.add]
+    dev_pipeline_modules: list[dict[str, Any]]
     risk_score: float
     permissions_granted: list[str]
     security_flags: list[str]
@@ -121,6 +138,8 @@ def create_initial_state(session_id: str) -> AgentState:
         doc_grades=[],
         tool_results=[],
         tool_errors=[],
+        parallel_results=[],
+        dev_pipeline_modules=[],
         risk_score=0.0,
         permissions_granted=[],
         security_flags=[],

@@ -35,11 +35,19 @@ from langgraph.graph import StateGraph
 if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph
 
+from lightagent.agents.codeact_agent import codeact_node
 from lightagent.agents.coder import coder_node
 from lightagent.agents.critic import critic_node
 from lightagent.agents.cron_manager import cron_manager_node
+from lightagent.agents.cua_agent import cua_node
 from lightagent.agents.data_analyst import data_analyst_node
 from lightagent.agents.file_manager import file_manager_node
+from lightagent.agents.parallel_research import (
+    parallel_researcher_node,
+    parallel_researcher_worker,
+    research_aggregator_node,
+    research_dispatcher,
+)
 from lightagent.agents.planner import planner_node
 from lightagent.agents.rag_agent import rag_agent_node
 from lightagent.agents.researcher import researcher_node
@@ -80,8 +88,111 @@ def _supervisor_router(state: AgentState) -> str:
     return supervisor_router(state)
 
 
+def _research_dispatcher(state: AgentState) -> Any:  # noqa: ANN401 -- Send | str return
+    """Forward to the parallel research dispatcher with AgentState in scope.
+
+    Same pattern as :func:`_supervisor_router` — LangGraph calls
+    ``typing.get_type_hints()`` on the routing function and the underlying
+    dispatcher's annotation references ``AgentState`` via a forward
+    reference that only resolves in this module.
+
+    Args:
+        state: Current agent state.
+
+    Returns:
+        Either a list of ``Send`` objects (one per parallel worker) or the
+        ``on_empty`` node name as a string.
+    """
+    return research_dispatcher(state)
+
+
 # Default path for the SQLite checkpoint database
 _DEFAULT_CHECKPOINT_PATH: Path = Path("data/db/checkpoints.db")
+
+# Keep a module-level reference to any async context managers opened by
+# ``build_checkpointer()`` so that the underlying connections remain alive
+# for the lifetime of the process. LangGraph's ``from_conn_string`` helpers
+# are async context managers; if we drop the CM the connection closes and
+# subsequent checkpoint operations would raise.
+_checkpointer_cms: list[Any] = []
+
+
+def _extract_sqlite_path(db_url: str) -> str:
+    """Extract the filesystem path from a SQLAlchemy-style sqlite URL.
+
+    Supports both ``sqlite:///path/to.db`` and
+    ``sqlite+aiosqlite:///path/to.db``. Returns ``":memory:"`` for an empty
+    path or when the URL is not a sqlite URL.
+
+    Args:
+        db_url: The DB URL to parse.
+
+    Returns:
+        The extracted filesystem path or ``":memory:"``.
+    """
+    for prefix in ("sqlite+aiosqlite:///", "sqlite:///"):
+        if db_url.startswith(prefix):
+            path = db_url.removeprefix(prefix)
+            return path or ":memory:"
+    return ":memory:"
+
+
+async def build_checkpointer(db_url: str | None = None) -> Any:  # noqa: ANN401 — no common base type
+    """Build an async checkpointer based on the configured DB URL.
+
+    Selects between ``AsyncPostgresSaver`` (for ``postgresql://``-prefixed
+    URLs) and ``AsyncSqliteSaver`` (for ``sqlite:///``-prefixed URLs, or as
+    an in-memory fallback). The returned checkpointer has already had
+    ``setup()`` invoked so LangGraph's checkpoint tables are guaranteed to
+    exist before the first write.
+
+    Args:
+        db_url: Optional explicit DB URL. When ``None``, the value from
+            ``get_settings().db_url`` is used.
+
+    Returns:
+        A fully-initialized async checkpointer ready to pass to
+        ``StateGraph.compile(checkpointer=...)``.
+
+    Raises:
+        ImportError: If ``db_url`` selects the PostgreSQL backend but
+            ``langgraph-checkpoint-postgres`` is not installed.
+    """
+    url = db_url if db_url is not None else (get_settings().db_url or "")
+
+    if url.startswith(("postgresql://", "postgresql+asyncpg://", "postgres://")):
+        try:
+            from langgraph.checkpoint.postgres.aio import (  # type: ignore[import-not-found]
+                AsyncPostgresSaver,
+            )
+        except ImportError as e:  # pragma: no cover — exercised via mocked tests
+            raise ImportError(
+                "PostgreSQL checkpointer backend requires the optional "
+                "'langgraph-checkpoint-postgres' package. Install it with "
+                "`uv pip install langgraph-checkpoint-postgres`."
+            ) from e
+
+        # AsyncPostgresSaver accepts plain ``postgresql://`` URIs (psycopg).
+        normalized = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        cm = AsyncPostgresSaver.from_conn_string(normalized)
+        saver = await cm.__aenter__()
+        await saver.setup()
+        _checkpointer_cms.append(cm)
+        logger.info("checkpointer_built", backend="postgresql")
+        return saver
+
+    # SQLite branch (also the fallback for empty/unknown URLs).
+    import aiosqlite
+
+    sqlite_path = _extract_sqlite_path(url)
+    if sqlite_path != ":memory:":
+        Path(sqlite_path).parent.mkdir(parents=True, exist_ok=True)
+
+    conn = await aiosqlite.connect(sqlite_path)
+    saver = AsyncSqliteSaver(conn)
+    await saver.setup()
+    logger.info("checkpointer_built", backend="sqlite", path=sqlite_path)
+    return saver
 
 
 def build_supervisor_graph(
@@ -148,6 +259,19 @@ def build_supervisor_graph(
     builder.add_node("supervisor", supervisor_node)
     builder.add_node("researcher", researcher_node)
     builder.add_node("coder", coder_node)
+    # Phase 38: CodeAct agent — direct Python code generation with
+    # auto-correction. Runs alongside the classic ``coder`` node; the
+    # supervisor picks between them based on task complexity.
+    builder.add_node("codeact", codeact_node)
+    # Phase 41: Computer Use Agent — VLM + Playwright for UI
+    # automation with HITL on HIGH_RISK actions. Registered
+    # conditionally on ``cua_enabled`` to avoid loading the node
+    # when the feature is off; the supervisor downgrades to
+    # ``researcher`` at routing time so the flat graph keeps
+    # working either way.
+    _include_cua = get_settings().cua_enabled
+    if _include_cua:
+        builder.add_node("cua", cua_node)
     builder.add_node("rag_agent", rag_agent_node)
     builder.add_node("planner", planner_node)
     builder.add_node("critic", critic_node)
@@ -155,6 +279,15 @@ def build_supervisor_graph(
     builder.add_node("file_manager", file_manager_node)
     builder.add_node("skill_manager", skill_manager_node)
     builder.add_node("cron_manager", cron_manager_node)
+
+    # Phase 34: parallel research fan-out / fan-in.
+    # ``parallel_researcher`` is a passthrough that anchors the conditional
+    # dispatcher edges; ``parallel_researcher_worker`` runs concurrently for
+    # each pending task; ``research_aggregator`` merges the results once all
+    # workers have finished.
+    builder.add_node("parallel_researcher", parallel_researcher_node)
+    builder.add_node("parallel_researcher_worker", parallel_researcher_worker)
+    builder.add_node("research_aggregator", research_aggregator_node)
 
     # Phase 24: dev_pipeline subgraph node (opt-in via enable_subgraphs setting).
     # The compiled subgraph must be built externally (async) and passed in.
@@ -185,13 +318,16 @@ def build_supervisor_graph(
     conditional_edges: dict[str, str | object] = {
         "researcher": "researcher",
         "coder": "coder",
+        "codeact": "codeact",
         "rag_agent": "rag_agent",
+        **({"cua": "cua"} if _include_cua else {}),
         "planner": "planner",
         "critic": "critic",
         "data_analyst": "data_analyst",
         "file_manager": "file_manager",
         "skill_manager": "skill_manager",
         "cron_manager": "cron_manager",
+        "parallel_researcher": "parallel_researcher",
         "__end__": END,
     }
     if _include_dev_pipeline:
@@ -211,6 +347,8 @@ def build_supervisor_graph(
     base_members = (
         "researcher",
         "coder",
+        "codeact",
+        *(("cua",) if _include_cua else ()),
         "rag_agent",
         "planner",
         "critic",
@@ -221,6 +359,22 @@ def build_supervisor_graph(
     )
     for member in base_members:
         builder.add_edge(member, "supervisor")
+
+    # Phase 34: parallel research wiring.
+    # ``parallel_researcher`` fans out via Send() to ``parallel_researcher_worker``;
+    # if there are no pending tasks the dispatcher routes straight to
+    # ``research_aggregator`` (its ``on_empty`` target).  Each worker invocation
+    # then converges back on ``research_aggregator``, which routes to supervisor.
+    builder.add_conditional_edges(
+        "parallel_researcher",
+        _research_dispatcher,
+        {
+            "parallel_researcher_worker": "parallel_researcher_worker",
+            "research_aggregator": "research_aggregator",
+        },
+    )
+    builder.add_edge("parallel_researcher_worker", "research_aggregator")
+    builder.add_edge("research_aggregator", "supervisor")
 
     if _include_dev_pipeline:
         builder.add_edge("dev_pipeline", "supervisor")
@@ -287,13 +441,20 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     if _async_graph is not None:
         return _async_graph
 
-    import aiosqlite
+    # Phase 40 / SPEC-042 AC-042-4: flat mode is the default; hierarchical
+    # mode is opt-in via ``LIGHTAGENT_HIERARCHICAL_MODE=true``. The two
+    # topologies share the same checkpointer backend and caching
+    # mechanism so callers never need to care which one is active.
+    if get_settings().hierarchical_mode:
+        _async_graph = await _build_hierarchical_graph()
+        return _async_graph
 
-    db_path = _DEFAULT_CHECKPOINT_PATH
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = await aiosqlite.connect(str(db_path))
-    checkpointer = AsyncSqliteSaver(conn)
-    await checkpointer.setup()
+    # Phase 36: the checkpointer backend is now selected from
+    # ``settings.db_url`` via ``build_checkpointer()``. For the default
+    # SQLite configuration this behaves identically to the previous
+    # hardcoded path; for ``postgresql://`` URLs it returns an
+    # ``AsyncPostgresSaver`` with its tables already created.
+    checkpointer = await build_checkpointer(get_settings().db_url)
 
     # Phase 24: build dev_pipeline subgraph asynchronously when enabled.
     dev_pipeline_graph: Any = None  # ANN401: no common base type for compiled subgraphs
@@ -327,6 +488,116 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     return _async_graph
 
 
+# ---------------------------------------------------------------------------
+# Hierarchical graph construction (Phase 40 / SPEC-042 AC-042-2)
+# ---------------------------------------------------------------------------
+
+
+def _hierarchical_router(state: AgentState) -> str:
+    """Conditional-edge router for the hierarchical root supervisor.
+
+    Reads ``state["next_agent"]`` (written by
+    :func:`hierarchical_supervisor_node`) and dispatches to a domain
+    orchestrator, to ``cron_manager``, or to ``__end__``. Keeps the
+    dispatch surface tiny — the root supervisor is only ever allowed
+    to pick between 4 targets plus END.
+    """
+    next_agent = state.get("next_agent")
+    if next_agent is None or next_agent == "END":
+        return "__end__"
+    return str(next_agent)
+
+
+async def _build_hierarchical_graph() -> (
+    CompiledStateGraph[AgentState, Any, Any, Any]
+):
+    """Build the 3-level hierarchical graph (SPEC-042 AC-042-2).
+
+    Topology::
+
+        hierarchical_supervisor ──┬──► research_orchestrator  ──┐
+                                  ├──► engineering_orchestrator ─┤
+                                  ├──► analysis_orchestrator   ──┼──► supervisor
+                                  ├──► cron_manager            ──┘
+                                  └──► __end__
+
+    Each domain orchestrator is itself a compiled ``CompiledStateGraph``
+    produced by the builders in ``subgraphs/{research,engineering,
+    analysis}_orchestrator/``. The root supervisor never sees the leaf
+    agents directly — its routing LLM prompt only lists 4 targets,
+    which keeps prompt accuracy predictable as more agents are added.
+
+    The analysis orchestrator internally wraps the existing pipeline
+    subgraphs (``dev_pipeline``, ``ml_pipeline``, ``financial_analyst``)
+    so callers do not need to pass them explicitly — the orchestrator
+    builder awaits its own ``get_compiled_*`` helpers.
+
+    Returns:
+        A compiled hierarchical graph backed by the same checkpointer
+        build pipeline (``build_checkpointer(settings.db_url)``) the
+        flat mode uses.
+    """
+    from lightagent.agents.subgraphs.analysis_orchestrator.builder import (
+        get_compiled_analysis_orchestrator,
+    )
+    from lightagent.agents.subgraphs.engineering_orchestrator.builder import (
+        get_compiled_engineering_orchestrator,
+    )
+    from lightagent.agents.subgraphs.research_orchestrator.builder import (
+        get_compiled_research_orchestrator,
+    )
+    from lightagent.agents.supervisor import hierarchical_supervisor_node
+
+    logger.info("building_hierarchical_graph")
+
+    checkpointer = await build_checkpointer(get_settings().db_url)
+
+    research = await get_compiled_research_orchestrator()
+    engineering = await get_compiled_engineering_orchestrator()
+    analysis = await get_compiled_analysis_orchestrator()
+
+    builder: StateGraph[AgentState, Any, Any, Any] = StateGraph(AgentState)
+
+    # Root supervisor + 4 routing targets (3 orchestrators + cron).
+    builder.add_node("supervisor", hierarchical_supervisor_node)
+    builder.add_node("research_orchestrator", research)
+    builder.add_node("engineering_orchestrator", engineering)
+    builder.add_node("analysis_orchestrator", analysis)
+    builder.add_node("cron_manager", cron_manager_node)
+
+    builder.set_entry_point("supervisor")
+
+    hierarchical_conditional_edges: dict[str, str | object] = {
+        "research_orchestrator": "research_orchestrator",
+        "engineering_orchestrator": "engineering_orchestrator",
+        "analysis_orchestrator": "analysis_orchestrator",
+        "cron_manager": "cron_manager",
+        "__end__": END,
+    }
+    builder.add_conditional_edges(
+        "supervisor",
+        _hierarchical_router,
+        hierarchical_conditional_edges,  # type: ignore[arg-type]
+    )
+
+    # Return edges — every routing target loops back to the root
+    # supervisor so its loop-breaker can terminate the turn after one
+    # specialist response.
+    for target in (
+        "research_orchestrator",
+        "engineering_orchestrator",
+        "analysis_orchestrator",
+        "cron_manager",
+    ):
+        builder.add_edge(target, "supervisor")
+
+    compiled: CompiledStateGraph[AgentState, Any, Any, Any] = builder.compile(
+        checkpointer=checkpointer
+    )
+    logger.info("hierarchical_graph_compiled")
+    return compiled
+
+
 def list_session_ids() -> list[str]:
     """
     Return all distinct thread IDs from the LangGraph SQLite checkpointer.
@@ -351,6 +622,9 @@ def list_session_ids() -> list[str]:
 
 
 __all__ = [
+    "_build_hierarchical_graph",
+    "_hierarchical_router",
+    "build_checkpointer",
     "build_supervisor_graph",
     "get_async_compiled_graph",
     "get_compiled_graph",

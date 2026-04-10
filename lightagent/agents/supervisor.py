@@ -22,11 +22,18 @@ Example::
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import TYPE_CHECKING, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from lightagent.core.config import get_settings
 from lightagent.core.logging import get_logger
+from lightagent.memory.long_term_store import (
+    LongTermMemoryStore,
+    preferences_namespace,
+)
 from lightagent.memory.profile import ProfileManager
 from lightagent.monitoring.otel import OTelManager
 from lightagent.providers.registry import ProviderRegistry
@@ -43,6 +50,8 @@ logger = get_logger("lightagent.agents.supervisor")
 MEMBERS: list[str] = [
     "researcher",
     "coder",
+    "codeact",
+    "cua",
     "rag_agent",
     "planner",
     "critic",
@@ -56,6 +65,8 @@ MEMBERS: list[str] = [
     "ml_pipeline",
     # Phase 27: Financial Analysis pipeline (read-only)
     "financial_analyst",
+    # Phase 34: map-reduce parallel research dispatcher.
+    "parallel_researcher",
 ]
 
 _VALID_ROUTES: frozenset[str] = frozenset(MEMBERS) | {"END"}
@@ -79,7 +90,31 @@ Your role is to:
 
 Available agents:
 - researcher: Web search, RAG queries, reading files
-- coder: Writing and executing code, reading/writing code files
+- coder: Writing and executing code, reading/writing code files.
+  Route here for SIMPLE, narrow code tasks: "fix this line", "explain this
+  function", "add a docstring", "rename a variable", "write a small helper",
+  code review, quick snippets without a full iteration loop.
+- codeact: Executes Python code DIRECTLY in an isolated sandbox with an
+  auto-correction loop (generate → run → read stderr → fix). Uses ~30%
+  fewer tokens than 'coder' on multi-step coding tasks.
+  Route here for COMPLEX multi-step coding: "refactor this module",
+  "implement full X", "write and test Y", "complete implementation",
+  "build a script that does A, B and C", anything that benefits from
+  iterative self-correction against real sandbox output.
+  Prefer 'coder' when the task is a single surgical edit or a pure
+  explanation; prefer 'codeact' when the task requires running code,
+  handling errors, and iterating.
+- cua: Computer Use Agent — drives a real browser via Playwright using a
+  vision-capable LLM to perceive screenshots and execute UI actions
+  (click, type, scroll, navigate). High-risk actions (submit, pay,
+  delete, send) trigger a mandatory human approval gate.
+  Route here when the task explicitly involves INTERACTIVE UI AUTOMATION
+  that cannot be done via API or the text-based researcher tools:
+  "click on the button", "fill out this form and submit", "navigate to
+  X and do Y in the interface", "automate the UI", "RPA", "drive the
+  web app", "interact with the canvas", "select from the dropdown".
+  DO NOT route here for simple web scraping (use researcher instead).
+  DO NOT route here when a direct API call is available.
 - rag_agent: Internal document knowledge base Q&A
 - planner: Decompose complex multi-step tasks AND create software specifications
   using Spec-Driven Design (SDD). Route here when the user asks to:
@@ -191,6 +226,163 @@ Routing rules:
 Respond with ONLY the agent name (e.g. "researcher" or "END"). No explanation."""
 
 # ---------------------------------------------------------------------------
+# Long-term memory helpers (SPEC-039 AC-039-3 / AC-039-4)
+# ---------------------------------------------------------------------------
+
+# Module-level store so recall + extraction share the same backend
+# instance across supervisor invocations in a given process. In tests
+# this can be replaced by monkey-patching ``_memory_store_singleton`` or
+# by patching :func:`_get_memory_store`.
+_memory_store_singleton: LongTermMemoryStore | None = None
+
+# Keep strong references to in-flight extraction tasks so they are not
+# garbage-collected mid-run (ruff RUF006).
+_memory_extraction_tasks: set[asyncio.Task[None]] = set()
+
+_MEMORY_EXTRACTION_PROMPT: str = (
+    "You are extracting durable user preferences for long-term memory. "
+    "Review the conversation and emit up to 5 SHORT facts or preferences "
+    "that will still be useful in FUTURE sessions (language, tone, "
+    "recurring goals, domain interests). Exclude greetings, ephemeral "
+    "chat, and details specific to the current task. Respond with one "
+    "fact per line — no numbering, no explanations. If there are no "
+    "durable facts, respond with an empty message."
+)
+
+
+def _get_memory_store() -> LongTermMemoryStore:
+    """Return the process-wide long-term memory store singleton."""
+    global _memory_store_singleton
+    if _memory_store_singleton is None:
+        _memory_store_singleton = LongTermMemoryStore()
+    return _memory_store_singleton
+
+
+def _derive_user_id(state: AgentState) -> str:
+    """Extract a stable user identifier from ``state["session_id"]``.
+
+    LightAgent session IDs follow the shape ``{user}-{timestamp}``; this
+    helper returns the leading segment so long-term memory is keyed per
+    user rather than per session. Falls back to ``"unknown"`` when no
+    session ID is present.
+    """
+    session_id = str(state.get("session_id", "") or "")
+    head = session_id.split("-", 1)[0]
+    return head or "unknown"
+
+
+async def _recall_memory_context(state: AgentState) -> str:
+    """Recall user preferences and format them as a system-prompt suffix.
+
+    Returns an empty string (not an exception) when recall is disabled,
+    when the store is unavailable, or when no facts are stored yet — the
+    supervisor continues without memory context per SPEC-039 AC-039-4.
+
+    The query used for semantic ranking is the most recent human message
+    in the conversation, or an empty query when no such message exists.
+    """
+    settings = get_settings()
+    if settings.memory_recall_limit <= 0:
+        return ""
+
+    query = ""
+    for msg in reversed(state.get("messages", [])):
+        if getattr(msg, "type", "") == "human":
+            query = str(getattr(msg, "content", ""))
+            break
+
+    try:
+        store = _get_memory_store()
+        facts = await store.recall_facts(
+            preferences_namespace(_derive_user_id(state)),
+            query=query,
+            limit=settings.memory_recall_limit,
+        )
+    except Exception as exc:
+        # Defensive: LongTermMemoryStore already swallows errors in
+        # recall_facts, but the factory itself may raise if a misconfig
+        # prevents instantiation. Graceful degradation always wins.
+        logger.debug("memory_recall_skipped", error=str(exc))
+        return ""
+
+    if not facts:
+        return ""
+
+    bullets = "\n".join(
+        f"- {fact['value']}" for fact in facts if fact.get("value")
+    )
+    if not bullets:
+        return ""
+    return (
+        "\n\n## Known User Preferences (from prior sessions)\n"
+        f"{bullets}\n"
+        "Use these preferences to tailor your routing decision when "
+        "relevant, but do not mention them unless the user asks."
+    )
+
+
+async def _extract_and_store_memory(state: AgentState) -> None:
+    """Extract up to 5 durable facts from the session and persist them.
+
+    Called as a fire-and-forget task at session end (supervisor routes
+    to END). All exceptions are caught and logged at WARNING level so a
+    memory-extraction failure never impacts the user-facing response.
+    The underlying :meth:`LongTermMemoryStore.store_fact` enforces PII
+    sanitization — this function intentionally does NOT log the raw fact
+    values anywhere.
+    """
+    try:
+        settings = get_settings()
+        if not settings.memory_extraction_enabled:
+            return
+
+        messages = state.get("messages", [])
+        if not messages:
+            return
+
+        # Only look at the tail of the conversation: older context is
+        # already covered by prior extraction runs.
+        recent = messages[-10:]
+
+        llm = ProviderRegistry().get_llm_with_fallback()
+        response = await llm.ainvoke(
+            [SystemMessage(content=_MEMORY_EXTRACTION_PROMPT), *recent]
+        )
+
+        raw = str(getattr(response, "content", "")).strip()
+        if not raw:
+            return
+
+        candidate_lines = [
+            line.lstrip("-*0123456789. ").strip()
+            for line in raw.splitlines()
+        ]
+        facts = [line for line in candidate_lines if line][:5]
+        if not facts:
+            return
+
+        user_id = _derive_user_id(state)
+        namespace = preferences_namespace(user_id)
+        store = _get_memory_store()
+        ts_ms = int(time.time() * 1000)
+        for idx, fact in enumerate(facts):
+            await store.store_fact(
+                user_id=user_id,
+                namespace=namespace,
+                key=f"fact_{ts_ms}_{idx}",
+                value=fact,
+                ttl_days=settings.memory_default_ttl_days,
+            )
+        logger.info(
+            "memory_extraction_completed",
+            user_id=user_id,
+            fact_count=len(facts),
+        )
+    except Exception as exc:
+        logger.warning("memory_extraction_failed", error=str(exc))
+
+
+# ---------------------------------------------------------------------------
 # Supervisor node
 # ---------------------------------------------------------------------------
 
@@ -263,8 +455,13 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
                     "messages": [],
                 }
 
+        # SPEC-039 AC-039-4: recall up to ``memory_recall_limit`` durable
+        # preferences for the current user and append them to the system
+        # prompt. Degrades gracefully to an empty suffix on any failure.
+        memory_context = await _recall_memory_context(state)
+
         routing_messages = [
-            SystemMessage(content=_SYSTEM_PROMPT),
+            SystemMessage(content=_SYSTEM_PROMPT + memory_context),
             *trimmed,
             HumanMessage(
                 content=(
@@ -297,6 +494,48 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
             matched = "END"
 
         next_agent: str | None = None if matched == "END" else matched
+
+        # Phase 38: respect the CodeAct feature flag — if the LLM picked
+        # ``codeact`` while the toggle is off, downgrade to the classic
+        # ``coder`` agent so the user still gets a response.
+        if next_agent == "codeact" and not get_settings().codeact_enabled:
+            logger.info(
+                "supervisor_codeact_downgrade_to_coder",
+                session_id=session_id,
+            )
+            next_agent = "coder"
+            matched = "coder"
+
+        # Phase 41: respect the CUA feature flag — if the LLM picked
+        # ``cua`` while the toggle is off, downgrade to the
+        # ``researcher`` agent which is the closest text-based
+        # fallback. The CUA node itself also returns a graceful
+        # disabled message, but downgrading at the routing layer
+        # avoids an extra round-trip through the graph.
+        if next_agent == "cua" and not get_settings().cua_enabled:
+            logger.info(
+                "supervisor_cua_downgrade_to_researcher",
+                session_id=session_id,
+            )
+            next_agent = "researcher"
+            matched = "researcher"
+
+        # Phase 34: heuristic upgrade — when the LLM picked ``researcher`` and
+        # the planner has already enqueued more than one independent task in
+        # ``pending_tasks``, switch to the parallel research dispatcher so the
+        # tasks fan out concurrently instead of running serially.
+        if (
+            next_agent == "researcher"
+            and len(state.get("pending_tasks", [])) > 1
+            and get_settings().parallel_enabled
+        ):
+            logger.info(
+                "supervisor_routing_upgraded_to_parallel",
+                pending_count=len(state.get("pending_tasks", [])),
+                session_id=session_id,
+            )
+            next_agent = "parallel_researcher"
+            matched = "parallel_researcher"
 
         span.set_attribute("lightagent.routing_decision", matched)
 
@@ -357,6 +596,231 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
 
                 response_messages = [AIMessage(content=answer_content)]
 
+        # SPEC-039 AC-039-3: when the session is ending (next_agent is
+        # None) fire memory extraction as a background task so the user
+        # response is returned immediately. ``create_task`` swallows its
+        # own exceptions via ``_extract_and_store_memory`` which wraps
+        # the entire body in try/except.
+        if next_agent is None and get_settings().memory_extraction_enabled:
+            try:
+                task = asyncio.create_task(_extract_and_store_memory(state))
+                _memory_extraction_tasks.add(task)
+                task.add_done_callback(_memory_extraction_tasks.discard)
+            except RuntimeError as exc:
+                # No running loop (unlikely inside an async node) —
+                # best-effort skip so the graph still returns cleanly.
+                logger.debug("memory_extraction_task_skipped", error=str(exc))
+
+        return {
+            "current_agent": "supervisor",
+            "next_agent": next_agent,
+            "messages": response_messages,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Hierarchical root supervisor (Phase 40 / SPEC-042 AC-042-2)
+# ---------------------------------------------------------------------------
+
+#: Valid routing targets when ``LIGHTAGENT_HIERARCHICAL_MODE=true``. The
+#: root supervisor only sees 3 domain orchestrators plus cron_manager,
+#: keeping the routing LLM prompt focused on ~4 targets instead of 12+.
+HIERARCHICAL_MEMBERS: list[str] = [
+    "research_orchestrator",
+    "engineering_orchestrator",
+    "analysis_orchestrator",
+    "cron_manager",
+]
+
+_HIERARCHICAL_VALID_ROUTES: frozenset[str] = frozenset(HIERARCHICAL_MEMBERS) | {
+    "END"
+}
+
+_HIERARCHICAL_SYSTEM_PROMPT: str = """\
+You are the ROOT orchestrator of a 3-level multi-agent system.
+
+Your only job is to decide which **domain orchestrator** should handle the
+user's request. You never call leaf agents directly — each domain has its
+own sub-orchestrator that picks the right specialist within its scope.
+
+## Available routing targets (ONLY these)
+
+- research_orchestrator: Investigation, web search, internal knowledge-base
+  (RAG) queries, document lookup, literature surveys, factual research.
+  Keywords: "investigate", "search", "look up", "find information about",
+  "what does the documentation say", "research", "summarise the paper".
+
+- engineering_orchestrator: Writing, modifying, planning or executing code
+  and files. Implementation, refactoring, debugging, PRDs and technical
+  specs, file operations, skill management.
+  Keywords: "code", "implement", "write a function", "refactor", "build
+  a script", "plan the architecture", "create the file", "install skill".
+
+- analysis_orchestrator: Producing structured analytical output. SQL /
+  DataFrame queries and charts, ML training and evaluation, full software
+  development pipelines, financial analysis of stocks / crypto / forex.
+  Keywords: "analyze", "SQL", "chart", "train a model", "AutoML",
+  "technical analysis", "P/E ratio", "dev pipeline".
+
+- cron_manager: Scheduling recurring tasks — add / list / pause / resume /
+  remove cron jobs. Time-based triggers ("every day", "cada hora",
+  "programar", "schedule", "reminder").
+
+## Routing rules
+
+1. Respond with ONLY the target name or the literal 'END'. No prose, no
+   explanation, no punctuation.
+2. Route to 'END' for greetings ("hola", "hello", "hi", "buenos días",
+   etc.) and all small-talk — answer them directly from the conversation
+   history.
+3. Route to 'END' for simple factual questions you can answer directly.
+4. CRITICAL loop-breaker: if the most recent message in the history is
+   already an AIMessage from a specialist (any domain orchestrator or
+   cron_manager), route to 'END' IMMEDIATELY. One specialist response
+   per turn.
+5. If the user request spans multiple domains, pick the domain that owns
+   the *primary* action — the other domains can be invoked on a follow-up
+   turn.
+
+Respond with ONLY the target name or 'END'. Nothing else."""
+
+
+async def hierarchical_supervisor_node(
+    state: AgentState,
+) -> dict[str, object]:
+    """Root supervisor for hierarchical mode (Phase 40).
+
+    A trimmed version of :func:`supervisor_node` scoped to 4 routing
+    targets — the 3 domain orchestrators plus ``cron_manager``. Reuses
+    the exact same machinery as the flat supervisor (history trimming,
+    loop breaker, case-insensitive routing match, graceful fallback
+    to END on invalid responses, direct-answer path when END is
+    reached with a HumanMessage at the tail) but with a smaller valid
+    routes set and a domain-level system prompt.
+
+    Returns:
+        Partial state dict with ``current_agent="supervisor"``,
+        ``next_agent`` set to one of :data:`HIERARCHICAL_MEMBERS` /
+        ``None``, and ``messages`` containing the direct answer when
+        routing to END from a human turn.
+    """
+    session_id: str = str(state.get("session_id", "unknown"))
+    logger.debug(
+        "hierarchical_supervisor_invoked",
+        session_id=session_id,
+        message_count=len(state["messages"]),
+    )
+
+    otel = OTelManager()
+    with otel.start_span(
+        "agent.hierarchical_supervisor",
+        attributes={
+            "lightagent.agent": "hierarchical_supervisor",
+            "lightagent.session_id": session_id,
+            "lightagent.mode": "hierarchical",
+        },
+    ) as span:
+        llm = ProviderRegistry().get_llm_with_fallback()
+        trimmed = state["messages"][-_HISTORY_WINDOW:]
+
+        # Loop breaker: an AIMessage from any non-supervisor node is a
+        # terminal response. Same semantics as ``supervisor_node``.
+        if trimmed:
+            last_msg = trimmed[-1]
+            last_is_ai = getattr(last_msg, "type", "") == "ai"
+            last_agent = state.get("current_agent", "")
+            if last_is_ai and last_agent != "supervisor":
+                logger.debug(
+                    "hierarchical_supervisor_loop_break",
+                    last_agent=last_agent,
+                    session_id=session_id,
+                )
+                span.set_attribute("lightagent.routing_decision", "END")
+                return {
+                    "current_agent": "supervisor",
+                    "next_agent": None,
+                    "messages": [],
+                }
+
+        # Optional memory recall — the hierarchical root benefits from
+        # the same cross-session preferences as the flat supervisor.
+        memory_context = await _recall_memory_context(state)
+
+        routing_messages = [
+            SystemMessage(
+                content=_HIERARCHICAL_SYSTEM_PROMPT + memory_context
+            ),
+            *trimmed,
+            HumanMessage(
+                content=(
+                    "Based on the conversation above, which domain "
+                    "orchestrator should handle the next step? "
+                    "Respond with ONLY the target name or 'END'."
+                )
+            ),
+        ]
+
+        response = await llm.ainvoke(routing_messages)
+        raw: str = str(response.content).strip()
+        normalised = raw.strip("\"' \t\n").upper()
+
+        matched: str | None = None
+        for valid in _HIERARCHICAL_VALID_ROUTES:
+            if valid.upper() == normalised:
+                matched = valid
+                break
+
+        if matched is None:
+            logger.warning(
+                "hierarchical_supervisor_invalid_routing",
+                raw_response=raw,
+                defaulting_to="END",
+                session_id=session_id,
+            )
+            matched = "END"
+
+        next_agent: str | None = None if matched == "END" else matched
+        span.set_attribute("lightagent.routing_decision", matched)
+
+        logger.info(
+            "hierarchical_supervisor_routing_decision",
+            next_agent=next_agent,
+            raw_response=raw,
+            session_id=session_id,
+        )
+
+        # Direct-answer path when routing to END with a human tail —
+        # mirrors the flat supervisor's behaviour so small talk still
+        # works without involving a domain orchestrator.
+        response_messages: list[AIMessage] = []
+        if next_agent is None and state.get("messages"):
+            last = state["messages"][-1]
+            if getattr(last, "type", "") == "human":
+                profile = ProfileManager()
+                answer_system = (
+                    profile.load_system_prompt() or _ANSWER_SYSTEM_PROMPT
+                )
+                answer_resp = await llm.ainvoke(
+                    [SystemMessage(content=answer_system), *trimmed]
+                )
+                response_messages = [
+                    AIMessage(content=str(answer_resp.content))
+                ]
+
+        # Fire memory extraction on session end (same as flat).
+        if next_agent is None and get_settings().memory_extraction_enabled:
+            try:
+                task = asyncio.create_task(
+                    _extract_and_store_memory(state)
+                )
+                _memory_extraction_tasks.add(task)
+                task.add_done_callback(_memory_extraction_tasks.discard)
+            except RuntimeError as exc:
+                logger.debug(
+                    "hierarchical_memory_extraction_task_skipped",
+                    error=str(exc),
+                )
+
         return {
             "current_agent": "supervisor",
             "next_agent": next_agent,
@@ -372,6 +836,13 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
 _RouterLiteral = Literal[
     "researcher",
     "coder",
+    "codeact",
+    # Phase 41 / SPEC-043 — Computer Use Agent (VLM + Playwright).
+    "cua",
+    # Phase 40 / SPEC-042 — hierarchical domain orchestrators.
+    "research_orchestrator",
+    "engineering_orchestrator",
+    "analysis_orchestrator",
     "rag_agent",
     "planner",
     "critic",
@@ -382,6 +853,7 @@ _RouterLiteral = Literal[
     "dev_pipeline",  # Phase 24: dynamic subgraph
     "ml_pipeline",  # Phase 26: ML/DL pipeline
     "financial_analyst",  # Phase 27: Financial Analysis pipeline
+    "parallel_researcher",  # Phase 34: map-reduce parallel research
     "__end__",
 ]
 
@@ -409,4 +881,10 @@ def supervisor_router(state: AgentState) -> _RouterLiteral:
     return next_agent  # type: ignore[return-value]
 
 
-__all__ = ["MEMBERS", "supervisor_node", "supervisor_router"]
+__all__ = [
+    "HIERARCHICAL_MEMBERS",
+    "MEMBERS",
+    "hierarchical_supervisor_node",
+    "supervisor_node",
+    "supervisor_router",
+]

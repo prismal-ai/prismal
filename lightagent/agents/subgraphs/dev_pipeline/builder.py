@@ -21,6 +21,12 @@ from lightagent.agents.subgraphs.dev_pipeline.architect_agent import (
 from lightagent.agents.subgraphs.dev_pipeline.developer_agent import (
     developer_agent_node,
 )
+from lightagent.agents.subgraphs.dev_pipeline.parallel_unit_test import (
+    dev_test_aggregator_node,
+    dev_unit_tester_node,
+    module_dispatcher,
+    module_router_node,
+)
 from lightagent.agents.subgraphs.dev_pipeline.po_agent import po_agent_node
 from lightagent.agents.subgraphs.dev_pipeline.qa_agent import qa_agent_node
 from lightagent.agents.subgraphs.dev_pipeline.reviewer_agent import (
@@ -30,8 +36,15 @@ from lightagent.agents.subgraphs.dev_pipeline.unit_test_agent import (
     unit_test_agent_node,
 )
 from lightagent.agents.subgraphs.factory import SubgraphFactory
-from lightagent.agents.subgraphs.gates import failure_gate, score_gate
+from lightagent.agents.subgraphs.gates import (
+    failure_gate,
+    hitl_gate,
+    human_approval_node,
+    score_gate,
+    seed_hitl_metadata,
+)
 from lightagent.agents.subgraphs.registry import SubgraphDefinition, SubgraphRegistry
+from lightagent.core.config import get_settings
 
 logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.builder")
 
@@ -41,13 +54,34 @@ _DESCRIPTION = (
     "PO -> Architect -> Developer -> UnitTest -> QA -> Reviewer"
 )
 
-# Approval gate: reviewer score >= 0.8 -> END, else back to developer
+# Approval gate: reviewer score >= 0.8 -> human approval seed, else back to developer.
+# Phase 35 (T-316): the score gate now hands off to a HITL approval flow
+# (seed → human_approval → hitl_gate) instead of routing directly to END.
 _REVIEWER_GATE = score_gate(
     field="dev_pipeline.review_result.score",
     threshold=0.8,
-    on_pass="__end__",  # noqa: S106
+    on_pass="approval_seed",  # noqa: S106
     on_fail="developer",
     max_iterations=3,
+)
+
+# Phase 35: HITL routing after the human decision.
+# - approve  → END (the dev_pipeline subgraph completes)
+# - reject / request_changes → back to developer for another iteration
+# Bypass entirely when ``settings.hitl_enabled`` is false (CI/CD bypass).
+_HITL_GATE = hitl_gate(
+    artifact_field="dev_pipeline.code_artifact",
+    on_approve="__end__",
+    on_reject="developer",
+    risk_level="HIGH",
+    bypass_condition=lambda _s: not get_settings().hitl_enabled,
+)
+
+# Phase 35: seed node that writes the artifact field + risk level into
+# metadata so ``human_approval_node`` can build its interrupt payload.
+_APPROVAL_SEED = seed_hitl_metadata(
+    artifact_field="dev_pipeline.code_artifact",
+    risk_level="HIGH",
 )
 
 # Approval gate: failing tests -> back to developer
@@ -76,20 +110,44 @@ def _make_definition() -> SubgraphDefinition:
             "po_agent": po_agent_node,
             "architect": architect_agent_node,
             "developer": developer_agent_node,
+            # Phase 34 (T-313): module router + parallel unit testing path.
+            "module_router": module_router_node,
+            "dev_unit_tester": dev_unit_tester_node,
+            "dev_test_aggregator": dev_test_aggregator_node,
             "unit_tester": unit_test_agent_node,
             "qa_agent": qa_agent_node,
             "reviewer": reviewer_agent_node,
+            # Phase 35 (T-316): HITL approval flow after the reviewer.
+            "approval_seed": _APPROVAL_SEED,
+            "human_approval": human_approval_node,
         },
         edges=[
             ("po_agent", "architect"),
             ("architect", "developer"),
-            ("developer", "unit_tester"),
+            # Developer routes through the module router so the dispatcher
+            # decides between the parallel and sequential paths.
+            ("developer", "module_router"),
+            # Each parallel worker converges on the aggregator.
+            ("dev_unit_tester", "dev_test_aggregator"),
             ("qa_agent", "reviewer"),
+            # Phase 35: linear edge from the metadata seed into the
+            # interrupt-raising approval node.
+            ("approval_seed", "human_approval"),
         ],
         conditional_edges={
+            # Both single-module (unit_tester) and merged multi-module
+            # (dev_test_aggregator) paths feed the same gate.
             "unit_tester": _TEST_GATE,
+            "dev_test_aggregator": _TEST_GATE,
             "reviewer": _REVIEWER_GATE,
+            # Phase 35: route the human decision recorded by
+            # ``human_approval_node`` to either END (approve) or back to
+            # the developer (reject / request_changes).
+            "human_approval": _HITL_GATE,
         },
+        # Phase 34: dispatcher fans out to ``dev_unit_tester`` when modules
+        # are present, otherwise routes to the sequential ``unit_tester``.
+        send_edges=[("module_router", module_dispatcher)],
     )
 
 

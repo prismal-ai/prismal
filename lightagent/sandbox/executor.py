@@ -10,13 +10,15 @@ ejecución.  Los proyectos persistentes deben guardarse en ``workspace/``.
 
 from __future__ import annotations
 
+import asyncio
 import shutil
 import subprocess
+import threading
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import monotonic
-from typing import Literal
+from typing import Any, Literal, cast
 
 from lightagent.core.logging import get_logger
 from lightagent.sandbox.manager import SandboxManager
@@ -110,8 +112,28 @@ class SandboxExecutor:
     ) -> ExecutionResult:
         """Ejecuta *code* en el lenguaje especificado dentro de la sandbox.
 
-        El código se escribe en un archivo temporal en ``sandbox/tmp/``,
-        se ejecuta y el archivo temporal se elimina tras la ejecución.
+        Phase 43 / SPEC-045 changed the dispatch model:
+
+        * When the operator has activated process isolation (either
+          ``LIGHTAGENT_SANDBOX_ISOLATION_REQUIRED=true`` OR
+          ``LIGHTAGENT_SANDBOX_ISOLATION_BACKEND`` is set to a
+          non-empty value), this method delegates to the selected
+          :class:`~lightagent.sandbox.isolation.IsolationBackend`
+          via :func:`select_backend`. The backend launches the code
+          inside a real isolation boundary (docker container,
+          podman container, nsjail / bwrap / firejail namespace) so
+          every consumer of ``SandboxExecutor`` automatically
+          inherits the hardening — no per-agent code change needed.
+        * Otherwise the legacy host-subprocess path runs unchanged
+          (the temp ``.py`` file under ``sandbox/tmp/`` is written,
+          executed, and removed). This is the dev-mode behaviour
+          retained for backward compatibility while Phase 43 rolls
+          out — the entire path will be deleted once
+          ``LIGHTAGENT_SANDBOX_ISOLATION_REQUIRED=true`` becomes the
+          default.
+
+        The shape of :class:`ExecutionResult` is identical in both
+        modes so callers do not need to special-case the dispatch.
 
         Args:
             code: Código fuente a ejecutar.
@@ -124,6 +146,12 @@ class SandboxExecutor:
         Returns:
             :class:`ExecutionResult` con el resultado de la ejecución.
         """
+        from lightagent.core.config import get_settings as _get_settings
+
+        settings = _get_settings()
+        if settings.sandbox_isolation_required or settings.sandbox_isolation_backend:
+            return self._run_isolated(code, language, workdir)
+
         lang = language.lower().strip()
         if lang not in _SUPPORTED_LANGUAGES:
             return ExecutionResult(
@@ -148,6 +176,116 @@ class SandboxExecutor:
         finally:
             for f in tmp_files:
                 f.unlink(missing_ok=True)
+
+    def _run_isolated(
+        self,
+        code: str,
+        language: str,
+        workdir: str,
+    ) -> ExecutionResult:
+        """Delegate to the configured Phase 43 isolation backend.
+
+        ``run_code`` is synchronous (it has to stay backward-
+        compatible with sync callers) while
+        :meth:`IsolationBackend.run` is async because the backends
+        all spawn subprocesses via ``asyncio``. This bridge resolves
+        the impedance mismatch by running the async coroutine in a
+        fresh event loop owned by this call. Two cases:
+
+        1. **Sync caller already on a worker thread** (the most
+           common case — async agents wrap ``run_code`` in
+           ``asyncio.to_thread`` to avoid blocking their own loop).
+           That worker thread has no running event loop, so
+           ``asyncio.run()`` works directly.
+        2. **Sync caller from the main thread with no loop**.
+           Same as case (1): ``asyncio.run()`` is the right tool.
+        3. **Sync caller from inside a running loop** — illegal,
+           the caller is doing the wrong thing. We cannot ``await``
+           from sync code, so we use ``asyncio.new_event_loop()``
+           in a worker thread as a fallback. This is also the
+           defensive path used by the legacy ``run_code``
+           contract.
+
+        Args:
+            code: Source to run.
+            language: Language identifier (Phase 43 supports Python only).
+            workdir: Optional cwd hint, surfaced in the result for
+                callers that key off it. The container backends
+                always use ``/sandbox`` internally regardless.
+
+        Returns:
+            The :class:`ExecutionResult` produced by the backend.
+        """
+        from lightagent.core.config import get_settings
+        from lightagent.sandbox.isolation import (
+            SandboxIsolationError,
+            select_backend,
+        )
+
+        settings = get_settings()
+        try:
+            backend = select_backend()
+        except SandboxIsolationError as exc:
+            return ExecutionResult(
+                stdout="",
+                stderr=f"Sandbox isolation backend unavailable: {exc}",
+                exit_code=1,
+                language=language.lower().strip(),
+                duration_ms=0,
+                workdir=workdir,
+            )
+
+        coro = backend.run(code, language, settings.sandbox_exec_timeout)
+        return self._await_in_fresh_loop(coro, language, workdir)
+
+    @staticmethod
+    def _await_in_fresh_loop(
+        coro: Any,  # noqa: ANN401 -- async coroutine, dynamic type ok
+        language: str,
+        workdir: str,
+    ) -> ExecutionResult:
+        """Execute *coro* on a fresh event loop, return its result.
+
+        Tries :func:`asyncio.run` first. If a loop is already
+        running on the current thread (sync caller from inside an
+        async context — illegal but possible), falls back to
+        spinning up a worker thread with its own loop.
+        """
+        try:
+            return cast("ExecutionResult", asyncio.run(coro))
+        except RuntimeError as exc:
+            if "running" not in str(exc).lower():
+                raise
+
+        # Fallback: a loop is already running — execute the coro on
+        # a worker thread with its own dedicated loop.
+        result_box: list[ExecutionResult] = []
+        error_box: list[BaseException] = []
+
+        def _runner() -> None:
+            new_loop = asyncio.new_event_loop()
+            try:
+                result_box.append(new_loop.run_until_complete(coro))
+            except BaseException as inner_exc:
+                error_box.append(inner_exc)
+            finally:
+                new_loop.close()
+
+        thread = threading.Thread(target=_runner, daemon=True)
+        thread.start()
+        thread.join()
+
+        if error_box:
+            err = error_box[0]
+            return ExecutionResult(
+                stdout="",
+                stderr=f"Sandbox backend raised: {err}",
+                exit_code=1,
+                language=language.lower().strip(),
+                duration_ms=0,
+                workdir=workdir,
+            )
+        return result_box[0]
 
     def run_command(
         self,
