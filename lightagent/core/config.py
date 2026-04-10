@@ -438,6 +438,88 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Sandbox Process Isolation (Phase 43 / SPEC-045) ──────────────
+    is_production: bool = Field(
+        default=False,
+        description=(
+            "Production-deployment marker. When True, the sandbox "
+            "isolation factory rejects the 'none' backend (CLAUDE.md "
+            "Phase 43 rule #2) so that operators cannot accidentally "
+            "deploy LightAgent without real process isolation. "
+            "Defaults to False so dev / test environments are "
+            "unaffected. Flip via LIGHTAGENT_IS_PRODUCTION=true."
+        ),
+    )
+    sandbox_isolation_required: bool = Field(
+        default=False,
+        description=(
+            "When True, ``SandboxExecutor.run_code()`` must delegate to "
+            "a real isolation backend (docker / podman / nsjail / bwrap / "
+            "firejail) and refuses to fall back to the unisolated host "
+            "subprocess path. Default is False during the Phase 43 "
+            "transition; flip to True once the deployment has at least "
+            "one isolation backend wired and verified."
+        ),
+    )
+    sandbox_isolation_backend: str = Field(
+        default="",
+        description=(
+            "Explicit isolation backend override. Empty string = "
+            "autoselect via ``BACKEND_PRIORITY``. Accepted values: "
+            "'docker', 'podman', 'nsjail', 'bwrap', 'firejail', 'none'. "
+            "The 'none' backend is a dev-mode fallback and is rejected "
+            "when ``is_production=True``."
+        ),
+    )
+    sandbox_container_image: str = Field(
+        default="python:3.13-slim",
+        description=(
+            "Container image used by DockerBackend / PodmanBackend. "
+            "Must have ``python`` on PATH so the backend can launch "
+            "``python -`` and feed the user code on stdin."
+        ),
+    )
+    sandbox_memory_mb: int = Field(
+        default=256,
+        ge=32,
+        le=8192,
+        description="Per-invocation memory cap in MB (docker --memory).",
+    )
+    sandbox_pids_limit: int = Field(
+        default=32,
+        ge=4,
+        le=1024,
+        description="Per-invocation PID cap (docker --pids-limit).",
+    )
+    sandbox_cpus: float = Field(
+        default=1.0,
+        gt=0.0,
+        le=16.0,
+        description="Per-invocation CPU quota (docker --cpus).",
+    )
+    sandbox_tmpfs_size_mb: int = Field(
+        default=128,
+        ge=16,
+        le=2048,
+        description=(
+            "Ephemeral workspace size in MB. Mounted at ``/sandbox`` "
+            "inside the container as rw,noexec,nosuid and wiped on "
+            "container exit."
+        ),
+    )
+    sandbox_env_allowlist: str = Field(
+        default="",
+        description=(
+            "Comma-separated list of env-var names to forward into the "
+            "isolated environment. Default is empty — no host env is "
+            "visible inside the sandbox. Keys matching the patterns "
+            "``*API_KEY*`` / ``*SECRET*`` / ``*TOKEN*`` / "
+            "``*PASSWORD*`` (case-insensitive) are rejected at parse "
+            "time with a WARNING log, even if the operator tries to "
+            "add them explicitly."
+        ),
+    )
+
     # ── Hierarchical Multi-Agent Architecture (Phase 40 / SPEC-042) ───
     hierarchical_mode: bool = Field(
         default=False,
