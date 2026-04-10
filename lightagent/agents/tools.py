@@ -848,6 +848,7 @@ def cron_add(
     task: str,
     output_channel: str = "",
     output_target: str = "",
+    timezone: str = "",
 ) -> str:
     """Schedule a new recurring cron job.
 
@@ -865,6 +866,8 @@ def cron_add(
             telegram -> chat_id, slack -> #channel,
             discord -> webhook URL, email -> address.
             Leave empty when output_channel is empty.
+        timezone: IANA timezone for this job (e.g. 'America/Caracas').
+            Leave empty to use the system-wide timezone resolution chain.
 
     Returns:
         Confirmation message with the next scheduled run time.
@@ -879,6 +882,7 @@ def cron_add(
             task,
             output_channel=output_channel or None,
             output_target=output_target or None,
+            timezone=timezone,
         )
     except ValueError as exc:
         return f"Failed to schedule job '{name}': {exc}"
@@ -893,8 +897,9 @@ def cron_add(
         if output_channel and output_target
         else ""
     )
+    tz_note = f" Timezone: {timezone}." if timezone else ""
     return (
-        f"Scheduled job '{name}' ({schedule}). Next run: {next_run}.{routing}"
+        f"Scheduled job '{name}' ({schedule}). Next run: {next_run}.{routing}{tz_note}"
     )
 
 
@@ -1007,7 +1012,7 @@ def get_current_time() -> str:
 
 
 @tool
-def cron_once(name: str, run_at: str, task: str) -> str:
+def cron_once(name: str, run_at: str, task: str, timezone: str = "") -> str:
     """Schedule a one-time (non-recurring) reminder or task at a specific datetime.
 
     Use this for relative-time requests: "in 5 minutes", "in 2 hours",
@@ -1024,6 +1029,8 @@ def cron_once(name: str, run_at: str, task: str) -> str:
             (local time, same timezone returned by ``get_current_time``).
         task: What to do when the time comes — sent verbatim to the agent
             (e.g. ``"Send a reminder to write the weekly report"``).
+        timezone: IANA timezone for this job (e.g. ``"America/Caracas"``).
+            Leave empty to use the system-wide timezone resolution chain.
 
     Returns:
         Confirmation string with the scheduled time, or an error message.
@@ -1036,13 +1043,14 @@ def cron_once(name: str, run_at: str, task: str) -> str:
 
         target = datetime.strptime(run_at, "%Y-%m-%d %H:%M:%S")  # noqa: DTZ007
         mgr = CronManager()
-        job = mgr.add_once(name, target, task)
+        job = mgr.add_once(name, target, task, timezone=timezone)
         executor = get_running_executor()
         if executor is not None:
             executor.schedule_coroutine(executor.add_job(job))
+        tz_note = f" (timezone: {timezone})" if timezone else ""
         return (
             f"One-time reminder '{name}' scheduled for"
-            f" {target.strftime('%Y-%m-%d %H:%M')}."
+            f" {target.strftime('%Y-%m-%d %H:%M')}{tz_note}."
         )
     except ValueError as exc:
         return f"Invalid datetime — use YYYY-MM-DD HH:MM:SS format. Error: {exc}"

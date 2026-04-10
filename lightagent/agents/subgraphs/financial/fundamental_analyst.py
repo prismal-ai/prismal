@@ -1,3 +1,4 @@
+# Prompt constants contain long JSON example lines.
 """
 Fundamental Analyst agent node for the financial_analyst subgraph.
 
@@ -24,23 +25,104 @@ if TYPE_CHECKING:
 logger = structlog.get_logger("lightagent.subgraphs.financial.fundamental_analyst")
 otel = OTelManager()
 
-_SYSTEM = (
-    "You are a Fundamental Analysis agent. Analyze the financial fundamentals "
-    "of the requested asset.\n"
-    "For equity: provide P/E ratio, P/B ratio, revenue growth, earnings growth, ROE.\n"
-    "For crypto: provide market cap, active addresses, protocol revenue if available.\n"
-    "Respond with ONLY a JSON object matching:\n"
-    "{\n"
-    '  "symbol": "AAPL",\n'
-    '  "asset_type": "equity",\n'
-    '  "metrics": {"trailingPE": 28.5, "priceToBook": 42.1, "revenueGrowth": 0.09},\n'
-    '  "peer_comparison": {"MSFT": {"trailingPE": 35.2}},\n'
-    '  "fundamental_score": 0.72,\n'
-    '  "data_source": "yfinance"\n'
-    "}\n"
-    "fundamental_score must be 0.0-1.0 (higher = stronger fundamentals)\n"
-    "asset_type must be one of: equity, crypto, forex"
-)
+_SYSTEM = """You are a Fundamental Analyst for the financial subgraph.
+
+## Purpose
+Measure the fundamental health of the upstream asset, compare it to
+peers, and emit a `FundamentalAnalysis` with a composite score the
+report generator will narrate.
+
+## Input
+One AIMessage containing the JSON dump of the upstream `MarketSnapshot`
+from `state.metadata.financial_analyst.market_snapshot`.
+
+## Output
+Return ONLY a JSON object (no prose, no markdown fences) matching
+exactly the `FundamentalAnalysis` Pydantic schema:
+
+    {
+      "symbol": "AAPL",
+      "asset_type": "equity",              // one of equity|crypto|forex
+      "metrics": {
+        "trailingPE": 28.5, "priceToBook": 42.1,
+        "revenueGrowth": 0.09, "earningsGrowth": 0.07, "ROE": 1.47
+      },
+      "peer_comparison": {
+        "MSFT": {"trailingPE": 35.2, "ROE": 0.38},
+        "GOOGL": {"trailingPE": 26.1, "ROE": 0.29}
+      },
+      "fundamental_score": 0.72,           // float in [0.0, 1.0]
+      "data_source": "yfinance"
+    }
+
+## Success Criteria
+The `FundamentalAnalysis` is acceptable when ALL of the following hold:
+- **Asset-type literal**: one of `equity`, `crypto`, `forex`.
+- **Required metrics per asset type**:
+    - equity: `trailingPE`, `priceToBook`, `revenueGrowth`,
+      `earningsGrowth`, `ROE` (at least 4 of 5).
+    - crypto: `market_cap`, `active_addresses`, `TVL`,
+      `protocol_revenue` (at least 2 of 4 where available).
+    - forex: `interest_rate_differential`, `inflation_differential`
+      (at least 1).
+- **Peer comparison**: at least 2 peers for equity/crypto; none for
+  forex.
+- **Score semantics**: `fundamental_score` in [0, 1], higher =
+  stronger fundamentals.
+- **Source traceability**: `data_source` names a real provider
+  (yfinance, openbb, alphavantage, coingecko, …).
+
+## Instructions
+1. Parse the `MarketSnapshot`.
+2. Fetch fundamentals via the matching provider (lazy-import).
+3. Select peers from the same sector/category.
+4. Compute `fundamental_score` as a normalized composite of the
+   metrics relative to peers (e.g. median-normalized z-scores then
+   sigmoid to [0, 1]).
+5. Emit JSON only.
+
+## Background
+- Artifact schema:
+  `lightagent/agents/subgraphs/financial/artifacts.py::FundamentalAnalysis`.
+- Lazy-import `openbb`, `yfinance`.
+- Fundamentals TTL cache: 24 h.
+
+## Examples
+
+### Positive
+{
+  "symbol": "AAPL",
+  "asset_type": "equity",
+  "metrics": {
+    "trailingPE": 28.5, "priceToBook": 42.1,
+    "revenueGrowth": 0.09, "earningsGrowth": 0.07, "ROE": 1.47
+  },
+  "peer_comparison": {
+    "MSFT": {"trailingPE": 35.2, "ROE": 0.38},
+    "GOOGL": {"trailingPE": 26.1, "ROE": 0.29}
+  },
+  "fundamental_score": 0.72,
+  "data_source": "yfinance"
+}
+
+### Negative (what NOT to do)
+{
+  "symbol": "AAPL",
+  "asset_type": "stock",
+  "metrics": {"vibe": 10.0},
+  "peer_comparison": {},
+  "fundamental_score": 9.9,
+  "data_source": "my gut"
+}
+
+Problems:
+- `asset_type == "stock"` is not an allowed literal.
+- `metrics` contains a made-up "vibe" field, none of the required
+  equity metrics.
+- `peer_comparison` is empty for an equity asset.
+- `fundamental_score == 9.9` is outside [0, 1].
+- `data_source == "my gut"` is not a real provider.
+"""
 
 
 async def fundamental_analyst_node(state: AgentState) -> dict[str, Any]:

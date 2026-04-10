@@ -7,9 +7,65 @@ configuration is validated at startup.
 
 from functools import lru_cache
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AliasChoices, Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class MaintenanceSettings(BaseSettings):
+    """Package security and maintenance configuration (SPEC-031/032).
+
+    All fields are readable from environment variables with the
+    ``LIGHTAGENT_MAINTENANCE_`` prefix (e.g.
+    ``LIGHTAGENT_MAINTENANCE_CONFIRM=false``).
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="LIGHTAGENT_MAINTENANCE_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    confirm: bool = Field(
+        default=True,
+        description=(
+            "Require interactive confirmation before applying any package update. "
+            "Set to false for CI/CD pipelines (LIGHTAGENT_MAINTENANCE_CONFIRM=false)."
+        ),
+    )
+    backup_dir: str = Field(
+        default="data/backups",
+        description=(
+            "Directory for pyproject.toml backups created before each write. "
+            "Created on demand."
+        ),
+    )
+    reports_dir: str = Field(
+        default="data/logs",
+        description=(
+            "Directory where JSON audit reports are saved "
+            "(``security_audit_YYYYMMDDHHMMSS.json``). Created on demand."
+        ),
+    )
+    osv_concurrency: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+        description="Maximum concurrent OSV API requests during a full package scan.",
+    )
+    uv_timeout: int = Field(
+        default=120,
+        ge=10,
+        description="Timeout in seconds for each ``uv pip install`` subprocess.",
+    )
+    pypi_timeout: int = Field(
+        default=10,
+        ge=3,
+        description="Timeout in seconds for PyPI JSON API HTTP requests.",
+    )
 
 
 class Settings(BaseSettings):
@@ -103,6 +159,19 @@ class Settings(BaseSettings):
         default=False,
         description="Allow shell execution via ActionInterceptor (dangerous)",
     )
+
+    # ── Maintenance (read-only property — env prefix LIGHTAGENT_MAINTENANCE_) ──
+    @property
+    def maintenance(self) -> MaintenanceSettings:
+        """Return the package maintenance sub-settings.
+
+        Delegates to :func:`get_maintenance_settings` so that the same
+        ``lru_cache``d instance is reused across the application lifetime.
+
+        Returns:
+            Cached :class:`MaintenanceSettings` loaded from env / .env file.
+        """
+        return get_maintenance_settings()
 
     # ── Skills ────────────────────────────────────────────────────────
     external_skills_dirs: list[str] = Field(
@@ -287,6 +356,221 @@ class Settings(BaseSettings):
         ge=1,
         description="Days before long-term memory entries expire (AC-011-6)",
     )
+    memory_backend: str = Field(
+        default="memory",
+        description=(
+            "Long-term memory store backend: 'memory' (InMemoryStore, dev), "
+            "'sqlite' (aiosqlite-backed), or 'postgresql' (AsyncPostgresStore). "
+            "SPEC-039 AC-039-1."
+        ),
+    )
+    memory_extraction_enabled: bool = Field(
+        default=True,
+        description=(
+            "Toggle LLM-based memory extraction at session end. "
+            "When False, sessions complete without firing the extraction task."
+        ),
+    )
+    memory_recall_limit: int = Field(
+        default=5,
+        ge=0,
+        le=50,
+        description="Max long-term facts retrieved per supervisor invocation.",
+    )
+    memory_default_ttl_days: int = Field(
+        default=90,
+        ge=0,
+        description=(
+            "Default TTL for stored facts in days. 0 disables expiration. "
+            "SPEC-039 AC-039-6."
+        ),
+    )
+
+    # ── CodeAct Agent (Phase 38 / SPEC-040; hardened by Phase 42 / SPEC-044) ─
+    codeact_enabled: bool = Field(
+        default=False,
+        description=(
+            "Toggle CodeAct agent. Default is FALSE after SPEC-044 "
+            "hardening — CodeAct still runs in a host subprocess "
+            "(isolation comes in Phase 43 / SPEC-045), so operators "
+            "must explicitly opt in. When False the supervisor "
+            "downgrades any 'codeact' routing decision to the "
+            "classic ReAct 'coder' node (see supervisor.py). Do NOT "
+            "enable in production without also configuring a real "
+            "sandbox isolation backend."
+        ),
+    )
+    codeact_max_iterations: int = Field(
+        default=6,
+        ge=1,
+        le=20,
+        description="Max generate/correct cycles per CodeAct invocation.",
+    )
+    codeact_import_allowlist: str = Field(
+        default=(
+            # Standard library — text, serialization, path, math, dates.
+            "pathlib,json,re,typing,datetime,collections,"
+            "itertools,functools,math,statistics,random,hashlib,base64,"
+            "csv,io,"
+            # Data science stack.
+            "pandas,numpy,polars,matplotlib,sklearn,torch,flaml,duckdb,"
+            # HTTP clients (egress is still gated by the isolation
+            # backend's network policy — the allowlist only decides
+            # what can be *imported*, not what can actually reach the
+            # network).
+            "requests,httpx"
+            # ─────────────────────────────────────────────────────────
+            # INTENTIONALLY REMOVED by SPEC-044 AC-044-5:
+            #   os         — exposes shell bridges + environment dict
+            #   sys        — exposes sys.modules for module-level pivot
+            #   subprocess — direct process spawning
+            # Operators who need any of these must override the env
+            # var explicitly AND accept the increased risk.
+            # ─────────────────────────────────────────────────────────
+        ),
+        description=(
+            "Comma-separated list of packages CodeAct code blocks may "
+            "import. Any non-allowlisted import blocks execution. "
+            "SPEC-044 AC-044-5 removed 'os', 'sys', 'subprocess' from "
+            "the default; they must be added explicitly by operators "
+            "who accept the risk, and even then are still subject to "
+            "the AST denylist (SPEC-044 AC-044-1, AC-044-2, AC-044-3)."
+        ),
+    )
+
+    # ── Sandbox Process Isolation (Phase 43 / SPEC-045) ──────────────
+    is_production: bool = Field(
+        default=False,
+        description=(
+            "Production-deployment marker. When True, the sandbox "
+            "isolation factory rejects the 'none' backend (CLAUDE.md "
+            "Phase 43 rule #2) so that operators cannot accidentally "
+            "deploy LightAgent without real process isolation. "
+            "Defaults to False so dev / test environments are "
+            "unaffected. Flip via LIGHTAGENT_IS_PRODUCTION=true."
+        ),
+    )
+    sandbox_isolation_required: bool = Field(
+        default=False,
+        description=(
+            "When True, ``SandboxExecutor.run_code()`` must delegate to "
+            "a real isolation backend (docker / podman / nsjail / bwrap / "
+            "firejail) and refuses to fall back to the unisolated host "
+            "subprocess path. Default is False during the Phase 43 "
+            "transition; flip to True once the deployment has at least "
+            "one isolation backend wired and verified."
+        ),
+    )
+    sandbox_isolation_backend: str = Field(
+        default="",
+        description=(
+            "Explicit isolation backend override. Empty string = "
+            "autoselect via ``BACKEND_PRIORITY``. Accepted values: "
+            "'docker', 'podman', 'nsjail', 'bwrap', 'firejail', 'none'. "
+            "The 'none' backend is a dev-mode fallback and is rejected "
+            "when ``is_production=True``."
+        ),
+    )
+    sandbox_container_image: str = Field(
+        default="python:3.13-slim",
+        description=(
+            "Container image used by DockerBackend / PodmanBackend. "
+            "Must have ``python`` on PATH so the backend can launch "
+            "``python -`` and feed the user code on stdin."
+        ),
+    )
+    sandbox_memory_mb: int = Field(
+        default=256,
+        ge=32,
+        le=8192,
+        description="Per-invocation memory cap in MB (docker --memory).",
+    )
+    sandbox_pids_limit: int = Field(
+        default=32,
+        ge=4,
+        le=1024,
+        description="Per-invocation PID cap (docker --pids-limit).",
+    )
+    sandbox_cpus: float = Field(
+        default=1.0,
+        gt=0.0,
+        le=16.0,
+        description="Per-invocation CPU quota (docker --cpus).",
+    )
+    sandbox_tmpfs_size_mb: int = Field(
+        default=128,
+        ge=16,
+        le=2048,
+        description=(
+            "Ephemeral workspace size in MB. Mounted at ``/sandbox`` "
+            "inside the container as rw,noexec,nosuid and wiped on "
+            "container exit."
+        ),
+    )
+    sandbox_env_allowlist: str = Field(
+        default="",
+        description=(
+            "Comma-separated list of env-var names to forward into the "
+            "isolated environment. Default is empty — no host env is "
+            "visible inside the sandbox. Keys matching the patterns "
+            "``*API_KEY*`` / ``*SECRET*`` / ``*TOKEN*`` / "
+            "``*PASSWORD*`` (case-insensitive) are rejected at parse "
+            "time with a WARNING log, even if the operator tries to "
+            "add them explicitly."
+        ),
+    )
+
+    # ── Hierarchical Multi-Agent Architecture (Phase 40 / SPEC-042) ───
+    hierarchical_mode: bool = Field(
+        default=False,
+        description=(
+            "Enable 3-level hierarchical agent graph. When True, "
+            "``get_async_compiled_graph()`` builds a root supervisor "
+            "that routes to 3 domain orchestrators (research, "
+            "engineering, analysis) + cron_manager instead of the "
+            "flat 12-agent topology. Default is False for full "
+            "backward compatibility — see SPEC-042 AC-042-4."
+        ),
+    )
+
+    # ── Computer Use Agent / CUA (Phase 41 / SPEC-043) ────────────────
+    cua_enabled: bool = Field(
+        default=False,
+        description=(
+            "Enable the Computer Use Agent. Requires a vision-capable "
+            "model configured via ``LIGHTAGENT_CUA_VISION_MODEL`` and "
+            "Playwright installed. Default is False because CUA "
+            "executes UI actions in a real browser and HIGH_RISK "
+            "actions require HITL approval."
+        ),
+    )
+    cua_vision_model: str = Field(
+        default="",
+        description=(
+            "Vision-capable model string used by the CUA agent to "
+            "perceive browser screenshots (e.g. 'claude-opus-4-6'). "
+            "Empty string disables CUA even when cua_enabled=True — "
+            "the node returns a graceful error message in that case."
+        ),
+    )
+    cua_max_actions: int = Field(
+        default=20,
+        ge=1,
+        le=200,
+        description=(
+            "Max browser actions per CUA task before forced stop. "
+            "Prevents runaway agents when the VLM fails to emit a "
+            "'finish' action."
+        ),
+    )
+    cua_screenshot_interval_ms: int = Field(
+        default=500,
+        ge=0,
+        description=(
+            "Milliseconds to wait between screenshots in the CUA "
+            "action loop. Lowered to 0 in tests."
+        ),
+    )
 
     # ── API ───────────────────────────────────────────────────────────
     api_key: SecretStr = Field(
@@ -362,6 +646,49 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr = Field(
         default=SecretStr(""),
         description="Telegram Bot API token",
+    )
+
+    # Telegram — Webhook transport (optional, Phase 29)
+    telegram_webhook_enabled: bool = Field(
+        default=False,
+        description="If True, use webhook instead of long-polling.",
+    )
+    telegram_webhook_url: str = Field(
+        default="",
+        description="Full HTTPS URL for Telegram webhook. Required when webhook_enabled=True.",
+    )
+    telegram_webhook_secret: SecretStr = Field(
+        default=SecretStr(""),
+        description="Secret token for X-Telegram-Bot-Api-Secret-Token header validation.",
+    )
+    telegram_max_connections: int = Field(
+        default=40,
+        ge=1,
+        le=100,
+        description="Max concurrent connections for webhook (1-100).",
+    )
+
+    # Telegram — Session controls (Phase 29)
+    telegram_session_inline_keyboard: bool = Field(
+        default=True,
+        description="Append [New Chat] [Reset] inline buttons to every agent response.",
+    )
+    telegram_max_sessions_per_user: int = Field(
+        default=10,
+        ge=1,
+        description="Max archived sessions per (chat_id, user_id) pair.",
+    )
+
+    # Telegram — Message tracking (Phase 29)
+    telegram_message_track: bool = Field(
+        default=True,
+        description="Record bot-sent message IDs in SQLite for later deletion.",
+    )
+
+    # Telegram — Formatting (Phase 29)
+    telegram_parse_mode: str = Field(
+        default="HTML",
+        description="Telegram parse mode: 'HTML' or 'MarkdownV2'.",
     )
 
     # Slack
@@ -490,6 +817,53 @@ class Settings(BaseSettings):
         description="Sender address for heartbeat email reports.",
     )
 
+    # ── Human-in-the-Loop (Phase 35) ──────────────────────────────────
+    hitl_enabled: bool = Field(
+        default=True,
+        description=(
+            "Global toggle for HITL approval gates. Set false in CI/CD to "
+            "bypass all interrupt() calls and route directly to on_approve."
+        ),
+    )
+    hitl_timeout_seconds: int = Field(
+        default=86400,
+        ge=0,
+        description=(
+            "Maximum seconds to wait before auto-rejecting a suspended "
+            "workflow (0 = no timeout). Used by housekeeping jobs."
+        ),
+    )
+
+    # ── Map-Reduce Parallel Execution (Phase 34) ──────────────────────
+    parallel_enabled: bool = Field(
+        default=True,
+        description="Global toggle for parallel Send() fan-out execution.",
+    )
+    parallel_max_workers: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Maximum concurrent Send() dispatches per fan-out node.",
+    )
+
+    # ── Reflection Loop Framework (Phase 33) ──────────────────────────
+    reflection_enabled: bool = Field(
+        default=True,
+        description="Global toggle for the generate-critique-refine reflection loop.",
+    )
+    reflection_default_threshold: float = Field(
+        default=0.85,
+        ge=0.0,
+        le=1.0,
+        description="Default score threshold that ends a reflection loop early.",
+    )
+    reflection_max_iterations: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Hard cap on reflection generate iterations.",
+    )
+
     # Dynamic Subgraphs (Phase 24)
     enable_subgraphs: bool = Field(
         default=False,
@@ -567,6 +941,107 @@ class Settings(BaseSettings):
         description="Phase 27 is read-only — trade execution must always be False",
     )
 
+    # ── Phase 39 / SPEC-041 — Financial Pipeline Quality Gates ────────
+    financial_min_confidence: float = Field(
+        default=0.4,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Minimum MarketSnapshot.data_confidence required for the "
+            "financial pipeline to continue past data collection. When "
+            "missing_fields is non-empty AND data_confidence is below "
+            "this threshold, the pipeline routes to END with an error "
+            "FinancialReport. SPEC-041 AC-041-2."
+        ),
+    )
+    financial_technical_min_confidence: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Minimum TechnicalAnalysis.data_confidence required to run "
+            "fundamental analysis. Below this threshold the pipeline "
+            "skips fundamental_analyst and jumps straight to "
+            "risk_sentiment_analyst, and the final report is tagged "
+            "with a 'limited data' disclaimer. SPEC-041 AC-041-3."
+        ),
+    )
+    financial_hitl_enabled: bool = Field(
+        default=False,
+        description=(
+            "Enable a HITL approval gate before delivering financial "
+            "reports to the user. When True the report_generator's "
+            "output is surfaced through hitl_gate() for human review; "
+            "when False the pipeline ends as soon as the report is "
+            "produced. SPEC-041 AC-041-4."
+        ),
+    )
+
+    # ── DateTime & Timezone (Phase 28) ────────────────────────────────
+    timezone: str = Field(
+        default="",
+        description=(
+            "IANA timezone for the process (e.g. 'America/Caracas'). "
+            "Empty = auto-detect from OS via tzlocal."
+        ),
+    )
+    cron_timezone: str = Field(
+        default="",
+        description=(
+            "Default IANA timezone for all cron jobs. "
+            "Empty = inherit from 'timezone' field."
+        ),
+    )
+    ntp_enabled: bool = Field(
+        default=False,
+        description="Enable NTP clock drift check.",
+    )
+    ntp_server: str = Field(
+        default="pool.ntp.org",
+        description="NTP server hostname. Only used when ntp_enabled=True.",
+    )
+    ntp_sync_interval_seconds: int = Field(
+        default=3600,
+        ge=60,
+        description="Seconds between NTP re-sync. Minimum 60.",
+    )
+    ntp_warn_threshold_seconds: int = Field(
+        default=5,
+        ge=1,
+        description="Log WARNING if NTP offset exceeds this many seconds.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_telegram_webhook(self) -> "Settings":
+        """Validate webhook config when telegram_webhook_enabled is True."""
+        if self.telegram_webhook_enabled:
+            if not self.telegram_webhook_url.startswith("https://"):
+                raise ValueError(
+                    "LIGHTAGENT_TELEGRAM_WEBHOOK_URL must be an HTTPS URL"
+                )
+            if not self.telegram_webhook_secret.get_secret_value():
+                raise ValueError(
+                    "LIGHTAGENT_TELEGRAM_WEBHOOK_SECRET must be set when webhook is enabled"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_iana_timezones(self) -> "Settings":
+        """Validate that timezone and cron_timezone are valid IANA names if set."""
+        for field_name, value in (
+            ("timezone", self.timezone),
+            ("cron_timezone", self.cron_timezone),
+        ):
+            if value:
+                try:
+                    ZoneInfo(value)
+                except (ZoneInfoNotFoundError, KeyError) as exc:
+                    raise ValueError(
+                        f"{value} is not a valid IANA timezone"
+                        f" (field: LIGHTAGENT_{field_name.upper()})"
+                    ) from exc
+        return self
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
@@ -580,3 +1055,16 @@ def get_settings() -> Settings:
         The singleton Settings instance loaded from env / .env file.
     """
     return Settings()
+
+
+@lru_cache(maxsize=1)
+def get_maintenance_settings() -> MaintenanceSettings:
+    """Return the cached :class:`MaintenanceSettings` instance.
+
+    Uses ``lru_cache`` so the same object is reused across the application
+    lifetime.  Also exposed via :attr:`Settings.maintenance` for convenience.
+
+    Returns:
+        Singleton :class:`MaintenanceSettings` loaded from env / .env file.
+    """
+    return MaintenanceSettings()

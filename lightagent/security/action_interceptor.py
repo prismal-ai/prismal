@@ -142,4 +142,29 @@ class ActionInterceptor(BaseCallbackHandler):
         )
 
 
+    @staticmethod
+    def check_shell(cmd: list[str]) -> bool:
+        """Return True if shell execution is permitted by current settings.
+
+        Checks ``settings.shell_enabled`` (``LIGHTAGENT_SHELL_ENABLED`` env var).
+        Always call this before spawning any subprocess from application code.
+
+        Args:
+            cmd: The command list that would be passed to
+                ``asyncio.create_subprocess_exec``.  Used only for logging.
+
+        Returns:
+            ``True`` when shell execution is enabled; ``False`` otherwise.
+        """
+        from lightagent.core.config import get_settings
+
+        if not get_settings().shell_enabled:
+            logger.warning(
+                "shell_execution_blocked",
+                cmd=cmd[0] if cmd else "",
+            )
+            return False
+        return True
+
+
 __all__ = ["_TOOL_PERMISSION_MAP", "ActionInterceptor"]
