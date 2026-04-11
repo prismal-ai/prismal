@@ -15,6 +15,39 @@ from __future__ import annotations
 import sys
 from unittest.mock import MagicMock
 
+import pytest
+
+
+#: LLM-provider env vars whose presence in the developer's local ``.env``
+#: would otherwise leak into unit tests and trip the
+#: :meth:`Settings._resolve_llm_provider` conflict warning (which
+#: ``filterwarnings=["error", ...]`` converts into a test failure).
+_ENV_ISOLATION_KEYS: tuple[str, ...] = (
+    "LIGHTAGENT_LLM_PROVIDER",
+    "LIGHTAGENT_DEFAULT_MODEL",
+    "LIGHTAGENT_MODEL",
+    "LIGHTAGENT_FALLBACK_MODEL",
+    "LIGHTAGENT_OLLAMA_BASE_URL",
+    "OLLAMA_API_BASE",
+)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_llm_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Strip LLM provider env vars and disable .env loading for each test."""
+    for key in _ENV_ISOLATION_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
+    try:
+        from lightagent.core.config import Settings, get_settings
+    except Exception:  # pragma: no cover — early import failures
+        return
+
+    new_config = dict(Settings.model_config)
+    new_config["env_file"] = None
+    monkeypatch.setattr(Settings, "model_config", new_config)
+    get_settings.cache_clear()
+
 # ── langchain_litellm stub ─────────────────────────────────────────────────
 # Only inject if not already available (venv case has real package).
 if "langchain_litellm" not in sys.modules:

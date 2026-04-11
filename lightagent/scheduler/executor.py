@@ -19,6 +19,7 @@ Example::
 from __future__ import annotations
 
 import asyncio
+import re
 
 import structlog
 from apscheduler.jobstores.base import JobLookupError as APJobLookupError
@@ -33,6 +34,82 @@ logger = structlog.get_logger("lightagent.scheduler.executor")
 
 # Module-level singleton tracking the currently running executor instance.
 _running_executor: CronExecutor | None = None
+
+
+class SoftFailureError(RuntimeError):
+    """Raised when an agent run appears successful but the output is a
+    known transient-error apology (rate limit, provider outage, quota
+    exhaustion, ...).  Catching this in :meth:`CronExecutor._run_job`
+    triggers the existing retry-with-backoff path instead of recording
+    a polite apology as a legitimate success."""
+
+
+#: Case-insensitive substrings that mark a provider / runtime transient
+#: failure.  Kept deliberately narrow: these are the strings the agent
+#: surfaces verbatim when an exception was swallowed upstream and a
+#: user-facing apology string was returned in its place.
+_SOFT_FAILURE_SIGNATURES: tuple[str, ...] = (
+    "rate-limited",
+    "rate limit",
+    "rate_limit",
+    "too many requests",
+    "too many tokens per minute",
+    "quota exceeded",
+    "temporarily unavailable",
+    "temporarily rate-limited",
+    "ai service is temporarily",
+    "service unavailable",
+    "overloaded",
+    "please try again later",
+)
+
+
+#: Regex identifying **permanent** provider failures that should NOT be
+#: retried by the cron runner.  Billing, authentication, model, and
+#: invalid-request errors never recover on a blind retry; retrying just
+#: wastes the job's ``max_retries`` budget and delays the user-visible
+#: failure notice.  Kept in sync with the equivalent regex inside
+#: :mod:`lightagent.agents.tool_registry`.
+_PERMANENT_ERROR_RE = re.compile(
+    r"credit.?balance|insufficient.?(?:credit|quota|funds)|billing|"
+    r"invalid.?api.?key|invalid.?request.?error|invalid.?model|"
+    r"authentication|permission.?denied|unauthori[sz]ed|"
+    r"account.?(?:suspended|disabled)|model.?not.?found",
+    re.IGNORECASE,
+)
+
+
+def _is_permanent_error(error_text: str) -> bool:
+    """Return ``True`` when *error_text* matches a non-retryable condition.
+
+    Args:
+        error_text: Stringified exception from ``_run_job``.
+
+    Returns:
+        ``True`` for billing / auth / invalid-request errors that will not
+        recover on retry; ``False`` otherwise.
+    """
+    return bool(_PERMANENT_ERROR_RE.search(error_text))
+
+
+def _looks_like_soft_failure(text: str | None) -> str | None:
+    """Return the matched signature when *text* resembles a transient error.
+
+    Args:
+        text: The agent's final message content.  ``None`` or empty
+            strings always return ``None``.
+
+    Returns:
+        The first matching signature string, or ``None`` when the output
+        does not look like a soft failure.
+    """
+    if not text:
+        return None
+    lowered = text.lower()
+    for sig in _SOFT_FAILURE_SIGNATURES:
+        if sig in lowered:
+            return sig
+    return None
 
 
 def get_running_executor() -> CronExecutor | None:
@@ -314,6 +391,20 @@ class CronExecutor:
                         str(output),
                     )
 
+            # Soft-failure detection: when the agent swallowed a provider
+            # rate-limit / outage and returned an apology string as its
+            # final message, treat the run as a failure so the retry
+            # policy re-fires the job instead of recording a polite
+            # apology as a legitimate "success".
+            signature = _looks_like_soft_failure(
+                str(output) if output is not None else None
+            )
+            if signature is not None:
+                raise SoftFailureError(
+                    f"soft_failure detected: matched signature {signature!r} "
+                    f"in agent output"
+                )
+
             self._manager.update_last_run(name, finished_at)
             self._manager.set_retry_count(name, 0)
             self._manager.add_run_record(
@@ -372,7 +463,24 @@ class CronExecutor:
                 error=error_msg,
             )
 
-            # Apply retry policy
+            # Apply retry policy — UNLESS this is a permanent error
+            # (billing / auth / invalid request) in which case retrying
+            # just burns the budget and delays the failure notification.
+            permanent = _is_permanent_error(error_msg)
+            if permanent:
+                logger.warning(
+                    "cron_job_permanent_failure_no_retry",
+                    name=name,
+                    error=error_msg[:200],
+                )
+                self._manager.set_retry_count(name, 0)
+                await self._notifier.notify_failure(
+                    job_name=name,
+                    error=error_msg,
+                    duration_seconds=duration,
+                )
+                return
+
             job = self._manager.get_job(name)
             if job is not None and job.retry_count < job.max_retries:
                 new_count = job.retry_count + 1

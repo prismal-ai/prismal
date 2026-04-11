@@ -24,9 +24,51 @@ from __future__ import annotations
 
 from langchain_core.tools import BaseTool, tool
 
+from lightagent.agents.context import channel_context_var
 from lightagent.core.config import get_settings
 from lightagent.scheduler.cron_manager import CronManager
 from lightagent.security.filesystem_guard import FilesystemGuard, PathViolation
+
+
+def _resolve_channel_delivery(
+    output_channel: str,
+    output_target: str,
+) -> tuple[str, str, str]:
+    """Resolve final (channel, target, note) for a cron delivery.
+
+    Auto-fills missing routing from the ambient
+    :data:`~lightagent.agents.context.channel_context_var` when both
+    ``output_channel`` and ``output_target`` are empty, so a cron created
+    from a Telegram / Slack / Discord conversation automatically delivers
+    its output back to the originating chat.  Pass ``output_channel="none"``
+    to opt out explicitly (neither field is auto-filled).
+
+    Args:
+        output_channel: Explicit channel argument supplied by the LLM
+            (or empty string when the model omitted it).
+        output_target: Explicit channel target supplied by the LLM.
+
+    Returns:
+        A ``(channel, target, note)`` tuple.  ``channel`` and ``target``
+        are empty strings when no delivery should be configured.  ``note``
+        is a short human-readable hint appended to the tool's confirmation
+        message (empty when nothing was auto-filled).
+    """
+    if output_channel.lower() == "none":
+        return "", "", " (delivery disabled by caller)"
+    if output_channel and output_target:
+        return output_channel, output_target, ""
+    if output_channel or output_target:
+        # Partial explicit routing — respect exactly what the LLM passed.
+        return output_channel, output_target, ""
+    ctx = channel_context_var.get()
+    if not ctx:
+        return "", "", ""
+    ch = ctx.get("channel", "")
+    tg = ctx.get("chat_id", "")
+    if ch and tg:
+        return ch, tg, f" Output auto-routed to {ch}:{tg}."
+    return "", "", ""
 
 
 def _get_fs_guard() -> FilesystemGuard:
@@ -841,6 +883,15 @@ def list_mcp_tools(server_name: str = "") -> str:
         return f"Error listing MCP tools: {exc!s}"
 
 
+#: Default retry count for cron jobs created via the ``cron_add`` tool.
+#:
+#: A value of 2 gives two retries with exponential backoff (60 s, 120 s by
+#: default) so that transient provider rate-limits — which the soft-failure
+#: detector in :meth:`CronExecutor._run_job` now raises as real errors —
+#: recover automatically without user intervention.
+CRON_ADD_DEFAULT_MAX_RETRIES = 2
+
+
 @tool
 def cron_add(
     name: str,
@@ -852,20 +903,24 @@ def cron_add(
 ) -> str:
     """Schedule a new recurring cron job.
 
-    Use this when the user wants to automate a task on a schedule.
-    Optionally specify an output channel to receive proactive reports.
+    Use this when the user wants to automate a task on a schedule.  When the
+    request originates from a messaging channel (Telegram, Slack, Discord,
+    …) and neither ``output_channel`` nor ``output_target`` is supplied, the
+    job is automatically routed back to the originating chat so the user
+    actually sees the result.  Pass ``output_channel="none"`` to opt out.
 
     Args:
         name: Unique job name.
         schedule: Cron expression (e.g. '0 9 * * *' for 9 AM daily).
         task: Natural-language task description the agent will perform.
         output_channel: Optional delivery channel for the job output.
-            One of: 'telegram', 'slack', 'discord', 'email'.
-            Leave empty to suppress proactive delivery.
+            One of: 'telegram', 'slack', 'discord', 'email', or 'none' to
+            explicitly disable delivery.  When empty and the request came
+            from a channel, the originating channel is used automatically.
         output_target: Channel-specific destination.
             telegram -> chat_id, slack -> #channel,
             discord -> webhook URL, email -> address.
-            Leave empty when output_channel is empty.
+            Leave empty when ``output_channel`` is empty.
         timezone: IANA timezone for this job (e.g. 'America/Caracas').
             Leave empty to use the system-wide timezone resolution chain.
 
@@ -874,14 +929,19 @@ def cron_add(
     """
     from lightagent.scheduler.executor import get_running_executor
 
+    resolved_channel, resolved_target, routing_note = _resolve_channel_delivery(
+        output_channel, output_target
+    )
+
     manager = CronManager()
     try:
         job = manager.add(
             name,
             schedule,
             task,
-            output_channel=output_channel or None,
-            output_target=output_target or None,
+            max_retries=CRON_ADD_DEFAULT_MAX_RETRIES,
+            output_channel=resolved_channel or None,
+            output_target=resolved_target or None,
             timezone=timezone,
         )
     except ValueError as exc:
@@ -892,11 +952,12 @@ def cron_add(
     next_run = (
         job.next_run.strftime("%Y-%m-%d %H:%M UTC") if job.next_run else "unknown"
     )
-    routing = (
-        f" Output will be delivered to {output_channel}:{output_target}."
-        if output_channel and output_target
-        else ""
-    )
+    if routing_note:
+        routing = routing_note
+    elif resolved_channel and resolved_target:
+        routing = f" Output will be delivered to {resolved_channel}:{resolved_target}."
+    else:
+        routing = ""
     tz_note = f" Timezone: {timezone}." if timezone else ""
     return (
         f"Scheduled job '{name}' ({schedule}). Next run: {next_run}.{routing}{tz_note}"
@@ -1012,16 +1073,23 @@ def get_current_time() -> str:
 
 
 @tool
-def cron_once(name: str, run_at: str, task: str, timezone: str = "") -> str:
+def cron_once(
+    name: str,
+    run_at: str,
+    task: str,
+    timezone: str = "",
+    output_channel: str = "",
+    output_target: str = "",
+) -> str:
     """Schedule a one-time (non-recurring) reminder or task at a specific datetime.
 
     Use this for relative-time requests: "in 5 minutes", "in 2 hours",
     "tomorrow at 9 AM".  Always call ``get_current_time`` first to know the
     current local time, then compute the target datetime and pass it here.
 
-    After the job fires, the agent is invoked with ``task`` as the user
-    message and the result is sent to configured notification channels
-    (Telegram / Slack).
+    When the request originates from a messaging channel and no explicit
+    ``output_channel``/``output_target`` is provided, the reminder is routed
+    back to the originating chat automatically.
 
     Args:
         name: Unique job name in snake_case (e.g. ``"email_reminder"``).
@@ -1031,6 +1099,8 @@ def cron_once(name: str, run_at: str, task: str, timezone: str = "") -> str:
             (e.g. ``"Send a reminder to write the weekly report"``).
         timezone: IANA timezone for this job (e.g. ``"America/Caracas"``).
             Leave empty to use the system-wide timezone resolution chain.
+        output_channel: Optional delivery channel; see :func:`cron_add`.
+        output_target: Channel-specific destination; see :func:`cron_add`.
 
     Returns:
         Confirmation string with the scheduled time, or an error message.
@@ -1041,16 +1111,27 @@ def cron_once(name: str, run_at: str, task: str, timezone: str = "") -> str:
         from lightagent.scheduler.cron_manager import CronManager
         from lightagent.scheduler.executor import get_running_executor
 
+        resolved_channel, resolved_target, routing_note = _resolve_channel_delivery(
+            output_channel, output_target
+        )
+
         target = datetime.strptime(run_at, "%Y-%m-%d %H:%M:%S")  # noqa: DTZ007
         mgr = CronManager()
-        job = mgr.add_once(name, target, task, timezone=timezone)
+        job = mgr.add_once(
+            name,
+            target,
+            task,
+            timezone=timezone,
+            output_channel=resolved_channel or None,
+            output_target=resolved_target or None,
+        )
         executor = get_running_executor()
         if executor is not None:
             executor.schedule_coroutine(executor.add_job(job))
         tz_note = f" (timezone: {timezone})" if timezone else ""
         return (
             f"One-time reminder '{name}' scheduled for"
-            f" {target.strftime('%Y-%m-%d %H:%M')}{tz_note}."
+            f" {target.strftime('%Y-%m-%d %H:%M')}{tz_note}.{routing_note}"
         )
     except ValueError as exc:
         return f"Invalid datetime — use YYYY-MM-DD HH:MM:SS format. Error: {exc}"

@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from lightagent.agents.intent_router import match_intent
 from lightagent.core.config import get_settings
 from lightagent.core.logging import get_logger
 from lightagent.memory.long_term_store import (
@@ -167,11 +168,33 @@ Available agents:
   After installation the agent will confirm the skill name so the user can
   request activation: "activa el skill <name>".
 - cron_manager: Schedule recurring tasks, list/pause/resume/remove cron jobs.
-  Route here when the user asks to:
-  · Schedule something periodically (daily, weekly, every hour, etc.)
-  · List, pause, resume, or remove scheduled jobs
-  · Use time-based triggers: "every day", "cada hora", "programar", "agendar",
-    "cron", "schedule", "recurring", "periodic", "reminder"
+  CRITICAL: route here for ANY query about cron jobs, scheduled jobs, or
+  recurring tasks — whether listing them, checking which are active, pausing,
+  resuming, removing, or creating new ones. The cron_manager reads the live
+  scheduler state via dedicated tools, so its answers are always accurate
+  and up-to-date. NEVER answer cron questions from memory, and NEVER route
+  cron questions to 'researcher' just because they start with "lista" or
+  "list".
+  Examples (Spanish):
+    · "lista los crons activos"
+    · "lista mis crons"
+    · "qué crons tengo activos"
+    · "pausa el cron de reporte diario"
+    · "borra el job de las 8"
+    · "programa una tarea cada hora"
+    · "agenda un recordatorio diario a las 9"
+    · "cada día a las 9 envíame el reporte"
+  Examples (English):
+    · "list scheduled jobs"
+    · "list my cron jobs"
+    · "pause cron daily-report"
+    · "remove cron daily-report"
+    · "schedule a daily summary at 8am"
+    · "every day at noon remind me to drink water"
+    · "set up a recurring reminder"
+  Keywords: "cron", "crons", "cronjob", "scheduled", "schedule", "programar",
+  "agendar", "recurring", "periodic", "reminder", "recordatorio", "every day",
+  "cada hora", "daily", "weekly", "diariamente".
 - dev_pipeline: for software development tasks requiring a full pipeline
   (PO → Architect → Developer → Tests → QA → Review).
   Route here when the user asks to build a complete software feature or product
@@ -308,9 +331,7 @@ async def _recall_memory_context(state: AgentState) -> str:
     if not facts:
         return ""
 
-    bullets = "\n".join(
-        f"- {fact['value']}" for fact in facts if fact.get("value")
-    )
+    bullets = "\n".join(f"- {fact['value']}" for fact in facts if fact.get("value"))
     if not bullets:
         return ""
     return (
@@ -354,8 +375,7 @@ async def _extract_and_store_memory(state: AgentState) -> None:
             return
 
         candidate_lines = [
-            line.lstrip("-*0123456789. ").strip()
-            for line in raw.splitlines()
+            line.lstrip("-*0123456789. ").strip() for line in raw.splitlines()
         ]
         facts = [line for line in candidate_lines if line][:5]
         if not facts:
@@ -454,6 +474,32 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
                     "next_agent": None,
                     "messages": [],
                 }
+
+        # SPEC-046 AC-046-5: deterministic short-circuit for unambiguous
+        # intents (currently only ``cron_manager``).  Runs AFTER the loop
+        # breaker and BEFORE building the LLM routing prompt so we never
+        # waste tokens — and never mis-route — on requests that a pure
+        # regex matcher can recognise with high confidence.
+        last_human_text = ""
+        for msg in reversed(trimmed):
+            if getattr(msg, "type", "") == "human":
+                last_human_text = str(getattr(msg, "content", ""))
+                break
+        matched_intent = match_intent(last_human_text)
+        if matched_intent is not None and matched_intent in _VALID_ROUTES:
+            logger.info(
+                "supervisor_intent_short_circuit",
+                intent="cron_management",
+                next_agent=matched_intent,
+                session_id=session_id,
+            )
+            span.set_attribute("lightagent.routing_decision", matched_intent)
+            span.set_attribute("lightagent.routing_source", "intent_router")
+            return {
+                "current_agent": "supervisor",
+                "next_agent": matched_intent,
+                "messages": [],
+            }
 
         # SPEC-039 AC-039-4: recall up to ``memory_recall_limit`` durable
         # preferences for the current user and append them to the system
@@ -594,6 +640,17 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
                 else:
                     answer_content = str(answer_resp.content)
 
+                # Unwrap synthetic function-call JSON (Ollama / open models)
+                # so the supervisor direct-answer path never leaks the raw
+                # wrapper through to the user.
+                from lightagent.agents.tool_registry import (
+                    _unwrap_synthetic_tool_call,
+                )
+
+                unwrapped = _unwrap_synthetic_tool_call(answer_content)
+                if unwrapped is not None:
+                    answer_content = unwrapped
+
                 response_messages = [AIMessage(content=answer_content)]
 
         # SPEC-039 AC-039-3: when the session is ending (next_agent is
@@ -632,9 +689,7 @@ HIERARCHICAL_MEMBERS: list[str] = [
     "cron_manager",
 ]
 
-_HIERARCHICAL_VALID_ROUTES: frozenset[str] = frozenset(HIERARCHICAL_MEMBERS) | {
-    "END"
-}
+_HIERARCHICAL_VALID_ROUTES: frozenset[str] = frozenset(HIERARCHICAL_MEMBERS) | {"END"}
 
 _HIERARCHICAL_SYSTEM_PROMPT: str = """\
 You are the ROOT orchestrator of a 3-level multi-agent system.
@@ -665,6 +720,16 @@ own sub-orchestrator that picks the right specialist within its scope.
 - cron_manager: Scheduling recurring tasks — add / list / pause / resume /
   remove cron jobs. Time-based triggers ("every day", "cada hora",
   "programar", "schedule", "reminder").
+  CRITICAL: route here for ANY query about cron jobs, scheduled jobs, or
+  recurring tasks. NEVER answer cron questions from memory, and NEVER route
+  cron questions to a domain orchestrator just because they start with
+  "lista" or "list".
+  Examples:
+    · "lista los crons activos"
+    · "pausa el cron de reporte diario"
+    · "borra el job de las 8"
+    · "list scheduled jobs"
+    · "schedule a daily summary at 8am"
 
 ## Routing rules
 
@@ -742,14 +807,37 @@ async def hierarchical_supervisor_node(
                     "messages": [],
                 }
 
+        # SPEC-046 AC-046-6: deterministic short-circuit for unambiguous
+        # intents, validated against the hierarchical allowed set. When
+        # the matched intent is not reachable from this supervisor, fall
+        # through to LLM routing instead of forcing an unknown target.
+        last_human_text = ""
+        for msg in reversed(trimmed):
+            if getattr(msg, "type", "") == "human":
+                last_human_text = str(getattr(msg, "content", ""))
+                break
+        matched_intent = match_intent(last_human_text)
+        if matched_intent is not None and matched_intent in _HIERARCHICAL_VALID_ROUTES:
+            logger.info(
+                "hierarchical_supervisor_intent_short_circuit",
+                intent="cron_management",
+                next_agent=matched_intent,
+                session_id=session_id,
+            )
+            span.set_attribute("lightagent.routing_decision", matched_intent)
+            span.set_attribute("lightagent.routing_source", "intent_router")
+            return {
+                "current_agent": "supervisor",
+                "next_agent": matched_intent,
+                "messages": [],
+            }
+
         # Optional memory recall — the hierarchical root benefits from
         # the same cross-session preferences as the flat supervisor.
         memory_context = await _recall_memory_context(state)
 
         routing_messages = [
-            SystemMessage(
-                content=_HIERARCHICAL_SYSTEM_PROMPT + memory_context
-            ),
+            SystemMessage(content=_HIERARCHICAL_SYSTEM_PROMPT + memory_context),
             *trimmed,
             HumanMessage(
                 content=(
@@ -797,22 +885,26 @@ async def hierarchical_supervisor_node(
             last = state["messages"][-1]
             if getattr(last, "type", "") == "human":
                 profile = ProfileManager()
-                answer_system = (
-                    profile.load_system_prompt() or _ANSWER_SYSTEM_PROMPT
-                )
+                answer_system = profile.load_system_prompt() or _ANSWER_SYSTEM_PROMPT
                 answer_resp = await llm.ainvoke(
                     [SystemMessage(content=answer_system), *trimmed]
                 )
-                response_messages = [
-                    AIMessage(content=str(answer_resp.content))
-                ]
+                answer_content = str(answer_resp.content)
+                # Same Ollama / open-model JSON-wrap defense as in the flat
+                # supervisor — small talk must never leak the synthetic blob.
+                from lightagent.agents.tool_registry import (
+                    _unwrap_synthetic_tool_call,
+                )
+
+                unwrapped = _unwrap_synthetic_tool_call(answer_content)
+                if unwrapped is not None:
+                    answer_content = unwrapped
+                response_messages = [AIMessage(content=answer_content)]
 
         # Fire memory extraction on session end (same as flat).
         if next_agent is None and get_settings().memory_extraction_enabled:
             try:
-                task = asyncio.create_task(
-                    _extract_and_store_memory(state)
-                )
+                task = asyncio.create_task(_extract_and_store_memory(state))
                 _memory_extraction_tasks.add(task)
                 task.add_done_callback(_memory_extraction_tasks.discard)
             except RuntimeError as exc:

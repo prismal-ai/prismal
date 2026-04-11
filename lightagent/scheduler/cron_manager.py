@@ -355,6 +355,8 @@ class CronManager:
         run_at: datetime,
         task: str,
         timezone: str = "",
+        output_channel: str | None = None,
+        output_target: str | None = None,
     ) -> CronJob:
         """Create and persist a one-time (non-recurring) cron job.
 
@@ -369,6 +371,9 @@ class CronManager:
             task: Human-readable task description sent to the agent.
             timezone: IANA timezone name for this job (e.g. ``"America/Caracas"``).
                 Empty string uses the system-wide timezone resolution chain.
+            output_channel: Delivery channel for the job output
+                (e.g. ``"telegram"``).  ``None`` disables proactive delivery.
+            output_target: Channel-specific target (chat_id, #channel, email).
 
         Returns:
             The newly created :class:`CronJob`.
@@ -389,15 +394,21 @@ class CronManager:
             task=task,
             next_run=run_at,
             timezone=timezone,
+            output_channel=output_channel,
+            output_target=output_target,
         )
         with self._conn() as conn:
             conn.execute(
                 "INSERT INTO cron_jobs"
                 " (name, schedule, task, status, created_at, next_run,"
-                "  max_retries, retry_delay_seconds, retry_count, timezone)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (name, schedule, task, job.status, now_str, run_at_str, 0, 60, 0,
-                 timezone),
+                "  max_retries, retry_delay_seconds, retry_count,"
+                "  output_channel, output_target, timezone)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    name, schedule, task, job.status, now_str, run_at_str,
+                    0, 60, 0,
+                    output_channel, output_target, timezone,
+                ),
             )
 
         logger.info(

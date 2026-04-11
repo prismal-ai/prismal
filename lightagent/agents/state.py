@@ -79,6 +79,12 @@ class AgentState(TypedDict):
         estimated_cost_usd: Running estimated cost in US dollars.
         iteration_count: Number of Reflexion self-critique iterations performed.
         metadata: Arbitrary key-value pairs for extension without schema changes.
+        channel_context: Origin channel context when the request entered
+            LightAgent through a messaging gateway (Telegram, Slack, Discord,
+            …).  When non-``None`` the dict contains ``channel``, ``chat_id``
+            and ``user_id`` so tools like ``cron_add`` can auto-route their
+            output back to the originating chat.  ``None`` for CLI, dashboard,
+            API, or any other non-channel invocation.
     """
 
     messages: Annotated[list[BaseMessage], add_messages]
@@ -102,6 +108,7 @@ class AgentState(TypedDict):
     estimated_cost_usd: float
     iteration_count: int
     metadata: dict[str, Any]
+    channel_context: dict[str, str] | None
 
 
 def create_initial_state(session_id: str) -> AgentState:
@@ -149,6 +156,7 @@ def create_initial_state(session_id: str) -> AgentState:
         estimated_cost_usd=0.0,
         iteration_count=0,
         metadata={},
+        channel_context=None,
     )
 
 
