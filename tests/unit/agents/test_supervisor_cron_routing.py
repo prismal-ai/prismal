@@ -15,7 +15,13 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from lightagent.agents.state import AgentState
-from lightagent.agents.supervisor import MEMBERS, supervisor_node
+from lightagent.agents.supervisor import (
+    _HIERARCHICAL_SYSTEM_PROMPT,
+    _SYSTEM_PROMPT,
+    MEMBERS,
+    hierarchical_supervisor_node,
+    supervisor_node,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -55,6 +61,7 @@ def _make_state(text: str) -> AgentState:
         estimated_cost_usd=0.0,
         iteration_count=0,
         metadata={},
+        channel_context=None,
     )
 
 
@@ -189,3 +196,67 @@ async def test_supervisor_does_not_route_coding_to_cron_manager() -> None:
 
     assert result.get("next_agent") == "coder"
     assert result.get("next_agent") != "cron_manager"
+
+
+# ---------------------------------------------------------------------------
+# SPEC-046: deterministic intent short-circuit tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_supervisor_short_circuits_cron_via_intent_router() -> None:
+    """``"lista los crons activos"`` short-circuits to cron_manager without LLM."""
+    state = _make_state("lista los crons activos")
+
+    # The mock would incorrectly route to 'researcher' (reproducing the
+    # production bug) — we assert the matcher wins before the LLM is called.
+    mock_reg = _mock_registry("researcher")
+    with patch(_PATCH_TARGET, mock_reg):
+        result = await supervisor_node(state)
+        mock_llm = mock_reg.return_value.get_llm_with_fallback.return_value
+
+    assert result.get("next_agent") == "cron_manager"
+    assert mock_llm.ainvoke.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_supervisor_falls_through_when_intent_router_misses() -> None:
+    """Non-cron requests still go through the LLM routing path."""
+    state = _make_state("write a Python script that prints hello")
+
+    mock_reg = _mock_registry("coder")
+    with patch(_PATCH_TARGET, mock_reg):
+        result = await supervisor_node(state)
+        mock_llm = mock_reg.return_value.get_llm_with_fallback.return_value
+
+    assert result.get("next_agent") == "coder"
+    assert mock_llm.ainvoke.await_count >= 1
+
+
+@pytest.mark.asyncio
+async def test_hierarchical_supervisor_short_circuits_cron() -> None:
+    """Hierarchical supervisor also short-circuits cron requests."""
+    state = _make_state("lista los crons activos")
+
+    # Mock returns a domain orchestrator to prove the matcher wins.
+    mock_reg = _mock_registry("research_orchestrator")
+    with patch(_PATCH_TARGET, mock_reg):
+        result = await hierarchical_supervisor_node(state)
+        mock_llm = mock_reg.return_value.get_llm_with_fallback.return_value
+
+    assert result.get("next_agent") == "cron_manager"
+    assert mock_llm.ainvoke.await_count == 0
+
+
+def test_system_prompt_has_strong_cron_rule() -> None:
+    """``_SYSTEM_PROMPT`` must contain the CRITICAL cron instruction + examples."""
+    assert "NEVER answer cron questions from memory" in _SYSTEM_PROMPT
+    assert "lista los crons activos" in _SYSTEM_PROMPT
+    assert "list scheduled jobs" in _SYSTEM_PROMPT
+
+
+def test_hierarchical_system_prompt_has_strong_cron_rule() -> None:
+    """``_HIERARCHICAL_SYSTEM_PROMPT`` mirrors the cron rule strengthening."""
+    assert "NEVER answer cron questions from memory" in _HIERARCHICAL_SYSTEM_PROMPT
+    assert "lista los crons activos" in _HIERARCHICAL_SYSTEM_PROMPT
+    assert "list scheduled jobs" in _HIERARCHICAL_SYSTEM_PROMPT

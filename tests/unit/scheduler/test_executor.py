@@ -802,3 +802,140 @@ def test_register_expired_once_job_is_skipped_and_removed(
         ex._register_job(job)
         mock_add_job.assert_not_called()
         mock_manager.remove.assert_called_once_with("expired-once")
+
+
+# ---------------------------------------------------------------------------
+# Soft-failure detection (Phase 44 — cron delivery reliability)
+# ---------------------------------------------------------------------------
+
+
+def test_looks_like_soft_failure_matches_rate_limit_apology() -> None:
+    """The detector recognises the exact string returned by throttled runs."""
+    from lightagent.scheduler.executor import _looks_like_soft_failure
+
+    msg = (
+        "I'm sorry, the AI service is temporarily rate-limited "
+        "(too many tokens per minute). Please wait a moment and try again."
+    )
+    assert _looks_like_soft_failure(msg) is not None
+
+
+def test_looks_like_soft_failure_ignores_normal_output() -> None:
+    """Legitimate agent output never matches the soft-failure signatures."""
+    from lightagent.scheduler.executor import _looks_like_soft_failure
+
+    assert _looks_like_soft_failure("Here are the top 5 Linux news items...") is None
+    assert _looks_like_soft_failure("") is None
+    assert _looks_like_soft_failure(None) is None
+
+
+@pytest.mark.asyncio
+async def test_run_job_treats_rate_limit_output_as_failure(
+    executor: CronExecutor, mock_manager: MagicMock
+) -> None:
+    """A soft-failure apology triggers the retry path instead of success."""
+    from langchain_core.messages import AIMessage
+
+    mock_graph = AsyncMock()
+    mock_graph.ainvoke = AsyncMock(
+        return_value={
+            "messages": [
+                AIMessage(
+                    content=(
+                        "I'm sorry, the AI service is temporarily "
+                        "rate-limited. Please wait and try again."
+                    )
+                )
+            ]
+        }
+    )
+
+    # Simulate a job with one retry remaining so we exercise the retry branch.
+    retry_job = MagicMock()
+    retry_job.retry_count = 0
+    retry_job.max_retries = 2
+    retry_job.retry_delay_seconds = 60
+    mock_manager.get_job.return_value = retry_job
+
+    with patch(
+        "lightagent.agents.graph.get_async_compiled_graph",
+        new=AsyncMock(return_value=mock_graph),
+    ):
+        await executor._run_job("throttled-job", "Fetch news")
+
+    # update_last_run must NOT be called — the run was a failure.
+    mock_manager.update_last_run.assert_not_called()
+    # History row must record the failure.
+    assert mock_manager.add_run_record.called
+    kwargs = mock_manager.add_run_record.call_args.kwargs
+    assert kwargs["outcome"] == "failure"
+    assert "soft_failure" in (kwargs.get("error") or "")
+    # Retry counter bumped to 1.
+    mock_manager.set_retry_count.assert_called_with("throttled-job", 1)
+
+
+# ---------------------------------------------------------------------------
+# Permanent-error bypass (billing / auth / invalid request)
+# ---------------------------------------------------------------------------
+
+
+def test_is_permanent_error_matches_billing() -> None:
+    """_is_permanent_error catches credit-balance and auth errors."""
+    from lightagent.scheduler.executor import _is_permanent_error
+
+    msg = (
+        'litellm.BadRequestError: AnthropicException - {"type":"error",'
+        '"error":{"type":"invalid_request_error","message":"Your credit '
+        'balance is too low to access the Anthropic API."}}'
+    )
+    assert _is_permanent_error(msg) is True
+    assert _is_permanent_error("AuthenticationError: invalid api key") is True
+
+
+def test_is_permanent_error_skips_transient() -> None:
+    """_is_permanent_error returns False for rate-limits and connection errors."""
+    from lightagent.scheduler.executor import _is_permanent_error
+
+    assert _is_permanent_error("429 Too Many Requests rate_limit_error") is False
+    assert _is_permanent_error("connection reset by peer") is False
+
+
+@pytest.mark.asyncio
+async def test_run_job_permanent_error_skips_retry_policy(
+    executor: CronExecutor, mock_manager: MagicMock
+) -> None:
+    """Permanent errors (billing) must NOT burn the retry budget — the
+    job fails immediately and the failure notifier fires once."""
+    billing_exc = RuntimeError(
+        'litellm.BadRequestError: AnthropicException - {"type":"error",'
+        '"error":{"type":"invalid_request_error","message":"Your credit '
+        'balance is too low to access the Anthropic API."}}'
+    )
+
+    # Retry would normally be available (retry_count < max_retries),
+    # but permanent-error bypass must short-circuit it.
+    retry_job = MagicMock()
+    retry_job.retry_count = 0
+    retry_job.max_retries = 3
+    retry_job.retry_delay_seconds = 60
+    mock_manager.get_job.return_value = retry_job
+
+    notify_mock = AsyncMock()
+    executor._notifier.notify_failure = notify_mock  # type: ignore[method-assign]
+
+    with patch(
+        "lightagent.agents.graph.get_async_compiled_graph",
+        new=AsyncMock(side_effect=billing_exc),
+    ):
+        await executor._run_job("billed_out", "do stuff")
+
+    # No retry scheduled — no APScheduler date-trigger add_job call.
+    date_retry_calls = [
+        c for c in executor._scheduler.add_job.call_args_list
+        if c.kwargs.get("trigger") == "date"
+    ]
+    assert date_retry_calls == []
+    # Retry count reset to zero (normal bypass accounting).
+    mock_manager.set_retry_count.assert_called_with("billed_out", 0)
+    # Failure notifier was fired exactly once.
+    assert notify_mock.await_count == 1

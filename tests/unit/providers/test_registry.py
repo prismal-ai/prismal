@@ -47,8 +47,16 @@ def test_token_usage_defaults_to_zero() -> None:
 
 @pytest.fixture
 def settings() -> Settings:
-    """Settings with deterministic test values (no real API keys)."""
+    """Settings with deterministic test values (no real API keys).
+
+    Passes ``_env_file=None`` so the developer's local ``.env`` can never
+    leak into the test run — otherwise an environment with
+    ``LIGHTAGENT_LLM_PROVIDER=ollama`` would trip the provider resolver
+    validator when the test fixture pins a non-Ollama model.
+    """
     return Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        llm_provider="",
         default_model="claude-sonnet-4-5",
         fallback_model="gpt-4o-mini",
         temperature=0.5,
@@ -291,3 +299,97 @@ def test_get_llm_with_fallback_uses_fallback_model(
     models_used = [call.kwargs["model"] for call in mock_cls.call_args_list]
     assert "claude-sonnet-4-5" in models_used
     assert "gpt-4o-mini" in models_used
+
+
+@patch("lightagent.providers.registry.ChatLiteLLM")
+def test_get_llm_with_fallback_skips_wrapper_when_empty(
+    mock_cls: MagicMock,
+) -> None:
+    """Ollama-only setup (fallback_model='') returns the primary directly."""
+    mock_llm = MagicMock(spec=BaseChatModel)
+    mock_cls.return_value = mock_llm
+
+    ollama_settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        llm_provider="ollama",
+        default_model="",
+        fallback_model="",
+    )
+    ollama_registry = ProviderRegistry(settings=ollama_settings)
+    result = ollama_registry.get_llm_with_fallback()
+
+    # No fallback wrapper — ChatLiteLLM called exactly once for the primary.
+    assert mock_cls.call_count == 1
+    assert mock_cls.call_args.kwargs["model"].startswith("ollama_chat/")
+    assert result is mock_llm
+    mock_llm.with_fallbacks.assert_not_called()
+
+
+def test_provider_registry_exports_ollama_base_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ProviderRegistry mirrors settings.ollama_base_url into os.environ."""
+    monkeypatch.delenv("OLLAMA_API_BASE", raising=False)
+
+    custom = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        ollama_base_url="http://ollama.internal:11434",
+    )
+    ProviderRegistry(settings=custom)
+
+    import os
+
+    assert os.environ.get("OLLAMA_API_BASE") == "http://ollama.internal:11434"
+
+
+@patch("lightagent.providers.registry.ChatLiteLLM")
+def test_get_llm_uses_ollama_timeout_for_ollama_models(
+    mock_cls: MagicMock,
+) -> None:
+    """Ollama models use the dedicated (longer) ollama timeout."""
+    settings_ollama = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        llm_provider="",
+        default_model="ollama_chat/llama3.1",
+        fallback_model="",
+        timeout_seconds=60,
+        llm_ollama_timeout_seconds=300,
+    )
+    registry = ProviderRegistry(settings=settings_ollama)
+    registry.get_llm()
+    kwargs = mock_cls.call_args.kwargs
+    assert kwargs["request_timeout"] == 300.0
+    assert kwargs["model"] == "ollama_chat/llama3.1"
+
+
+@patch("lightagent.providers.registry.ChatLiteLLM")
+def test_get_llm_uses_cloud_timeout_for_non_ollama_models(
+    mock_cls: MagicMock,
+) -> None:
+    """Cloud providers still use the short default timeout."""
+    settings_cloud = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        llm_provider="",
+        default_model="claude-sonnet-4-5",
+        fallback_model="",
+        timeout_seconds=60,
+        llm_ollama_timeout_seconds=300,
+    )
+    registry = ProviderRegistry(settings=settings_cloud)
+    registry.get_llm()
+    kwargs = mock_cls.call_args.kwargs
+    assert kwargs["request_timeout"] == 60.0
+
+
+def test_provider_map_default_ollama_is_ollama_chat_prefix() -> None:
+    """The auto-resolver maps llm_provider='ollama' to an ollama_chat/*
+    model so LiteLLM uses Ollama's native /api/chat tool-calling path
+    instead of prompt-based emulation."""
+    s = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        llm_provider="ollama",
+        default_model="",
+        fallback_model="",
+    )
+    assert s.default_model.startswith("ollama_chat/")
+    assert s.fallback_model == ""

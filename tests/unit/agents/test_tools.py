@@ -346,10 +346,116 @@ def test_cron_add_tool_accepts_output_channel() -> None:
         "hb",
         "0 8 * * *",
         "Morning check",
+        max_retries=2,
         output_channel="telegram",
         output_target="12345",
+        timezone="",
     )
     assert "telegram" in result
+
+
+def test_cron_add_auto_fills_from_channel_context() -> None:
+    """When the LLM omits routing, cron_add borrows channel context."""
+    from lightagent.agents.context import use_channel_context
+    from lightagent.agents.tools import cron_add
+
+    with patch("lightagent.agents.tools.CronManager") as mock_cls:
+        mock_manager = MagicMock()
+        mock_manager.add.return_value = MagicMock(
+            name="news", schedule="40 9 * * *", next_run=None,
+        )
+        mock_cls.return_value = mock_manager
+
+        with use_channel_context(
+            {"channel": "telegram", "chat_id": "999", "user_id": "u1"}
+        ):
+            result = cron_add.invoke({
+                "name": "news",
+                "schedule": "40 9 * * *",
+                "task": "Linux news",
+            })
+
+    mock_manager.add.assert_called_once_with(
+        "news",
+        "40 9 * * *",
+        "Linux news",
+        max_retries=2,
+        output_channel="telegram",
+        output_target="999",
+        timezone="",
+    )
+    assert "auto-routed to telegram:999" in result
+
+
+def test_cron_add_honours_explicit_none_opt_out() -> None:
+    """Passing output_channel='none' disables auto-fill."""
+    from lightagent.agents.context import use_channel_context
+    from lightagent.agents.tools import cron_add
+
+    with patch("lightagent.agents.tools.CronManager") as mock_cls:
+        mock_manager = MagicMock()
+        mock_manager.add.return_value = MagicMock(next_run=None)
+        mock_cls.return_value = mock_manager
+
+        with use_channel_context(
+            {"channel": "telegram", "chat_id": "999", "user_id": "u1"}
+        ):
+            cron_add.invoke({
+                "name": "silent",
+                "schedule": "0 9 * * *",
+                "task": "Silent job",
+                "output_channel": "none",
+            })
+
+    mock_manager.add.assert_called_once_with(
+        "silent",
+        "0 9 * * *",
+        "Silent job",
+        max_retries=2,
+        output_channel=None,
+        output_target=None,
+        timezone="",
+    )
+
+
+def test_cron_add_no_context_no_auto_fill() -> None:
+    """Without channel context, cron_add does not auto-fill any routing."""
+    from lightagent.agents.tools import cron_add
+
+    with patch("lightagent.agents.tools.CronManager") as mock_cls:
+        mock_manager = MagicMock()
+        mock_manager.add.return_value = MagicMock(next_run=None)
+        mock_cls.return_value = mock_manager
+
+        cron_add.invoke({
+            "name": "api_only",
+            "schedule": "0 0 * * *",
+            "task": "API job",
+        })
+
+    kwargs = mock_manager.add.call_args.kwargs
+    assert kwargs["output_channel"] is None
+    assert kwargs["output_target"] is None
+
+
+def test_cron_add_default_max_retries_is_two() -> None:
+    """cron_add passes max_retries=2 to CronManager.add by default."""
+    from lightagent.agents.tools import CRON_ADD_DEFAULT_MAX_RETRIES, cron_add
+
+    assert CRON_ADD_DEFAULT_MAX_RETRIES == 2
+    with patch("lightagent.agents.tools.CronManager") as mock_cls:
+        mock_manager = MagicMock()
+        mock_manager.add.return_value = MagicMock(next_run=None)
+        mock_cls.return_value = mock_manager
+
+        cron_add.invoke({
+            "name": "plain",
+            "schedule": "0 0 * * *",
+            "task": "Plain job",
+        })
+
+    kwargs = mock_manager.add.call_args.kwargs
+    assert kwargs["max_retries"] == 2
 
 
 def test_list_dir_returns_entries(tmp_path: Path) -> None:

@@ -12,9 +12,15 @@ Launch (stdio transport)::
 Environment variables read at runtime:
     LIGHTAGENT_TIMEZONE      — override OS timezone (IANA name or "")
     LIGHTAGENT_CRON_TIMEZONE — default cron timezone (IANA name or "")
-"""
 
-from __future__ import annotations
+Note:
+    This module intentionally does NOT use ``from __future__ import annotations``.
+    The MCP SDK's ``Tool.from_function()`` calls
+    ``issubclass(param.annotation, Context)`` on raw ``inspect.signature``
+    annotations without resolving them via ``typing.get_type_hints()``.
+    PEP 563 string annotations would raise
+    ``TypeError: issubclass() arg 1 must be a class`` at decorator time.
+"""
 
 import os
 from datetime import UTC, datetime

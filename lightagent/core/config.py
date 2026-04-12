@@ -82,16 +82,51 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        # Let tests and callers pass either the field name (``default_model``)
+        # or the declared alias (``LIGHTAGENT_DEFAULT_MODEL``) as init kwargs.
+        # Without this, adding a ``validation_alias`` silently breaks any
+        # code that constructs ``Settings(default_model=...)`` directly.
+        populate_by_name=True,
     )
 
     # ── LLM ──────────────────────────────────────────────────────────
+    llm_provider: str = Field(
+        default="",
+        description=(
+            "High-level LLM provider selector. When non-empty, "
+            "``default_model`` / ``fallback_model`` are auto-derived from "
+            "the provider map unless the user also pinned a compatible "
+            "explicit model.  Accepted values (case-insensitive): "
+            "'' (legacy / no override), 'anthropic', 'openai', 'google', "
+            "'ollama'.  Set via LIGHTAGENT_LLM_PROVIDER."
+        ),
+    )
     default_model: str = Field(
         default="claude-sonnet-4-5",
-        description="Default LLM model (provider/model-id format for LiteLLM)",
+        validation_alias=AliasChoices(
+            "LIGHTAGENT_DEFAULT_MODEL",
+            "LIGHTAGENT_MODEL",
+        ),
+        description=(
+            "Default LLM model (provider/model-id format for LiteLLM). "
+            "LIGHTAGENT_MODEL is accepted as an alias for convenience."
+        ),
     )
     fallback_model: str = Field(
         default="gpt-4o-mini",
-        description="Fallback model if primary is unavailable",
+        description=(
+            "Fallback model if primary is unavailable.  Empty string "
+            "disables the fallback wrapper entirely (use for single-"
+            "provider setups like Ollama-only)."
+        ),
+    )
+    ollama_base_url: str = Field(
+        default="http://localhost:11434",
+        description=(
+            "Base URL of the local Ollama server.  Exported to the "
+            "environment as OLLAMA_API_BASE so LiteLLM picks it up when "
+            "routing ``ollama/*`` model strings."
+        ),
     )
     temperature: float = Field(
         default=0.7,
@@ -108,6 +143,17 @@ class Settings(BaseSettings):
         default=60,
         ge=1,
         description="Timeout in seconds for a single LLM API call",
+    )
+    llm_ollama_timeout_seconds: int = Field(
+        default=300,
+        ge=1,
+        description=(
+            "Timeout in seconds for calls routed to an Ollama model "
+            "(``ollama/*`` or ``ollama_chat/*``).  Local models are "
+            "typically far slower than cloud providers — 60 s is not "
+            "enough for a 7B-parameter+ model on CPU — so Ollama gets a "
+            "generous override that takes effect automatically."
+        ),
     )
     retry_attempts: int = Field(
         default=1,
@@ -1011,6 +1057,28 @@ class Settings(BaseSettings):
         description="Log WARNING if NTP offset exceeds this many seconds.",
     )
 
+    # ── LLM rate-limit retry ───────────────────────────────────────────────
+    llm_rate_limit_max_retries: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description=(
+            "Maximum number of LLM invocation retries on 429 / rate-limit "
+            "errors inside the ReAct loop.  0 disables retry (legacy "
+            "behaviour: fail fast and return an apology string)."
+        ),
+    )
+    llm_rate_limit_base_delay_seconds: float = Field(
+        default=5.0,
+        ge=0.0,
+        le=120.0,
+        description=(
+            "Base delay in seconds for exponential backoff between LLM "
+            "rate-limit retries.  Attempt N waits `base * 2**N` seconds, "
+            "capped at 60 s."
+        ),
+    )
+
     @model_validator(mode="after")
     def _validate_telegram_webhook(self) -> "Settings":
         """Validate webhook config when telegram_webhook_enabled is True."""
@@ -1023,6 +1091,97 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "LIGHTAGENT_TELEGRAM_WEBHOOK_SECRET must be set when webhook is enabled"
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _resolve_llm_provider(self) -> "Settings":
+        """Resolve ``llm_provider`` into ``default_model`` / ``fallback_model``.
+
+        When ``llm_provider`` is non-empty the validator:
+
+        1. Validates the provider name against the known map.
+        2. Replaces ``default_model`` / ``fallback_model`` with the
+           provider defaults *unless* the user already pinned a model
+           whose LiteLLM prefix is consistent with the provider
+           (e.g. ``ollama/mistral`` when provider is ``ollama``).
+        3. Logs a ``warnings.warn`` entry when a conflict is detected
+           so the operator notices stale overrides in ``.env``.
+
+        An empty ``llm_provider`` is the legacy path — explicit
+        ``default_model`` / ``fallback_model`` values are used as-is.
+        """
+        if not self.llm_provider:
+            return self
+
+        provider = self.llm_provider.strip().lower()
+        provider_map: dict[str, tuple[str, str, tuple[str, ...]]] = {
+            # key: (default_model, fallback_model, litellm_prefixes)
+            "anthropic": (
+                "claude-sonnet-4-5",
+                "gpt-4o-mini",
+                ("claude-", "anthropic/"),
+            ),
+            "openai": (
+                "gpt-4o",
+                "gpt-4o-mini",
+                ("gpt-", "o1-", "openai/"),
+            ),
+            "google": (
+                "gemini/gemini-1.5-pro",
+                "gemini/gemini-2.0-flash",
+                ("gemini/", "google/"),
+            ),
+            "ollama": (
+                # ``ollama_chat/`` uses Ollama's /api/chat endpoint which
+                # supports native tool / function calling for compatible
+                # models (llama3.1+, mistral, qwen2.5, ...), avoiding
+                # LiteLLM's prompt-based emulation that otherwise leaks
+                # raw ``{"function": "respond", ...}`` JSON into the reply.
+                "ollama_chat/llama3.1",
+                "",
+                ("ollama/", "ollama_chat/"),
+            ),
+        }
+        entry = provider_map.get(provider)
+        if entry is None:
+            raise ValueError(
+                f"Unknown LIGHTAGENT_LLM_PROVIDER value: {self.llm_provider!r}."
+                f" Accepted: '', 'anthropic', 'openai', 'google', 'ollama'."
+            )
+
+        default_default, default_fallback, prefixes = entry
+
+        def _matches(model: str) -> bool:
+            return any(model.startswith(p) for p in prefixes)
+
+        import warnings
+
+        if not self.default_model or not _matches(self.default_model):
+            if self.default_model and not _matches(self.default_model):
+                warnings.warn(
+                    f"LIGHTAGENT_LLM_PROVIDER={provider!r} but "
+                    f"LIGHTAGENT_DEFAULT_MODEL={self.default_model!r} does "
+                    f"not match that provider — overriding with "
+                    f"{default_default!r}.  Remove one of the two env "
+                    f"vars to silence this warning.",
+                    stacklevel=2,
+                )
+            self.default_model = default_default
+
+        if self.fallback_model and not _matches(self.fallback_model):
+            warnings.warn(
+                f"LIGHTAGENT_LLM_PROVIDER={provider!r} but "
+                f"LIGHTAGENT_FALLBACK_MODEL={self.fallback_model!r} does "
+                f"not match that provider — overriding with "
+                f"{default_fallback!r}.  Set LIGHTAGENT_FALLBACK_MODEL= "
+                f"(empty) to disable the fallback wrapper entirely.",
+                stacklevel=2,
+            )
+            self.fallback_model = default_fallback
+        elif not self.fallback_model:
+            # Use provider default (may itself be empty for ollama).
+            self.fallback_model = default_fallback
+
         return self
 
     @model_validator(mode="after")

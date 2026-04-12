@@ -74,12 +74,18 @@ class ProviderRegistry:
         self._inject_api_keys()
 
     def _inject_api_keys(self) -> None:
-        """Inject configured API keys into os.environ for LiteLLM consumption.
+        """Bridge Pydantic Settings to LiteLLM's environment-variable API.
 
-        Pydantic Settings loads keys from .env into the Settings object but does
-        NOT set them in os.environ. LiteLLM reads from os.environ directly, so
-        we bridge the two here using setdefault to avoid overwriting values that
-        were already set by the shell environment.
+        LiteLLM reads provider credentials and base URLs from ``os.environ``
+        directly, so values loaded through Pydantic Settings (from ``.env``
+        or explicit constructor arguments) must be mirrored into the
+        process environment before any LLM call.  ``setdefault`` is used so
+        that values already set by the shell environment win — useful in
+        container and CI deployments where secrets come from the platform
+        rather than ``.env``.
+
+        For Ollama, LiteLLM respects the ``OLLAMA_API_BASE`` variable, so
+        we export ``settings.ollama_base_url`` the same way.
         """
         key_map = {
             "ANTHROPIC_API_KEY": self._settings.anthropic_api_key.get_secret_value(),
@@ -89,6 +95,15 @@ class ProviderRegistry:
         for env_var, value in key_map.items():
             if value:
                 os.environ.setdefault(env_var, value)
+
+        # Ollama needs no API key, but LiteLLM needs the base URL to route
+        # ``ollama/*`` model strings.  Export from settings so a single
+        # LIGHTAGENT_OLLAMA_BASE_URL covers every codepath.
+        if self._settings.ollama_base_url:
+            os.environ.setdefault(
+                "OLLAMA_API_BASE", self._settings.ollama_base_url
+            )
+
         # Allow LiteLLM to auto-fix provider-specific parameter mismatches.
         # Anthropic rejects requests containing tool-use message history without
         # `tools=`; modify_params=True makes LiteLLM add a dummy tool automatically.
@@ -119,11 +134,24 @@ class ProviderRegistry:
         resolved_model = model if model is not None else self._settings.default_model
         temp = temperature if temperature is not None else self._settings.temperature
 
+        # Ollama local models are much slower than cloud providers — use
+        # the dedicated timeout override when the model is routed through
+        # Ollama so the default 60 s ceiling does not break simple greetings.
+        is_ollama = resolved_model.startswith(
+            ("ollama/", "ollama_chat/")
+        )
+        timeout_s = (
+            self._settings.llm_ollama_timeout_seconds
+            if is_ollama
+            else self._settings.timeout_seconds
+        )
+
         logger.debug(
             "creating_llm",
             model=resolved_model,
             streaming=streaming,
             temperature=temp,
+            timeout_seconds=timeout_s,
         )
 
         langfuse = LangfuseManager()
@@ -143,7 +171,7 @@ class ProviderRegistry:
                 streaming=streaming,
                 temperature=temp,
                 max_tokens=self._settings.max_tokens,
-                request_timeout=float(self._settings.timeout_seconds),
+                request_timeout=float(timeout_s),
                 max_retries=self._settings.retry_attempts,
             )
             # Inject Langfuse callback handler if available
@@ -157,12 +185,16 @@ class ProviderRegistry:
         model: str | None = None,
         streaming: bool = False,
         temperature: float | None = None,
-    ) -> RunnableWithFallbacks[LanguageModelInput, BaseMessage]:
+    ) -> BaseChatModel | RunnableWithFallbacks[LanguageModelInput, BaseMessage]:
         """
-        Return a primary LLM wrapped with automatic fallback.
+        Return a primary LLM wrapped with an optional automatic fallback.
 
-        If the primary model raises any exception (network, quota, timeout),
-        LangChain will automatically retry with ``settings.fallback_model``.
+        If ``settings.fallback_model`` is non-empty and differs from the
+        primary, the returned runnable falls back to the secondary model on
+        any primary failure (network, quota, timeout).  When the fallback
+        is empty — typical for single-provider setups like Ollama-only —
+        the primary ``BaseChatModel`` is returned directly so that the
+        caller does not pay for an unreachable fallback provider.
 
         Args:
             model: Primary model string. None = ``settings.default_model``.
@@ -170,13 +202,24 @@ class ProviderRegistry:
             temperature: Sampling temperature. None = ``settings.temperature``.
 
         Returns:
-            A ``RunnableWithFallbacks`` wrapping primary and fallback models.
+            Either the primary ``BaseChatModel`` (when no fallback is
+            configured) or a ``RunnableWithFallbacks`` wrapping both
+            models.
         """
         primary = self.get_llm(
             model=model, streaming=streaming, temperature=temperature
         )
+        fallback_model = self._settings.fallback_model
+        primary_model = model if model is not None else self._settings.default_model
+        if not fallback_model or fallback_model == primary_model:
+            logger.debug(
+                "provider.fallback_skipped",
+                primary=primary_model,
+                reason="empty" if not fallback_model else "same_as_primary",
+            )
+            return primary
         fallback = self.get_llm(
-            model=self._settings.fallback_model,
+            model=fallback_model,
             streaming=streaming,
             temperature=temperature,
         )

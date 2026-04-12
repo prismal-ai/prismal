@@ -5,11 +5,11 @@ from pydantic import ValidationError
 
 
 def test_settings_default_model() -> None:
-    """Settings loads default_model with fallback value."""
+    """Settings loads default_model with its class-level default."""
     from lightagent.core.config import Settings
 
     s = Settings()
-    assert s.default_model == "claude-sonnet-4-6"
+    assert s.default_model == "claude-sonnet-4-5"
 
 
 def test_settings_fallback_model() -> None:
@@ -108,3 +108,92 @@ def test_cron_notify_defaults_empty() -> None:
     s = Settings()
     assert s.cron_notify_telegram_chat_id == ""
     assert s.cron_notify_slack_channel == ""
+
+
+# ---------------------------------------------------------------------------
+# llm_provider resolver (Phase 44)
+# ---------------------------------------------------------------------------
+
+
+def test_llm_provider_blank_keeps_explicit_models() -> None:
+    """With llm_provider='' the explicit default_model/fallback_model win."""
+    from lightagent.core.config import Settings
+
+    s = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        llm_provider="",
+        default_model="claude-sonnet-4-5",
+        fallback_model="gpt-4o-mini",
+    )
+    assert s.default_model == "claude-sonnet-4-5"
+    assert s.fallback_model == "gpt-4o-mini"
+
+
+def test_llm_provider_ollama_resolves_defaults() -> None:
+    """llm_provider=ollama picks an ollama_chat/* model for native tools."""
+    from lightagent.core.config import Settings
+
+    s = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        llm_provider="ollama",
+        default_model="",
+        fallback_model="",
+    )
+    assert s.default_model.startswith("ollama_chat/")
+    assert s.fallback_model == ""  # single-provider setup
+
+
+def test_llm_provider_ollama_keeps_consistent_model() -> None:
+    """A consistent ollama/* default_model is preserved (no override)."""
+    from lightagent.core.config import Settings
+
+    s = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        llm_provider="ollama",
+        default_model="ollama/mistral",
+        fallback_model="",
+    )
+    assert s.default_model == "ollama/mistral"
+
+
+def test_llm_provider_conflict_warns_and_overrides() -> None:
+    """A cross-provider default_model triggers a warning and is overridden."""
+    import warnings
+
+    from lightagent.core.config import Settings
+
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always")
+        s = Settings(
+            _env_file=None,  # type: ignore[call-arg]
+            llm_provider="ollama",
+            default_model="claude-sonnet-4-5",
+            fallback_model="gpt-4o-mini",
+        )
+
+    assert s.default_model.startswith("ollama_chat/")
+    assert s.fallback_model == ""
+    messages = [str(w.message) for w in captured]
+    assert any("LIGHTAGENT_DEFAULT_MODEL" in m for m in messages)
+    assert any("LIGHTAGENT_FALLBACK_MODEL" in m for m in messages)
+
+
+def test_llm_provider_unknown_value_raises() -> None:
+    """Unknown provider names raise a clear validation error."""
+    from lightagent.core.config import Settings
+
+    with pytest.raises(ValidationError) as excinfo:
+        Settings(_env_file=None, llm_provider="cohere")  # type: ignore[call-arg]
+    assert "Unknown LIGHTAGENT_LLM_PROVIDER" in str(excinfo.value)
+
+
+def test_default_model_accepts_lightagent_model_alias(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LIGHTAGENT_MODEL is accepted as an alias for default_model."""
+    from lightagent.core.config import Settings
+
+    monkeypatch.delenv("LIGHTAGENT_DEFAULT_MODEL", raising=False)
+    monkeypatch.setenv("LIGHTAGENT_MODEL", "ollama/codellama")
+    s = Settings(_env_file=None)  # type: ignore[call-arg]
+    assert s.default_model == "ollama/codellama"

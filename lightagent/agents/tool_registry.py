@@ -22,6 +22,7 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -124,6 +125,14 @@ def get_skill_tools() -> list[BaseTool]:
 # (~15 k tokens) without issue.
 _MAX_MCP_TOOLS: int = 60
 
+# Hard upper bound on the total tool list handed to the LLM.  OpenAI rejects
+# any ``tools`` array longer than 128 entries with a BadRequestError; this
+# constant leaves a small safety margin so the merged list (MCP + skills +
+# stubs) never reaches the provider limit.  When the merged list exceeds
+# this cap the tail (lowest-priority entries — typically extra skill tools
+# and unused stubs) is dropped.
+_MAX_TOTAL_TOOLS: int = 120
+
 # Agents that operate on a fixed, minimal tool set and must NOT receive MCP
 # or skill tools.  Loading 60+ MCP schemas + unbounded skill schemas into
 # these agents causes the prompt to exceed Anthropic's 30 k token/min rate
@@ -220,6 +229,21 @@ def get_tools_for_agent(agent_name: str) -> list[BaseTool]:
 
     merged = live_tools + filtered_stubs
 
+    # Enforce the global provider cap (OpenAI rejects > 128 tool schemas).
+    # The merge order above is priority-ordered (MCP → skills → stubs), so
+    # truncating from the tail drops the lowest-value entries first.
+    if len(merged) > _MAX_TOTAL_TOOLS:
+        dropped = len(merged) - _MAX_TOTAL_TOOLS
+        merged = merged[:_MAX_TOTAL_TOOLS]
+        logger.warning(
+            "tool_registry.tools_truncated",
+            agent=agent_name,
+            cap=_MAX_TOTAL_TOOLS,
+            dropped=dropped,
+            live=len(live_tools),
+            stubs=len(filtered_stubs),
+        )
+
     logger.debug(
         "tool_registry.tools_resolved",
         agent=agent_name,
@@ -248,6 +272,274 @@ _RATE_LIMIT_BACKOFF: float = 1.2
 
 # Pattern to detect rate-limit errors by message content.
 _RATE_LIMIT_RE = re.compile(r"429|rate.?limit|too.many.requests", re.IGNORECASE)
+
+# Pattern to detect permanent / non-retryable provider errors.  These are
+# conditions that will NOT recover with a simple retry (billing, auth,
+# misconfigured API key, invalid request payload) — retrying them wastes
+# the remaining budget and delays the user-visible failure message.
+_PERMANENT_ERROR_RE = re.compile(
+    r"credit.?balance|insufficient.?(?:credit|quota|funds)|billing|"
+    r"invalid.?api.?key|invalid.?request.?error|invalid.?model|"
+    r"authentication|permission.?denied|unauthori[sz]ed|"
+    r"account.?(?:suspended|disabled)|model.?not.?found",
+    re.IGNORECASE,
+)
+
+# Maximum backoff delay (seconds) between LLM rate-limit retries.  The
+# exponential formula ``base * 2**attempt`` is capped at this value so a
+# badly configured ``base_delay`` cannot block the event loop for minutes.
+_LLM_RATE_LIMIT_MAX_DELAY: float = 60.0
+
+
+def _extract_retry_after(exc: BaseException) -> float | None:
+    """Best-effort extraction of a server-advertised Retry-After delay.
+
+    Providers like Anthropic and OpenAI include a ``retry-after`` header
+    on 429 responses.  LiteLLM forwards it as ``exc.retry_after`` on its
+    rate-limit exception types, and Anthropic error bodies sometimes
+    include a ``retry-after`` field in the JSON payload.
+
+    Args:
+        exc: The exception raised by ``llm.ainvoke``.
+
+    Returns:
+        Number of seconds to wait before the next attempt, or ``None``
+        when no hint is available.
+    """
+    hint = getattr(exc, "retry_after", None)
+    if isinstance(hint, int | float) and hint > 0:
+        return float(hint)
+    headers = getattr(exc, "response_headers", None) or getattr(exc, "headers", None)
+    if isinstance(headers, dict):
+        raw = headers.get("retry-after") or headers.get("Retry-After")
+        try:
+            if raw is not None:
+                parsed = float(raw)
+                if parsed > 0:
+                    return parsed
+        except (TypeError, ValueError):
+            pass
+    return None
+
+
+#: Keys we accept as the "final-answer" synthetic tool-call name.  Ollama
+#: and other open models commonly wrap their reply in one of these shapes
+#: when LiteLLM falls back to prompt-based function-call emulation.
+_SYNTHETIC_FINAL_NAMES: frozenset[str] = frozenset({
+    "respond",
+    "response",
+    "answer",
+    "final",
+    "final_answer",
+    "reply",
+    "say",
+})
+
+
+def _unwrap_synthetic_tool_call(content: str) -> str | None:
+    """Extract the inner text from a synthetic function-call JSON blob.
+
+    When LiteLLM routes a request through a model that cannot natively
+    emit OpenAI-style tool calls, it falls back to a prompt template that
+    instructs the model to answer with JSON of the form::
+
+        {"function": "respond", "arguments": {"response": "Hola ..."}}
+
+    LangChain then delivers that text as ``AIMessage.content`` without
+    any ``tool_calls`` attribute, so the ReAct loop mistakes the synthetic
+    wrapper for the real reply and the literal JSON reaches the user.
+
+    This helper recognises the wrapper and returns the inner reply string.
+    Accepted shapes include ``{"function": "respond", "arguments":
+    {"response": "..."}}``, ``{"name": "respond", "parameters":
+    {"text": "..."}}`` and the same with ``answer`` / ``final`` /
+    ``reply`` as the name.  Anything else returns ``None`` so the caller
+    falls back to the original content unchanged.
+
+    Args:
+        content: The raw ``AIMessage.content`` string.
+
+    Returns:
+        The extracted reply text, or ``None`` when *content* does not
+        look like a synthetic final-answer JSON wrapper.
+    """
+    if not content:
+        return None
+    stripped = content.strip()
+    # Tolerate code-fence decoration some models add: ```json\n{...}\n```
+    if stripped.startswith("```"):
+        stripped = stripped.strip("`").strip()
+        if stripped.lower().startswith("json"):
+            stripped = stripped[4:].lstrip()
+    if not stripped.startswith("{"):
+        return None
+    try:
+        payload = json.loads(stripped)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    name = payload.get("function") or payload.get("name") or payload.get("tool")
+    if not isinstance(name, str) or name.lower() not in _SYNTHETIC_FINAL_NAMES:
+        return None
+    args = (
+        payload.get("arguments")
+        or payload.get("parameters")
+        or payload.get("args")
+    )
+    if isinstance(args, dict):
+        for key in ("response", "text", "message", "content", "answer", "reply"):
+            candidate = args.get(key)
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate
+        # Fallback: a single string value inside arguments wins.
+        string_values = [v for v in args.values() if isinstance(v, str)]
+        if len(string_values) == 1 and string_values[0].strip():
+            return string_values[0]
+    if isinstance(args, str) and args.strip():
+        return args
+    return None
+
+
+def _sanitise_final_response(message: object) -> object:
+    """Return *message* with any synthetic JSON wrapper unwrapped.
+
+    ``react_loop`` calls this right before returning so downstream
+    callers (channel routers, supervisor, cron executor) never see the
+    synthetic wrapper.  Non-``AIMessage`` inputs and messages whose
+    content is not a synthetic wrapper are returned unchanged.
+
+    Args:
+        message: The message produced by ``llm.ainvoke`` — usually an
+            :class:`~langchain_core.messages.AIMessage`.
+
+    Returns:
+        Either the original message or a new
+        :class:`~langchain_core.messages.AIMessage` whose ``content``
+        has been replaced with the unwrapped reply text.
+    """
+    from langchain_core.messages import AIMessage
+
+    content = getattr(message, "content", None)
+    if not isinstance(content, str):
+        return message
+    unwrapped = _unwrap_synthetic_tool_call(content)
+    if unwrapped is None:
+        return message
+    logger.info(
+        "react_loop.synthetic_json_unwrapped",
+        original_length=len(content),
+        unwrapped_length=len(unwrapped),
+    )
+    return AIMessage(
+        content=unwrapped,
+        tool_calls=getattr(message, "tool_calls", None) or [],
+    )
+
+
+def _llm_permanent_error_message() -> str:
+    """Return the canonical user-facing string for a permanent LLM failure.
+
+    Kept as a helper so the three ``react_loop`` call sites share one
+    string and tests can assert against a stable token (``"unavailable"``).
+
+    Returns:
+        A short sentence telling the user the service is unavailable
+        because of a non-transient configuration or billing problem.
+    """
+    return (
+        "The AI service is currently unavailable due to a configuration "
+        "or billing problem (for example: expired credits, invalid API "
+        "key, or an unauthorised model). Please contact the administrator "
+        "— retrying will not fix this on its own."
+    )
+
+
+async def _invoke_llm_with_backoff(
+    llm: object,
+    messages: list[object],
+    *,
+    agent_name: str,
+    session_id: str | None,
+    iteration: int,
+) -> object:
+    """Call ``llm.ainvoke`` with exponential-backoff retries on 429 errors.
+
+    Transient rate-limit errors from the LLM provider (Anthropic / OpenAI
+    / Azure / …) are retried up to ``settings.llm_rate_limit_max_retries``
+    times before being re-raised.  The delay between retries is
+    ``base_delay * 2 ** attempt`` seconds, clamped to ``_LLM_RATE_LIMIT_MAX_DELAY``,
+    and overridden by any provider-supplied ``Retry-After`` hint when
+    available.
+
+    Non rate-limit exceptions are re-raised immediately so the existing
+    ``react_loop`` error handling can process them.
+
+    Args:
+        llm: A bound chat model that exposes ``ainvoke``.
+        messages: The conversation slice to send.
+        agent_name: Agent name used only for structured log entries.
+        session_id: Optional session identifier for log correlation.
+        iteration: Current ReAct iteration number (for logging).
+
+    Returns:
+        The :class:`~langchain_core.messages.AIMessage` returned by the
+        LLM on the first successful attempt.
+
+    Raises:
+        BaseException: The final rate-limit exception after all retries
+            are exhausted, or any non-rate-limit error unchanged.
+    """
+    from lightagent.core.config import get_settings
+
+    settings = get_settings()
+    max_retries = settings.llm_rate_limit_max_retries
+    base_delay = settings.llm_rate_limit_base_delay_seconds
+
+    attempt = 0
+    while True:
+        try:
+            return await llm.ainvoke(messages)  # type: ignore[attr-defined]
+        except Exception as exc:
+            exc_str = str(exc)
+            if _PERMANENT_ERROR_RE.search(exc_str):
+                # Billing / auth / invalid-request errors never recover
+                # from a blind retry.  Re-raise so the caller can surface
+                # the real reason to the user instead of looping.
+                logger.error(
+                    "react_loop.llm_permanent_error",
+                    agent=agent_name,
+                    iteration=iteration,
+                    error=exc_str[:200],
+                    session_id=session_id,
+                )
+                raise
+            if not _RATE_LIMIT_RE.search(exc_str):
+                raise
+            if attempt >= max_retries:
+                logger.warning(
+                    "react_loop.llm_rate_limit_exhausted",
+                    agent=agent_name,
+                    iteration=iteration,
+                    attempts=attempt + 1,
+                    session_id=session_id,
+                )
+                raise
+            hint = _extract_retry_after(exc)
+            delay = hint if hint is not None else base_delay * (2**attempt)
+            delay = min(delay, _LLM_RATE_LIMIT_MAX_DELAY)
+            logger.warning(
+                "react_loop.llm_rate_limit_retry",
+                agent=agent_name,
+                iteration=iteration,
+                attempt=attempt + 1,
+                max_attempts=max_retries,
+                delay_seconds=delay,
+                retry_after_hint=hint,
+                session_id=session_id,
+            )
+            await asyncio.sleep(delay)
+            attempt += 1
 
 
 async def react_loop(
@@ -307,14 +599,30 @@ async def react_loop(
 
     for iteration in range(max_iterations):
         try:
-            response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+            response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
+                llm,
+                loop_messages,
+                agent_name=agent_name,
+                session_id=session_id,
+                iteration=iteration,
+            )
         except Exception as llm_exc:
-            if _RATE_LIMIT_RE.search(str(llm_exc)):
+            exc_str = str(llm_exc)
+            if _PERMANENT_ERROR_RE.search(exc_str):
+                logger.error(
+                    "react_loop.llm_unavailable",
+                    agent=agent_name,
+                    iteration=iteration,
+                    error=exc_str[:200],
+                    session_id=session_id,
+                )
+                return AIMessage(content=_llm_permanent_error_message())
+            if _RATE_LIMIT_RE.search(exc_str):
                 logger.warning(
                     "react_loop.llm_rate_limited",
                     agent=agent_name,
                     iteration=iteration,
-                    error=str(llm_exc)[:200],
+                    error=exc_str[:200],
                     session_id=session_id,
                 )
                 return AIMessage(
@@ -464,14 +772,30 @@ async def react_loop(
                 )
             )
             try:
-                response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+                response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
+                    llm,
+                    loop_messages,
+                    agent_name=agent_name,
+                    session_id=session_id,
+                    iteration=iteration,
+                )
             except Exception as llm_exc:
-                if _RATE_LIMIT_RE.search(str(llm_exc)):
+                exc_str = str(llm_exc)
+                if _PERMANENT_ERROR_RE.search(exc_str):
+                    logger.error(
+                        "react_loop.llm_unavailable",
+                        agent=agent_name,
+                        iteration=iteration,
+                        error=exc_str[:200],
+                        session_id=session_id,
+                    )
+                    return AIMessage(content=_llm_permanent_error_message())
+                if _RATE_LIMIT_RE.search(exc_str):
                     logger.warning(
                         "react_loop.llm_rate_limited",
                         agent=agent_name,
                         iteration=iteration,
-                        error=str(llm_exc)[:200],
+                        error=exc_str[:200],
                         session_id=session_id,
                     )
                     return AIMessage(
@@ -506,13 +830,28 @@ async def react_loop(
             )
         )
         try:
-            response = await llm.ainvoke(loop_messages)  # type: ignore[assignment]
+            response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
+                llm,
+                loop_messages,
+                agent_name=agent_name,
+                session_id=session_id,
+                iteration=max_iterations,
+            )
         except Exception as llm_exc:
-            if _RATE_LIMIT_RE.search(str(llm_exc)):
+            exc_str = str(llm_exc)
+            if _PERMANENT_ERROR_RE.search(exc_str):
+                logger.error(
+                    "react_loop.llm_unavailable",
+                    agent=agent_name,
+                    error=exc_str[:200],
+                    session_id=session_id,
+                )
+                return AIMessage(content=_llm_permanent_error_message())
+            if _RATE_LIMIT_RE.search(exc_str):
                 logger.warning(
                     "react_loop.llm_rate_limited",
                     agent=agent_name,
-                    error=str(llm_exc)[:200],
+                    error=exc_str[:200],
                     session_id=session_id,
                 )
                 return AIMessage(
@@ -523,7 +862,7 @@ async def react_loop(
                 )
             raise
 
-    return response
+    return _sanitise_final_response(response)
 
 
 __all__ = [

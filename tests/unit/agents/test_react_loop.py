@@ -399,3 +399,339 @@ async def test_unknown_tool_returns_error_message() -> None:
     tm = next((m for m in second_call_msgs if isinstance(m, ToolMessage)), None)
     assert tm is not None
     assert "not found" in tm.content.lower()
+
+
+# ---------------------------------------------------------------------------
+# LLM rate-limit retry with exponential backoff (Phase 44)
+# ---------------------------------------------------------------------------
+
+
+class _FakeRateLimitError(Exception):
+    """Stand-in for ``litellm.RateLimitError`` that matches ``_RATE_LIMIT_RE``."""
+
+    def __init__(self, msg: str = "AnthropicException rate_limit_error 429") -> None:
+        super().__init__(msg)
+
+
+@pytest.mark.asyncio
+async def test_extract_retry_after_from_attribute() -> None:
+    """``_extract_retry_after`` reads ``exc.retry_after`` numeric attribute."""
+    from lightagent.agents.tool_registry import _extract_retry_after
+
+    class RetryAfterAttrError(Exception):
+        retry_after = 4
+
+    assert _extract_retry_after(RetryAfterAttrError()) == 4.0
+
+
+@pytest.mark.asyncio
+async def test_extract_retry_after_from_headers() -> None:
+    """``_extract_retry_after`` parses ``exc.headers['Retry-After']``."""
+    from lightagent.agents.tool_registry import _extract_retry_after
+
+    class RetryAfterHeaderError(Exception):
+        headers = {"Retry-After": "7"}
+
+    assert _extract_retry_after(RetryAfterHeaderError()) == 7.0
+
+
+@pytest.mark.asyncio
+async def test_extract_retry_after_returns_none_when_absent() -> None:
+    """No hint on the exception → ``None`` so caller falls back to backoff."""
+    from lightagent.agents.tool_registry import _extract_retry_after
+
+    assert _extract_retry_after(Exception("boom")) is None
+
+
+@pytest.mark.asyncio
+async def test_llm_rate_limit_succeeds_after_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LLM rate-limited once then succeeds → final response reaches the user."""
+    import lightagent.agents.tool_registry as reg
+    from lightagent.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "llm_rate_limit_max_retries", 3)
+    monkeypatch.setattr(settings, "llm_rate_limit_base_delay_seconds", 0.0)
+
+    call_count = {"n": 0}
+
+    async def flaky_ainvoke(_msgs: list[object]) -> AIMessage:
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise _FakeRateLimitError()
+        return _ai_final("Here are the news")
+
+    llm = MagicMock()
+    llm.ainvoke = flaky_ainvoke
+
+    response = await reg.react_loop(
+        llm, [], [HumanMessage(content="news please")], agent_name="researcher",
+    )
+
+    assert call_count["n"] == 2
+    assert response.content == "Here are the news"
+
+
+@pytest.mark.asyncio
+async def test_llm_rate_limit_exhausts_retries_returns_apology(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When every retry is rate-limited, the helper re-raises and react_loop
+    returns the canonical apology string (existing behaviour preserved).
+    """
+    import lightagent.agents.tool_registry as reg
+    from lightagent.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "llm_rate_limit_max_retries", 2)
+    monkeypatch.setattr(settings, "llm_rate_limit_base_delay_seconds", 0.0)
+
+    call_count = {"n": 0}
+
+    async def always_rate_limited(_msgs: list[object]) -> AIMessage:
+        call_count["n"] += 1
+        raise _FakeRateLimitError()
+
+    llm = MagicMock()
+    llm.ainvoke = always_rate_limited
+
+    response = await reg.react_loop(
+        llm, [], [HumanMessage(content="hi")], agent_name="researcher",
+    )
+
+    # 1 initial attempt + 2 retries = 3 calls before giving up.
+    assert call_count["n"] == 3
+    assert "rate-limited" in response.content.lower()
+
+
+@pytest.mark.asyncio
+async def test_llm_rate_limit_retry_disabled_when_max_retries_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``llm_rate_limit_max_retries=0`` reverts to fail-fast legacy behaviour."""
+    import lightagent.agents.tool_registry as reg
+    from lightagent.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "llm_rate_limit_max_retries", 0)
+    monkeypatch.setattr(settings, "llm_rate_limit_base_delay_seconds", 0.0)
+
+    call_count = {"n": 0}
+
+    async def always_rate_limited(_msgs: list[object]) -> AIMessage:
+        call_count["n"] += 1
+        raise _FakeRateLimitError()
+
+    llm = MagicMock()
+    llm.ainvoke = always_rate_limited
+
+    response = await reg.react_loop(
+        llm, [], [HumanMessage(content="hi")], agent_name="researcher",
+    )
+
+    assert call_count["n"] == 1
+    assert "rate-limited" in response.content.lower()
+
+
+@pytest.mark.asyncio
+async def test_llm_rate_limit_retry_respects_retry_after_hint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When the exception carries ``retry_after``, that hint drives the delay."""
+    import lightagent.agents.tool_registry as reg
+    from lightagent.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "llm_rate_limit_max_retries", 2)
+    monkeypatch.setattr(settings, "llm_rate_limit_base_delay_seconds", 99.0)
+
+    sleeps: list[float] = []
+
+    async def fake_sleep(d: float) -> None:
+        sleeps.append(d)
+
+    monkeypatch.setattr(reg.asyncio, "sleep", fake_sleep)
+
+    class HintedRateLimitError(_FakeRateLimitError):
+        retry_after = 2
+
+    call_count = {"n": 0}
+
+    async def flaky(_msgs: list[object]) -> AIMessage:
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise HintedRateLimitError
+        return _ai_final("ok")
+
+    llm = MagicMock()
+    llm.ainvoke = flaky
+
+    response = await reg.react_loop(
+        llm, [], [HumanMessage(content="hi")], agent_name="researcher",
+    )
+
+    assert response.content == "ok"
+    # Slept exactly once, using the hint (2s) and not the 99s base delay.
+    assert sleeps == [2.0]
+
+
+# ---------------------------------------------------------------------------
+# Permanent LLM errors (billing, auth, invalid request) — no retry
+# ---------------------------------------------------------------------------
+
+
+class _FakeBillingError(Exception):
+    """Stand-in for the ``credit_balance`` BadRequestError from Anthropic."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            'litellm.BadRequestError: AnthropicException - {"type":"error",'
+            '"error":{"type":"invalid_request_error","message":"Your credit '
+            'balance is too low to access the Anthropic API."}}'
+        )
+
+
+@pytest.mark.asyncio
+async def test_permanent_error_skips_retry_and_returns_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Credit-balance / auth errors must NOT be retried; react_loop returns
+    the dedicated 'service unavailable' message on the first attempt."""
+    import lightagent.agents.tool_registry as reg
+    from lightagent.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "llm_rate_limit_max_retries", 3)
+    monkeypatch.setattr(settings, "llm_rate_limit_base_delay_seconds", 0.0)
+
+    call_count = {"n": 0}
+
+    async def always_billing(_msgs: list[object]) -> AIMessage:
+        call_count["n"] += 1
+        raise _FakeBillingError()
+
+    llm = MagicMock()
+    llm.ainvoke = always_billing
+
+    response = await reg.react_loop(
+        llm, [], [HumanMessage(content="hi")], agent_name="researcher",
+    )
+
+    assert call_count["n"] == 1
+    assert "unavailable" in response.content.lower()
+    assert "billing" in response.content.lower() or "credit" in response.content.lower()
+
+
+@pytest.mark.asyncio
+async def test_permanent_error_in_retry_helper_raises_without_sleeping(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`_invoke_llm_with_backoff` must re-raise immediately on permanent
+    errors — never sleep, never retry."""
+    import lightagent.agents.tool_registry as reg
+    from lightagent.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "llm_rate_limit_max_retries", 3)
+    monkeypatch.setattr(settings, "llm_rate_limit_base_delay_seconds", 0.0)
+
+    sleeps: list[float] = []
+
+    async def fake_sleep(d: float) -> None:
+        sleeps.append(d)
+
+    monkeypatch.setattr(reg.asyncio, "sleep", fake_sleep)
+
+    call_count = {"n": 0}
+
+    async def always_billing(_msgs: list[object]) -> AIMessage:
+        call_count["n"] += 1
+        raise _FakeBillingError()
+
+    llm = MagicMock()
+    llm.ainvoke = always_billing
+
+    with pytest.raises(_FakeBillingError):
+        await reg._invoke_llm_with_backoff(
+            llm,
+            [HumanMessage(content="hi")],
+            agent_name="t",
+            session_id=None,
+            iteration=0,
+        )
+
+    assert call_count["n"] == 1
+    assert sleeps == []
+
+
+# ---------------------------------------------------------------------------
+# Synthetic function-call JSON unwrapping (Ollama / local models)
+# ---------------------------------------------------------------------------
+
+
+def test_unwrap_synthetic_respond() -> None:
+    """The canonical 'respond' shape emitted by Ollama is unwrapped."""
+    from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
+
+    raw = (
+        '{"function": "respond", "arguments": {"response": '
+        '"Hola. ¿En qué puedo ayudarte hoy?"}}'
+    )
+    assert _unwrap_synthetic_tool_call(raw) == "Hola. ¿En qué puedo ayudarte hoy?"
+
+
+def test_unwrap_synthetic_name_parameters_text() -> None:
+    """Alternative shape with name/parameters/text is also supported."""
+    from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
+
+    raw = '{"name": "final_answer", "parameters": {"text": "42"}}'
+    assert _unwrap_synthetic_tool_call(raw) == "42"
+
+
+def test_unwrap_synthetic_leaves_real_tool_calls_alone() -> None:
+    """A JSON blob invoking a real tool (not a final-answer wrapper) is
+    ignored so the ReAct loop can still dispatch it normally."""
+    from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
+
+    raw = '{"function": "cron_add", "arguments": {"name": "x"}}'
+    assert _unwrap_synthetic_tool_call(raw) is None
+
+
+def test_unwrap_synthetic_ignores_plain_text() -> None:
+    """Plain conversational text is returned as None (no unwrap)."""
+    from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
+
+    assert _unwrap_synthetic_tool_call("Hola, ¿cómo estás?") is None
+    assert _unwrap_synthetic_tool_call("") is None
+
+
+def test_unwrap_synthetic_handles_code_fence() -> None:
+    """Ollama often wraps JSON in ```json ... ``` fences — also unwrap that."""
+    from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
+
+    raw = (
+        '```json\n{"function": "respond", "arguments": '
+        '{"response": "hi"}}\n```'
+    )
+    assert _unwrap_synthetic_tool_call(raw) == "hi"
+
+
+@pytest.mark.asyncio
+async def test_react_loop_unwraps_synthetic_json_final_answer() -> None:
+    """When the LLM returns a synthetic JSON wrapper on its first call,
+    ``react_loop`` must deliver the inner reply as clean text instead
+    of the raw JSON."""
+    llm = _make_llm(
+        _ai_final(
+            '{"function": "respond", "arguments": '
+            '{"response": "Hola. ¿En qué puedo ayudarte hoy, Ernesto?"}}'
+        )
+    )
+
+    response = await react_loop(
+        llm, [], [HumanMessage(content="hola")], agent_name="supervisor",
+    )
+
+    assert response.content == "Hola. ¿En qué puedo ayudarte hoy, Ernesto?"
