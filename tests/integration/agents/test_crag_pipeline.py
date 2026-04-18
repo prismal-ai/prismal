@@ -4,6 +4,7 @@ Tests exercise the CRAG graph topology. LLM calls are mocked to avoid
 external API dependencies, but real LangGraph routing and state transitions
 are tested.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

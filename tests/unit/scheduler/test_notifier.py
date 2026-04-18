@@ -99,9 +99,7 @@ class TestCronNotifier:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(
-                side_effect=httpx.HTTPError("network error")
-            )
+            mock_client.post = AsyncMock(side_effect=httpx.HTTPError("network error"))
             mock_client_cls.return_value = mock_client
 
             # Must not raise

@@ -145,10 +145,7 @@ async def feature_engineer_node(state: AgentState) -> dict[str, Any]:
         eda_data = ml.get("eda_report", {})
 
         llm = ProviderRegistry().get_llm()
-        context = (
-            f"Dataset profile: {json.dumps(profile_data)}\n"
-            f"EDA report: {json.dumps(eda_data)}"
-        )
+        context = f"Dataset profile: {json.dumps(profile_data)}\nEDA report: {json.dumps(eda_data)}"
         messages = [SystemMessage(content=_SYSTEM), AIMessage(content=context)]
         response = await llm.ainvoke(messages)
         content = str(response.content)

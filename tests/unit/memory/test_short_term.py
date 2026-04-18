@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import threading
 
-import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-
 
 # ── construction ──────────────────────────────────────────────────────────────
 

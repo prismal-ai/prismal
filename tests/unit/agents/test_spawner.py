@@ -1,4 +1,5 @@
 """Unit tests for SubAgentSpawner (T-045)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -19,6 +20,7 @@ def spawner() -> SubAgentSpawner:
 @pytest.mark.asyncio
 async def test_spawn_task_returns_asyncio_task(spawner: SubAgentSpawner) -> None:
     """spawn() must return an asyncio.Task."""
+
     async def quick() -> str:
         return "done"
 
@@ -32,6 +34,7 @@ async def test_spawn_task_returns_asyncio_task(spawner: SubAgentSpawner) -> None
 @pytest.mark.asyncio
 async def test_spawn_task_completes_correctly(spawner: SubAgentSpawner) -> None:
     """Spawned task must return the coroutine's result."""
+
     async def compute() -> int:
         return 42
 
@@ -44,6 +47,7 @@ async def test_spawn_task_completes_correctly(spawner: SubAgentSpawner) -> None:
 @pytest.mark.asyncio
 async def test_spawn_cancels_on_timeout(spawner: SubAgentSpawner) -> None:
     """Tasks that exceed timeout must raise TimeoutError."""
+
     async def slow() -> str:
         await asyncio.sleep(100)
         return "never"
@@ -62,6 +66,7 @@ def test_spawner_active_count_starts_at_zero(spawner: SubAgentSpawner) -> None:
 @pytest.mark.asyncio
 async def test_cleanup_removes_done_tasks(spawner: SubAgentSpawner) -> None:
     """cleanup() must remove completed tasks from registry."""
+
     async def quick() -> str:
         return "x"
 

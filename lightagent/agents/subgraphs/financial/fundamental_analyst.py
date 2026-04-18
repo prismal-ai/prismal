@@ -140,9 +140,7 @@ async def fundamental_analyst_node(state: AgentState) -> dict[str, Any]:
         span.set_attribute("lightagent.subgraph", "financial_analyst")
         span.set_attribute("lightagent.agent", "fundamental_analyst")
 
-        fin: dict[str, Any] = dict(
-            state.get("metadata", {}).get("financial_analyst", {})
-        )
+        fin: dict[str, Any] = dict(state.get("metadata", {}).get("financial_analyst", {}))
         snapshot = fin.get("market_snapshot", {})
         symbol = snapshot.get("symbol", "UNKNOWN")
         asset_type: str = snapshot.get("asset_type", "equity")
@@ -174,9 +172,7 @@ async def fundamental_analyst_node(state: AgentState) -> dict[str, Any]:
             score=analysis.fundamental_score,
             metrics_count=len(analysis.metrics),
         )
-        span.set_attribute(
-            "lightagent.financial.fundamental_score", analysis.fundamental_score
-        )
+        span.set_attribute("lightagent.financial.fundamental_score", analysis.fundamental_score)
 
         return {
             "current_agent": "fundamental_analyst",

@@ -1,4 +1,4 @@
-# ruff: noqa: E501  # Prompt constants contain long JSON example lines.
+# Prompt constants contain long JSON example lines.
 """
 Data Ingester agent node for the ml_pipeline subgraph.
 

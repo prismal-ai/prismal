@@ -50,8 +50,7 @@ logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.builder")
 
 _NAME = "dev_pipeline"
 _DESCRIPTION = (
-    "Software Development Pipeline: "
-    "PO -> Architect -> Developer -> UnitTest -> QA -> Reviewer"
+    "Software Development Pipeline: PO -> Architect -> Developer -> UnitTest -> QA -> Reviewer"
 )
 
 # Approval gate: reviewer score >= 0.8 -> human approval seed, else back to developer.

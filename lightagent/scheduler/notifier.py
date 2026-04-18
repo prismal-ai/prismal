@@ -55,9 +55,7 @@ class CronNotifier:
         s = get_settings()
 
         self._tg_chat_id: str = (
-            telegram_chat_id
-            if telegram_chat_id is not None
-            else s.cron_notify_telegram_chat_id
+            telegram_chat_id if telegram_chat_id is not None else s.cron_notify_telegram_chat_id
         )
         self._tg_token: str = (
             telegram_token
@@ -65,14 +63,10 @@ class CronNotifier:
             else s.telegram_bot_token.get_secret_value()
         )
         self._slack_channel: str = (
-            slack_channel
-            if slack_channel is not None
-            else s.cron_notify_slack_channel
+            slack_channel if slack_channel is not None else s.cron_notify_slack_channel
         )
         self._slack_token: str = (
-            slack_token
-            if slack_token is not None
-            else s.slack_bot_token.get_secret_value()
+            slack_token if slack_token is not None else s.slack_bot_token.get_secret_value()
         )
 
     async def notify_failure(
@@ -92,11 +86,7 @@ class CronNotifier:
             error: Error message from the exception.
             duration_seconds: How long the job ran before failing.
         """
-        text = (
-            f"Cron job FAILED: {job_name}\n"
-            f"Error: {error}\n"
-            f"Duration: {duration_seconds:.1f}s"
-        )
+        text = f"Cron job FAILED: {job_name}\nError: {error}\nDuration: {duration_seconds:.1f}s"
         if self._tg_chat_id and self._tg_token:
             await self._send_telegram(text)
         if self._slack_channel and self._slack_token:

@@ -10,9 +10,7 @@ Checkpointing is isolated per-subgraph to prevent state contention.  Pass
 Usage::
 
     factory = SubgraphFactory()
-    compiled = await factory.build(
-        definition, checkpointer_path=":memory:"
-    )
+    compiled = await factory.build(definition, checkpointer_path=":memory:")
     builder.add_node("dev_pipeline", compiled)
 """
 

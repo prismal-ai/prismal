@@ -33,9 +33,7 @@ ChartKind = Literal["bar", "line", "scatter", "hist"]
 # ---------------------------------------------------------------------------
 
 
-def _apply_filter(
-    df: pl.DataFrame, column: str, op: FilterOp, value: object
-) -> pl.DataFrame:
+def _apply_filter(df: pl.DataFrame, column: str, op: FilterOp, value: object) -> pl.DataFrame:
     """Return rows from *df* where *column op value* is True.
 
     Args:
@@ -198,9 +196,7 @@ def select_columns(df: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
     """
     missing = [c for c in columns if c not in df.columns]
     if missing:
-        raise LightAgentError(
-            f"Columns not found: {missing}. Available: {df.columns}"
-        )
+        raise LightAgentError(f"Columns not found: {missing}. Available: {df.columns}")
     return df.select(columns)
 
 
@@ -263,6 +259,7 @@ def save_chart(
             unsupported.
     """
     import matplotlib as mpl
+
     mpl.use("Agg")  # non-interactive backend — safe in server context
     import matplotlib.pyplot as plt
 

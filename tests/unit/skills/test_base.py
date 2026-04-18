@@ -91,9 +91,7 @@ def test_concrete_skill_with_validate_false() -> None:
         @property
         def metadata(self) -> SkillMetadata:
             """Return metadata."""
-            return SkillMetadata(
-                name="bad", description="broken", version="0.0.1", author="test"
-            )
+            return SkillMetadata(name="bad", description="broken", version="0.0.1", author="test")
 
         def get_tools(self) -> list[BaseTool]:
             """Return empty tools."""
@@ -117,9 +115,7 @@ async def test_base_skill_default_initialize_is_noop() -> None:
         @property
         def metadata(self) -> SkillMetadata:
             """Return metadata."""
-            return SkillMetadata(
-                name="min", description="minimal", version="1.0.0", author="test"
-            )
+            return SkillMetadata(name="min", description="minimal", version="1.0.0", author="test")
 
         def get_tools(self) -> list[BaseTool]:
             """Return empty tools."""
@@ -141,9 +137,7 @@ async def test_base_skill_default_validate_returns_true() -> None:
         @property
         def metadata(self) -> SkillMetadata:
             """Return metadata."""
-            return SkillMetadata(
-                name="a", description="a", version="1.0.0", author="test"
-            )
+            return SkillMetadata(name="a", description="a", version="1.0.0", author="test")
 
         def get_tools(self) -> list[BaseTool]:
             """Return empty tools."""

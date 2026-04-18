@@ -65,8 +65,7 @@ def _search_ddg(query: str, max_results: int) -> str:
         if not results:
             encoded = urllib.parse.quote_plus(query)
             return (
-                f"No instant results found for '{query}'. "
-                f"Try: https://duckduckgo.com/?q={encoded}"
+                f"No instant results found for '{query}'. Try: https://duckduckgo.com/?q={encoded}"
             )
 
         return "\n".join(results)
@@ -128,7 +127,7 @@ class WebSearchSkill(BaseSkill):
         """Return web search skill metadata."""
         return SkillMetadata(
             name="web_search",
-            description="Search the web for current information via DuckDuckGo or Google",  # noqa: E501
+            description="Search the web for current information via DuckDuckGo or Google",
             version="1.0.0",
             author="lightagent",
             safe_to_auto_activate=True,

@@ -149,9 +149,7 @@ async def reviewer_agent_node(state: AgentState) -> dict[str, Any]:
             data = json.loads(content)
             result = ReviewResult.model_validate(data)
         except Exception:
-            result = ReviewResult(
-                score=0.0, approved=False, strengths=[], improvements=[]
-            )
+            result = ReviewResult(score=0.0, approved=False, strengths=[], improvements=[])
 
         dp["review_result"] = result.model_dump()
         logger.info("reviewer.result", score=result.score, approved=result.approved)
@@ -159,8 +157,6 @@ async def reviewer_agent_node(state: AgentState) -> dict[str, Any]:
         verdict = "APPROVED" if result.approved else "NEEDS REVISION"
         return {
             "current_agent": "reviewer",
-            "messages": [
-                AIMessage(content=f"Review score: {result.score:.2f} | {verdict}")
-            ],
+            "messages": [AIMessage(content=f"Review score: {result.score:.2f} | {verdict}")],
             "metadata": {**state.get("metadata", {}), "dev_pipeline": dp},
         }

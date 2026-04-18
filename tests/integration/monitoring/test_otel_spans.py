@@ -63,7 +63,14 @@ def test_counter_and_histogram_noop() -> None:
         otel = OTelManager()
 
     # All metric names from the standard set
-    for metric in ["llm_requests", "llm_tokens", "agent_errors", "security_blocks", "rag_queries", "mcp_tool_calls"]:
+    for metric in [
+        "llm_requests",
+        "llm_tokens",
+        "agent_errors",
+        "security_blocks",
+        "rag_queries",
+        "mcp_tool_calls",
+    ]:
         otel.increment_counter(metric, 1, {"label": "test"})
     for metric in ["agent_latency", "llm_latency", "rag_latency"]:
         otel.record_histogram(metric, 0.5, {"label": "test"})

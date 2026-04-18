@@ -15,7 +15,6 @@ import pytest
 
 from lightagent.memory.mongodb_store import MongoDBMemoryStore
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -54,7 +53,9 @@ def _make_motor_stubs(collection: MagicMock) -> tuple[MagicMock, ModuleType]:
     return motor_mock, stub
 
 
-def _make_store(mongodb_url: str = "mongodb://localhost:27017") -> tuple[MongoDBMemoryStore, MagicMock]:
+def _make_store(
+    mongodb_url: str = "mongodb://localhost:27017",
+) -> tuple[MongoDBMemoryStore, MagicMock]:
     """Return (store, collection_mock) with motor fully stubbed."""
     mock_vs = MagicMock()
     mock_vs.similarity_search.return_value = []
@@ -236,8 +237,11 @@ async def test_recall_filters_by_session_id() -> None:
     col = _make_collection_mock()
     col.find_one = AsyncMock(
         return_value={
-            "_id": "e1", "session_id": "sess-other", "content": "hello",
-            "created_at": now, "expires_at": expires,
+            "_id": "e1",
+            "session_id": "sess-other",
+            "content": "hello",
+            "created_at": now,
+            "expires_at": expires,
         }
     )
     motor_mock, motor_stub = _make_motor_stubs(col)

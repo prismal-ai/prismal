@@ -1,4 +1,5 @@
 """Security tests for Phase 27 financial analysis agent."""
+
 from __future__ import annotations
 
 
@@ -22,14 +23,8 @@ def test_no_openbb_import_at_module_level_in_graph() -> None:
                 assert not alias.name.startswith("openbb"), (
                     f"openbb imported at module level in graph.py: {alias.name}"
                 )
-        if (
-            isinstance(node, ast.ImportFrom)
-            and node.module
-            and node.module.startswith("openbb")
-        ):
-            raise AssertionError(
-                f"openbb imported at module level in graph.py: {node.module}"
-            )
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("openbb"):
+            raise AssertionError(f"openbb imported at module level in graph.py: {node.module}")
 
 
 def test_no_ccxt_import_at_module_level_in_supervisor() -> None:

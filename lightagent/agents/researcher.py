@@ -44,9 +44,7 @@ _HISTORY_WINDOW: int = 6
 
 # Absolute path to the MCP servers config — computed once at import time so
 # the researcher can always read the live file regardless of the process CWD.
-_MCP_CONFIG_PATH: str = str(
-    Path(__file__).resolve().parents[2] / "config" / "mcp_servers.yaml"
-)
+_MCP_CONFIG_PATH: str = str(Path(__file__).resolve().parents[2] / "config" / "mcp_servers.yaml")
 
 _SYSTEM_PROMPT = f"""You are a research specialist with access to web search, a \
 knowledge base, filesystem tools, and MCP browser automation.

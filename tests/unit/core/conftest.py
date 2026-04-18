@@ -6,7 +6,6 @@ from collections.abc import Iterator
 
 import pytest
 
-
 #: Environment variables that the developer's local ``.env`` may populate
 #: and that cause :class:`~lightagent.core.config.Settings` construction to
 #: either override test expectations or emit warnings that pytest's

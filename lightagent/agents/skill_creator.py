@@ -288,10 +288,7 @@ async def _llm_generate(messages: list[dict[str, str]]) -> str:
     from langchain_core.messages import BaseMessage
 
     llm = ProviderRegistry().get_llm()
-    lc_messages = [
-        BaseMessage(content=m["content"], type=m.get("role", "user"))
-        for m in messages
-    ]
+    lc_messages = [BaseMessage(content=m["content"], type=m.get("role", "user")) for m in messages]
     response = await llm.ainvoke(lc_messages)
     content = response.content if hasattr(response, "content") else str(response)
     return content if isinstance(content, str) else str(content)
@@ -330,10 +327,7 @@ async def create_skill(
     builder = SecurePromptBuilder()
     generation_messages = builder.build(
         system=_SYSTEM_PROMPT,
-        user=(
-            "Write a complete LightAgent skill.py for the following specification:\n\n"
-            f"{spec}"
-        ),
+        user=(f"Write a complete LightAgent skill.py for the following specification:\n\n{spec}"),
     )
 
     logger.info("skill_creator_generating", spec_length=len(spec))
@@ -384,10 +378,7 @@ async def create_skill(
         for tool in ("ruff", "mypy", "bandit"):
             tool_result = quality_results.get(tool, {})
             if isinstance(tool_result, dict) and not tool_result.get("passed"):
-                errors.append(
-                    f"=== {tool.upper()} ERRORS ===\n"
-                    f"{tool_result.get('output', '')}"
-                )
+                errors.append(f"=== {tool.upper()} ERRORS ===\n{tool_result.get('output', '')}")
         error_summary = "\n\n".join(errors)
 
         fix_messages = builder.build(
@@ -421,8 +412,7 @@ async def create_skill(
 
     # AC-017-7: original spec for audit
     (skill_dir / "generation_prompt.txt").write_text(
-        f"Generated: {datetime.now(UTC).isoformat()}\n\n"
-        f"Original specification:\n{spec}\n",
+        f"Generated: {datetime.now(UTC).isoformat()}\n\nOriginal specification:\n{spec}\n",
         encoding="utf-8",
     )
 
@@ -465,8 +455,7 @@ async def create_skill(
         "Next steps:",
         f"  1. Review generated code in {skill_py}",
         "  2. Check quality_report.json for tool output",
-        f"  3. Rename '{skill_dir}/human_review_required.txt'"
-        " → 'validated_by_human.txt'",
+        f"  3. Rename '{skill_dir}/human_review_required.txt' → 'validated_by_human.txt'",
         f"  4. Activate:  lightagent skills enable {slug}",
     ]
     return "\n".join(result_lines)

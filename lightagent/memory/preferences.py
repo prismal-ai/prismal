@@ -319,9 +319,7 @@ class PreferenceExtractor:
             response = await llm.ainvoke(
                 [
                     SystemMessage(content=_EXTRACT_SYSTEM_PROMPT),
-                    HumanMessage(
-                        content=f"Conversation to analyse:\n\n{conversation}"
-                    ),
+                    HumanMessage(content=f"Conversation to analyse:\n\n{conversation}"),
                 ]
             )
             raw = str(response.content).strip()

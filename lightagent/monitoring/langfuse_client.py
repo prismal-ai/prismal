@@ -116,7 +116,7 @@ class LangfuseManager:
         session_id: str | None = None,
         user_id: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> Any:  # noqa: ANN401 — returns Langfuse StatefulTraceClient or _NoOpTrace
+    ) -> Any:
         """Create a Langfuse trace or return a no-op.
 
         Args:
@@ -148,7 +148,7 @@ class LangfuseManager:
         self,
         trace_id: str | None = None,
         session_id: str | None = None,
-    ) -> Any | None:  # noqa: ANN401 — returns CallbackHandler or None
+    ) -> Any | None:
         """Return a LangChain/LangGraph Langfuse callback handler.
 
         Args:

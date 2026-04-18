@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from langgraph.graph.state import CompiledStateGraph
 
 from lightagent.agents.graph import build_supervisor_graph, get_compiled_graph
@@ -71,12 +70,15 @@ def test_graph_creates_checkpoint_dir(tmp_path: Path) -> None:
 
 def test_list_session_ids_returns_empty_when_no_db() -> None:
     """list_session_ids returns [] when the default checkpoint DB does not exist."""
-    from unittest.mock import patch
     from pathlib import Path
+    from unittest.mock import patch
 
     from lightagent.agents.graph import list_session_ids
 
-    with patch("lightagent.agents.graph._DEFAULT_CHECKPOINT_PATH", Path("/nonexistent/path/x.db")):
+    with patch(
+        "lightagent.agents.graph._DEFAULT_CHECKPOINT_PATH",
+        Path("/nonexistent/path/x.db"),
+    ):
         result = list_session_ids()
     assert result == []
 
@@ -127,7 +129,9 @@ def test_supervisor_router_wrapper_delegates(tmp_path: Path) -> None:
     from lightagent.agents.graph import _supervisor_router
 
     mock_state = MagicMock()
-    with patch("lightagent.agents.graph.supervisor_router", return_value="researcher") as mock_router:
+    with patch(
+        "lightagent.agents.graph.supervisor_router", return_value="researcher"
+    ) as mock_router:
         result = _supervisor_router(mock_state)
 
     mock_router.assert_called_once_with(mock_state)

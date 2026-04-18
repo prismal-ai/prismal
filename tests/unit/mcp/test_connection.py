@@ -72,9 +72,7 @@ def _make_call_tool_result(is_error: bool = False) -> mcp.types.CallToolResult:
 
 
 @asynccontextmanager
-async def _fake_transport(
-    read: object, write: object
-) -> AsyncGenerator[tuple[object, object]]:
+async def _fake_transport(read: object, write: object) -> AsyncGenerator[tuple[object, object]]:
     """Async context manager that yields (read, write) — simulates stdio/sse client."""
     yield read, write
 
@@ -155,9 +153,7 @@ class TestMCPServerConfig:
 
     def test_auth_config_stored(self) -> None:
         """Auth config embedded in SSE config must be parsed correctly."""
-        cfg = _make_sse_config(
-            auth={"type": "bearer", "token_env": "SSE_TOKEN"}
-        )
+        cfg = _make_sse_config(auth={"type": "bearer", "token_env": "SSE_TOKEN"})
         assert cfg.auth is not None
         assert cfg.auth.token_env == "SSE_TOKEN"  # noqa: S105
 
@@ -259,9 +255,7 @@ class TestStdioConnect:
         return session
 
     @pytest.mark.asyncio
-    async def test_connect_sets_connected_true(
-        self, mock_session: AsyncMock
-    ) -> None:
+    async def test_connect_sets_connected_true(self, mock_session: AsyncMock) -> None:
         """connect() must mark the connection as connected on success."""
         cfg = _make_stdio_config()
         conn = MCPServerConnection(cfg)
@@ -307,9 +301,7 @@ class TestStdioConnect:
         assert conn.status.tool_count == 2
 
     @pytest.mark.asyncio
-    async def test_disconnect_sets_connected_false(
-        self, mock_session: AsyncMock
-    ) -> None:
+    async def test_disconnect_sets_connected_false(self, mock_session: AsyncMock) -> None:
         """disconnect() must set connected to False."""
         cfg = _make_stdio_config()
         conn = MCPServerConnection(cfg)
@@ -423,14 +415,10 @@ class TestSSEConnect:
         assert conn.connected is True
 
     @pytest.mark.asyncio
-    async def test_sse_connect_with_bearer_auth(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_sse_connect_with_bearer_auth(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """SSE connect with bearer auth must pass Authorization header (AC-004-9)."""
         monkeypatch.setenv("SSE_TOKEN", "super-secret-token")
-        cfg = _make_sse_config(
-            auth={"type": "bearer", "token_env": "SSE_TOKEN"}
-        )
+        cfg = _make_sse_config(auth={"type": "bearer", "token_env": "SSE_TOKEN"})
         conn = MCPServerConnection(cfg)
 
         session = AsyncMock(spec=mcp.ClientSession)
@@ -469,9 +457,7 @@ class TestSSEConnect:
         """Missing bearer token env var must log a warning but still attempt connect."""
         # Ensure the env var is absent
         monkeypatch.delenv("MISSING_TOKEN_ENV", raising=False)
-        cfg = _make_sse_config(
-            auth={"type": "bearer", "token_env": "MISSING_TOKEN_ENV"}
-        )
+        cfg = _make_sse_config(auth={"type": "bearer", "token_env": "MISSING_TOKEN_ENV"})
         conn = MCPServerConnection(cfg)
 
         session = AsyncMock(spec=mcp.ClientSession)
@@ -642,9 +628,7 @@ class TestTimeoutEnforcement:
         cfg = _make_stdio_config(timeout_seconds=1)
         conn = MCPServerConnection(cfg)
 
-        async def slow_call(
-            *_args: object, **_kwargs: object
-        ) -> mcp.types.CallToolResult:
+        async def slow_call(*_args: object, **_kwargs: object) -> mcp.types.CallToolResult:
             await asyncio.sleep(10)  # deliberate timeout
             return _make_call_tool_result()
 
@@ -922,9 +906,7 @@ async def test_cleanup_stack_kills_processes_after_aclose() -> None:
     ):
         await conn._cleanup_stack()
 
-    assert call_order == ["aclose", "kill"], (
-        f"Expected aclose() before kill, got: {call_order}"
-    )
+    assert call_order == ["aclose", "kill"], f"Expected aclose() before kill, got: {call_order}"
     assert conn._connected is False
 
 
@@ -948,9 +930,7 @@ async def test_do_connect_timeout_with_process_lookup_error_on_cleanup() -> None
         """Simulate a stdio_client that raises TimeoutError on initialize, then
         ProcessLookupError during cleanup (process already dead)."""
         mock_stack = AsyncMock()
-        mock_stack.aclose = AsyncMock(
-            side_effect=ProcessLookupError(3, "No such process")
-        )
+        mock_stack.aclose = AsyncMock(side_effect=ProcessLookupError(3, "No such process"))
         yield (AsyncMock(), AsyncMock())
 
     timeout_session = AsyncMock()
@@ -962,9 +942,7 @@ async def test_do_connect_timeout_with_process_lookup_error_on_cleanup() -> None
             "lightagent.mcp.connection.ClientSession",
             return_value=AsyncMock(
                 __aenter__=AsyncMock(return_value=timeout_session),
-                __aexit__=AsyncMock(
-                    side_effect=ProcessLookupError(3, "No such process")
-                ),
+                __aexit__=AsyncMock(side_effect=ProcessLookupError(3, "No such process")),
             ),
         ),
     ):

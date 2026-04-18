@@ -30,9 +30,7 @@ def engine() -> GuardrailsEngine:
 
 @pytest.mark.parametrize(("pii_type", "text"), _PII_SAMPLES)
 @pytest.mark.asyncio
-async def test_pii_detected_in_output(
-    engine: GuardrailsEngine, pii_type: str, text: str
-) -> None:
+async def test_pii_detected_in_output(engine: GuardrailsEngine, pii_type: str, text: str) -> None:
     """Every PII sample must be detected and flagged in LLM output."""
     result = await engine.validate_output(text)
     assert not result.safe, f"{pii_type} not detected in: {text!r}"

@@ -175,9 +175,7 @@ async def research_aggregator_node(state: AgentState) -> dict[str, Any]:
         ``"research_aggregator"`` and a new AIMessage in ``messages``.
     """
     raw_results: Any = state.get("parallel_results", [])
-    results: list[dict[str, Any]] = (
-        raw_results if isinstance(raw_results, list) else []
-    )
+    results: list[dict[str, Any]] = raw_results if isinstance(raw_results, list) else []
     session_id = state.get("session_id")
     logger.info(
         "research_aggregator_called",

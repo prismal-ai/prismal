@@ -14,7 +14,6 @@ import pytest
 from lightagent.security.guardrails import GuardrailsEngine
 from lightagent.security.prompt_builder import SecurePromptBuilder
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -127,7 +126,9 @@ async def test_canary_empty_string_not_matched(engine: GuardrailsEngine) -> None
 
 
 @pytest.mark.asyncio
-async def test_canary_leak_partial_match_not_sufficient(engine: GuardrailsEngine) -> None:
+async def test_canary_leak_partial_match_not_sufficient(
+    engine: GuardrailsEngine,
+) -> None:
     """Only the exact canary token must trigger the leak — a partial prefix must not."""
     canary = str(uuid.uuid4())
     partial = canary[:8]  # First 8 chars of UUID — not the full canary

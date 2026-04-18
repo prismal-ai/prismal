@@ -1,4 +1,5 @@
 """Unit tests for ml_pipeline subgraph builder."""
+
 import pytest
 
 
@@ -27,6 +28,7 @@ async def test_get_compiled_ml_pipeline_returns_graph() -> None:
         _COMPILED_GRAPHS,
         get_compiled_ml_pipeline,
     )
+
     _COMPILED_GRAPHS.clear()
 
     graph = await get_compiled_ml_pipeline(checkpointer_path=":memory:")

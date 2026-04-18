@@ -303,7 +303,7 @@ class CronExecutor:
 
             # fromisoformat handles both '2026-03-09 20:51:06' (space) and
             # '2026-03-09T20:51:06' (T) regardless of how the value was stored.
-            naive_run_date = datetime.fromisoformat(job.schedule[len("once:"):])
+            naive_run_date = datetime.fromisoformat(job.schedule[len("once:") :])
             # Attach the job timezone so APScheduler fires at the right instant.
             # BUG-001 fix: attach timezone before comparing — using UTC-aware now()
             # prevents wrong expiry decisions when the OS clock is not in UTC.
@@ -330,9 +330,7 @@ class CronExecutor:
             args=[job.name, job.task],
             replace_existing=True,
         )
-        logger.debug(
-            "cron_executor_job_registered", name=job.name, schedule=job.schedule
-        )
+        logger.debug("cron_executor_job_registered", name=job.name, schedule=job.schedule)
 
     async def _run_job(self, name: str, task: str) -> None:
         """Execute a cron job and apply the retry policy on failure.
@@ -383,11 +381,7 @@ class CronExecutor:
                 output = getattr(last, "content", None)
                 if isinstance(output, list):
                     output = next(
-                        (
-                            b.get("text")
-                            for b in output
-                            if isinstance(b, dict) and "text" in b
-                        ),
+                        (b.get("text") for b in output if isinstance(b, dict) and "text" in b),
                         str(output),
                     )
 
@@ -396,13 +390,10 @@ class CronExecutor:
             # final message, treat the run as a failure so the retry
             # policy re-fires the job instead of recording a polite
             # apology as a legitimate "success".
-            signature = _looks_like_soft_failure(
-                str(output) if output is not None else None
-            )
+            signature = _looks_like_soft_failure(str(output) if output is not None else None)
             if signature is not None:
                 raise SoftFailureError(
-                    f"soft_failure detected: matched signature {signature!r} "
-                    f"in agent output"
+                    f"soft_failure detected: matched signature {signature!r} in agent output"
                 )
 
             self._manager.update_last_run(name, finished_at)
@@ -430,9 +421,7 @@ class CronExecutor:
                     await HeartbeatDelivery().send(
                         completed_job.output_channel,
                         completed_job.output_target,
-                        str(output)
-                        if output is not None
-                        else f"Job '{name}' completed.",
+                        str(output) if output is not None else f"Job '{name}' completed.",
                     )
                 except Exception as delivery_exc:
                     logger.warning(

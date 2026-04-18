@@ -23,7 +23,7 @@ Usage::
     await store.initialize()
 
     entry_id = await store.save("User prefers dark mode", session_id="sess-1")
-    results  = await store.recall("UI preferences", session_id="sess-1")
+    results = await store.recall("UI preferences", session_id="sess-1")
     await store.clear(session_id="sess-1")
 
 SPEC-015 acceptance criteria
@@ -91,9 +91,7 @@ class MongoDBMemoryStore:
         self._mongodb_url: str = mongodb_url or settings.mongodb_url
         self._db_name = db_name
         self._retention: int = (
-            retention_days
-            if retention_days is not None
-            else settings.memory_retention_days
+            retention_days if retention_days is not None else settings.memory_retention_days
         )
         self._initialized = False
         self._collection: AsyncIOMotorCollection  # type: ignore[type-arg]
@@ -103,9 +101,7 @@ class MongoDBMemoryStore:
         else:
             from lightagent.rag.vector_store import ChromaVectorStore
 
-            self._vector_store = ChromaVectorStore(
-                collection_name=f"{_COLLECTION_NAME}_mongo"
-            )
+            self._vector_store = ChromaVectorStore(collection_name=f"{_COLLECTION_NAME}_mongo")
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -132,8 +128,7 @@ class MongoDBMemoryStore:
             import motor.motor_asyncio as _motor
         except ImportError as exc:
             raise ImportError(
-                "MongoDB support requires 'motor'. "
-                "Install with: pip install 'lightagent[mongodb]'"
+                "MongoDB support requires 'motor'. Install with: pip install 'lightagent[mongodb]'"
             ) from exc
 
         client = _motor.AsyncIOMotorClient(self._mongodb_url)

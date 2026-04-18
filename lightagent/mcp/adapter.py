@@ -76,7 +76,10 @@ def _build_args_schema(mcp_tool: mcp.types.Tool) -> type[BaseModel] | None:
         if field_name in required:
             fields[field_name] = (py_type, Field(..., description=description))
         else:
-            fields[field_name] = (py_type | None, Field(default=None, description=description))
+            fields[field_name] = (
+                py_type | None,
+                Field(default=None, description=description),
+            )
 
     if not fields:
         return None
@@ -163,7 +166,7 @@ class MCPToolAdapter(BaseTool):
     def _run(
         self,
         tool_input: str,
-        run_manager: Any | None = None,  # noqa: ANN401 — LangChain interface
+        run_manager: Any | None = None,
     ) -> str:
         """Synchronous execution is not supported for MCP tools.
 
@@ -180,8 +183,8 @@ class MCPToolAdapter(BaseTool):
     async def _arun(
         self,
         tool_input: str = "",
-        run_manager: Any | None = None,  # noqa: ANN401 ARG002 — LangChain interface
-        **kwargs: Any,  # noqa: ANN401 — catches dict-dispatched args when args_schema is set
+        run_manager: Any | None = None,  # noqa: ARG002 — LangChain interface
+        **kwargs: Any,
     ) -> str:
         """Execute the MCP tool asynchronously.
 

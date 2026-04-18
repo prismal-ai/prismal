@@ -65,9 +65,7 @@ def _make_call_tool_result(
     extra_blocks: list[mcp.types.ContentBlock] | None = None,
 ) -> mcp.types.CallToolResult:
     """Return a CallToolResult with one TextContent block."""
-    content: list[mcp.types.ContentBlock] = [
-        mcp.types.TextContent(type="text", text=text)
-    ]
+    content: list[mcp.types.ContentBlock] = [mcp.types.TextContent(type="text", text=text)]
     if extra_blocks:
         content.extend(extra_blocks)
     return mcp.types.CallToolResult(content=content, isError=is_error)
@@ -257,9 +255,7 @@ class TestArunContentExtraction:
     async def test_single_text_block_returned(self) -> None:
         """A single TextContent block must be returned as-is."""
         conn = _make_mock_connection()
-        conn.call_tool = AsyncMock(
-            return_value=_make_call_tool_result("result text")
-        )
+        conn.call_tool = AsyncMock(return_value=_make_call_tool_result("result text"))
         adapter = MCPToolAdapter(conn, _make_mcp_tool())
 
         output = await adapter._arun("{}")
@@ -272,9 +268,7 @@ class TestArunContentExtraction:
         extra = mcp.types.TextContent(type="text", text="second block")
         conn = _make_mock_connection()
         conn.call_tool = AsyncMock(
-            return_value=_make_call_tool_result(
-                "first block", extra_blocks=[extra]
-            )
+            return_value=_make_call_tool_result("first block", extra_blocks=[extra])
         )
         adapter = MCPToolAdapter(conn, _make_mcp_tool())
 
@@ -286,9 +280,7 @@ class TestArunContentExtraction:
     async def test_empty_content_returns_empty_string(self) -> None:
         """A result with an empty content list must return an empty string."""
         conn = _make_mock_connection()
-        conn.call_tool = AsyncMock(
-            return_value=mcp.types.CallToolResult(content=[], isError=False)
-        )
+        conn.call_tool = AsyncMock(return_value=mcp.types.CallToolResult(content=[], isError=False))
         adapter = MCPToolAdapter(conn, _make_mcp_tool())
 
         output = await adapter._arun("{}")
@@ -299,9 +291,7 @@ class TestArunContentExtraction:
     async def test_non_text_block_stringified(self) -> None:
         """Non-TextContent blocks must be included via str() fallback."""
         # Use ImageContent as a non-text block example.
-        img_block = mcp.types.ImageContent(
-            type="image", data="base64data", mimeType="image/png"
-        )
+        img_block = mcp.types.ImageContent(type="image", data="base64data", mimeType="image/png")
         conn = _make_mock_connection()
         conn.call_tool = AsyncMock(
             return_value=mcp.types.CallToolResult(
@@ -321,10 +311,7 @@ class TestArunContentExtraction:
         assert lines[0] == "text part"
         assert len(lines) == 2
         # The image block stringified form should contain something identifiable.
-        assert any(
-            marker in lines[1]
-            for marker in ["image", "ImageContent", "base64data"]
-        )
+        assert any(marker in lines[1] for marker in ["image", "ImageContent", "base64data"])
 
 
 # ---------------------------------------------------------------------------
@@ -340,9 +327,7 @@ class TestArunErrorHandling:
         """When isError=True the adapter must raise MCPToolError."""
         conn = _make_mock_connection()
         conn.call_tool = AsyncMock(
-            return_value=_make_call_tool_result(
-                "something went wrong", is_error=True
-            )
+            return_value=_make_call_tool_result("something went wrong", is_error=True)
         )
         adapter = MCPToolAdapter(conn, _make_mcp_tool())
 
@@ -476,9 +461,7 @@ class TestArunInterceptorIntegration:
         interceptor = _make_mock_interceptor()
         captured: dict[str, Any] = {}
 
-        async def capture_start(
-            serialized: dict[str, Any], input_str: str, **kwargs: Any
-        ) -> None:
+        async def capture_start(serialized: dict[str, Any], input_str: str, **kwargs: Any) -> None:
             captured.update(serialized)
 
         interceptor.on_tool_start = AsyncMock(side_effect=capture_start)
@@ -498,9 +481,7 @@ class TestArunInterceptorIntegration:
         interceptor = _make_mock_interceptor()
         captured_input: list[str] = []
 
-        async def capture_start(
-            serialized: dict[str, Any], input_str: str, **kwargs: Any
-        ) -> None:
+        async def capture_start(serialized: dict[str, Any], input_str: str, **kwargs: Any) -> None:
             captured_input.append(input_str)
 
         interceptor.on_tool_start = AsyncMock(side_effect=capture_start)
@@ -546,9 +527,7 @@ class TestArunInterceptorIntegration:
     async def test_on_tool_error_called_when_is_error_true(self) -> None:
         """on_tool_error must be awaited when isError=True (tool-level error)."""
         conn = _make_mock_connection()
-        conn.call_tool = AsyncMock(
-            return_value=_make_call_tool_result("failure", is_error=True)
-        )
+        conn.call_tool = AsyncMock(return_value=_make_call_tool_result("failure", is_error=True))
         interceptor = _make_mock_interceptor()
 
         adapter = MCPToolAdapter(conn, _make_mcp_tool(), interceptor=interceptor)

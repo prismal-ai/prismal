@@ -6,7 +6,9 @@ Public API::
     from lightagent.memory import ShortTermMemory, LongTermMemory, MemoryEntry
     from lightagent.memory import MongoDBMemoryStore  # requires [mongodb] extra
     from lightagent.memory import (
-        PreferenceExtractor, PreferenceFacts, PreferencesManager
+        PreferenceExtractor,
+        PreferenceFacts,
+        PreferencesManager,
     )
 """
 

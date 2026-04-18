@@ -141,9 +141,7 @@ class CRAGPipeline:
 
         # ── Step 1: RETRIEVE ──────────────────────────────────────────────────
         with otel.start_span("crag.retrieve") as retrieve_span:
-            raw_results: list[tuple[Document, float]] = self._store.similarity_search(
-                query, k=5
-            )
+            raw_results: list[tuple[Document, float]] = self._store.similarity_search(query, k=5)
             retrieve_span.set_attribute("lightagent.query_len", len(query))
             retrieve_span.set_attribute("lightagent.retrieved_count", len(raw_results))
             logger.info(
@@ -197,9 +195,7 @@ class CRAGPipeline:
         # ── Step 5: GENERATE ──────────────────────────────────────────────────
         with otel.start_span("crag.generate") as generate_span:
             generate_span.set_attribute("lightagent.context_chunks", len(filtered))
-            generate_span.set_attribute(
-                "lightagent.used_web_fallback", used_web_fallback
-            )
+            generate_span.set_attribute("lightagent.used_web_fallback", used_web_fallback)
             logger.info("crag_generate_start", context_chunks=len(filtered))
             answer = await self._generate(query=query, chunks=filtered)
             generate_span.set_attribute("lightagent.answer_len", len(answer))
@@ -287,8 +283,7 @@ class CRAGPipeline:
         builder = SecurePromptBuilder()
         messages = builder.build(
             system=(
-                "Answer the following query using the provided context."
-                " Include source citations."
+                "Answer the following query using the provided context. Include source citations."
             ),
             user=query,
             docs=doc_entries,

@@ -12,13 +12,12 @@ Tests cover:
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from lightagent.agents.state import create_initial_state
-
 
 # ---------------------------------------------------------------------------
 # Helper
@@ -138,9 +137,7 @@ async def test_cron_manager_node_uses_cron_tools() -> None:
 
     with (
         patch("lightagent.agents.cron_manager.ProviderRegistry") as mock_reg,
-        patch(
-            "lightagent.agents.cron_manager.get_tools_for_agent", return_value=[]
-        ) as mock_tools,
+        patch("lightagent.agents.cron_manager.get_tools_for_agent", return_value=[]) as mock_tools,
         patch(
             "lightagent.agents.cron_manager.react_loop",
             new_callable=AsyncMock,

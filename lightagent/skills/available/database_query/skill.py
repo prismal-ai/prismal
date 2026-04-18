@@ -90,8 +90,7 @@ def _run_query(db_path: Path, query: str) -> str:
             header = " | ".join(c.ljust(col_widths[i]) for i, c in enumerate(columns))
             separator = "-+-".join("-" * w for w in col_widths)
             data_rows = [
-                " | ".join(str(v).ljust(col_widths[i]) for i, v in enumerate(row))
-                for row in rows
+                " | ".join(str(v).ljust(col_widths[i]) for i, v in enumerate(row)) for row in rows
             ]
             result = "\n".join([header, separator, *data_rows])
             if len(rows) == _MAX_ROWS:

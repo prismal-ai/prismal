@@ -9,11 +9,10 @@ import pytest
 
 from lightagent.monitoring.cost_tracker import CostEntry, CostTracker, UsageSummary
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 
-@pytest.fixture()
+@pytest.fixture
 def tracker(tmp_path: Path) -> CostTracker:
     """Return a CostTracker backed by a fresh in-memory SQLite file."""
     return CostTracker(db_path=tmp_path / "cost_test.db")

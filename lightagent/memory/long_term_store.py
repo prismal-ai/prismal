@@ -155,8 +155,7 @@ class LongTermMemoryStore:
             return AsyncPostgresStore(db_url)  # type: ignore[no-any-return]
 
         raise ValueError(
-            f"Unknown memory backend: {backend!r}. "
-            f"Expected 'memory', 'sqlite' or 'postgresql'."
+            f"Unknown memory backend: {backend!r}. Expected 'memory', 'sqlite' or 'postgresql'."
         )
 
     @property
@@ -169,7 +168,7 @@ class LongTermMemoryStore:
         user_id: str,
         namespace: tuple[str, ...],
         key: str,
-        value: Any,  # noqa: ANN401 -- store accepts arbitrary serialisable values
+        value: Any,
         ttl_days: int | None = None,
     ) -> None:
         """Persist a single fact under ``namespace[/key]`` for ``user_id``.
@@ -199,9 +198,7 @@ class LongTermMemoryStore:
                 pass ``0`` to disable expiration entirely.
         """
         resolved_ttl_days = (
-            ttl_days
-            if ttl_days is not None
-            else get_settings().memory_default_ttl_days
+            ttl_days if ttl_days is not None else get_settings().memory_default_ttl_days
         )
         now = time.time()
         expires_at: float | None = (

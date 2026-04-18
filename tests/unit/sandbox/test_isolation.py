@@ -93,9 +93,10 @@ def test_select_backend_unknown_name_raises() -> None:
 
 def test_select_backend_explicit_not_available_raises() -> None:
     """Explicit backend that isn't available on the host must raise."""
-    with patch.object(
-        DockerBackend, "is_available", return_value=False
-    ), pytest.raises(SandboxIsolationError, match="not"):
+    with (
+        patch.object(DockerBackend, "is_available", return_value=False),
+        pytest.raises(SandboxIsolationError, match="not"),
+    ):
         select_backend(override="docker")
 
 
@@ -111,14 +112,16 @@ def test_select_backend_explicit_available_returns_it() -> None:
 
 def test_select_backend_autoselect_picks_first_available() -> None:
     """Autoselect walks BACKEND_PRIORITY and returns the first available one."""
+
     # Force everything to be unavailable except the nsjail backend so we can
     # verify the walk actually honours the ordering.
     def _only_nsjail(self) -> bool:
-        return isinstance(self, (NsjailBackend, NoneBackend))
+        return isinstance(self, NsjailBackend | NoneBackend)
 
-    with patch.object(
-        isolation.IsolationBackend, "is_available", _only_nsjail
-    ), patch("lightagent.core.config.get_settings") as mock_settings:
+    with (
+        patch.object(isolation.IsolationBackend, "is_available", _only_nsjail),
+        patch("lightagent.core.config.get_settings") as mock_settings,
+    ):
         mock_settings.return_value.sandbox_isolation_backend = ""
         mock_settings.return_value.is_production = False
         backend = select_backend()
@@ -131,14 +134,13 @@ def test_select_backend_none_blocked_in_production() -> None:
     def _only_none(self) -> bool:
         return isinstance(self, NoneBackend)
 
-    with patch.object(
-        isolation.IsolationBackend, "is_available", _only_none
-    ), patch("lightagent.core.config.get_settings") as mock_settings:
+    with (
+        patch.object(isolation.IsolationBackend, "is_available", _only_none),
+        patch("lightagent.core.config.get_settings") as mock_settings,
+    ):
         mock_settings.return_value.sandbox_isolation_backend = ""
         mock_settings.return_value.is_production = True
-        with pytest.raises(
-            SandboxIsolationError, match="forbidden in production"
-        ):
+        with pytest.raises(SandboxIsolationError, match="forbidden in production"):
             select_backend()
 
 
@@ -148,9 +150,10 @@ def test_select_backend_none_allowed_in_dev() -> None:
     def _only_none(self) -> bool:
         return isinstance(self, NoneBackend)
 
-    with patch.object(
-        isolation.IsolationBackend, "is_available", _only_none
-    ), patch("lightagent.core.config.get_settings") as mock_settings:
+    with (
+        patch.object(isolation.IsolationBackend, "is_available", _only_none),
+        patch("lightagent.core.config.get_settings") as mock_settings,
+    ):
         mock_settings.return_value.sandbox_isolation_backend = ""
         mock_settings.return_value.is_production = False
         backend = select_backend()
@@ -183,8 +186,10 @@ def test_build_env_args_forwards_allowed_keys(monkeypatch) -> None:
     monkeypatch.setenv("LIGHTAGENT_TEST_BAZ", "qux")
     args = _build_env_args("LIGHTAGENT_TEST_FOO,LIGHTAGENT_TEST_BAZ")
     assert args == [
-        "-e", "LIGHTAGENT_TEST_FOO=bar",
-        "-e", "LIGHTAGENT_TEST_BAZ=qux",
+        "-e",
+        "LIGHTAGENT_TEST_FOO=bar",
+        "-e",
+        "LIGHTAGENT_TEST_BAZ=qux",
     ]
 
 
@@ -226,9 +231,7 @@ async def test_docker_backend_rejects_non_python_language() -> None:
 async def test_docker_backend_run_mocked_success() -> None:
     """A mocked docker spawn returns an ExecutionResult with the captured stdout."""
     backend = DockerBackend()
-    with patch.object(
-        isolation, "_spawn_container", return_value=_FakeProc(b"hello\n")
-    ):
+    with patch.object(isolation, "_spawn_container", return_value=_FakeProc(b"hello\n")):
         result = await backend.run("print('hello')", "python", timeout=5)
     assert result.exit_code == 0
     assert "hello" in result.stdout
@@ -257,7 +260,8 @@ async def test_namespace_backend_run_mocked_success(backend_cls) -> None:
     """Namespace backends decode stdout/stderr and surface the exit code."""
     backend = backend_cls()
     with patch.object(
-        isolation, "_spawn_container",
+        isolation,
+        "_spawn_container",
         return_value=_FakeProc(b"ns-ok\n", b"", returncode=0),
     ):
         result = await backend.run("print('ns-ok')", "python", timeout=5)
@@ -293,11 +297,13 @@ async def test_audit_entry_shape_from_container_backend() -> None:
             }
         )
 
-    with patch(
-        "lightagent.security.audit.AuditLogger.log_tool_call", new=_fake_log
-    ), patch.object(
-        isolation, "_spawn_container",
-        return_value=_FakeProc(b"shape", b"", 0),
+    with (
+        patch("lightagent.security.audit.AuditLogger.log_tool_call", new=_fake_log),
+        patch.object(
+            isolation,
+            "_spawn_container",
+            return_value=_FakeProc(b"shape", b"", 0),
+        ),
     ):
         await DockerBackend().run("print('shape')", "python", timeout=5)
 
@@ -318,5 +324,3 @@ async def test_audit_entry_shape_from_container_backend() -> None:
     assert params["code_hash"] == hashlib.sha256(b"print('shape')").hexdigest()
     assert isinstance(row["duration_ms"], int)
     assert row["duration_ms"] >= 0
-
-

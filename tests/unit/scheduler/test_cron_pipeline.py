@@ -43,9 +43,7 @@ def _make_compiled_graph_mock(*, fail: bool = False) -> AsyncMock:
     if fail:
         mock_graph.ainvoke = AsyncMock(side_effect=RuntimeError("graph error"))
     else:
-        mock_graph.ainvoke = AsyncMock(
-            return_value={"messages": [MagicMock(content="done")]}
-        )
+        mock_graph.ainvoke = AsyncMock(return_value={"messages": [MagicMock(content="done")]})
     return AsyncMock(return_value=mock_graph)
 
 
@@ -208,7 +206,5 @@ async def test_start_registers_all_active_jobs_from_real_manager(
         await executor.start()
 
     assert mock_scheduler.add_job.call_count == 2
-    registered_ids = {
-        call.kwargs["id"] for call in mock_scheduler.add_job.call_args_list
-    }
+    registered_ids = {call.kwargs["id"] for call in mock_scheduler.add_job.call_args_list}
     assert registered_ids == {"job-1", "job-3"}

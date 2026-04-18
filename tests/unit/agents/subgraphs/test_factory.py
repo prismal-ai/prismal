@@ -1,17 +1,16 @@
 """Unit tests for SubgraphFactory."""
+
 import pytest
 from langchain_core.messages import HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 
+from lightagent.agents.state import create_initial_state
 from lightagent.agents.subgraphs.factory import SubgraphFactory
 from lightagent.agents.subgraphs.registry import SubgraphDefinition
-from lightagent.agents.state import create_initial_state
 
 # aiosqlite connections held by AsyncSqliteSaver are intentionally kept open
 # for the lifetime of the compiled graph; GC finaliser warnings are expected.
-pytestmark = pytest.mark.filterwarnings(
-    "ignore::pytest.PytestUnraisableExceptionWarning"
-)
+pytestmark = pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 
 
 async def _node_a(state: dict) -> dict:  # type: ignore[type-arg]
@@ -61,9 +60,7 @@ async def test_factory_graph_invokable() -> None:
     graph = await factory.build(defn, checkpointer_path=":memory:")
     state = create_initial_state("test-sess")
     state["messages"] = [HumanMessage(content="build something")]
-    result = await graph.ainvoke(
-        state, config={"configurable": {"thread_id": "t1"}}
-    )
+    result = await graph.ainvoke(state, config={"configurable": {"thread_id": "t1"}})
     assert result["current_agent"] == "node_a"
 
 

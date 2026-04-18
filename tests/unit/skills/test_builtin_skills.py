@@ -297,9 +297,7 @@ class TestCalendarSkill:
         assert skill.metadata.name == "calendar"
         assert skill.metadata.safe_to_auto_activate is True
 
-    def test_no_calendar_dir_returns_error(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_no_calendar_dir_returns_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """list_events returns error when calendar dir does not exist."""
         from lightagent.skills.available.calendar.skill import CalendarSkill
 
@@ -381,11 +379,7 @@ class TestDatabaseQuerySkill:
                 conn.execute("CREATE TABLE t (x INT)")
                 conn.close()
 
-                result = (
-                    DatabaseQuerySkill()
-                    .get_tools()[0]
-                    .invoke({"query": "DROP TABLE t"})
-                )
+                result = DatabaseQuerySkill().get_tools()[0].invoke({"query": "DROP TABLE t"})
 
         assert "Only SELECT" in result or "not permitted" in result
 
@@ -437,9 +431,7 @@ class TestDatabaseQuerySkill:
                 result = (
                     DatabaseQuerySkill()
                     .get_tools()[0]
-                    .invoke(
-                        {"query": "WITH src AS (SELECT n FROM nums) SELECT * FROM src"}
-                    )
+                    .invoke({"query": "WITH src AS (SELECT n FROM nums) SELECT * FROM src"})
                 )
 
         assert "1" in result
@@ -524,9 +516,7 @@ class TestEmailReaderHelpers:
             mock_imap.login.side_effect = imaplib.IMAP4.error("auth failed")
             mock_ssl.return_value = mock_imap
 
-            result = _fetch_emails(
-                "imap.example.com", "user", "pass", 993, "INBOX", 5, False
-            )
+            result = _fetch_emails("imap.example.com", "user", "pass", 993, "INBOX", 5, False)
 
         assert "IMAP error" in result
 
@@ -545,9 +535,7 @@ class TestEmailReaderHelpers:
             mock_imap.search = MagicMock(return_value=(None, [b""]))
             mock_ssl.return_value = mock_imap
 
-            result = _fetch_emails(
-                "imap.example.com", "user", "pass", 993, "INBOX", 5, False
-            )
+            result = _fetch_emails("imap.example.com", "user", "pass", 993, "INBOX", 5, False)
 
         assert "No emails found" in result
 
@@ -823,8 +811,9 @@ class TestEmailReaderCoverage:
             "LIGHTAGENT_EMAIL_USER": "user@example.com",
             "LIGHTAGENT_EMAIL_PASSWORD": "secret",
         }
-        with patch.dict("os.environ", env), patch(
-            "imaplib.IMAP4_SSL", return_value=mock_imap
+        with (
+            patch.dict("os.environ", env),
+            patch("imaplib.IMAP4_SSL", return_value=mock_imap),
         ):
             tool = EmailReaderSkill().get_tools()[0]
             result = tool.invoke({"max_emails": 5, "unread_only": False})
@@ -853,8 +842,9 @@ class TestEmailReaderCoverage:
             "LIGHTAGENT_EMAIL_USER": "user@example.com",
             "LIGHTAGENT_EMAIL_PASSWORD": "secret",
         }
-        with patch.dict("os.environ", env), patch(
-            "imaplib.IMAP4_SSL", return_value=mock_imap
+        with (
+            patch.dict("os.environ", env),
+            patch("imaplib.IMAP4_SSL", return_value=mock_imap),
         ):
             tool = EmailReaderSkill().get_tools()[0]
             result = tool.invoke({"max_emails": 5})
@@ -883,8 +873,9 @@ class TestEmailReaderCoverage:
             "LIGHTAGENT_EMAIL_USER": "user@example.com",
             "LIGHTAGENT_EMAIL_PASSWORD": "wrong_password",
         }
-        with patch.dict("os.environ", env), patch(
-            "imaplib.IMAP4_SSL", return_value=mock_imap
+        with (
+            patch.dict("os.environ", env),
+            patch("imaplib.IMAP4_SSL", return_value=mock_imap),
         ):
             tool = EmailReaderSkill().get_tools()[0]
             result = tool.invoke({"max_emails": 5})
@@ -911,8 +902,9 @@ class TestEmailReaderCoverage:
             "LIGHTAGENT_EMAIL_USER": "user@example.com",
             "LIGHTAGENT_EMAIL_PASSWORD": "secret",
         }
-        with patch.dict("os.environ", env), patch(
-            "imaplib.IMAP4_SSL", return_value=mock_imap
+        with (
+            patch.dict("os.environ", env),
+            patch("imaplib.IMAP4_SSL", return_value=mock_imap),
         ):
             tool = EmailReaderSkill().get_tools()[0]
             result = tool.invoke({"max_emails": 5})

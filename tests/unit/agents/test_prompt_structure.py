@@ -90,9 +90,7 @@ PIPELINE_AGENTS: dict[str, type[BaseModel]] = {
     "lightagent.agents.subgraphs.financial.market_data_collector": MarketSnapshot,
     "lightagent.agents.subgraphs.financial.technical_analyst": TechnicalAnalysis,
     "lightagent.agents.subgraphs.financial.fundamental_analyst": FundamentalAnalysis,
-    "lightagent.agents.subgraphs.financial.risk_sentiment_analyst": (
-        RiskSentimentReport
-    ),
+    "lightagent.agents.subgraphs.financial.risk_sentiment_analyst": (RiskSentimentReport),
     "lightagent.agents.subgraphs.financial.report_generator": FinancialReport,
 }
 
@@ -105,9 +103,7 @@ def _load_prompt(module_name: str) -> str:
             value = getattr(module, attr)
             assert isinstance(value, str), f"{module_name}.{attr} must be str"
             return value
-    raise AssertionError(
-        f"{module_name} exposes neither `_SYSTEM_PROMPT` nor `_SYSTEM`"
-    )
+    raise AssertionError(f"{module_name} exposes neither `_SYSTEM_PROMPT` nor `_SYSTEM`")
 
 
 # Positive example block starts after `### Positive` (optionally followed by
@@ -156,9 +152,7 @@ def test_base_agent_prompts_have_required_sections(module_name: str) -> None:
     """
     prompt = _load_prompt(module_name)
     missing = [section for section in REQUIRED_SECTIONS if section not in prompt]
-    assert not missing, (
-        f"{module_name} is missing required prompt sections: {missing}"
-    )
+    assert not missing, f"{module_name} is missing required prompt sections: {missing}"
 
 
 @pytest.mark.parametrize("module_name", sorted(PIPELINE_AGENTS))
@@ -169,9 +163,7 @@ def test_pipeline_agent_prompts_have_all_7_sections(module_name: str) -> None:
     """
     prompt = _load_prompt(module_name)
     missing = [section for section in REQUIRED_SECTIONS if section not in prompt]
-    assert not missing, (
-        f"{module_name} is missing required prompt sections: {missing}"
-    )
+    assert not missing, f"{module_name} is missing required prompt sections: {missing}"
 
 
 @pytest.mark.parametrize(
@@ -190,8 +182,7 @@ def test_positive_json_examples_match_pydantic_schemas(
     prompt = _load_prompt(module_name)
     payload = _extract_first_positive_json(prompt)
     assert payload is not None, (
-        f"{module_name} prompt has no parseable positive JSON example under "
-        f"`### Positive`"
+        f"{module_name} prompt has no parseable positive JSON example under `### Positive`"
     )
     # ``model_validate`` raises ``ValidationError`` on any schema mismatch,
     # which pytest will surface with a precise field-level diagnostic.
@@ -208,9 +199,7 @@ def test_pipeline_prompts_have_at_least_one_negative_example() -> None:
         prompt = _load_prompt(module_name)
         if "### Negative" not in prompt:
             offenders.append(module_name)
-    assert not offenders, (
-        f"Pipeline prompts without `### Negative` examples: {offenders}"
-    )
+    assert not offenders, f"Pipeline prompts without `### Negative` examples: {offenders}"
 
 
 def test_reviewer_success_criteria_threshold_matches_score_gate() -> None:
@@ -220,9 +209,9 @@ def test_reviewer_success_criteria_threshold_matches_score_gate() -> None:
     Enforces SPEC-034 AC-034-3: numeric thresholds in Success Criteria align
     with the gate constants used downstream.
     """
-    builder_src = Path(
-        "lightagent/agents/subgraphs/dev_pipeline/builder.py"
-    ).read_text(encoding="utf-8")
+    builder_src = Path("lightagent/agents/subgraphs/dev_pipeline/builder.py").read_text(
+        encoding="utf-8"
+    )
     match = re.search(
         r"_REVIEWER_GATE\s*=\s*score_gate\([^)]*threshold\s*=\s*(?P<t>[0-9.]+)",
         builder_src,
@@ -246,9 +235,7 @@ def test_model_evaluator_threshold_mentions_settings_variable() -> None:
     ``settings.ml_quality_threshold`` rather than hard-coding a number, since
     the ml_pipeline gate reads that setting at runtime.
     """
-    prompt = _load_prompt(
-        "lightagent.agents.subgraphs.ml_pipeline.model_evaluator"
-    )
+    prompt = _load_prompt("lightagent.agents.subgraphs.ml_pipeline.model_evaluator")
     assert "settings.ml_quality_threshold" in prompt, (
         "model_evaluator prompt must defer to settings.ml_quality_threshold "
         "so the Success Criteria stays in sync with the ml_pipeline gate"

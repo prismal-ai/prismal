@@ -12,8 +12,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import litellm
-#from langchain_community.chat_models import ChatLiteLLM
+
+# from langchain_community.chat_models import ChatLiteLLM
 from langchain_litellm import ChatLiteLLM
+
 from lightagent.core.config import Settings, get_settings
 from lightagent.core.logging import get_logger
 from lightagent.monitoring.langfuse_client import LangfuseManager
@@ -100,9 +102,7 @@ class ProviderRegistry:
         # ``ollama/*`` model strings.  Export from settings so a single
         # LIGHTAGENT_OLLAMA_BASE_URL covers every codepath.
         if self._settings.ollama_base_url:
-            os.environ.setdefault(
-                "OLLAMA_API_BASE", self._settings.ollama_base_url
-            )
+            os.environ.setdefault("OLLAMA_API_BASE", self._settings.ollama_base_url)
 
         # Allow LiteLLM to auto-fix provider-specific parameter mismatches.
         # Anthropic rejects requests containing tool-use message history without
@@ -137,9 +137,7 @@ class ProviderRegistry:
         # Ollama local models are much slower than cloud providers — use
         # the dedicated timeout override when the model is routed through
         # Ollama so the default 60 s ceiling does not break simple greetings.
-        is_ollama = resolved_model.startswith(
-            ("ollama/", "ollama_chat/")
-        )
+        is_ollama = resolved_model.startswith(("ollama/", "ollama_chat/"))
         timeout_s = (
             self._settings.llm_ollama_timeout_seconds
             if is_ollama
@@ -206,9 +204,7 @@ class ProviderRegistry:
             configured) or a ``RunnableWithFallbacks`` wrapping both
             models.
         """
-        primary = self.get_llm(
-            model=model, streaming=streaming, temperature=temperature
-        )
+        primary = self.get_llm(model=model, streaming=streaming, temperature=temperature)
         fallback_model = self._settings.fallback_model
         primary_model = model if model is not None else self._settings.default_model
         if not fallback_model or fallback_model == primary_model:
@@ -312,9 +308,7 @@ class ProviderRegistry:
         usage.estimated_cost += estimated_cost
         otel = OTelManager()
         total = prompt_tokens + completion_tokens
-        otel.increment_counter(
-            "llm_tokens", total, attributes={"session_id": session_id}
-        )
+        otel.increment_counter("llm_tokens", total, attributes={"session_id": session_id})
         logger.debug(
             "usage_tracked",
             session_id=session_id,

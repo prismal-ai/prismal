@@ -50,7 +50,7 @@ class SystemTimeResult(BaseModel):
     """Result of datetime_get_system_time()."""
 
     iso8601: str
-    """Current time as ISO-8601 string with UTC offset, e.g. '2026-03-28T09:00:00-04:00'."""  # noqa: E501
+    """Current time as ISO-8601 string with UTC offset, e.g. '2026-03-28T09:00:00-04:00'."""
 
     unix_timestamp: float
     """Current time as POSIX timestamp (seconds since epoch)."""
@@ -278,12 +278,28 @@ def _describe_cron(schedule: str) -> str:
     all_dow = _is_wildcard(dow)
 
     month_names = [
-        "", "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December",
+        "",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
     ]
     dow_names = [
-        "Sunday", "Monday", "Tuesday", "Wednesday",
-        "Thursday", "Friday", "Saturday",
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
     ]
 
     time_part: str
@@ -406,9 +422,7 @@ def datetime_convert(dt_iso: str, from_tz: str, to_tz: str) -> ConvertResult:
     try:
         source_tz = ZoneInfo(from_tz)
     except (ZoneInfoNotFoundError, KeyError):
-        return ConvertResult(
-            success=False, error=f"Invalid source timezone: {from_tz!r}"
-        )
+        return ConvertResult(success=False, error=f"Invalid source timezone: {from_tz!r}")
 
     try:
         target_tz = ZoneInfo(to_tz)

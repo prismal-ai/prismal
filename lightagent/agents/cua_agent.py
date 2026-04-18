@@ -384,10 +384,7 @@ async def cua_node(state: AgentState) -> dict[str, Any]:
             screenshot = await take_screenshot()
         except Exception as exc:
             logger.warning("cua.screenshot_failed", error=str(exc))
-            final_reply = (
-                f"CUA could not capture a screenshot from the "
-                f"browser: {exc}"
-            )
+            final_reply = f"CUA could not capture a screenshot from the browser: {exc}"
             break
 
         # -------- Plan ----------------------------------------------------
@@ -412,8 +409,7 @@ async def cua_node(state: AgentState) -> dict[str, Any]:
                 preview=raw[:120],
             )
             final_reply = (
-                "CUA received an unparseable response from the vision "
-                "model and stopped the loop."
+                "CUA received an unparseable response from the vision model and stopped the loop."
             )
             break
 
@@ -431,8 +427,7 @@ async def cua_node(state: AgentState) -> dict[str, Any]:
             )
             final_reply = (
                 action.rationale
-                or f"CUA finished the task after {executed_actions} "
-                f"executed action(s)."
+                or f"CUA finished the task after {executed_actions} executed action(s)."
             )
             logger.info(
                 "cua.finished",
@@ -460,10 +455,7 @@ async def cua_node(state: AgentState) -> dict[str, Any]:
                     "rationale": action.rationale,
                     "risk_level": "HIGH_RISK",
                     "screenshot_bytes_len": len(screenshot),
-                    "question": (
-                        f"Approve {action.action_type} on "
-                        f"'{action.target}'?"
-                    ),
+                    "question": (f"Approve {action.action_type} on '{action.target}'?"),
                 }
             )
             hitl_decision = str(
@@ -511,8 +503,7 @@ async def cua_node(state: AgentState) -> dict[str, Any]:
                 error=str(exc),
             )
             final_reply = (
-                f"CUA failed while executing "
-                f"'{action.action_type}' on '{action.target}': {exc}"
+                f"CUA failed while executing '{action.action_type}' on '{action.target}': {exc}"
             )
             break
 
@@ -527,10 +518,7 @@ async def cua_node(state: AgentState) -> dict[str, Any]:
         executed_actions += 1
         working_messages.append(
             HumanMessage(
-                content=(
-                    f"Action '{action.action_type}' executed. "
-                    f"Result: {result[:200]}"
-                )
+                content=(f"Action '{action.action_type}' executed. Result: {result[:200]}")
             )
         )
 

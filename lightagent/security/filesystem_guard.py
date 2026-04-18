@@ -1,4 +1,5 @@
 """Centralized filesystem path validation for agent tools."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -43,12 +44,8 @@ class FilesystemGuard:
         readonly_paths: list[str] | None = None,
     ) -> None:
         """Initialise the guard."""
-        self._workspace: Path | None = (
-            Path(workspace_root).resolve() if workspace_root else None
-        )
-        self._readonly: list[Path] = [
-            Path(p).resolve() for p in (readonly_paths or [])
-        ]
+        self._workspace: Path | None = Path(workspace_root).resolve() if workspace_root else None
+        self._readonly: list[Path] = [Path(p).resolve() for p in (readonly_paths or [])]
 
     def validate(self, path: str, *, write: bool) -> Path:
         """Validate *path* against security policy and return the resolved Path.

@@ -39,8 +39,7 @@ class MaintenanceSettings(BaseSettings):
     backup_dir: str = Field(
         default="data/backups",
         description=(
-            "Directory for pyproject.toml backups created before each write. "
-            "Created on demand."
+            "Directory for pyproject.toml backups created before each write. Created on demand."
         ),
     )
     reports_dir: str = Field(
@@ -168,10 +167,7 @@ class Settings(BaseSettings):
             "LIGHTAGENT_ANTHROPIC_API_KEY",
             "ANTHROPIC_API_KEY",
         ),
-        description=(
-            "Anthropic API key"
-            " (LIGHTAGENT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY)"
-        ),
+        description=("Anthropic API key (LIGHTAGENT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY)"),
     )
     openai_api_key: SecretStr = Field(
         default=SecretStr(""),
@@ -227,7 +223,7 @@ class Settings(BaseSettings):
             "Each entry is a filesystem path that contains skill subdirectories "
             "(same layout as lightagent/skills/available/). "
             "Set via env var as a JSON array: "
-            'LIGHTAGENT_EXTERNAL_SKILLS_DIRS=\'["/home/user/.agents/skills"]\''
+            "LIGHTAGENT_EXTERNAL_SKILLS_DIRS='[\"/home/user/.agents/skills\"]'"
         ),
     )
 
@@ -427,8 +423,7 @@ class Settings(BaseSettings):
         default=90,
         ge=0,
         description=(
-            "Default TTL for stored facts in days. 0 disables expiration. "
-            "SPEC-039 AC-039-6."
+            "Default TTL for stored facts in days. 0 disables expiration. SPEC-039 AC-039-6."
         ),
     )
 
@@ -632,8 +627,7 @@ class Settings(BaseSettings):
     rbac_enabled: bool = Field(
         default=False,
         description=(
-            "Enable JWT-based multi-user RBAC. "
-            "When False, the simple api_key auth is used."
+            "Enable JWT-based multi-user RBAC. When False, the simple api_key auth is used."
         ),
     )
     jwt_secret_key: SecretStr = Field(
@@ -826,9 +820,7 @@ class Settings(BaseSettings):
     # ── Filesystem access ─────────────────────────────────────────────
     fs_workspace_root: str = Field(
         default="",
-        description=(
-            "Confine agent filesystem access to this directory. Empty = unrestricted."
-        ),
+        description=("Confine agent filesystem access to this directory. Empty = unrestricted."),
     )
     fs_allow_outside_workspace: bool = Field(
         default=False,
@@ -949,9 +941,7 @@ class Settings(BaseSettings):
         gt=0,
         description="Maximum dataset rows allowed (safety limit)",
     )
-    ml_random_seed: int = Field(
-        default=42, description="Global random seed for reproducibility"
-    )
+    ml_random_seed: int = Field(default=42, description="Global random seed for reproducibility")
     ml_shap_max_samples: int = Field(
         default=1000, gt=0, description="Max background samples for SHAP explainer"
     )
@@ -1034,8 +1024,7 @@ class Settings(BaseSettings):
     cron_timezone: str = Field(
         default="",
         description=(
-            "Default IANA timezone for all cron jobs. "
-            "Empty = inherit from 'timezone' field."
+            "Default IANA timezone for all cron jobs. Empty = inherit from 'timezone' field."
         ),
     )
     ntp_enabled: bool = Field(
@@ -1084,9 +1073,7 @@ class Settings(BaseSettings):
         """Validate webhook config when telegram_webhook_enabled is True."""
         if self.telegram_webhook_enabled:
             if not self.telegram_webhook_url.startswith("https://"):
-                raise ValueError(
-                    "LIGHTAGENT_TELEGRAM_WEBHOOK_URL must be an HTTPS URL"
-                )
+                raise ValueError("LIGHTAGENT_TELEGRAM_WEBHOOK_URL must be an HTTPS URL")
             if not self.telegram_webhook_secret.get_secret_value():
                 raise ValueError(
                     "LIGHTAGENT_TELEGRAM_WEBHOOK_SECRET must be set when webhook is enabled"

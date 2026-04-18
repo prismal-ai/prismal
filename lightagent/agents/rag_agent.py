@@ -94,6 +94,7 @@ def _format_sources(docs: list[dict[str, Any]]) -> str:
         lines.append(f"[{idx}] {title}\n{content}")
     return "\n\n".join(lines)
 
+
 _SYSTEM_PROMPT = """You are a knowledge base specialist that uses Corrective RAG (CRAG).
 
 ## Purpose

@@ -36,9 +36,7 @@ async def test_single_iteration_pass() -> None:
         calls.append("crit")
         return ("ok", 0.95)
 
-    draft, score = await reflection_loop(
-        gen, crit, _state(), threshold=0.85, max_iterations=3
-    )
+    draft, score = await reflection_loop(gen, crit, _state(), threshold=0.85, max_iterations=3)
 
     assert draft == "perfect-draft"
     assert score == 0.95
@@ -64,9 +62,7 @@ async def test_multi_iteration_convergence() -> None:
     async def crit(draft, state):  # type: ignore[no-untyped-def]
         return ("needs more rigor", next(scores))
 
-    draft, score = await reflection_loop(
-        gen, crit, _state(), threshold=0.85, max_iterations=3
-    )
+    draft, score = await reflection_loop(gen, crit, _state(), threshold=0.85, max_iterations=3)
 
     assert draft == "draft-2-refined"
     assert score == 0.9
@@ -86,9 +82,7 @@ async def test_max_iterations_forced_exit() -> None:
         # Always below threshold.
         return ("never enough", 0.2)
 
-    draft, score = await reflection_loop(
-        gen, crit, _state(), threshold=0.95, max_iterations=2
-    )
+    draft, score = await reflection_loop(gen, crit, _state(), threshold=0.95, max_iterations=2)
 
     # All drafts scored 0.2 → first draft remains the "best" (ties don't override).
     assert draft == "draft-1"
@@ -108,17 +102,13 @@ async def test_reflection_disabled_by_env() -> None:
         crit_calls["n"] += 1
         return ("unused", 0.0)
 
-    fake_settings = type(
-        "S", (), {"reflection_enabled": False, "reflection_max_iterations": 3}
-    )()
+    fake_settings = type("S", (), {"reflection_enabled": False, "reflection_max_iterations": 3})()
 
     with patch(
         "lightagent.agents.patterns.reflection.get_settings",
         return_value=fake_settings,
     ):
-        draft, score = await reflection_loop(
-            gen, crit, _state(), threshold=0.85, max_iterations=3
-        )
+        draft, score = await reflection_loop(gen, crit, _state(), threshold=0.85, max_iterations=3)
 
     assert draft == "first-draft"
     # Sentinel score when bypassed.
@@ -141,9 +131,7 @@ async def test_best_draft_returned_on_early_exit() -> None:
     async def crit(draft, state):  # type: ignore[no-untyped-def]
         return ("rework", next_score["d"][draft])
 
-    draft, score = await reflection_loop(
-        gen, crit, _state(), threshold=0.99, max_iterations=3
-    )
+    draft, score = await reflection_loop(gen, crit, _state(), threshold=0.99, max_iterations=3)
 
     # Highest score across all 3 iterations is draft-1 @ 0.7.
     assert draft == "draft-1"
@@ -162,17 +150,13 @@ async def test_global_max_iterations_cap() -> None:
     async def crit(draft, state):  # type: ignore[no-untyped-def]
         return ("low", 0.1)
 
-    fake_settings = type(
-        "S", (), {"reflection_enabled": True, "reflection_max_iterations": 2}
-    )()
+    fake_settings = type("S", (), {"reflection_enabled": True, "reflection_max_iterations": 2})()
 
     with patch(
         "lightagent.agents.patterns.reflection.get_settings",
         return_value=fake_settings,
     ):
-        await reflection_loop(
-            gen, crit, _state(), threshold=0.99, max_iterations=10
-        )
+        await reflection_loop(gen, crit, _state(), threshold=0.99, max_iterations=10)
 
     # Caller asked for 10 but global cap is 2.
     assert counter["n"] == 2

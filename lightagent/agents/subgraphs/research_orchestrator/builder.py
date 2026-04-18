@@ -39,9 +39,7 @@ from lightagent.agents.subgraphs.registry import (
     SubgraphRegistry,
 )
 
-logger = structlog.get_logger(
-    "lightagent.subgraphs.research_orchestrator.builder"
-)
+logger = structlog.get_logger("lightagent.subgraphs.research_orchestrator.builder")
 
 _NAME = "research_orchestrator"
 _DESCRIPTION = (
@@ -124,9 +122,7 @@ def _make_definition() -> SubgraphDefinition:
 
 
 async def register_research_orchestrator(
-    checkpointer_path: str = (
-        "data/db/checkpoints_subgraph_research_orchestrator.db"
-    ),
+    checkpointer_path: str = ("data/db/checkpoints_subgraph_research_orchestrator.db"),
 ) -> None:
     """Compile and register the research orchestrator.
 
@@ -145,9 +141,7 @@ async def register_research_orchestrator(
 
     definition = _make_definition()
     factory = SubgraphFactory()
-    compiled = await factory.build(
-        definition, checkpointer_path=checkpointer_path
-    )
+    compiled = await factory.build(definition, checkpointer_path=checkpointer_path)
     await registry.register(_NAME, definition)
 
     _COMPILED_GRAPHS[_NAME] = compiled
@@ -156,7 +150,7 @@ async def register_research_orchestrator(
 
 async def get_compiled_research_orchestrator(
     checkpointer_path: str = ":memory:",
-) -> Any:  # noqa: ANN401 — no common base type for compiled subgraphs
+) -> Any:
     """Return (building if needed) the compiled research orchestrator."""
     if _NAME not in _COMPILED_GRAPHS:
         definition = _make_definition()

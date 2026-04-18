@@ -57,9 +57,7 @@ async def test_review_saves_proposals_file(tmp_path: Path) -> None:
     with (
         patch.object(learner, "fetch_traces", AsyncMock(return_value=[])),
         patch.object(learner, "score_traces", AsyncMock(return_value=mock_scores)),
-        patch.object(
-            learner, "generate_proposals", AsyncMock(return_value=proposals)
-        ),
+        patch.object(learner, "generate_proposals", AsyncMock(return_value=proposals)),
     ):
         result = await learner.review()
 
@@ -103,7 +101,9 @@ async def test_review_returns_no_issues_when_no_low_scores(
 
 
 @pytest.mark.asyncio
-async def test_fetch_traces_returns_traces_when_langfuse_enabled(tmp_path: Path) -> None:
+async def test_fetch_traces_returns_traces_when_langfuse_enabled(
+    tmp_path: Path,
+) -> None:
     """fetch_traces() returns trace dicts when Langfuse is enabled and works."""
     mock_settings = MagicMock()
     mock_settings.langfuse_enabled = True
@@ -177,7 +177,9 @@ async def test_score_traces_returns_scores_for_valid_traces(tmp_path: Path) -> N
 
     mock_llm = AsyncMock()
     mock_response = MagicMock()
-    mock_response.content = '{"task_completion": 0.8, "accuracy": 0.9, "efficiency": 0.7, "issues": []}'
+    mock_response.content = (
+        '{"task_completion": 0.8, "accuracy": 0.9, "efficiency": 0.7, "issues": []}'
+    )
     mock_llm.ainvoke = AsyncMock(return_value=mock_response)
 
     mock_registry = MagicMock()
@@ -235,7 +237,9 @@ async def test_score_traces_handles_invalid_json(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_generate_proposals_returns_empty_for_no_low_scores(tmp_path: Path) -> None:
+async def test_generate_proposals_returns_empty_for_no_low_scores(
+    tmp_path: Path,
+) -> None:
     """generate_proposals() returns '' when given an empty list."""
     learner = MetaLearner(proposals_dir=tmp_path)
     result = await learner.generate_proposals([])

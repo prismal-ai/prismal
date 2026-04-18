@@ -366,17 +366,13 @@ async def _extract_and_store_memory(state: AgentState) -> None:
         recent = messages[-10:]
 
         llm = ProviderRegistry().get_llm_with_fallback()
-        response = await llm.ainvoke(
-            [SystemMessage(content=_MEMORY_EXTRACTION_PROMPT), *recent]
-        )
+        response = await llm.ainvoke([SystemMessage(content=_MEMORY_EXTRACTION_PROMPT), *recent])
 
         raw = str(getattr(response, "content", "")).strip()
         if not raw:
             return
 
-        candidate_lines = [
-            line.lstrip("-*0123456789. ").strip() for line in raw.splitlines()
-        ]
+        candidate_lines = [line.lstrip("-*0123456789. ").strip() for line in raw.splitlines()]
         facts = [line for line in candidate_lines if line][:5]
         if not facts:
             return
@@ -886,9 +882,7 @@ async def hierarchical_supervisor_node(
             if getattr(last, "type", "") == "human":
                 profile = ProfileManager()
                 answer_system = profile.load_system_prompt() or _ANSWER_SYSTEM_PROMPT
-                answer_resp = await llm.ainvoke(
-                    [SystemMessage(content=answer_system), *trimmed]
-                )
+                answer_resp = await llm.ainvoke([SystemMessage(content=answer_system), *trimmed])
                 answer_content = str(answer_resp.content)
                 # Same Ollama / open-model JSON-wrap defense as in the flat
                 # supervisor — small talk must never leak the synthetic blob.

@@ -297,9 +297,7 @@ class CostTracker:
         Returns:
             Total cost in USD for the current UTC day.
         """
-        today = datetime.now(UTC).replace(
-            hour=0, minute=0, second=0, microsecond=0, tzinfo=None
-        )
+        today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
         summary = self.get_summary(user_id=user_id, from_date=today)
         return summary.total_cost_usd
 
@@ -388,9 +386,9 @@ class CostTracker:
                         tokens_in=row["tokens_in"],
                         tokens_out=row["tokens_out"],
                         cost_usd=row["cost_usd"],
-                        created_at=datetime.strptime(
-                            row["created_at"], _DT_FMT
-                        ).replace(tzinfo=UTC),
+                        created_at=datetime.strptime(row["created_at"], _DT_FMT).replace(
+                            tzinfo=UTC
+                        ),
                     )
                 )
             except (ValueError, KeyError):

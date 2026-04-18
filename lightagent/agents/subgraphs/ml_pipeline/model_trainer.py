@@ -180,9 +180,7 @@ async def model_trainer_node(state: AgentState) -> dict[str, Any]:
             data["random_seed"] = settings.ml_random_seed
             trained_model = TrainedModel.model_validate(data)
         except Exception:
-            model_path = (
-                f"{settings.ml_workspace_root}/{dataset_name}/model.joblib"
-            )
+            model_path = f"{settings.ml_workspace_root}/{dataset_name}/model.joblib"
             trained_model = TrainedModel(
                 model_type="LightGBM",
                 task=task_type,
@@ -201,9 +199,7 @@ async def model_trainer_node(state: AgentState) -> dict[str, Any]:
             random_seed=trained_model.random_seed,
         )
         span.set_attribute("lightagent.ml.model_type", trained_model.model_type)
-        span.set_attribute(
-            "lightagent.ml.training_time", trained_model.training_time_seconds
-        )
+        span.set_attribute("lightagent.ml.training_time", trained_model.training_time_seconds)
 
         return {
             "current_agent": "model_trainer",

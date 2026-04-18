@@ -23,9 +23,7 @@ logger = get_logger("lightagent.security.pii_sanitizer")
 
 # PII detection patterns. Mirrors ``output_patterns.pii`` in
 # ``injection_patterns.yaml``; kept in sync intentionally.
-_EMAIL_RE: Pattern[str] = re.compile(
-    r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
-)
+_EMAIL_RE: Pattern[str] = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 _PHONE_US_RE: Pattern[str] = re.compile(
     r"\b(?:\+?1[-.\s]?)?(?:\(?[0-9]{3}\)?[-.\s]?)[0-9]{3}[-.\s]?[0-9]{4}\b"
 )

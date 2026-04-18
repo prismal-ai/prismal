@@ -141,9 +141,7 @@ async def risk_sentiment_analyst_node(state: AgentState) -> dict[str, Any]:
         span.set_attribute("lightagent.subgraph", "financial_analyst")
         span.set_attribute("lightagent.agent", "risk_sentiment_analyst")
 
-        fin: dict[str, Any] = dict(
-            state.get("metadata", {}).get("financial_analyst", {})
-        )
+        fin: dict[str, Any] = dict(state.get("metadata", {}).get("financial_analyst", {}))
         snapshot = fin.get("market_snapshot", {})
         symbol = snapshot.get("symbol", "UNKNOWN")
 

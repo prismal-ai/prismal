@@ -1,4 +1,5 @@
 """Unit tests for ML pipeline tools (Phase 26 F5-02)."""
+
 from __future__ import annotations
 
 import json
@@ -34,9 +35,7 @@ def test_validate_dataset_missing_file() -> None:
         validate_dataset,
     )
 
-    result = json.loads(
-        validate_dataset.invoke({"path": "/no/such/file.csv"})
-    )
+    result = json.loads(validate_dataset.invoke({"path": "/no/such/file.csv"}))
     assert "error" in result
 
 
@@ -52,9 +51,7 @@ def test_statistical_summary_iris() -> None:
     )
 
     result = json.loads(
-        statistical_summary.invoke(
-            {"path": str(IRIS_CSV), "target_column": "species"}
-        )
+        statistical_summary.invoke({"path": str(IRIS_CSV), "target_column": "species"})
     )
     assert "numeric_summary" in result
     assert "target_distribution" in result
@@ -73,13 +70,15 @@ def test_feature_transform_fill_null(tmp_path: Path) -> None:
 
     out = tmp_path / "out.csv"
     result = json.loads(
-        feature_transform.invoke({
-            "dataset_path": str(IRIS_CSV),
-            "output_path": str(out),
-            "operations": json.dumps(
-                [{"type": "fill_null", "column": "sepal_length", "value": 0}]
-            ),
-        })
+        feature_transform.invoke(
+            {
+                "dataset_path": str(IRIS_CSV),
+                "output_path": str(out),
+                "operations": json.dumps(
+                    [{"type": "fill_null", "column": "sepal_length", "value": 0}]
+                ),
+            }
+        )
     )
     assert result.get("status") == "ok"
     assert out.exists()
@@ -97,12 +96,14 @@ def test_feature_select_variance() -> None:
     )
 
     result = json.loads(
-        feature_select.invoke({
-            "dataset_path": str(IRIS_CSV),
-            "target_column": "species",
-            "method": "variance",
-            "n_features": 3,
-        })
+        feature_select.invoke(
+            {
+                "dataset_path": str(IRIS_CSV),
+                "target_column": "species",
+                "method": "variance",
+                "n_features": 3,
+            }
+        )
     )
     assert "selected_features" in result
     assert len(result["selected_features"]) <= 3
@@ -121,12 +122,14 @@ def test_apply_sampling_oversample(tmp_path: Path) -> None:
 
     out = tmp_path / "balanced.csv"
     result = json.loads(
-        apply_sampling.invoke({
-            "dataset_path": str(IRIS_CSV),
-            "output_path": str(out),
-            "target_column": "species",
-            "method": "oversample",
-        })
+        apply_sampling.invoke(
+            {
+                "dataset_path": str(IRIS_CSV),
+                "output_path": str(out),
+                "target_column": "species",
+                "method": "oversample",
+            }
+        )
     )
     assert result.get("status") == "ok"
     assert out.exists()
@@ -142,12 +145,14 @@ def test_export_model_missing_source(tmp_path: Path) -> None:
     from lightagent.agents.subgraphs.ml_pipeline.tools_ml import export_model
 
     result = json.loads(
-        export_model.invoke({
-            "model_path": str(tmp_path / "no_model.joblib"),
-            "output_dir": str(tmp_path / "out"),
-            "format": "joblib",
-            "model_name": "test",
-        })
+        export_model.invoke(
+            {
+                "model_path": str(tmp_path / "no_model.joblib"),
+                "output_dir": str(tmp_path / "out"),
+                "format": "joblib",
+                "model_name": "test",
+            }
+        )
     )
     assert "error" in result
 
@@ -160,13 +165,15 @@ def test_generate_inference_code(tmp_path: Path) -> None:
 
     schema = json.dumps({"sepal_length": "float", "sepal_width": "float"})
     result = json.loads(
-        generate_inference_code.invoke({
-            "model_path": "model.joblib",
-            "input_schema": schema,
-            "output_dir": str(tmp_path),
-            "model_name": "iris_clf",
-            "task": "classification",
-        })
+        generate_inference_code.invoke(
+            {
+                "model_path": "model.joblib",
+                "input_schema": schema,
+                "output_dir": str(tmp_path),
+                "model_name": "iris_clf",
+                "task": "classification",
+            }
+        )
     )
     assert result.get("status") == "ok"
     script = Path(result["script_path"])
@@ -192,13 +199,13 @@ def test_feature_transform_drop(tmp_path: Path) -> None:
 
     out = tmp_path / "dropped.csv"
     result = json.loads(
-        feature_transform.invoke({
-            "dataset_path": str(IRIS_CSV),
-            "output_path": str(out),
-            "operations": json.dumps(
-                [{"type": "drop", "columns": ["petal_width"]}]
-            ),
-        })
+        feature_transform.invoke(
+            {
+                "dataset_path": str(IRIS_CSV),
+                "output_path": str(out),
+                "operations": json.dumps([{"type": "drop", "columns": ["petal_width"]}]),
+            }
+        )
     )
     assert result.get("status") == "ok"
     assert result["cols_after"] == result["cols_before"] - 1
@@ -210,13 +217,13 @@ def test_feature_transform_log1p(tmp_path: Path) -> None:
 
     out = tmp_path / "log.csv"
     result = json.loads(
-        feature_transform.invoke({
-            "dataset_path": str(IRIS_CSV),
-            "output_path": str(out),
-            "operations": json.dumps(
-                [{"type": "log1p", "column": "sepal_length"}]
-            ),
-        })
+        feature_transform.invoke(
+            {
+                "dataset_path": str(IRIS_CSV),
+                "output_path": str(out),
+                "operations": json.dumps([{"type": "log1p", "column": "sepal_length"}]),
+            }
+        )
     )
     assert result.get("status") == "ok"
 
@@ -227,13 +234,13 @@ def test_feature_transform_normalize(tmp_path: Path) -> None:
 
     out = tmp_path / "norm.csv"
     result = json.loads(
-        feature_transform.invoke({
-            "dataset_path": str(IRIS_CSV),
-            "output_path": str(out),
-            "operations": json.dumps(
-                [{"type": "normalize", "column": "sepal_width"}]
-            ),
-        })
+        feature_transform.invoke(
+            {
+                "dataset_path": str(IRIS_CSV),
+                "output_path": str(out),
+                "operations": json.dumps([{"type": "normalize", "column": "sepal_width"}]),
+            }
+        )
     )
     assert result.get("status") == "ok"
 
@@ -244,13 +251,15 @@ def test_feature_transform_cast(tmp_path: Path) -> None:
 
     out = tmp_path / "cast.csv"
     result = json.loads(
-        feature_transform.invoke({
-            "dataset_path": str(IRIS_CSV),
-            "output_path": str(out),
-            "operations": json.dumps(
-                [{"type": "cast", "column": "sepal_length", "dtype": "float32"}]
-            ),
-        })
+        feature_transform.invoke(
+            {
+                "dataset_path": str(IRIS_CSV),
+                "output_path": str(out),
+                "operations": json.dumps(
+                    [{"type": "cast", "column": "sepal_length", "dtype": "float32"}]
+                ),
+            }
+        )
     )
     assert result.get("status") == "ok"
 
@@ -261,11 +270,13 @@ def test_feature_transform_parquet_output(tmp_path: Path) -> None:
 
     out = tmp_path / "out.parquet"
     result = json.loads(
-        feature_transform.invoke({
-            "dataset_path": str(IRIS_CSV),
-            "output_path": str(out),
-            "operations": json.dumps([]),
-        })
+        feature_transform.invoke(
+            {
+                "dataset_path": str(IRIS_CSV),
+                "output_path": str(out),
+                "operations": json.dumps([]),
+            }
+        )
     )
     assert result.get("status") == "ok"
     assert out.exists()
@@ -282,12 +293,14 @@ def test_feature_select_correlation() -> None:
 
     # Use churn CSV: tenure/monthly_charges are numeric, churned is integer target
     result = json.loads(
-        feature_select.invoke({
-            "dataset_path": str(CHURN_CSV),
-            "target_column": "churned",
-            "method": "correlation",
-            "n_features": 2,
-        })
+        feature_select.invoke(
+            {
+                "dataset_path": str(CHURN_CSV),
+                "target_column": "churned",
+                "method": "correlation",
+                "n_features": 2,
+            }
+        )
     )
     # pearson_corr may not be available in all Polars versions — accept graceful error
     assert "selected_features" in result or "error" in result
@@ -299,12 +312,14 @@ def test_feature_select_mutual_info() -> None:
 
     # churned is 0/1 integer — valid for mutual_info_classif
     result = json.loads(
-        feature_select.invoke({
-            "dataset_path": str(CHURN_CSV),
-            "target_column": "churned",
-            "method": "mutual_info",
-            "n_features": 2,
-        })
+        feature_select.invoke(
+            {
+                "dataset_path": str(CHURN_CSV),
+                "target_column": "churned",
+                "method": "mutual_info",
+                "n_features": 2,
+            }
+        )
     )
     assert "selected_features" in result or "error" in result
 
@@ -320,12 +335,14 @@ def test_apply_sampling_undersample(tmp_path: Path) -> None:
 
     out = tmp_path / "under.csv"
     result = json.loads(
-        apply_sampling.invoke({
-            "dataset_path": str(CHURN_CSV),
-            "output_path": str(out),
-            "target_column": "churned",
-            "method": "undersample",
-        })
+        apply_sampling.invoke(
+            {
+                "dataset_path": str(CHURN_CSV),
+                "output_path": str(out),
+                "target_column": "churned",
+                "method": "undersample",
+            }
+        )
     )
     assert result.get("status") == "ok"
     assert out.exists()
@@ -341,14 +358,16 @@ def test_train_clustering_kmeans(tmp_path: Path) -> None:
     from lightagent.agents.subgraphs.ml_pipeline.tools_ml import train_clustering
 
     result = json.loads(
-        train_clustering.invoke({
-            "dataset_path": str(IRIS_CSV),
-            "output_dir": str(tmp_path),
-            "model_name": "iris_km",
-            "n_clusters": 3,
-            "method": "kmeans",
-            "random_seed": 42,
-        })
+        train_clustering.invoke(
+            {
+                "dataset_path": str(IRIS_CSV),
+                "output_dir": str(tmp_path),
+                "model_name": "iris_km",
+                "n_clusters": 3,
+                "method": "kmeans",
+                "random_seed": 42,
+            }
+        )
     )
     assert result.get("status") in ("ok", "unavailable") or "error" in result
     if result.get("status") == "ok":
@@ -360,15 +379,17 @@ def test_train_clustering_auto_k(tmp_path: Path) -> None:
     from lightagent.agents.subgraphs.ml_pipeline.tools_ml import train_clustering
 
     result = json.loads(
-        train_clustering.invoke({
-            "dataset_path": str(IRIS_CSV),
-            "output_dir": str(tmp_path),
-            "model_name": "iris_auto_km",
-            "n_clusters": 0,
-            "method": "kmeans",
-            "max_k": 4,
-            "random_seed": 42,
-        })
+        train_clustering.invoke(
+            {
+                "dataset_path": str(IRIS_CSV),
+                "output_dir": str(tmp_path),
+                "model_name": "iris_auto_km",
+                "n_clusters": 0,
+                "method": "kmeans",
+                "max_k": 4,
+                "random_seed": 42,
+            }
+        )
     )
     assert result.get("status") in ("ok", "unavailable") or "error" in result
 
@@ -398,9 +419,7 @@ def trained_model_path(tmp_path: Path) -> Path:
     return model_path
 
 
-def test_evaluate_model_classification(
-    tmp_path: Path, trained_model_path: Path
-) -> None:
+def test_evaluate_model_classification(tmp_path: Path, trained_model_path: Path) -> None:
     """evaluate_model computes accuracy + f1 for a classification model."""
     # Write a simple numeric CSV for the model (species encoded as int)
     import polars as pl
@@ -412,19 +431,19 @@ def test_evaluate_model_classification(
     le = LabelEncoder()
     labels = le.fit_transform(df["species"].to_numpy())
     feats = [c for c in df.columns if c != "species"]
-    numeric_df = df.select(feats).with_columns(
-        pl.Series("label", labels)
-    )
+    numeric_df = df.select(feats).with_columns(pl.Series("label", labels))
     eval_path = tmp_path / "eval.csv"
     numeric_df.write_csv(eval_path)
 
     result = json.loads(
-        evaluate_model.invoke({
-            "model_path": str(trained_model_path),
-            "dataset_path": str(eval_path),
-            "target_column": "label",
-            "task": "classification",
-        })
+        evaluate_model.invoke(
+            {
+                "model_path": str(trained_model_path),
+                "dataset_path": str(eval_path),
+                "target_column": "label",
+                "task": "classification",
+            }
+        )
     )
     assert result.get("status") in ("ok", "unavailable") or "error" in result
     if result.get("status") == "ok":
@@ -453,12 +472,14 @@ def test_evaluate_model_regression(tmp_path: Path) -> None:
     from lightagent.agents.subgraphs.ml_pipeline.tools_ml import evaluate_model
 
     result = json.loads(
-        evaluate_model.invoke({
-            "model_path": str(model_path),
-            "dataset_path": str(eval_path),
-            "target_column": "petal_length",
-            "task": "regression",
-        })
+        evaluate_model.invoke(
+            {
+                "model_path": str(model_path),
+                "dataset_path": str(eval_path),
+                "target_column": "petal_length",
+                "task": "regression",
+            }
+        )
     )
     assert result.get("status") in ("ok", "unavailable") or "error" in result
 
@@ -479,12 +500,14 @@ def test_explain_model(tmp_path: Path, trained_model_path: Path) -> None:
     from lightagent.agents.subgraphs.ml_pipeline.tools_ml import explain_model
 
     result = json.loads(
-        explain_model.invoke({
-            "model_path": str(trained_model_path),
-            "dataset_path": str(eval_path),
-            "target_column": "label",
-            "max_samples": 20,
-        })
+        explain_model.invoke(
+            {
+                "model_path": str(trained_model_path),
+                "dataset_path": str(eval_path),
+                "target_column": "label",
+                "max_samples": 20,
+            }
+        )
     )
     assert result.get("status") in ("ok", "unavailable") or "error" in result
 
@@ -494,20 +517,20 @@ def test_explain_model(tmp_path: Path, trained_model_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_export_model_joblib_copy(
-    tmp_path: Path, trained_model_path: Path
-) -> None:
+def test_export_model_joblib_copy(tmp_path: Path, trained_model_path: Path) -> None:
     """export_model with format=joblib copies the model file."""
     from lightagent.agents.subgraphs.ml_pipeline.tools_ml import export_model
 
     out_dir = tmp_path / "exported"
     result = json.loads(
-        export_model.invoke({
-            "model_path": str(trained_model_path),
-            "output_dir": str(out_dir),
-            "format": "joblib",
-            "model_name": "iris_clf",
-        })
+        export_model.invoke(
+            {
+                "model_path": str(trained_model_path),
+                "output_dir": str(out_dir),
+                "format": "joblib",
+                "model_name": "iris_clf",
+            }
+        )
     )
     assert result.get("status") == "ok"
     assert "exported_path" in result
@@ -523,13 +546,15 @@ def test_automl_train_missing_lib(tmp_path: Path) -> None:
     from lightagent.agents.subgraphs.ml_pipeline.tools_ml import automl_train
 
     result = json.loads(
-        automl_train.invoke({
-            "dataset_path": str(IRIS_CSV),
-            "target_column": "species",
-            "task": "classification",
-            "time_budget": 5,
-            "model_output_dir": str(tmp_path),
-        })
+        automl_train.invoke(
+            {
+                "dataset_path": str(IRIS_CSV),
+                "target_column": "species",
+                "task": "classification",
+                "time_budget": 5,
+                "model_output_dir": str(tmp_path),
+            }
+        )
     )
     # Either flaml ran (ok) or it's unavailable — never a crash
     assert result.get("status") in ("ok", "unavailable") or "error" in result
@@ -547,13 +572,15 @@ def test_train_dl_model_missing_lib(tmp_path: Path) -> None:
     )
 
     result = json.loads(
-        train_dl_model.invoke({
-            "dataset_path": str(IRIS_CSV),
-            "target_column": "species",
-            "task": "classification",
-            "epochs": 2,
-            "model_output_dir": str(tmp_path),
-        })
+        train_dl_model.invoke(
+            {
+                "dataset_path": str(IRIS_CSV),
+                "target_column": "species",
+                "task": "classification",
+                "epochs": 2,
+                "model_output_dir": str(tmp_path),
+            }
+        )
     )
     assert result.get("status") in ("ok", "unavailable") or "error" in result
 
@@ -613,9 +640,7 @@ def test_statistical_summary_missing_file() -> None:
     from lightagent.agents.subgraphs.ml_pipeline.tools_ml import statistical_summary
 
     result = json.loads(
-        statistical_summary.invoke(
-            {"path": "/no/such/dataset.csv", "target_column": ""}
-        )
+        statistical_summary.invoke({"path": "/no/such/dataset.csv", "target_column": ""})
     )
     assert "error" in result
 
@@ -631,12 +656,14 @@ def test_apply_sampling_smote_fallback(tmp_path: Path) -> None:
 
     out = tmp_path / "smote.csv"
     result = json.loads(
-        apply_sampling.invoke({
-            "dataset_path": str(CHURN_CSV),
-            "output_path": str(out),
-            "target_column": "churned",
-            "method": "smote",
-        })
+        apply_sampling.invoke(
+            {
+                "dataset_path": str(CHURN_CSV),
+                "output_path": str(out),
+                "target_column": "churned",
+                "method": "smote",
+            }
+        )
     )
     assert result.get("status") == "ok" or "error" in result
 
@@ -646,20 +673,20 @@ def test_apply_sampling_smote_fallback(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_export_model_onnx_fallback(
-    tmp_path: Path, trained_model_path: Path
-) -> None:
+def test_export_model_onnx_fallback(tmp_path: Path, trained_model_path: Path) -> None:
     """export_model with onnx format falls back to joblib when skl2onnx is absent."""
     from lightagent.agents.subgraphs.ml_pipeline.tools_ml import export_model
 
     out_dir = tmp_path / "onnx_export"
     result = json.loads(
-        export_model.invoke({
-            "model_path": str(trained_model_path),
-            "output_dir": str(out_dir),
-            "format": "onnx",
-            "model_name": "iris_clf",
-        })
+        export_model.invoke(
+            {
+                "model_path": str(trained_model_path),
+                "output_dir": str(out_dir),
+                "format": "onnx",
+                "model_name": "iris_clf",
+            }
+        )
     )
     assert result.get("status") == "ok"
     assert result.get("format") in ("onnx", "joblib")

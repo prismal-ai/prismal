@@ -7,8 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from lightagent.scheduler.cron_manager import CronJob, CronManager, CronRunRecord, CronStatus
-
+from lightagent.scheduler.cron_manager import (
+    CronJob,
+    CronManager,
+)
 
 # ── CronJob model ─────────────────────────────────────────────────────────────
 
@@ -319,7 +321,7 @@ class TestCronRunHistory:
 # ── CronManager.get_last_run ──────────────────────────────────────────────────
 
 
-@pytest.fixture()
+@pytest.fixture
 def manager(tmp_path: Path) -> CronManager:
     """Provide a fresh CronManager backed by a temp SQLite DB."""
     return CronManager(db_path=tmp_path / "cron.db")
@@ -331,6 +333,7 @@ class TestGetLastRun:
     def test_get_last_run_returns_most_recent(self, manager: CronManager) -> None:
         """get_last_run returns the most recent run record."""
         from datetime import datetime, timedelta
+
         manager.add("lr-job", "* * * * *", "task")
         base = datetime(2026, 3, 9, 10, 0, 0)
         manager.add_run_record(
@@ -375,8 +378,11 @@ class TestRetryFields:
     def test_job_created_with_custom_retry(self, manager: CronManager) -> None:
         """Jobs can be created with custom max_retries and retry_delay_seconds."""
         job = manager.add(
-            "retry-custom", "* * * * *", "task",
-            max_retries=3, retry_delay_seconds=30,
+            "retry-custom",
+            "* * * * *",
+            "task",
+            max_retries=3,
+            retry_delay_seconds=30,
         )
         assert job.max_retries == 3
         assert job.retry_delay_seconds == 30

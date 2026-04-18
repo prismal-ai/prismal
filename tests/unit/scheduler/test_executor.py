@@ -14,7 +14,6 @@ import pytest
 from lightagent.scheduler.cron_manager import CronJob, CronManager
 from lightagent.scheduler.executor import CronExecutor
 
-
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
@@ -30,7 +29,7 @@ def _make_paused_job(name: str = "paused-job") -> CronJob:
     return CronJob(name=name, schedule="0 10 * * *", task="Paused task", status="paused")  # type: ignore[call-arg]
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_manager(tmp_path: Path) -> MagicMock:
     """Return a mock CronManager with sensible defaults."""
     manager = MagicMock(spec=CronManager)
@@ -41,7 +40,7 @@ def mock_manager(tmp_path: Path) -> MagicMock:
     return manager
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_scheduler() -> MagicMock:
     """Return a mock AsyncIOScheduler."""
     scheduler = MagicMock()
@@ -49,7 +48,7 @@ def mock_scheduler() -> MagicMock:
     return scheduler
 
 
-@pytest.fixture()
+@pytest.fixture
 def executor(mock_manager: MagicMock, mock_scheduler: MagicMock) -> CronExecutor:
     """Return a CronExecutor with mocked manager and scheduler."""
     ex = CronExecutor(manager=mock_manager)
@@ -95,8 +94,7 @@ async def test_start_registers_active_jobs(
 
     assert mock_scheduler.add_job.call_count == 2
     ids_registered = {
-        call.kwargs.get("id") or call.args[2]
-        for call in mock_scheduler.add_job.call_args_list
+        call.kwargs.get("id") or call.args[2] for call in mock_scheduler.add_job.call_args_list
     }
     assert "job-a" in ids_registered
     assert "job-b" in ids_registered
@@ -115,9 +113,10 @@ async def test_start_skips_paused_jobs(
     await executor.start()
 
     assert mock_scheduler.add_job.call_count == 1
-    registered_id = mock_scheduler.add_job.call_args.kwargs.get(
-        "id"
-    ) or mock_scheduler.add_job.call_args.args[2]
+    registered_id = (
+        mock_scheduler.add_job.call_args.kwargs.get("id")
+        or mock_scheduler.add_job.call_args.args[2]
+    )
     assert registered_id == "active-job"
     mock_scheduler.start.assert_called_once()
 
@@ -221,9 +220,7 @@ async def test_remove_job_no_op_when_not_found(
 
 
 @pytest.mark.asyncio
-async def test_pause_job(
-    executor: CronExecutor, mock_scheduler: MagicMock
-) -> None:
+async def test_pause_job(executor: CronExecutor, mock_scheduler: MagicMock) -> None:
     """pause_job() calls scheduler.pause_job with the job name."""
     await executor.pause_job("my-job")
 
@@ -231,9 +228,7 @@ async def test_pause_job(
 
 
 @pytest.mark.asyncio
-async def test_resume_job(
-    executor: CronExecutor, mock_scheduler: MagicMock
-) -> None:
+async def test_resume_job(executor: CronExecutor, mock_scheduler: MagicMock) -> None:
     """resume_job() calls scheduler.resume_job with the job name."""
     await executor.resume_job("my-job")
 
@@ -267,7 +262,6 @@ async def test_resume_job_no_op_when_not_found(mock_manager: MagicMock) -> None:
 # ---------------------------------------------------------------------------
 # CronExecutor._run_job — success path
 # ---------------------------------------------------------------------------
-
 
 
 @pytest.mark.asyncio
@@ -373,12 +367,12 @@ async def test_run_job_does_not_update_last_run_on_ainvoke_error(
 class TestRunJobHistory:
     """Tests that _run_job records execution history via CronManager."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def manager(self, tmp_path: Path) -> CronManager:
         """Return a real CronManager backed by a temporary SQLite database."""
         return CronManager(db_path=tmp_path / "cron_test.db")
 
-    @pytest.fixture()
+    @pytest.fixture
     def executor(self, manager: CronManager) -> CronExecutor:
         """Return a CronExecutor with a real CronManager and mocked scheduler."""
         ex = CronExecutor(manager=manager)
@@ -437,7 +431,7 @@ class TestRunJobHistory:
 class TestCronExecutorNotifier:
     """Tests that CronExecutor calls the notifier on job failure."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def manager(self, tmp_path: Path) -> CronManager:
         """Return a real CronManager backed by a temporary SQLite database."""
         return CronManager(db_path=tmp_path / "cron_test.db")
@@ -488,9 +482,7 @@ class TestCronExecutorNotifier:
         manager.add("success-notify", "* * * * *", "task")
 
         mock_graph = AsyncMock()
-        mock_graph.ainvoke = AsyncMock(
-            return_value={"messages": [AIMessage(content="done")]}
-        )
+        mock_graph.ainvoke = AsyncMock(return_value={"messages": [AIMessage(content="done")]})
 
         with patch(
             "lightagent.agents.graph.get_async_compiled_graph",
@@ -509,7 +501,7 @@ class TestCronExecutorNotifier:
 class TestRetryLogic:
     """Tests for CronExecutor retry-on-failure behaviour."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def manager(self, tmp_path: Path) -> CronManager:
         """Return a real CronManager backed by a temporary SQLite database."""
         return CronManager(db_path=tmp_path / "cron_test.db")
@@ -585,6 +577,7 @@ class TestRetryLogic:
     ) -> None:
         """retry_count is reset to 0 on a successful run."""
         from unittest.mock import AsyncMock, MagicMock, patch
+
         from langchain_core.messages import AIMessage
 
         executor = CronExecutor(manager=manager)
@@ -593,9 +586,7 @@ class TestRetryLogic:
         manager.set_retry_count("success-job", 2)  # simulate mid-retry
 
         mock_graph = AsyncMock()
-        mock_graph.ainvoke = AsyncMock(
-            return_value={"messages": [AIMessage(content="done")]}
-        )
+        mock_graph.ainvoke = AsyncMock(return_value={"messages": [AIMessage(content="done")]})
         with patch(
             "lightagent.agents.graph.get_async_compiled_graph",
             new=AsyncMock(return_value=mock_graph),
@@ -632,9 +623,7 @@ async def test_successful_job_with_output_routing_calls_delivery(
     mock_delivery = AsyncMock()
 
     with (
-        patch(
-            "lightagent.agents.graph.get_async_compiled_graph"
-        ) as mock_graph_fn,
+        patch("lightagent.agents.graph.get_async_compiled_graph") as mock_graph_fn,
         patch(
             "lightagent.scheduler.heartbeat_delivery.HeartbeatDelivery",
             return_value=mock_delivery,
@@ -642,18 +631,14 @@ async def test_successful_job_with_output_routing_calls_delivery(
     ):
         mock_graph = AsyncMock()
         mock_graph.ainvoke = AsyncMock(
-            return_value={
-                "messages": [MagicMock(content="Here is your report")]
-            }
+            return_value={"messages": [MagicMock(content="Here is your report")]}
         )
         mock_graph_fn.return_value = mock_graph
 
         executor = CronExecutor(manager=manager)
         await executor._run_job("notify-job", "Check news")
 
-    mock_delivery.send.assert_awaited_once_with(
-        "telegram", "99887766", "Here is your report"
-    )
+    mock_delivery.send.assert_awaited_once_with("telegram", "99887766", "Here is your report")
 
 
 @pytest.mark.asyncio
@@ -670,18 +655,14 @@ async def test_job_without_output_routing_does_not_call_delivery(
     mock_delivery = AsyncMock()
 
     with (
-        patch(
-            "lightagent.agents.graph.get_async_compiled_graph"
-        ) as mock_graph_fn,
+        patch("lightagent.agents.graph.get_async_compiled_graph") as mock_graph_fn,
         patch(
             "lightagent.scheduler.heartbeat_delivery.HeartbeatDelivery",
             return_value=mock_delivery,
         ),
     ):
         mock_graph = AsyncMock()
-        mock_graph.ainvoke = AsyncMock(
-            return_value={"messages": [MagicMock(content="done")]}
-        )
+        mock_graph.ainvoke = AsyncMock(return_value={"messages": [MagicMock(content="done")]})
         mock_graph_fn.return_value = mock_graph
 
         executor = CronExecutor(manager=manager)
@@ -699,9 +680,7 @@ def test_executor_scheduler_receives_timezone() -> None:
 
     from lightagent.scheduler.executor import CronExecutor
 
-    with patch(
-        "lightagent.scheduler.executor.AsyncIOScheduler"
-    ) as mock_scheduler_cls:
+    with patch("lightagent.scheduler.executor.AsyncIOScheduler") as mock_scheduler_cls:
         mock_scheduler_cls.return_value = MagicMock()
         ex = CronExecutor()
         # AsyncIOScheduler must be called with a timezone kwarg
@@ -744,9 +723,7 @@ def test_register_job_passes_timezone_to_cron_trigger(mock_manager: MagicMock) -
     job = CronJob(name="tz-job", schedule="0 9 * * *", task="t", timezone="America/Caracas")
     ex = CronExecutor(manager=mock_manager)
 
-    with patch(
-        "lightagent.scheduler.executor.CronTrigger"
-    ) as mock_trigger_cls:
+    with patch("lightagent.scheduler.executor.CronTrigger") as mock_trigger_cls:
         mock_trigger_cls.from_crontab.return_value = MagicMock()
         ex._register_job(job)
         mock_trigger_cls.from_crontab.assert_called_once()
@@ -931,8 +908,7 @@ async def test_run_job_permanent_error_skips_retry_policy(
 
     # No retry scheduled — no APScheduler date-trigger add_job call.
     date_retry_calls = [
-        c for c in executor._scheduler.add_job.call_args_list
-        if c.kwargs.get("trigger") == "date"
+        c for c in executor._scheduler.add_job.call_args_list if c.kwargs.get("trigger") == "date"
     ]
     assert date_retry_calls == []
     # Retry count reset to zero (normal bypass accounting).

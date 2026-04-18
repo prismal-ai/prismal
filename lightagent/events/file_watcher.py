@@ -12,12 +12,12 @@ Example::
 
     from lightagent.events.file_watcher import create_default_watcher
 
+
     def on_doc(event_type: str, path: str) -> None:
         print(f"New document: {path}")
 
-    watcher = create_default_watcher(
-        callbacks={"index_document_event": on_doc}
-    )
+
+    watcher = create_default_watcher(callbacks={"index_document_event": on_doc})
     watcher.start()
     # ... do work ...
     watcher.stop()
@@ -112,9 +112,7 @@ class _WatchEntry:
 
     __slots__ = ("callback", "event_name", "path")
 
-    def __init__(
-        self, path: Path, event_name: str, callback: EventCallback
-    ) -> None:
+    def __init__(self, path: Path, event_name: str, callback: EventCallback) -> None:
         """Initialise a watch entry."""
         self.path = path
         self.event_name = event_name

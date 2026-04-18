@@ -1,9 +1,8 @@
 """Unit tests for SessionRegistry."""
+
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 from lightagent.memory.session_registry import SessionRegistry
 

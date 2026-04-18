@@ -30,9 +30,9 @@ class DatasetProfile(BaseModel):
     target_column: str | None = Field(
         default=None, description="Detected or user-specified target column"
     )
-    task_type: Literal[
-        "classification", "regression", "clustering", "time_series"
-    ] = Field(..., description="ML task type inferred or specified by user")
+    task_type: Literal["classification", "regression", "clustering", "time_series"] = Field(
+        ..., description="ML task type inferred or specified by user"
+    )
     class_distribution: dict[str, int] | None = Field(
         default=None, description="Class label to count (classification only)"
     )
@@ -50,9 +50,9 @@ class EDAReport(BaseModel):
     missing_pattern: Literal["MCAR", "MAR", "MNAR", "none"] = Field(
         default="none", description="Missing-at-random pattern"
     )
-    class_balance: Literal[
-        "balanced", "imbalanced", "severely_imbalanced", "n/a"
-    ] = Field(default="n/a", description="Class balance assessment")
+    class_balance: Literal["balanced", "imbalanced", "severely_imbalanced", "n/a"] = Field(
+        default="n/a", description="Class balance assessment"
+    )
     recommended_transforms: list[str] = Field(
         default_factory=list, description="Suggested preprocessing steps"
     )
@@ -76,15 +76,9 @@ class FeatureSet(BaseModel):
     encoding_map: dict[str, str] = Field(
         default_factory=dict, description="Column name to encoding type applied"
     )
-    scaling_method: str = Field(
-        default="StandardScaler", description="Scaling method applied"
-    )
-    train_shape: tuple[int, int] = Field(
-        default=(0, 0), description="(rows, cols) of training set"
-    )
-    test_shape: tuple[int, int] = Field(
-        default=(0, 0), description="(rows, cols) of test set"
-    )
+    scaling_method: str = Field(default="StandardScaler", description="Scaling method applied")
+    train_shape: tuple[int, int] = Field(default=(0, 0), description="(rows, cols) of training set")
+    test_shape: tuple[int, int] = Field(default=(0, 0), description="(rows, cols) of test set")
     feature_pipeline_path: str | None = Field(
         default=None, description="Path to serialized feature pipeline (joblib)"
     )
@@ -93,9 +87,7 @@ class FeatureSet(BaseModel):
 class TrainedModel(BaseModel):
     """Model trainer artifact: trained ML model metadata."""
 
-    model_type: str = Field(
-        ..., description="Algorithm name (e.g. 'LightGBM', 'RandomForest')"
-    )
+    model_type: str = Field(..., description="Algorithm name (e.g. 'LightGBM', 'RandomForest')")
     hyperparameters: dict[str, object] = Field(
         default_factory=dict, description="Hyperparameters used"
     )
@@ -116,15 +108,13 @@ class TrainedModel(BaseModel):
 class EvaluationReport(BaseModel):
     """Model evaluator artifact: evaluation results with metrics and charts."""
 
-    metrics: dict[str, float] = Field(
-        default_factory=dict, description="Metric name to value"
-    )
-    primary_metric: str = Field(
-        default="f1", description="Primary metric used for gate comparison"
-    )
+    metrics: dict[str, float] = Field(default_factory=dict, description="Metric name to value")
+    primary_metric: str = Field(default="f1", description="Primary metric used for gate comparison")
     primary_score: float = Field(
-        default=0.0, ge=0.0, le=1.0,
-        description="Score on primary_metric (used by gate)"
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Score on primary_metric (used by gate)",
     )
     confusion_matrix: list[list[int]] | None = Field(
         default=None, description="Confusion matrix (classification only)"
@@ -151,9 +141,7 @@ class ModelPackage(BaseModel):
     inference_code_path: str = Field(
         ..., description="Path to generated predict.py inference script"
     )
-    model_card: str = Field(
-        default="", description="Auto-generated Markdown model card"
-    )
+    model_card: str = Field(default="", description="Auto-generated Markdown model card")
     dependencies: list[str] = Field(
         default_factory=list, description="Required packages for inference"
     )

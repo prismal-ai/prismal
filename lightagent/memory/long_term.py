@@ -209,9 +209,7 @@ class LongTermMemory:
     def _list_all(self) -> list[MemoryEntry]:
         """Return all entries from SQLite (used in tests and expire())."""
         with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM memory_entries ORDER BY created_at"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM memory_entries ORDER BY created_at").fetchall()
         return [self._row_to_entry(r) for r in rows]
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -341,9 +339,7 @@ class LongTermMemory:
             if session_id is None:
                 conn.execute("DELETE FROM memory_entries")
             else:
-                conn.execute(
-                    "DELETE FROM memory_entries WHERE session_id = ?", (session_id,)
-                )
+                conn.execute("DELETE FROM memory_entries WHERE session_id = ?", (session_id,))
 
         for entry_id in ids:
             try:
@@ -372,9 +368,7 @@ class LongTermMemory:
                 "SELECT id FROM memory_entries WHERE expires_at <= ?", (now,)
             ).fetchall()
             ids = [r["id"] for r in rows]
-            conn.execute(
-                "DELETE FROM memory_entries WHERE expires_at <= ?", (now,)
-            )
+            conn.execute("DELETE FROM memory_entries WHERE expires_at <= ?", (now,))
 
         for entry_id in ids:
             try:

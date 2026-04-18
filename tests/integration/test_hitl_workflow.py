@@ -91,9 +91,7 @@ async def test_hitl_full_pause_then_approve_completes_to_end() -> None:
     result = await compiled.ainvoke(initial, config)
     snapshot = await compiled.aget_state(config)
 
-    assert snapshot.next, (
-        "Workflow should be suspended at the human_approval interrupt"
-    )
+    assert snapshot.next, "Workflow should be suspended at the human_approval interrupt"
     assert "reached" not in result.get("metadata", {})
 
     # The interrupt payload is exposed in snapshot.tasks[i].interrupts[0].value.
@@ -105,10 +103,7 @@ async def test_hitl_full_pause_then_approve_completes_to_end() -> None:
             value = getattr(interrupt, "value", None)
             if isinstance(value, dict) and value.get("risk_level") == "HIGH":
                 payload_seen = True
-                assert (
-                    value.get("artifact_field")
-                    == "dev_pipeline.code_artifact"
-                )
+                assert value.get("artifact_field") == "dev_pipeline.code_artifact"
                 assert "options" in value
     assert payload_seen, "Interrupt payload should expose risk_level + options"
 
@@ -154,6 +149,4 @@ async def test_hitl_request_changes_merges_modifications_into_state() -> None:
         config,
     )
     assert final["metadata"]["reached"] == "rejected"
-    assert final["metadata"]["saw_revision"] == (
-        "rename the function to charge_card"
-    )
+    assert final["metadata"]["saw_revision"] == ("rename the function to charge_card")

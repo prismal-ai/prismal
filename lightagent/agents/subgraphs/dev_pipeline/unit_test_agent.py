@@ -153,12 +153,7 @@ async def unit_test_agent_node(state: AgentState) -> dict[str, Any]:
         return {
             "current_agent": "unit_tester",
             "messages": [
-                AIMessage(
-                    content=(
-                        f"Tests: {report.tests_passed}"
-                        f"/{report.tests_written} passed"
-                    )
-                )
+                AIMessage(content=(f"Tests: {report.tests_passed}/{report.tests_written} passed"))
             ],
             "metadata": {**state.get("metadata", {}), "dev_pipeline": dp},
         }

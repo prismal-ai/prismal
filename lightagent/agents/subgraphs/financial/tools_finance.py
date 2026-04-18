@@ -177,9 +177,7 @@ def fetch_fundamentals(symbol: str, asset_type: str = "equity") -> dict[str, flo
         logger.warning("tools_finance.yfinance_not_installed")
         return {}
     except Exception as exc:
-        logger.warning(
-            "tools_finance.fundamentals_failed", symbol=symbol, error=str(exc)
-        )
+        logger.warning("tools_finance.fundamentals_failed", symbol=symbol, error=str(exc))
         return {}
 
 

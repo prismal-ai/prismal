@@ -2,6 +2,7 @@
 
 Tests the Reflexion graph topology: researcher -> critic -> supervisor loop.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

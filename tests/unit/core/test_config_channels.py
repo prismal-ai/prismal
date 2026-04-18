@@ -1,5 +1,7 @@
 """Tests for channel-related config fields."""
+
 import pytest
+
 from lightagent.core.config import Settings
 
 

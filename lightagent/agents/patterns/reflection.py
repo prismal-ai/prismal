@@ -206,8 +206,8 @@ def with_reflection(
         @functools.wraps(node_fn)
         async def wrapper(
             state: AgentState,
-            *args: Any,  # noqa: ANN401 -- forwards positional args to wrapped node
-            **kwargs: Any,  # noqa: ANN401 -- forwards keyword args to wrapped node
+            *args: Any,
+            **kwargs: Any,
         ) -> str:
             async def _generate(
                 s: AgentState,

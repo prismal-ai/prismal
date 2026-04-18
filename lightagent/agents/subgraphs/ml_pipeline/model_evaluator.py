@@ -159,10 +159,7 @@ async def model_evaluator_node(state: AgentState) -> dict[str, Any]:
         dataset_name = profile_data.get("name", "unknown")
 
         # Exclude raw hyperparameters (can be large) from the LLM context
-        safe_model_meta = {
-            k: v for k, v in model_data.items()
-            if k != "hyperparameters"
-        }
+        safe_model_meta = {k: v for k, v in model_data.items() if k != "hyperparameters"}
 
         llm = ProviderRegistry().get_llm()
         context = (
@@ -189,9 +186,7 @@ async def model_evaluator_node(state: AgentState) -> dict[str, Any]:
         ml["evaluation_report"] = report.model_dump()
 
         gate_result = (
-            "PASSED"
-            if report.primary_score >= settings.ml_quality_threshold
-            else "FAILED"
+            "PASSED" if report.primary_score >= settings.ml_quality_threshold else "FAILED"
         )
 
         logger.info(

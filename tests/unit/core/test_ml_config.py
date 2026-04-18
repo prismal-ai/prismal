@@ -1,4 +1,5 @@
 """Tests for ML pipeline configuration settings."""
+
 from lightagent.core.config import Settings
 
 
@@ -18,5 +19,6 @@ def test_ml_settings_defaults() -> None:
 def test_ml_time_budget_bounds() -> None:
     """ml_time_budget must be positive."""
     import pytest
+
     with pytest.raises(Exception):
         Settings(ml_time_budget=0)

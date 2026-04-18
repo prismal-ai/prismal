@@ -17,18 +17,13 @@ Targets lines not reached by the original test_manager.py:
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lightagent.core.exceptions import SkillLoadError, SkillValidationError
+from lightagent.core.exceptions import SkillLoadError
 from lightagent.skills.manager import SkillsManager
-
-if TYPE_CHECKING:
-    pass
 
 # ---------------------------------------------------------------------------
 # Skill source stubs
@@ -226,9 +221,7 @@ class TestSkillsManagerCoverage:
     # ── Line 143: skill.py absent → SkillLoadError ───────────────────────────
 
     @pytest.mark.asyncio
-    async def test_activate_missing_skill_py_raises_load_error(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_activate_missing_skill_py_raises_load_error(self, tmp_path: Path) -> None:
         """activate() raises SkillLoadError when skill.py is absent from the dir."""
         root = _make_root(tmp_path)
         # Create the directory but do NOT write skill.py
@@ -242,9 +235,7 @@ class TestSkillsManagerCoverage:
     # ── Lines 159-162: _load_skill_class raises propagation paths ────────────
 
     @pytest.mark.asyncio
-    async def test_activate_propagates_skill_load_error_from_loader(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_activate_propagates_skill_load_error_from_loader(self, tmp_path: Path) -> None:
         """SkillLoadError from _load_skill_class is re-raised unchanged (line 159-160)."""
         root = _make_root(tmp_path)
         _add_available(root, "bad_skill", _SAFE_SKILL_PY)
@@ -278,9 +269,7 @@ class TestSkillsManagerCoverage:
     # ── Line 191→195: symlink already present, creation skipped ──────────────
 
     @pytest.mark.asyncio
-    async def test_activate_with_existing_symlink_does_not_re_create(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_activate_with_existing_symlink_does_not_re_create(self, tmp_path: Path) -> None:
         """activate() skips symlink creation when link already exists (line 191→195)."""
         root = _make_root(tmp_path)
         skill_dir = _add_available(root, "safe_skill", _SAFE_SKILL_PY)
@@ -297,9 +286,7 @@ class TestSkillsManagerCoverage:
     # ── Lines 210-211: deactivate() swallows teardown error ──────────────────
 
     @pytest.mark.asyncio
-    async def test_deactivate_swallows_teardown_exception(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_deactivate_swallows_teardown_exception(self, tmp_path: Path) -> None:
         """deactivate() logs warning and does not propagate teardown exceptions."""
         root = _make_root(tmp_path)
         _add_available(root, "teardown_error_skill", _TEARDOWN_ERROR_SKILL_PY)
@@ -313,9 +300,7 @@ class TestSkillsManagerCoverage:
     # ── Lines 232→231: duplicate tool name is skipped ────────────────────────
 
     @pytest.mark.asyncio
-    async def test_get_active_tools_deduplicates_by_name(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_get_active_tools_deduplicates_by_name(self, tmp_path: Path) -> None:
         """get_active_tools() deduplicates tools with identical names (line 232→231)."""
         root = _make_root(tmp_path)
         _add_available(root, "safe_skill", _SAFE_SKILL_PY)
@@ -333,9 +318,7 @@ class TestSkillsManagerCoverage:
     # ── Lines 235-236: get_tools() raises → error logged, no propagation ─────
 
     @pytest.mark.asyncio
-    async def test_get_active_tools_handles_get_tools_error(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_get_active_tools_handles_get_tools_error(self, tmp_path: Path) -> None:
         """get_active_tools() catches and logs errors from skill.get_tools()."""
         root = _make_root(tmp_path)
         _add_available(root, "tools_error_skill", _TOOLS_ERROR_SKILL_PY)
@@ -350,9 +333,7 @@ class TestSkillsManagerCoverage:
     # ── Lines 257-264: reload_all() re-activates symlinked skills ────────────
 
     @pytest.mark.asyncio
-    async def test_reload_all_reactivates_linked_skills(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_reload_all_reactivates_linked_skills(self, tmp_path: Path) -> None:
         """reload_all() re-activates skills that are already symlinked in active/."""
         root = _make_root(tmp_path)
         skill_dir = _add_available(root, "safe_skill", _SAFE_SKILL_PY)
@@ -367,9 +348,7 @@ class TestSkillsManagerCoverage:
         assert any(i.name == "safe_skill" for i in active)
 
     @pytest.mark.asyncio
-    async def test_reload_all_skips_hidden_entries_in_active(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_reload_all_skips_hidden_entries_in_active(self, tmp_path: Path) -> None:
         """reload_all() skips entries starting with '.' or '_' in active/."""
         root = _make_root(tmp_path)
         skill_dir = _add_available(root, "safe_skill", _SAFE_SKILL_PY)
@@ -384,9 +363,7 @@ class TestSkillsManagerCoverage:
         assert manager.list_skills(status="active") == []
 
     @pytest.mark.asyncio
-    async def test_reload_all_logs_error_for_bad_skill_in_active(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_reload_all_logs_error_for_bad_skill_in_active(self, tmp_path: Path) -> None:
         """reload_all() logs an error (does not raise) when a linked skill fails."""
         root = _make_root(tmp_path)
         # Create a skill dir without a skill.py — activation will raise SkillLoadError
@@ -403,9 +380,7 @@ class TestSkillsManagerCoverage:
 
     # ── Line 305: _load_skill_class — spec is None ───────────────────────────
 
-    def test_load_skill_class_raises_when_spec_is_none(
-        self, tmp_path: Path
-    ) -> None:
+    def test_load_skill_class_raises_when_spec_is_none(self, tmp_path: Path) -> None:
         """_load_skill_class raises SkillLoadError when spec_from_file_location returns None."""
         root = _make_root(tmp_path)
         skill_dir = _add_available(root, "spec_none_skill", _SAFE_SKILL_PY)
@@ -416,9 +391,7 @@ class TestSkillsManagerCoverage:
             with pytest.raises(SkillLoadError, match="Cannot create module spec"):
                 manager._load_skill_class(skill_py)
 
-    def test_load_skill_class_raises_when_spec_loader_is_none(
-        self, tmp_path: Path
-    ) -> None:
+    def test_load_skill_class_raises_when_spec_loader_is_none(self, tmp_path: Path) -> None:
         """_load_skill_class raises SkillLoadError when spec.loader is None."""
         root = _make_root(tmp_path)
         skill_dir = _add_available(root, "loader_none_skill", _SAFE_SKILL_PY)
@@ -434,9 +407,7 @@ class TestSkillsManagerCoverage:
 
     # ── Line 326: _load_skill_class — no BaseSkill subclass found ────────────
 
-    def test_load_skill_class_raises_when_no_subclass(
-        self, tmp_path: Path
-    ) -> None:
+    def test_load_skill_class_raises_when_no_subclass(self, tmp_path: Path) -> None:
         """_load_skill_class raises SkillLoadError when no BaseSkill subclass is found."""
         root = _make_root(tmp_path)
         skill_dir = _add_available(root, "no_subclass_skill", _NO_SUBCLASS_PY)
@@ -448,20 +419,14 @@ class TestSkillsManagerCoverage:
 
     # ── Lines 348, 351: _scan_dir — non-existent dir / hidden entries ────────
 
-    def test_scan_dir_returns_empty_when_directory_does_not_exist(
-        self, tmp_path: Path
-    ) -> None:
+    def test_scan_dir_returns_empty_when_directory_does_not_exist(self, tmp_path: Path) -> None:
         """_scan_dir returns [] without error when the directory does not exist."""
         root = _make_root(tmp_path)
         manager = SkillsManager(skills_root=root)
-        result = manager._scan_dir(
-            root / "nonexistent", status="available", skip_names=set()
-        )
+        result = manager._scan_dir(root / "nonexistent", status="available", skip_names=set())
         assert result == []
 
-    def test_scan_dir_skips_hidden_and_non_dir_entries(
-        self, tmp_path: Path
-    ) -> None:
+    def test_scan_dir_skips_hidden_and_non_dir_entries(self, tmp_path: Path) -> None:
         """_scan_dir skips entries starting with '.' or '_' and plain files."""
         root = _make_root(tmp_path)
         avail = root / "available"
@@ -483,9 +448,7 @@ class TestSkillsManagerCoverage:
 
     # ── Line 356: _scan_dir — subdir without skill.py skipped ────────────────
 
-    def test_scan_dir_skips_subdir_without_skill_py(
-        self, tmp_path: Path
-    ) -> None:
+    def test_scan_dir_skips_subdir_without_skill_py(self, tmp_path: Path) -> None:
         """_scan_dir skips subdirectories that have no skill.py file."""
         root = _make_root(tmp_path)
         avail = root / "available"
@@ -500,9 +463,7 @@ class TestSkillsManagerCoverage:
         result = manager._scan_dir(avail, status="available", skip_names=set())
         assert result == []
 
-    def test_scan_dir_skips_names_in_skip_set(
-        self, tmp_path: Path
-    ) -> None:
+    def test_scan_dir_skips_names_in_skip_set(self, tmp_path: Path) -> None:
         """_scan_dir honours the skip_names set (already-active skills)."""
         root = _make_root(tmp_path)
         avail = root / "available"
@@ -511,17 +472,13 @@ class TestSkillsManagerCoverage:
         (skill_dir / "skill.py").write_text(_SAFE_SKILL_PY)
 
         manager = SkillsManager(skills_root=root)
-        result = manager._scan_dir(
-            avail, status="available", skip_names={"safe_skill"}
-        )
+        result = manager._scan_dir(avail, status="available", skip_names={"safe_skill"})
         assert result == []
 
     # ── Line 255→exit: reload_all() — active dir does not exist ─────────────
 
     @pytest.mark.asyncio
-    async def test_reload_all_when_active_dir_does_not_exist(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_reload_all_when_active_dir_does_not_exist(self, tmp_path: Path) -> None:
         """reload_all() exits cleanly when active/ directory does not exist."""
         root = tmp_path / "skills"
         (root / "available").mkdir(parents=True)
@@ -534,9 +491,7 @@ class TestSkillsManagerCoverage:
     # ── Line 260: reload_all() — non-directory entry in active/ skipped ──────
 
     @pytest.mark.asyncio
-    async def test_reload_all_skips_plain_files_in_active(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_reload_all_skips_plain_files_in_active(self, tmp_path: Path) -> None:
         """reload_all() skips plain files (non-directories) in active/."""
         root = _make_root(tmp_path)
         # Create a plain file in active/ — not a symlink/directory

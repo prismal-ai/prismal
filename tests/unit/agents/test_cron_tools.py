@@ -5,9 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -44,9 +41,7 @@ class TestCronAdd:
 
         job = _make_job(name="daily-brief", next_run=datetime(2099, 6, 15, 9, 0, 0))
 
-        with patch(
-            "lightagent.scheduler.cron_manager.CronManager.add", return_value=job
-        ):
+        with patch("lightagent.scheduler.cron_manager.CronManager.add", return_value=job):
             result = cron_add.invoke(
                 {"name": "daily-brief", "schedule": "0 9 * * *", "task": "Send a brief"}
             )
@@ -76,9 +71,7 @@ class TestCronAdd:
         job = _make_job(name="no-time-job", next_run=None)
         job.next_run = None  # ensure None
 
-        with patch(
-            "lightagent.scheduler.cron_manager.CronManager.add", return_value=job
-        ):
+        with patch("lightagent.scheduler.cron_manager.CronManager.add", return_value=job):
             result = cron_add.invoke(
                 {"name": "no-time-job", "schedule": "0 9 * * *", "task": "mystery"}
             )
@@ -94,12 +87,14 @@ class TestCronAdd:
         with patch(
             "lightagent.scheduler.cron_manager.CronManager.add", return_value=job
         ) as mock_add:
-            cron_add.invoke({
-                "name": "tz-job",
-                "schedule": "0 9 * * *",
-                "task": "Do something",
-                "timezone": "America/Caracas",
-            })
+            cron_add.invoke(
+                {
+                    "name": "tz-job",
+                    "schedule": "0 9 * * *",
+                    "task": "Do something",
+                    "timezone": "America/Caracas",
+                }
+            )
 
         mock_add.assert_called_once_with(
             "tz-job",
@@ -116,15 +111,15 @@ class TestCronAdd:
 
         job = _make_job(name="tz-job")
 
-        with patch(
-            "lightagent.scheduler.cron_manager.CronManager.add", return_value=job
-        ):
-            result = cron_add.invoke({
-                "name": "tz-job",
-                "schedule": "0 9 * * *",
-                "task": "Do something",
-                "timezone": "Europe/Madrid",
-            })
+        with patch("lightagent.scheduler.cron_manager.CronManager.add", return_value=job):
+            result = cron_add.invoke(
+                {
+                    "name": "tz-job",
+                    "schedule": "0 9 * * *",
+                    "task": "Do something",
+                    "timezone": "Europe/Madrid",
+                }
+            )
 
         assert "Europe/Madrid" in result
 
@@ -137,11 +132,13 @@ class TestCronAdd:
         with patch(
             "lightagent.scheduler.cron_manager.CronManager.add", return_value=job
         ) as mock_add:
-            cron_add.invoke({
-                "name": "no-tz-job",
-                "schedule": "0 9 * * *",
-                "task": "Task without tz",
-            })
+            cron_add.invoke(
+                {
+                    "name": "no-tz-job",
+                    "schedule": "0 9 * * *",
+                    "task": "Task without tz",
+                }
+            )
 
         assert mock_add.call_args.kwargs.get("timezone", "") == ""
 
@@ -160,14 +157,14 @@ class TestCronOnce:
 
         job = _make_job(name="once-job", schedule="once:2099-12-01T10:00:00")
 
-        with patch(
-            "lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job
-        ):
-            result = cron_once.invoke({
-                "name": "once-job",
-                "run_at": "2099-12-01 10:00:00",
-                "task": "Send reminder",
-            })
+        with patch("lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job):
+            result = cron_once.invoke(
+                {
+                    "name": "once-job",
+                    "run_at": "2099-12-01 10:00:00",
+                    "task": "Send reminder",
+                }
+            )
 
         assert "once-job" in result
         assert "2099-12-01" in result
@@ -176,11 +173,13 @@ class TestCronOnce:
         """cron_once returns an error message for invalid datetime format."""
         from lightagent.agents.tools import cron_once
 
-        result = cron_once.invoke({
-            "name": "bad-job",
-            "run_at": "not-a-date",
-            "task": "irrelevant",
-        })
+        result = cron_once.invoke(
+            {
+                "name": "bad-job",
+                "run_at": "not-a-date",
+                "task": "irrelevant",
+            }
+        )
 
         assert "Invalid datetime" in result
 
@@ -193,12 +192,14 @@ class TestCronOnce:
         with patch(
             "lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job
         ) as mock_add_once:
-            cron_once.invoke({
-                "name": "tz-once",
-                "run_at": "2099-12-01 10:00:00",
-                "task": "Ping",
-                "timezone": "America/New_York",
-            })
+            cron_once.invoke(
+                {
+                    "name": "tz-once",
+                    "run_at": "2099-12-01 10:00:00",
+                    "task": "Ping",
+                    "timezone": "America/New_York",
+                }
+            )
 
         assert mock_add_once.call_args.kwargs.get("timezone") == "America/New_York"
 
@@ -208,15 +209,15 @@ class TestCronOnce:
 
         job = _make_job(name="tz-once", schedule="once:2099-12-01T10:00:00")
 
-        with patch(
-            "lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job
-        ):
-            result = cron_once.invoke({
-                "name": "tz-once",
-                "run_at": "2099-12-01 10:00:00",
-                "task": "Alert",
-                "timezone": "Asia/Tokyo",
-            })
+        with patch("lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job):
+            result = cron_once.invoke(
+                {
+                    "name": "tz-once",
+                    "run_at": "2099-12-01 10:00:00",
+                    "task": "Alert",
+                    "timezone": "Asia/Tokyo",
+                }
+            )
 
         assert "Asia/Tokyo" in result
 
@@ -229,11 +230,13 @@ class TestCronOnce:
         with patch(
             "lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job
         ) as mock_add_once:
-            cron_once.invoke({
-                "name": "no-tz-once",
-                "run_at": "2099-12-01 10:00:00",
-                "task": "Task without tz",
-            })
+            cron_once.invoke(
+                {
+                    "name": "no-tz-once",
+                    "run_at": "2099-12-01 10:00:00",
+                    "task": "Task without tz",
+                }
+            )
 
         assert mock_add_once.call_args.kwargs.get("timezone", "") == ""
 
@@ -250,9 +253,7 @@ class TestCronList:
         """When no jobs exist the tool returns the empty-state message."""
         from lightagent.agents.tools import cron_list
 
-        with patch(
-            "lightagent.scheduler.cron_manager.CronManager.list_jobs", return_value=[]
-        ):
+        with patch("lightagent.scheduler.cron_manager.CronManager.list_jobs", return_value=[]):
             result = cron_list.invoke({})
 
         assert result == "No cron jobs scheduled."
@@ -266,9 +267,7 @@ class TestCronList:
             _make_job(name="job-beta", next_run=datetime(2099, 3, 15, 12, 0)),
         ]
 
-        with patch(
-            "lightagent.scheduler.cron_manager.CronManager.list_jobs", return_value=jobs
-        ):
+        with patch("lightagent.scheduler.cron_manager.CronManager.list_jobs", return_value=jobs):
             result = cron_list.invoke({})
 
         assert "job-alpha" in result
@@ -398,12 +397,8 @@ class TestCronToolsRegistry:
     def _get_tool_names(self, agent_name: str) -> list[str]:
         """Return tool names for an agent with MCP + skills mocked to empty."""
         with (
-            patch(
-                "lightagent.agents.tool_registry.get_mcp_tools", return_value=[]
-            ),
-            patch(
-                "lightagent.agents.tool_registry.get_skill_tools", return_value=[]
-            ),
+            patch("lightagent.agents.tool_registry.get_mcp_tools", return_value=[]),
+            patch("lightagent.agents.tool_registry.get_skill_tools", return_value=[]),
         ):
             from lightagent.agents.tool_registry import get_tools_for_agent
 
@@ -418,7 +413,13 @@ class TestCronToolsRegistry:
     def test_all_cron_tools_registered_for_planner(self) -> None:
         """All 5 cron tools must appear in the planner's tool list."""
         tool_names = self._get_tool_names("planner")
-        for expected in ("cron_add", "cron_list", "cron_pause", "cron_resume", "cron_remove"):
+        for expected in (
+            "cron_add",
+            "cron_list",
+            "cron_pause",
+            "cron_resume",
+            "cron_remove",
+        ):
             assert expected in tool_names, f"{expected!r} missing from planner tools"
 
     def test_cron_manager_tools_registered_for_cron_manager(self) -> None:
@@ -429,7 +430,13 @@ class TestCronToolsRegistry:
     def test_all_cron_tools_registered_for_cron_manager(self) -> None:
         """All 5 cron tools must appear in the cron_manager agent's tool list."""
         tool_names = self._get_tool_names("cron_manager")
-        for expected in ("cron_add", "cron_list", "cron_pause", "cron_resume", "cron_remove"):
+        for expected in (
+            "cron_add",
+            "cron_list",
+            "cron_pause",
+            "cron_resume",
+            "cron_remove",
+        ):
             assert expected in tool_names, f"{expected!r} missing from cron_manager tools"
 
     def test_cron_manager_tools_list_has_7_items(self) -> None:

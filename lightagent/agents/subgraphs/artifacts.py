@@ -18,9 +18,7 @@ class UserStory(BaseModel):
 
     id: str = Field(..., description="Unique story identifier")
     title: str = Field(..., description="Short story title")
-    description: str = Field(
-        ..., description="As [role], I want [action], so [benefit]"
-    )
+    description: str = Field(..., description="As [role], I want [action], so [benefit]")
     acceptance_criteria: list[str] = Field(
         default_factory=list, description="Testable acceptance criteria"
     )
@@ -38,9 +36,7 @@ class TechnicalSpec(BaseModel):
     design_decisions: list[str] = Field(
         default_factory=list, description="Key architectural decisions"
     )
-    technology_stack: list[str] = Field(
-        default_factory=list, description="Technologies used"
-    )
+    technology_stack: list[str] = Field(default_factory=list, description="Technologies used")
 
 
 class CodeArtifact(BaseModel):
@@ -62,9 +58,7 @@ class TestReport(BaseModel):
     coverage_percent: float = Field(
         default=0.0, ge=0.0, le=100.0, description="Code coverage percentage"
     )
-    failing_tests: list[str] = Field(
-        default_factory=list, description="Names of failing tests"
-    )
+    failing_tests: list[str] = Field(default_factory=list, description="Names of failing tests")
     recommendations: list[str] = Field(
         default_factory=list, description="Suggestions to improve tests"
     )
@@ -76,9 +70,7 @@ class QAReport(BaseModel):
     integration_tests_run: int = Field(default=0, ge=0)
     integration_tests_passed: int = Field(default=0, ge=0)
     security_findings: list[str] = Field(default_factory=list)
-    quality_score: float = Field(
-        default=0.0, ge=0.0, le=100.0, description="Overall quality 0-100"
-    )
+    quality_score: float = Field(default=0.0, ge=0.0, le=100.0, description="Overall quality 0-100")
     approved: bool = Field(default=False)
 
 

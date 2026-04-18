@@ -97,9 +97,7 @@ async def test_tool_error_logs_to_audit(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("tool_name", "expected_perm"), list(_TOOL_PERMISSION_MAP.items())
-)
+@pytest.mark.parametrize(("tool_name", "expected_perm"), list(_TOOL_PERMISSION_MAP.items()))
 async def test_all_mapped_tools_check_permission(
     interceptor: ActionInterceptor,
     mock_pm: AsyncMock,

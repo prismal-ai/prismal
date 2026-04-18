@@ -1,4 +1,5 @@
 """Unit tests for SubgraphRegistry."""
+
 import asyncio
 
 import pytest

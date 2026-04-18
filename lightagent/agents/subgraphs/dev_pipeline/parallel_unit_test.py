@@ -168,14 +168,11 @@ async def dev_test_aggregator_node(state: AgentState) -> dict[str, Any]:
         ``test_report`` under ``metadata.dev_pipeline``.
     """
     raw_results: Any = state.get("parallel_results", [])
-    results: list[dict[str, Any]] = (
-        raw_results if isinstance(raw_results, list) else []
-    )
+    results: list[dict[str, Any]] = raw_results if isinstance(raw_results, list) else []
     own_results = [
         item
         for item in results
-        if isinstance(item, dict)
-        and item.get("agent") == _DEV_UNIT_TESTER_AGENT_TAG
+        if isinstance(item, dict) and item.get("agent") == _DEV_UNIT_TESTER_AGENT_TAG
     ]
 
     total_written = 0

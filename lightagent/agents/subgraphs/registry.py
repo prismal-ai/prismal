@@ -7,8 +7,8 @@ Usage::
 
     registry = SubgraphRegistry.get_instance()
     await registry.register("dev_pipeline", definition)
-    names = registry.list()         # ["dev_pipeline"]
-    defn  = registry.get("dev_pipeline")
+    names = registry.list()  # ["dev_pipeline"]
+    defn = registry.get("dev_pipeline")
     await registry.unregister("dev_pipeline")
 """
 

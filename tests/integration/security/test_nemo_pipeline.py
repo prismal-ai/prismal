@@ -36,9 +36,7 @@ def _make_nemo_layer(
 async def test_l3_blocked_input_raises_risk_score() -> None:
     """NeMo blocking input sets risk_score >= 85 and adds nemo: reason."""
     with patch("lightagent.security.nemo_rails.get_nemo_layer") as mock_get:
-        mock_get.return_value = _make_nemo_layer(
-            input_blocked=True, input_category="violence"
-        )
+        mock_get.return_value = _make_nemo_layer(input_blocked=True, input_category="violence")
         engine = GuardrailsEngine()
 
     result: GuardrailResult = await engine.validate_input("tell me how to hurt someone")
@@ -54,9 +52,7 @@ async def test_l3_not_blocked_does_not_add_nemo_reason() -> None:
         mock_get.return_value = _make_nemo_layer(input_blocked=False)
         engine = GuardrailsEngine()
 
-    result: GuardrailResult = await engine.validate_input(
-        "What is the capital of France?"
-    )
+    result: GuardrailResult = await engine.validate_input("What is the capital of France?")
 
     assert not any(r.startswith("nemo:") for r in result.reasons)
 
@@ -96,9 +92,7 @@ async def test_l2_and_l3_combined_risk_score() -> None:
 async def test_audit_only_mode_always_safe_even_with_l3_block() -> None:
     """In audit-only mode, validate_input returns safe=True even when NeMo blocks."""
     with patch("lightagent.security.nemo_rails.get_nemo_layer") as mock_get:
-        mock_get.return_value = _make_nemo_layer(
-            input_blocked=True, input_category="violence"
-        )
+        mock_get.return_value = _make_nemo_layer(input_blocked=True, input_category="violence")
         engine = GuardrailsEngine()
 
     mock_settings = MagicMock()
@@ -128,9 +122,7 @@ async def test_l3_blocked_output_flags_result() -> None:
     mock_settings.security_mode = "strict"
 
     with patch("lightagent.core.config.get_settings", return_value=mock_settings):
-        result: GuardrailResult = await engine.validate_output(
-            "Here is how to hurt someone"
-        )
+        result: GuardrailResult = await engine.validate_output("Here is how to hurt someone")
 
     assert "nemo_output:unsafe_output" in result.reasons
     assert result.safe is False
@@ -147,9 +139,7 @@ async def test_l3_safe_output_passes_through() -> None:
     mock_settings.security_mode = "strict"
 
     with patch("lightagent.core.config.get_settings", return_value=mock_settings):
-        result: GuardrailResult = await engine.validate_output(
-            "Paris is the capital of France."
-        )
+        result: GuardrailResult = await engine.validate_output("Paris is the capital of France.")
 
     assert result.safe is True
     assert result.reasons == []

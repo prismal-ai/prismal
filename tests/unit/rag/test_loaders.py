@@ -140,9 +140,7 @@ def test_load_md_sets_metadata_source(tmp_path: Path) -> None:
 def test_load_csv_returns_list_of_documents(tmp_path: Path) -> None:
     """load() with a .csv file must return a non-empty list[Document]."""
     csv_file = tmp_path / "data.csv"
-    csv_file.write_text(
-        "name,age,city\nAlice,30,London\nBob,25,Paris\n", encoding="utf-8"
-    )
+    csv_file.write_text("name,age,city\nAlice,30,London\nBob,25,Paris\n", encoding="utf-8")
 
     factory = DocumentProcessorFactory()
     docs = factory.load(csv_file)
@@ -183,9 +181,7 @@ def test_load_json_returns_list_of_documents(tmp_path: Path) -> None:
         metadata={"source": str(json_file), "seq_num": 1},
     )
 
-    with patch(
-        "lightagent.rag.loaders.JSONLoader", autospec=True
-    ) as mock_loader_cls:
+    with patch("lightagent.rag.loaders.JSONLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -208,9 +204,7 @@ def test_load_json_calls_jsonloader_with_correct_args(tmp_path: Path) -> None:
         metadata={"source": str(json_file)},
     )
 
-    with patch(
-        "lightagent.rag.loaders.JSONLoader", autospec=True
-    ) as mock_loader_cls:
+    with patch("lightagent.rag.loaders.JSONLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -218,9 +212,7 @@ def test_load_json_calls_jsonloader_with_correct_args(tmp_path: Path) -> None:
         factory = DocumentProcessorFactory()
         factory.load(json_file)
 
-    mock_loader_cls.assert_called_once_with(
-        str(json_file), jq_schema=".", text_content=False
-    )
+    mock_loader_cls.assert_called_once_with(str(json_file), jq_schema=".", text_content=False)
 
 
 def test_load_json_sets_metadata_source(tmp_path: Path) -> None:
@@ -231,9 +223,7 @@ def test_load_json_sets_metadata_source(tmp_path: Path) -> None:
     # Loader returns doc WITHOUT source; factory must set it
     fake_doc = Document(page_content='{"key": "value"}', metadata={})
 
-    with patch(
-        "lightagent.rag.loaders.JSONLoader", autospec=True
-    ) as mock_loader_cls:
+    with patch("lightagent.rag.loaders.JSONLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -258,9 +248,7 @@ def test_load_pdf_returns_list_of_documents(tmp_path: Path) -> None:
         metadata={"source": str(pdf_file), "page": 0},
     )
 
-    with patch(
-        "lightagent.rag.loaders.PyPDFLoader", autospec=True
-    ) as mock_loader_cls:
+    with patch("lightagent.rag.loaders.PyPDFLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -283,9 +271,7 @@ def test_load_pdf_calls_pypdfloader_with_path(tmp_path: Path) -> None:
         metadata={"source": str(pdf_file)},
     )
 
-    with patch(
-        "lightagent.rag.loaders.PyPDFLoader", autospec=True
-    ) as mock_loader_cls:
+    with patch("lightagent.rag.loaders.PyPDFLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -304,9 +290,7 @@ def test_load_pdf_sets_metadata_source(tmp_path: Path) -> None:
     # Loader returns doc WITHOUT source; factory must set it
     fake_doc = Document(page_content="page", metadata={})
 
-    with patch(
-        "lightagent.rag.loaders.PyPDFLoader", autospec=True
-    ) as mock_loader_cls:
+    with patch("lightagent.rag.loaders.PyPDFLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -330,9 +314,7 @@ def test_load_docx_returns_list_of_documents(tmp_path: Path) -> None:
         metadata={"source": str(docx_file)},
     )
 
-    with patch(
-        "lightagent.rag.loaders.Docx2txtLoader", autospec=True
-    ) as mock_loader_cls:
+    with patch("lightagent.rag.loaders.Docx2txtLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -352,9 +334,7 @@ def test_load_docx_calls_docx2txtloader_with_path(tmp_path: Path) -> None:
 
     fake_doc = Document(page_content="memo body", metadata={"source": str(docx_file)})
 
-    with patch(
-        "lightagent.rag.loaders.Docx2txtLoader", autospec=True
-    ) as mock_loader_cls:
+    with patch("lightagent.rag.loaders.Docx2txtLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -372,9 +352,7 @@ def test_load_docx_sets_metadata_source(tmp_path: Path) -> None:
 
     fake_doc = Document(page_content="notes", metadata={})
 
-    with patch(
-        "lightagent.rag.loaders.Docx2txtLoader", autospec=True
-    ) as mock_loader_cls:
+    with patch("lightagent.rag.loaders.Docx2txtLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -419,7 +397,7 @@ def test_unsupported_extension_html(tmp_path: Path) -> None:
 
 
 def test_unsupported_extension_no_extension(tmp_path: Path) -> None:
-    """load() with a file that has no extension must raise UnsupportedDocumentTypeError."""  # noqa: E501
+    """load() with a file that has no extension must raise UnsupportedDocumentTypeError."""
     no_ext_file = tmp_path / "datafile"
     no_ext_file.write_text("binary-ish content", encoding="utf-8")
 
@@ -454,9 +432,7 @@ def test_unsupported_document_type_error_can_be_raised_with_ext() -> None:
         ("readme.md", "# Heading"),
     ],
 )
-def test_metadata_source_is_absolute_string(
-    tmp_path: Path, filename: str, content: str
-) -> None:
+def test_metadata_source_is_absolute_string(tmp_path: Path, filename: str, content: str) -> None:
     """metadata['source'] must equal str(path) — the absolute path string."""
     target = tmp_path / filename
     target.write_text(content, encoding="utf-8")

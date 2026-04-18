@@ -1,4 +1,5 @@
 """Unit tests for supervisor routing to financial_analyst."""
+
 from __future__ import annotations
 
 

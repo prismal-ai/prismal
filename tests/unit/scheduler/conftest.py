@@ -39,8 +39,8 @@ if "prefect" not in sys.modules:
 # We keep lightagent.agents as a proper package (real __path__) so that other
 # scheduler tests can still import lightagent.agents.tools (which only needs
 # langchain_core, which IS available in the system Python).
-import types  # noqa: E402
-from pathlib import Path as _Path  # noqa: E402
+import types
+from pathlib import Path as _Path
 
 if "lightagent.agents" not in sys.modules:
     _agents_real = _Path(__file__).parent.parent.parent.parent / "lightagent" / "agents"

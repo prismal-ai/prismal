@@ -65,9 +65,7 @@ def test_normalize_nfkc_ligature(sanitizer: InputSanitizer) -> None:
 
 def test_normalize_nfkc_fullwidth(sanitizer: InputSanitizer) -> None:
     """Full-width ASCII must normalize to ASCII."""
-    assert (
-        sanitizer.normalize_unicode("\uff49\uff47\uff4e\uff4f\uff52\uff45") == "ignore"
-    )
+    assert sanitizer.normalize_unicode("\uff49\uff47\uff4e\uff4f\uff52\uff45") == "ignore"
 
 
 def test_normalize_nfkc_superscript(sanitizer: InputSanitizer) -> None:

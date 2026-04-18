@@ -87,10 +87,7 @@ class TestExtractSqlitePath:
         assert _extract_sqlite_path("sqlite:///data/db/test.db") == "data/db/test.db"
 
     def test_sqlite_aiosqlite_prefix(self) -> None:
-        assert (
-            _extract_sqlite_path("sqlite+aiosqlite:///data/db/test.db")
-            == "data/db/test.db"
-        )
+        assert _extract_sqlite_path("sqlite+aiosqlite:///data/db/test.db") == "data/db/test.db"
 
     def test_empty_url_returns_memory(self) -> None:
         assert _extract_sqlite_path("") == ":memory:"
@@ -126,9 +123,7 @@ class TestBuildCheckpointerSqlite:
         saver = await build_checkpointer("mysql://host/db")
         assert isinstance(saver, AsyncSqliteSaver)
 
-    async def test_sqlite_url_returns_sqlite_saver_with_path(
-        self, tmp_path: Any
-    ) -> None:
+    async def test_sqlite_url_returns_sqlite_saver_with_path(self, tmp_path: Any) -> None:
         """``sqlite:///path`` opens an aiosqlite connection on ``path``."""
         db_file = tmp_path / "nested" / "checkpoints.db"
         url = f"sqlite:///{db_file}"
@@ -164,40 +159,28 @@ class TestBuildCheckpointerSqlite:
 class TestBuildCheckpointerPostgres:
     """Postgres backend selection covers AC-038-1 + AC-038-4 (setup called)."""
 
-    async def test_postgresql_url_returns_postgres_saver(
-        self, fake_postgres_module: Any
-    ) -> None:
+    async def test_postgresql_url_returns_postgres_saver(self, fake_postgres_module: Any) -> None:
         _, saver_cls, saver_instance = fake_postgres_module
         saver = await build_checkpointer("postgresql://user:pw@localhost/app")
         assert saver is saver_instance
-        saver_cls.from_conn_string.assert_called_once_with(
-            "postgresql://user:pw@localhost/app"
-        )
+        saver_cls.from_conn_string.assert_called_once_with("postgresql://user:pw@localhost/app")
 
-    async def test_postgresql_asyncpg_url_is_normalized(
-        self, fake_postgres_module: Any
-    ) -> None:
+    async def test_postgresql_asyncpg_url_is_normalized(self, fake_postgres_module: Any) -> None:
         """The SQLAlchemy ``postgresql+asyncpg://`` prefix is normalized to
         plain ``postgresql://`` before being passed to psycopg-based
         ``AsyncPostgresSaver.from_conn_string``.
         """
         _, saver_cls, _ = fake_postgres_module
         await build_checkpointer("postgresql+asyncpg://user:pw@localhost/app")
-        saver_cls.from_conn_string.assert_called_once_with(
-            "postgresql://user:pw@localhost/app"
-        )
+        saver_cls.from_conn_string.assert_called_once_with("postgresql://user:pw@localhost/app")
 
-    async def test_postgres_setup_called_on_init(
-        self, fake_postgres_module: Any
-    ) -> None:
+    async def test_postgres_setup_called_on_init(self, fake_postgres_module: Any) -> None:
         """AC-038-4: ``setup()`` must run to create checkpoint tables."""
         _, _, saver_instance = fake_postgres_module
         await build_checkpointer("postgresql://user@host/db")
         saver_instance.setup.assert_awaited_once()
 
-    async def test_postgres_cm_retained_for_lifetime(
-        self, fake_postgres_module: Any
-    ) -> None:
+    async def test_postgres_cm_retained_for_lifetime(self, fake_postgres_module: Any) -> None:
         """The ``from_conn_string`` context manager must be kept alive so
         the underlying connection does not close after the factory returns.
         """
@@ -261,9 +244,7 @@ class TestSubgraphFactoryUsesBuildCheckpointer:
         # proving the delegation path was taken.
         assert compiled.checkpointer is sentinel
 
-    async def test_string_path_preserves_legacy_behaviour(
-        self, tmp_path: Any
-    ) -> None:
+    async def test_string_path_preserves_legacy_behaviour(self, tmp_path: Any) -> None:
         """Passing a string path still uses an isolated ``AsyncSqliteSaver``
         and does NOT invoke ``build_checkpointer``.
         """
@@ -288,9 +269,7 @@ class TestSubgraphFactoryUsesBuildCheckpointer:
             new=AsyncMock(),
         ) as mock_build:
             factory = SubgraphFactory()
-            compiled = await factory.build(
-                definition, checkpointer_path=str(db_file)
-            )
+            compiled = await factory.build(definition, checkpointer_path=str(db_file))
 
         mock_build.assert_not_awaited()
         assert compiled is not None

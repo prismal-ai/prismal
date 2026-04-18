@@ -18,7 +18,6 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from lightagent.agents.state import create_initial_state
 
-
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------

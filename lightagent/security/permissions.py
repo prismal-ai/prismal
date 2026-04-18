@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 logger = get_logger("lightagent.security.permissions")
 
 
-class PermissionType(str, enum.Enum):
+class PermissionType(enum.StrEnum):
     """Categories of permissions that can be granted to agents."""
 
     FILESYSTEM_READ = "filesystem_read"
@@ -41,12 +41,8 @@ class PermissionRecord(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     permission_type: Mapped[str] = mapped_column(String(64), nullable=False)
     resource: Mapped[str] = mapped_column(String(512), nullable=False)
-    granted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reason: Mapped[str] = mapped_column(String(256), default="", nullable=False)
 
 
@@ -120,8 +116,7 @@ class PermissionManager:
                 select(PermissionRecord).where(
                     PermissionRecord.permission_type == permission_type.value,
                     PermissionRecord.resource == resource,
-                    (PermissionRecord.expires_at.is_(None))
-                    | (PermissionRecord.expires_at > now),
+                    (PermissionRecord.expires_at.is_(None)) | (PermissionRecord.expires_at > now),
                 )
             )
             found = result.scalars().first() is not None
@@ -154,8 +149,7 @@ class PermissionManager:
         async for session in get_db_session(self._engine):
             result = await session.execute(
                 select(PermissionRecord).where(
-                    (PermissionRecord.expires_at.is_(None))
-                    | (PermissionRecord.expires_at > now),
+                    (PermissionRecord.expires_at.is_(None)) | (PermissionRecord.expires_at > now),
                 )
             )
             records = list(result.scalars().all())

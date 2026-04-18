@@ -16,7 +16,6 @@ import pytest
 
 from lightagent.core.users import User, UserRole, UserStore
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 _FAKE_HASH = "$2b$12$fakehashfakehashfakehashfakehashfakehashfakehashfakehashfak"
@@ -33,7 +32,7 @@ def _mock_crypt_context() -> MagicMock:
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 
-@pytest.fixture()
+@pytest.fixture
 def store(tmp_path: Path) -> UserStore:
     """Return a UserStore backed by a temporary SQLite file."""
     # Mock passlib to avoid passlib/bcrypt 4.x incompatibility

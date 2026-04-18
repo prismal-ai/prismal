@@ -113,11 +113,7 @@ def _patch_runtime(
         screenshot_list = list(screenshots)
 
     async def _take_screenshot() -> bytes:
-        return (
-            screenshot_list.pop(0)
-            if len(screenshot_list) > 1
-            else screenshot_list[0]
-        )
+        return screenshot_list.pop(0) if len(screenshot_list) > 1 else screenshot_list[0]
 
     if execute_side_effect is not None:
         execute_mock = AsyncMock(side_effect=execute_side_effect)
@@ -153,9 +149,7 @@ def _patch_runtime(
                 "lightagent.agents.cua_agent.execute_browser_action",
                 new=execute_mock,
             ),
-            patch(
-                "lightagent.agents.cua_agent.AuditLogger"
-            ),
+            patch("lightagent.agents.cua_agent.AuditLogger"),
         ]
         if interrupt_return is not None:
             patches.append(
@@ -210,45 +204,27 @@ class TestClassifyRisk:
         assert classify_risk(CuaAction(action_type="navigate")) == "SAFE"
 
     def test_safe_click_link(self) -> None:
-        assert (
-            classify_risk(CuaAction(action_type="click_link")) == "SAFE"
-        )
+        assert classify_risk(CuaAction(action_type="click_link")) == "SAFE"
 
     def test_safe_finish(self) -> None:
         """``finish`` is SAFE so the termination path doesn't trip HITL."""
-        assert (
-            classify_risk(CuaAction(action_type="finish")) == "SAFE"
-        )
+        assert classify_risk(CuaAction(action_type="finish")) == "SAFE"
 
     def test_moderate_type(self) -> None:
-        assert (
-            classify_risk(CuaAction(action_type="type")) == "MODERATE"
-        )
+        assert classify_risk(CuaAction(action_type="type")) == "MODERATE"
 
     def test_moderate_file_upload(self) -> None:
-        assert (
-            classify_risk(CuaAction(action_type="file_upload"))
-            == "MODERATE"
-        )
+        assert classify_risk(CuaAction(action_type="file_upload")) == "MODERATE"
 
     def test_high_risk_click_submit(self) -> None:
-        assert (
-            classify_risk(CuaAction(action_type="click_submit"))
-            == "HIGH_RISK"
-        )
+        assert classify_risk(CuaAction(action_type="click_submit")) == "HIGH_RISK"
 
     def test_high_risk_click_pay(self) -> None:
-        assert (
-            classify_risk(CuaAction(action_type="click_pay"))
-            == "HIGH_RISK"
-        )
+        assert classify_risk(CuaAction(action_type="click_pay")) == "HIGH_RISK"
 
     def test_unknown_action_defaults_to_high_risk(self) -> None:
         """Fail-closed: unknown action_type → HIGH_RISK with warning."""
-        assert (
-            classify_risk(CuaAction(action_type="mystery_move"))
-            == "HIGH_RISK"
-        )
+        assert classify_risk(CuaAction(action_type="mystery_move")) == "HIGH_RISK"
 
     def test_taxonomies_are_disjoint(self) -> None:
         """No action can appear in more than one risk bucket."""
@@ -259,10 +235,7 @@ class TestClassifyRisk:
     def test_all_high_risk_actions_classified(self) -> None:
         """Every entry in HIGH_RISK_ACTIONS must classify as HIGH_RISK."""
         for action_type in HIGH_RISK_ACTIONS:
-            assert (
-                classify_risk(CuaAction(action_type=action_type))
-                == "HIGH_RISK"
-            )
+            assert classify_risk(CuaAction(action_type=action_type)) == "HIGH_RISK"
 
 
 # ---------------------------------------------------------------------------
@@ -272,9 +245,7 @@ class TestClassifyRisk:
 
 class TestParseAction:
     def test_plain_json(self) -> None:
-        a = _parse_action(
-            '{"action_type": "click_link", "target": ".btn"}'
-        )
+        a = _parse_action('{"action_type": "click_link", "target": ".btn"}')
         assert a is not None
         assert a.action_type == "click_link"
         assert a.target == ".btn"
@@ -508,10 +479,7 @@ class TestHighRiskActionPath:
         # Critical: execute must NOT have run for the rejected action.
         mocks["execute"].assert_not_awaited()
         # Audit records the rejection.
-        audit_params = (
-            mocks["audit"].return_value.log_tool_call.call_args_list[0]
-            .kwargs["params"]
-        )
+        audit_params = mocks["audit"].return_value.log_tool_call.call_args_list[0].kwargs["params"]
         assert audit_params["hitl_decision"] == "reject"
         assert "denied" in out["messages"][0].content.lower()
 
@@ -593,9 +561,7 @@ class TestMaxActions:
         settings = _settings_mock()
         vlm = _vlm_mock(_action_json("scroll"))
         provider_mock = MagicMock()
-        provider_mock.return_value.get_vision_llm = MagicMock(
-            return_value=vlm
-        )
+        provider_mock.return_value.get_vision_llm = MagicMock(return_value=vlm)
         with (
             patch(
                 "lightagent.agents.cua_agent.get_settings",
@@ -634,15 +600,11 @@ class TestMaxActions:
             out = await cua_node(_state())
 
         mocks["execute"].assert_awaited_once()
-        audit_params = (
-            mocks["audit"].return_value.log_tool_call.call_args_list[0]
-            .kwargs["params"]
-        )
+        audit_params = mocks["audit"].return_value.log_tool_call.call_args_list[0].kwargs["params"]
         assert audit_params["action_type"] == "scroll"
         # The audit result_preview contains the exception message.
         result_preview = (
-            mocks["audit"].return_value.log_tool_call.call_args_list[0]
-            .kwargs["result"]
+            mocks["audit"].return_value.log_tool_call.call_args_list[0].kwargs["result"]
         )
         assert "exception" in result_preview
         assert "click missed" in result_preview

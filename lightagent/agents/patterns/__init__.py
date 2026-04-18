@@ -5,10 +5,10 @@ Each pattern corresponds to a different graph topology in ``AgentFactory``.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class AgentPattern(str, Enum):
+class AgentPattern(StrEnum):
     """Supported multi-agent execution patterns.
 
     Attributes:

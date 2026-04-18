@@ -44,7 +44,7 @@ class DateTimeService:
     Usage::
 
         dts = DateTimeService.get()
-        now = dts.now()                    # aware datetime in resolved TZ
+        now = dts.now()  # aware datetime in resolved TZ
         next_fire = dts.next_run("0 9 * * *")
 
     Tests can reset the singleton via ``DateTimeService._instance = None``.

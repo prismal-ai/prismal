@@ -88,9 +88,7 @@ class GuardrailsEngine:
 
         raw_patterns: dict[str, list[str]] = data.get("patterns") or {}  # type: ignore[assignment]
         for category, patterns in raw_patterns.items():
-            self._input_patterns[category] = [
-                re.compile(p, _RE_FLAGS) for p in patterns
-            ]
+            self._input_patterns[category] = [re.compile(p, _RE_FLAGS) for p in patterns]
 
         raw_output: dict[str, dict[str, str]] = data.get("output_patterns") or {}  # type: ignore[assignment]
         for group, group_patterns in raw_output.items():
@@ -137,9 +135,7 @@ class GuardrailsEngine:
 
             # L3: NeMo Guardrails (optional)
             if self._nemo_layer is not None and self._nemo_layer.available:
-                nemo_blocked, nemo_category = await self._nemo_layer.check_input(
-                    sanitized
-                )
+                nemo_blocked, nemo_category = await self._nemo_layer.check_input(sanitized)
                 if nemo_blocked:
                     reasons.append(f"nemo:{nemo_category}")
                     risk_score = max(risk_score, 85)
@@ -177,9 +173,7 @@ class GuardrailsEngine:
                 sanitized_text=sanitized,
             )
 
-    async def validate_output(
-        self, text: str, canary: str | None = None
-    ) -> GuardrailResult:
+    async def validate_output(self, text: str, canary: str | None = None) -> GuardrailResult:
         """Scan LLM output for PII, API key leaks, and canary token leakage.
 
         Args:

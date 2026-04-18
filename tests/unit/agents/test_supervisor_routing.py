@@ -56,9 +56,7 @@ async def test_supervisor_routes_to_researcher() -> None:
     state["messages"] = [HumanMessage(content="Find information about LangGraph")]
 
     with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
-        mock_registry.return_value.get_llm_with_fallback.return_value = _make_mock_llm(
-            "researcher"
-        )
+        mock_registry.return_value.get_llm_with_fallback.return_value = _make_mock_llm("researcher")
         result = await supervisor_node(state)
 
     assert result["next_agent"] == "researcher"
@@ -123,9 +121,7 @@ async def test_supervisor_updates_current_agent() -> None:
     state["messages"] = [HumanMessage(content="Write some code")]
 
     with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
-        mock_registry.return_value.get_llm_with_fallback.return_value = _make_mock_llm(
-            "coder"
-        )
+        mock_registry.return_value.get_llm_with_fallback.return_value = _make_mock_llm("coder")
         result = await supervisor_node(state)
 
     assert result["current_agent"] == "supervisor"

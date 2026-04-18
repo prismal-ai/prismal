@@ -95,9 +95,7 @@ def test_dispatcher_global_settings_cap_overrides_caller() -> None:
         (),
         {"parallel_enabled": True, "parallel_max_workers": 2},
     )()
-    with patch(
-        "lightagent.agents.patterns.parallel.get_settings", return_value=fake
-    ):
+    with patch("lightagent.agents.patterns.parallel.get_settings", return_value=fake):
         result = dispatcher(state)
 
     assert isinstance(result, list)
@@ -119,9 +117,7 @@ def test_dispatcher_disabled_globally_routes_to_on_empty() -> None:
         (),
         {"parallel_enabled": False, "parallel_max_workers": 10},
     )()
-    with patch(
-        "lightagent.agents.patterns.parallel.get_settings", return_value=fake
-    ):
+    with patch("lightagent.agents.patterns.parallel.get_settings", return_value=fake):
         result = dispatcher(state)
 
     assert result == "fallback"
@@ -210,9 +206,7 @@ async def test_parallel_results_aggregated_by_reducer() -> None:
     graph.add_edge("worker", "aggregator")
 
     compiled = graph.compile()
-    result = await compiled.ainvoke(
-        {"tasks": ["a", "b", "c"], "parallel_results": []}
-    )
+    result = await compiled.ainvoke({"tasks": ["a", "b", "c"], "parallel_results": []})
 
     assert len(result["parallel_results"]) == 3
     tasks_seen = {item["task"] for item in result["parallel_results"]}

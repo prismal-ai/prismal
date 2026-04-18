@@ -1,8 +1,9 @@
 """Integration test: full dev_pipeline subgraph invocation with mocked LLM."""
+
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
@@ -15,35 +16,76 @@ def _mock_llm_sequence() -> list[AIMessage]:
     """Return ordered mock LLM responses for each pipeline stage."""
     return [
         # PO Agent
-        AIMessage(content=json.dumps({
-            "id": "s1", "title": "Login", "description": "As a user I can log in",
-            "acceptance_criteria": ["Credentials work"], "priority": "MUST"
-        })),
+        AIMessage(
+            content=json.dumps(
+                {
+                    "id": "s1",
+                    "title": "Login",
+                    "description": "As a user I can log in",
+                    "acceptance_criteria": ["Credentials work"],
+                    "priority": "MUST",
+                }
+            )
+        ),
         # Architect
-        AIMessage(content=json.dumps({
-            "id": "spec1", "story_id": "s1", "architecture": "JWT auth",
-            "design_decisions": ["bcrypt"], "technology_stack": ["fastapi"]
-        })),
+        AIMessage(
+            content=json.dumps(
+                {
+                    "id": "spec1",
+                    "story_id": "s1",
+                    "architecture": "JWT auth",
+                    "design_decisions": ["bcrypt"],
+                    "technology_stack": ["fastapi"],
+                }
+            )
+        ),
         # Developer
-        AIMessage(content=json.dumps({
-            "language": "python", "file_path": "auth/login.py",
-            "content": "def login(): return True", "dependencies": []
-        })),
+        AIMessage(
+            content=json.dumps(
+                {
+                    "language": "python",
+                    "file_path": "auth/login.py",
+                    "content": "def login(): return True",
+                    "dependencies": [],
+                }
+            )
+        ),
         # Unit Tester (passing)
-        AIMessage(content=json.dumps({
-            "tests_written": 3, "tests_passed": 3, "coverage_percent": 90.0,
-            "failing_tests": [], "recommendations": []
-        })),
+        AIMessage(
+            content=json.dumps(
+                {
+                    "tests_written": 3,
+                    "tests_passed": 3,
+                    "coverage_percent": 90.0,
+                    "failing_tests": [],
+                    "recommendations": [],
+                }
+            )
+        ),
         # QA Agent
-        AIMessage(content=json.dumps({
-            "integration_tests_run": 2, "integration_tests_passed": 2,
-            "security_findings": [], "quality_score": 85.0, "approved": True
-        })),
+        AIMessage(
+            content=json.dumps(
+                {
+                    "integration_tests_run": 2,
+                    "integration_tests_passed": 2,
+                    "security_findings": [],
+                    "quality_score": 85.0,
+                    "approved": True,
+                }
+            )
+        ),
         # Reviewer (score >= 0.8 -> approves)
-        AIMessage(content=json.dumps({
-            "score": 0.9, "approved": True, "strengths": ["clean"],
-            "improvements": [], "blocking_issues": []
-        })),
+        AIMessage(
+            content=json.dumps(
+                {
+                    "score": 0.9,
+                    "approved": True,
+                    "strengths": ["clean"],
+                    "improvements": [],
+                    "blocking_issues": [],
+                }
+            )
+        ),
     ]
 
 

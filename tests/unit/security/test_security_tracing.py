@@ -105,7 +105,8 @@ async def test_validate_input_blocked_sets_blocked_attribute_true() -> None:
 
     if not result.safe:
         blocked_calls = [
-            call for call in mock_span.set_attribute.call_args_list
+            call
+            for call in mock_span.set_attribute.call_args_list
             if call.args[0] == "lightagent.blocked"
         ]
         assert blocked_calls

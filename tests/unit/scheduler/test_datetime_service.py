@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import time
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
 
-from lightagent.scheduler.datetime_service import DateTimeService, _UTC
-
+from lightagent.scheduler.datetime_service import _UTC, DateTimeService
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -51,7 +49,9 @@ def test_resolve_timezone_explicit_iana() -> None:
     assert tz == ZoneInfo("America/Caracas")
 
 
-def test_resolve_timezone_invalid_falls_back_utc(capsys: pytest.CaptureFixture[str]) -> None:
+def test_resolve_timezone_invalid_falls_back_utc(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """resolve_timezone('Bad/Zone') logs WARNING and returns UTC."""
     dts = DateTimeService.get()
     tz = dts.resolve_timezone("Bad/Zone")
@@ -111,9 +111,7 @@ def test_resolve_timezone_falls_back_to_os_tz() -> None:
             timezone="",
             ntp_enabled=False,
         )
-        with patch(
-            "lightagent.scheduler.datetime_service.tzlocal.get_localzone"
-        ) as mock_local:
+        with patch("lightagent.scheduler.datetime_service.tzlocal.get_localzone") as mock_local:
             mock_local.return_value = ZoneInfo("America/New_York")
             dts = DateTimeService()
             tz = dts.resolve_timezone(None)
@@ -302,6 +300,7 @@ def test_ntp_enabled_mocked_server() -> None:
         )
         with patch.dict("sys.modules", {"ntplib": MagicMock()}):
             import sys
+
             mock_ntplib = sys.modules["ntplib"]
             mock_ntplib.NTPClient.return_value.request.return_value = mock_response
 
@@ -326,10 +325,9 @@ def test_ntp_unreachable_falls_back(caplog: pytest.LogCaptureFixture) -> None:
         )
         with patch.dict("sys.modules", {"ntplib": MagicMock()}):
             import sys
+
             mock_ntplib = sys.modules["ntplib"]
-            mock_ntplib.NTPClient.return_value.request.side_effect = Exception(
-                "Connection refused"
-            )
+            mock_ntplib.NTPClient.return_value.request.side_effect = Exception("Connection refused")
 
             with caplog.at_level(logging.WARNING):
                 dts = DateTimeService()
@@ -354,6 +352,7 @@ def test_ntp_large_offset_logs_warning(capsys: pytest.CaptureFixture[str]) -> No
         )
         with patch.dict("sys.modules", {"ntplib": MagicMock()}):
             import sys
+
             mock_ntplib = sys.modules["ntplib"]
             mock_ntplib.NTPClient.return_value.request.return_value = mock_response
 
@@ -381,6 +380,7 @@ def test_ntp_resync_after_interval() -> None:
         )
         with patch.dict("sys.modules", {"ntplib": MagicMock()}):
             import sys
+
             mock_ntplib = sys.modules["ntplib"]
             mock_ntplib.NTPClient.return_value.request.return_value = mock_response
 
@@ -408,6 +408,7 @@ def test_ntp_no_resync_within_interval() -> None:
         )
         with patch.dict("sys.modules", {"ntplib": MagicMock()}):
             import sys
+
             mock_ntplib = sys.modules["ntplib"]
             mock_ntplib.NTPClient.return_value.request.return_value = mock_response
 
@@ -436,6 +437,7 @@ def test_now_applies_ntp_offset() -> None:
         )
         with patch.dict("sys.modules", {"ntplib": MagicMock()}):
             import sys
+
             mock_ntplib = sys.modules["ntplib"]
             mock_ntplib.NTPClient.return_value.request.return_value = mock_response
 
@@ -459,7 +461,10 @@ def test_next_run_croniter_naive_result() -> None:
     mock_cron_instance = MagicMock()
     mock_cron_instance.get_next.return_value = naive_result
 
-    with patch("lightagent.scheduler.datetime_service.croniter", return_value=mock_cron_instance):
+    with patch(
+        "lightagent.scheduler.datetime_service.croniter",
+        return_value=mock_cron_instance,
+    ):
         result = dts.next_run("0 9 * * *", tz=tz)
 
     assert result.tzinfo is not None

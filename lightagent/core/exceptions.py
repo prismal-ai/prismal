@@ -56,8 +56,7 @@ class InjectionDetectedError(SecurityError):
         self.patterns = patterns
         preview = text[:80] + "..." if len(text) > 80 else text
         super().__init__(
-            f"Injection detected (risk={risk_score}): '{preview}' "
-            f"matched patterns: {patterns}"
+            f"Injection detected (risk={risk_score}): '{preview}' matched patterns: {patterns}"
         )
 
 
@@ -73,9 +72,7 @@ class PermissionDeniedError(SecurityError):
         """Initialize PermissionDeniedError."""
         self.resource = resource
         self.action = action
-        super().__init__(
-            f"Permission denied: action='{action}' on resource='{resource}'"
-        )
+        super().__init__(f"Permission denied: action='{action}' on resource='{resource}'")
 
 
 class CanaryLeakError(SecurityError):
@@ -125,9 +122,7 @@ class ProviderTimeoutError(ProviderError):
         """Initialize ProviderTimeoutError."""
         self.model_id = model_id
         self.timeout_seconds = timeout_seconds
-        super().__init__(
-            f"Provider timeout after {timeout_seconds}s for model '{model_id}'"
-        )
+        super().__init__(f"Provider timeout after {timeout_seconds}s for model '{model_id}'")
 
 
 # ── Skill ─────────────────────────────────────────────────────────────────────
@@ -166,8 +161,7 @@ class SkillValidationError(SkillError):
         self.violations = violations
         joined = "; ".join(violations)
         super().__init__(
-            f"Skill '{skill_name}' failed validation with {len(violations)} "
-            f"violation(s): {joined}"
+            f"Skill '{skill_name}' failed validation with {len(violations)} violation(s): {joined}"
         )
 
 
@@ -190,9 +184,7 @@ class MCPConnectionError(MCPError):
         """Initialize MCPConnectionError."""
         self.server_name = server_name
         self.reason = reason
-        super().__init__(
-            f"Cannot connect to MCP server '{server_name}': {reason}"
-        )
+        super().__init__(f"Cannot connect to MCP server '{server_name}': {reason}")
 
 
 class MCPToolError(MCPError):

@@ -15,7 +15,6 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from lightagent.agents.tool_registry import react_loop
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -119,9 +118,7 @@ async def test_all_tools_fail_triggers_early_exit() -> None:
 
     # The synthesis prompt injected by react_loop must contain guidance text
     synth_call_args: list[Any] = llm.ainvoke.call_args_list[1][0][0]
-    last_human = next(
-        (m for m in reversed(synth_call_args) if isinstance(m, HumanMessage)), None
-    )
+    last_human = next((m for m in reversed(synth_call_args) if isinstance(m, HumanMessage)), None)
     assert last_human is not None
     assert "unavailable" in last_human.content.lower() or "failed" in last_human.content.lower()
 
@@ -147,7 +144,9 @@ async def test_all_tools_fail_six_parallel_calls() -> None:
         synthesis,
     )
 
-    response = await react_loop(llm, [tavily], [HumanMessage(content="news")], agent_name="researcher")
+    response = await react_loop(
+        llm, [tavily], [HumanMessage(content="news")], agent_name="researcher"
+    )
 
     # Only 2 LLM calls (tool request + synthesis) — not 6+ iterations
     assert llm.ainvoke.await_count == 2
@@ -188,7 +187,10 @@ async def test_tool_skipped_after_failure_budget_exhausted() -> None:
     llm = _make_llm(*call_responses)
 
     response = await react_loop(
-        llm, [bad_tool, good_tool], [HumanMessage(content="test")], agent_name="test",
+        llm,
+        [bad_tool, good_tool],
+        [HumanMessage(content="test")],
+        agent_name="test",
         max_iterations=num_mixed_iters + 2,
     )
 
@@ -269,7 +271,11 @@ async def test_iteration_cap_triggers_synthesis() -> None:
     llm = _make_llm(*llm_responses)
 
     response = await react_loop(
-        llm, [tool], [HumanMessage(content="test")], agent_name="test", max_iterations=max_iter
+        llm,
+        [tool],
+        [HumanMessage(content="test")],
+        agent_name="test",
+        max_iterations=max_iter,
     )
 
     assert response.content == "forced synthesis answer"
@@ -283,7 +289,9 @@ async def test_iteration_cap_triggers_synthesis() -> None:
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_does_not_burn_failure_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_rate_limit_does_not_burn_failure_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A 429 rate-limit error must not count toward the permanent failure budget."""
     import lightagent.agents.tool_registry as reg
 
@@ -303,7 +311,9 @@ async def test_rate_limit_does_not_burn_failure_budget(monkeypatch: pytest.Monke
         final,
     )
 
-    response = await react_loop(llm, [brave], [HumanMessage(content="news")], agent_name="researcher")
+    response = await react_loop(
+        llm, [brave], [HumanMessage(content="news")], agent_name="researcher"
+    )
 
     # Tool was called in both iterations (budget not burned by 429)
     assert brave.ainvoke.await_count == 2
@@ -311,7 +321,9 @@ async def test_rate_limit_does_not_burn_failure_budget(monkeypatch: pytest.Monke
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_skips_subsequent_parallel_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_rate_limit_skips_subsequent_parallel_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Regression: 3 parallel brave_web_search calls — first succeeds, 2nd triggers 429.
 
     The 3rd call must be skipped (same iteration, already rate-limited) without
@@ -353,7 +365,9 @@ async def test_rate_limit_skips_subsequent_parallel_calls(monkeypatch: pytest.Mo
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_different_from_permanent_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_rate_limit_different_from_permanent_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A 429 must NOT increment the permanent fail counter; a 400 MUST."""
     import lightagent.agents.tool_registry as reg
 
@@ -370,9 +384,7 @@ async def test_rate_limit_different_from_permanent_error(monkeypatch: pytest.Mon
         _ai_final("done"),
     )
 
-    await react_loop(
-        llm, [rate_tool, perm_tool], [HumanMessage(content="test")], agent_name="test"
-    )
+    await react_loop(llm, [rate_tool, perm_tool], [HumanMessage(content="test")], agent_name="test")
 
     # rate_tool: called once (rate-limit branch); perm_tool: called once (error branch)
     rate_tool.ainvoke.assert_awaited_once()
@@ -467,7 +479,10 @@ async def test_llm_rate_limit_succeeds_after_retry(
     llm.ainvoke = flaky_ainvoke
 
     response = await reg.react_loop(
-        llm, [], [HumanMessage(content="news please")], agent_name="researcher",
+        llm,
+        [],
+        [HumanMessage(content="news please")],
+        agent_name="researcher",
     )
 
     assert call_count["n"] == 2
@@ -498,7 +513,10 @@ async def test_llm_rate_limit_exhausts_retries_returns_apology(
     llm.ainvoke = always_rate_limited
 
     response = await reg.react_loop(
-        llm, [], [HumanMessage(content="hi")], agent_name="researcher",
+        llm,
+        [],
+        [HumanMessage(content="hi")],
+        agent_name="researcher",
     )
 
     # 1 initial attempt + 2 retries = 3 calls before giving up.
@@ -528,7 +546,10 @@ async def test_llm_rate_limit_retry_disabled_when_max_retries_zero(
     llm.ainvoke = always_rate_limited
 
     response = await reg.react_loop(
-        llm, [], [HumanMessage(content="hi")], agent_name="researcher",
+        llm,
+        [],
+        [HumanMessage(content="hi")],
+        agent_name="researcher",
     )
 
     assert call_count["n"] == 1
@@ -569,7 +590,10 @@ async def test_llm_rate_limit_retry_respects_retry_after_hint(
     llm.ainvoke = flaky
 
     response = await reg.react_loop(
-        llm, [], [HumanMessage(content="hi")], agent_name="researcher",
+        llm,
+        [],
+        [HumanMessage(content="hi")],
+        agent_name="researcher",
     )
 
     assert response.content == "ok"
@@ -616,7 +640,10 @@ async def test_permanent_error_skips_retry_and_returns_unavailable(
     llm.ainvoke = always_billing
 
     response = await reg.react_loop(
-        llm, [], [HumanMessage(content="hi")], agent_name="researcher",
+        llm,
+        [],
+        [HumanMessage(content="hi")],
+        agent_name="researcher",
     )
 
     assert call_count["n"] == 1
@@ -675,10 +702,7 @@ def test_unwrap_synthetic_respond() -> None:
     """The canonical 'respond' shape emitted by Ollama is unwrapped."""
     from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
 
-    raw = (
-        '{"function": "respond", "arguments": {"response": '
-        '"Hola. ¿En qué puedo ayudarte hoy?"}}'
-    )
+    raw = '{"function": "respond", "arguments": {"response": "Hola. ¿En qué puedo ayudarte hoy?"}}'
     assert _unwrap_synthetic_tool_call(raw) == "Hola. ¿En qué puedo ayudarte hoy?"
 
 
@@ -711,10 +735,7 @@ def test_unwrap_synthetic_handles_code_fence() -> None:
     """Ollama often wraps JSON in ```json ... ``` fences — also unwrap that."""
     from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
 
-    raw = (
-        '```json\n{"function": "respond", "arguments": '
-        '{"response": "hi"}}\n```'
-    )
+    raw = '```json\n{"function": "respond", "arguments": {"response": "hi"}}\n```'
     assert _unwrap_synthetic_tool_call(raw) == "hi"
 
 
@@ -731,7 +752,10 @@ async def test_react_loop_unwraps_synthetic_json_final_answer() -> None:
     )
 
     response = await react_loop(
-        llm, [], [HumanMessage(content="hola")], agent_name="supervisor",
+        llm,
+        [],
+        [HumanMessage(content="hola")],
+        agent_name="supervisor",
     )
 
     assert response.content == "Hola. ¿En qué puedo ayudarte hoy, Ernesto?"

@@ -149,9 +149,7 @@ class DocumentProcessorFactory:
         return JSONLoader(path_str, jq_schema=".", text_content=False).load()
 
     @staticmethod
-    def _ensure_source_metadata(
-        docs: list[Document], path: Path
-    ) -> list[Document]:
+    def _ensure_source_metadata(docs: list[Document], path: Path) -> list[Document]:
         """Set ``metadata["source"]`` to ``str(path)`` on every document.
 
         Loaders may set a different value (e.g. CSVLoader uses row numbers as
