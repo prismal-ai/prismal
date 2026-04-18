@@ -68,27 +68,17 @@ class HeartbeatDelivery:
             else s.telegram_bot_token.get_secret_value()
         )
         self._slack_token: str = (
-            slack_token
-            if slack_token is not None
-            else s.slack_bot_token.get_secret_value()
+            slack_token if slack_token is not None else s.slack_bot_token.get_secret_value()
         )
-        self._smtp_host: str = (
-            smtp_host if smtp_host is not None else s.heartbeat_smtp_host
-        )
-        self._smtp_port: int = (
-            smtp_port if smtp_port is not None else s.heartbeat_smtp_port
-        )
-        self._smtp_user: str = (
-            smtp_user if smtp_user is not None else s.heartbeat_smtp_user
-        )
+        self._smtp_host: str = smtp_host if smtp_host is not None else s.heartbeat_smtp_host
+        self._smtp_port: int = smtp_port if smtp_port is not None else s.heartbeat_smtp_port
+        self._smtp_user: str = smtp_user if smtp_user is not None else s.heartbeat_smtp_user
         self._smtp_password: str = (
             smtp_password
             if smtp_password is not None
             else s.heartbeat_smtp_password.get_secret_value()
         )
-        self._smtp_from: str = (
-            smtp_from if smtp_from is not None else s.heartbeat_smtp_from
-        )
+        self._smtp_from: str = smtp_from if smtp_from is not None else s.heartbeat_smtp_from
 
     async def send(self, channel: str, target: str, content: str) -> None:
         """Deliver ``content`` to ``target`` via ``channel``.
@@ -170,9 +160,7 @@ class HeartbeatDelivery:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(webhook_url, json={"content": text})
             resp.raise_for_status()
-        logger.info(
-            "heartbeat_delivery.discord_sent", webhook_url=webhook_url[:40]
-        )
+        logger.info("heartbeat_delivery.discord_sent", webhook_url=webhook_url[:40])
 
     async def _send_email(self, recipient: str, text: str) -> None:
         """Send text to an email address via SMTP (aiosmtplib).

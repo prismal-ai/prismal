@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
-
 from lightagent.monitoring.langfuse_client import LangfuseManager, _NoOpTrace
 
 
@@ -44,9 +42,7 @@ def test_langfuse_disabled_without_keys() -> None:
 def test_create_trace_returns_noop_when_disabled() -> None:
     """create_trace returns a no-op object when Langfuse is disabled."""
     _reset_singleton()
-    with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-    ) as mock_settings:
+    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -63,9 +59,7 @@ def test_create_trace_returns_noop_when_disabled() -> None:
 def test_get_callback_handler_returns_none_when_disabled() -> None:
     """get_callback_handler returns None when Langfuse is disabled."""
     _reset_singleton()
-    with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-    ) as mock_settings:
+    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -81,9 +75,7 @@ def test_get_callback_handler_returns_none_when_disabled() -> None:
 def test_flush_and_shutdown_noop_when_disabled() -> None:
     """flush/shutdown are safe no-ops when disabled."""
     _reset_singleton()
-    with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-    ) as mock_settings:
+    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -105,7 +97,7 @@ def test_noop_trace_score_and_generation() -> None:
     trace.score(value=0.9, name="accuracy")  # must not raise
     gen = trace.generation(name="llm-call", model="gpt-4")
     assert gen is not None
-    gen.end(output="result")      # must not raise
+    gen.end(output="result")  # must not raise
     gen.update(usage={"tokens": 10})  # must not raise
 
 
@@ -125,9 +117,7 @@ def test_langfuse_enabled_creates_client() -> None:
 
     with (
         patch.dict("sys.modules", {"langfuse": langfuse_stub}),
-        patch(
-            "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-        ) as mock_s,
+        patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_s,
     ):
         s = MagicMock()
         s.langfuse_enabled = True
@@ -156,9 +146,7 @@ def test_langfuse_init_exception_disables() -> None:
 
     with (
         patch.dict("sys.modules", {"langfuse": langfuse_stub}),
-        patch(
-            "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-        ) as mock_s,
+        patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_s,
     ):
         s = MagicMock()
         s.langfuse_enabled = True
@@ -250,9 +238,7 @@ def test_get_callback_handler_when_enabled() -> None:
     langchain_stub = MagicMock()
     langchain_stub.CallbackHandler = mock_handler_cls
 
-    with patch.dict(
-        "sys.modules", {"langfuse.langchain": langchain_stub}
-    ):
+    with patch.dict("sys.modules", {"langfuse.langchain": langchain_stub}):
         result = mgr.get_callback_handler(trace_id="t-1", session_id="s-1")
 
     assert result is mock_handler
@@ -265,9 +251,7 @@ def test_get_callback_handler_exception_returns_none() -> None:
 
     mgr, _ = _make_enabled_manager()
 
-    with patch.dict(
-        "sys.modules", {"langfuse.langchain": None}
-    ):
+    with patch.dict("sys.modules", {"langfuse.langchain": None}):
         result = mgr.get_callback_handler()
 
     assert result is None
@@ -295,9 +279,7 @@ def test_score_trace_noop_when_disabled() -> None:
     from unittest.mock import MagicMock, patch
 
     _reset_singleton()
-    with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-    ) as mock_s:
+    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_s:
         s = MagicMock()
         s.langfuse_enabled = False
         s.langfuse_public_key.get_secret_value.return_value = ""

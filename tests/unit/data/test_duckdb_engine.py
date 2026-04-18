@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import tempfile
 from pathlib import Path
 
 import polars as pl
@@ -11,7 +10,6 @@ import pytest
 
 from lightagent.core.exceptions import LightAgentError
 from lightagent.data.duckdb_engine import DuckDBEngine, SQLValidator
-
 
 # ── SQLValidator ─────────────────────────────────────────────────────────────
 
@@ -102,10 +100,12 @@ def test_query_csv_reads_file(tmp_path: Path) -> None:
     with csv_file.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["region", "sales"])
         writer.writeheader()
-        writer.writerows([
-            {"region": "north", "sales": "100"},
-            {"region": "south", "sales": "200"},
-        ])
+        writer.writerows(
+            [
+                {"region": "north", "sales": "100"},
+                {"region": "south", "sales": "200"},
+            ]
+        )
     engine = DuckDBEngine()
     rows = engine.query_csv(csv_file)
     assert len(rows) == 2

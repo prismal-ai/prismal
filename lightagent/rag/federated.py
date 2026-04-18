@@ -106,11 +106,7 @@ class FederatedRAGEngine:
             )
 
             nodes = _load_nodes()
-            return [
-                {"url": n.url, "name": n.name}
-                for n in nodes
-                if "rag" in n.capabilities
-            ]
+            return [{"url": n.url, "name": n.name} for n in nodes if "rag" in n.capabilities]
         except Exception as exc:
             logger.warning("federated_rag_load_nodes_error", error=str(exc))
             return []
@@ -191,30 +187,23 @@ class FederatedRAGEngine:
 
             # Local search (synchronous RAGEngine.search)
             try:
-                local_results: list[RetrievedChunk] = self._local.search(
-                    query, k=k
-                )
+                local_results: list[RetrievedChunk] = self._local.search(query, k=k)
             except Exception as exc:
                 logger.warning("federated_rag_local_error", error=str(exc))
                 local_results = []
 
             # Remote searches in parallel
-            remote_tasks = [
-                self._query_remote_node(node, query, k)
-                for node in self._nodes
-            ]
+            remote_tasks = [self._query_remote_node(node, query, k) for node in self._nodes]
 
-            remote_results_nested: list[
-                list[RetrievedChunk] | BaseException
-            ] = list(await asyncio.gather(*remote_tasks, return_exceptions=True))
+            remote_results_nested: list[list[RetrievedChunk] | BaseException] = list(
+                await asyncio.gather(*remote_tasks, return_exceptions=True)
+            )
 
             all_chunks: list[RetrievedChunk] = list(local_results)
             for i, result in enumerate(remote_results_nested):
                 if isinstance(result, BaseException):
                     node_name = (
-                        self._nodes[i].get("name", str(i))
-                        if i < len(self._nodes)
-                        else str(i)
+                        self._nodes[i].get("name", str(i)) if i < len(self._nodes) else str(i)
                     )
                     logger.warning(
                         "federated_rag_node_failed",

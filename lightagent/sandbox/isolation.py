@@ -314,9 +314,7 @@ def _audit_sandbox_run(
         "env_allowlist": env_allowlist or [],
         "exit_code": exit_code,
     }
-    result_preview = (
-        f"{stdout[:256]}|{stderr[:256]}|exit={exit_code}"
-    )
+    result_preview = f"{stdout[:256]}|{stderr[:256]}|exit={exit_code}"
     try:
         AuditLogger().log_tool_call(
             name="sandbox.run",
@@ -500,10 +498,7 @@ class _ContainerBackend(IsolationBackend):
             f"--pids-limit={settings.sandbox_pids_limit}",
             f"--cpus={settings.sandbox_cpus}",
             "--tmpfs",
-            (
-                f"/sandbox:rw,noexec,nosuid,"
-                f"size={settings.sandbox_tmpfs_size_mb}m"
-            ),
+            (f"/sandbox:rw,noexec,nosuid,size={settings.sandbox_tmpfs_size_mb}m"),
             "--workdir",
             "/sandbox",
         ]
@@ -607,10 +602,7 @@ class _ContainerBackend(IsolationBackend):
             duration_ms = int((time.monotonic() - start) * 1000)
             timeout_result = ExecutionResult(
                 stdout="",
-                stderr=(
-                    f"Sandbox timed out after {timeout}s and the "
-                    f"container was killed."
-                ),
+                stderr=(f"Sandbox timed out after {timeout}s and the container was killed."),
                 exit_code=124,
                 language=lang,
                 duration_ms=duration_ms,
@@ -854,8 +846,7 @@ class _NamespaceBackend(IsolationBackend):
             timeout_result = ExecutionResult(
                 stdout="",
                 stderr=(
-                    f"Sandbox timed out after {timeout}s and the "
-                    f"{self.name} subprocess was killed."
+                    f"Sandbox timed out after {timeout}s and the {self.name} subprocess was killed."
                 ),
                 exit_code=124,
                 language=lang,
@@ -1023,25 +1014,43 @@ class BwrapBackend(_NamespaceBackend):
             # Read-only host system mounts. Only the directories
             # python actually needs are exposed; everything else is
             # invisible inside the sandbox.
-            "--ro-bind", "/usr", "/usr",
-            "--ro-bind", "/lib", "/lib",
-            "--ro-bind", "/lib64", "/lib64",
-            "--ro-bind", "/bin", "/bin",
-            "--ro-bind", "/sbin", "/sbin",
-            "--ro-bind", "/etc", "/etc",
-            "--proc", "/proc",
-            "--dev", "/dev",
+            "--ro-bind",
+            "/usr",
+            "/usr",
+            "--ro-bind",
+            "/lib",
+            "/lib",
+            "--ro-bind",
+            "/lib64",
+            "/lib64",
+            "--ro-bind",
+            "/bin",
+            "/bin",
+            "--ro-bind",
+            "/sbin",
+            "/sbin",
+            "--ro-bind",
+            "/etc",
+            "/etc",
+            "--proc",
+            "/proc",
+            "--dev",
+            "/dev",
             # Namespace + capability lockdown.
             "--unshare-all",
             "--share-net" if False else "--unshare-net",
             "--die-with-parent",
-            "--cap-drop", "ALL",
+            "--cap-drop",
+            "ALL",
             "--new-session",
             # Ephemeral workspace.
-            "--tmpfs", "/sandbox",
-            "--chdir", "/sandbox",
+            "--tmpfs",
+            "/sandbox",
+            "--chdir",
+            "/sandbox",
             # The wrapped command.
-            "python", "-",
+            "python",
+            "-",
         ]
         # Note: bwrap does not surface a memory cap natively. The
         # ``sandbox_memory_mb`` setting is honoured by the docker
@@ -1182,9 +1191,7 @@ class NoneBackend(IsolationBackend):
             # tiny bit of plumbing it needs.
             executor = SandboxExecutor()
             cwd = executor._resolve_cwd("")
-            cmd, tmp_files = executor._build_command(
-                language.lower().strip(), code, "none-bk", cwd
-            )
+            cmd, tmp_files = executor._build_command(language.lower().strip(), code, "none-bk", cwd)
             try:
                 return executor._run(cmd, cwd, language.lower().strip(), "")
             finally:

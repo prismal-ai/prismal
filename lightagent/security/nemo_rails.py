@@ -172,9 +172,7 @@ class NemoRailsLayer:
 
         try:
             result = await asyncio.wait_for(
-                self._rails.generate_async(
-                    messages=[{"role": "user", "content": text}]
-                ),
+                self._rails.generate_async(messages=[{"role": "user", "content": text}]),
                 timeout=_NEMO_TIMEOUT_SECONDS,
             )
             response_text = _extract_response_text(result)

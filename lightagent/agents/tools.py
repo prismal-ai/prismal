@@ -123,9 +123,7 @@ def web_search(query: str) -> str:
                     )
                     for i, r in enumerate(results)
                 ]
-                return (
-                    "\n\n".join(parts) if parts else f"No results found for: {query!r}"
-                )
+                return "\n\n".join(parts) if parts else f"No results found for: {query!r}"
             return str(results) if results else f"No results found for: {query!r}"
         except Exception as exc:
             # Tavily failed — fall through to DuckDuckGo
@@ -370,10 +368,7 @@ def delete_path(path: str) -> str:
     import shutil
 
     if not get_settings().fs_delete_enabled:
-        return (
-            "Error: delete_path is not enabled. "
-            "Set LIGHTAGENT_FS_DELETE_ENABLED=true."
-        )
+        return "Error: delete_path is not enabled. Set LIGHTAGENT_FS_DELETE_ENABLED=true."
 
     try:
         guard = _get_fs_guard()
@@ -390,6 +385,7 @@ def delete_path(path: str) -> str:
         resolved.unlink()
 
     return f"Deleted: {resolved}"
+
 
 @tool
 def shell_exec(command: str, timeout: int = 30, workdir: str = "") -> str:
@@ -469,10 +465,7 @@ def code_executor(code: str, language: str = "python") -> str:
         return f"Unsupported language: '{language}'. Use 'python' or 'bash'."
 
     cmd: list[str]
-    if lang in ("python", "python3"):
-        cmd = ["python3", "-c", code]
-    else:
-        cmd = ["bash", "-c", code]
+    cmd = ["python3", "-c", code] if lang in ("python", "python3") else ["bash", "-c", code]
 
     try:
         proc = subprocess.run(
@@ -545,10 +538,7 @@ def doc_index(path: str, collection: str = "default") -> str:
     try:
         engine = RAGEngine(collection_name=collection)
         count = engine.index_directory(src) if src.is_dir() else engine.index_file(src)
-        return (
-            f"Indexed {count} chunk(s) from '{src}' "
-            f"into collection '{collection}'."
-        )
+        return f"Indexed {count} chunk(s) from '{src}' into collection '{collection}'."
     except Exception as exc:
         return f"Indexing error: {exc!s}"
 
@@ -579,8 +569,10 @@ def evaluate(text: str, criteria: str) -> str:
             "and specific recommendations for improvement."
         )
         response = llm.invoke(
-            [SystemMessage(content="You are an expert evaluator."),
-             HumanMessage(content=prompt)]
+            [
+                SystemMessage(content="You are an expert evaluator."),
+                HumanMessage(content=prompt),
+            ]
         )
         return str(response.content)
     except Exception as exc:
@@ -615,8 +607,10 @@ def score(text: str, rubric: str) -> float:
             "No explanation."
         )
         response = llm.invoke(
-            [SystemMessage(content="You are a precise numeric scorer."),
-             HumanMessage(content=prompt)]
+            [
+                SystemMessage(content="You are a precise numeric scorer."),
+                HumanMessage(content=prompt),
+            ]
         )
         raw = str(response.content).strip()
         m = re.search(r"[01]?\.\d+|[01]", raw)
@@ -712,10 +706,7 @@ def polars_transform(operation: str, data_source: str) -> str:
         return f"Data source not found: {data_source}"
 
     try:
-        if src.suffix == ".csv":
-            df = pl.read_csv(str(src))
-        else:
-            df = pl.read_parquet(str(src))
+        df = pl.read_csv(str(src)) if src.suffix == ".csv" else pl.read_parquet(str(src))
     except Exception as exc:
         return f"Error reading data source: {exc!s}"
 
@@ -761,8 +752,7 @@ def polars_transform(operation: str, data_source: str) -> str:
 
         else:
             return (
-                f"Unknown operation: '{operation}'. "
-                "Supported: filter, groupby, sort, select, head."
+                f"Unknown operation: '{operation}'. Supported: filter, groupby, sort, select, head."
             )
     except Exception as exc:
         return f"Transform error: {exc!s}"
@@ -875,9 +865,7 @@ def list_mcp_tools(server_name: str = "") -> str:
 
         if not lines:
             return f"No tools found for server '{server_name}'."
-        header = (
-            f"MCP tools (filter: '{server_name}')" if server_name else "All MCP tools"
-        )
+        header = f"MCP tools (filter: '{server_name}')" if server_name else "All MCP tools"
         return f"**{header}** ({len(lines)} tools):\n" + "\n".join(lines)
     except Exception as exc:
         return f"Error listing MCP tools: {exc!s}"
@@ -949,9 +937,7 @@ def cron_add(
     executor = get_running_executor()
     if executor is not None:
         executor.schedule_coroutine(executor.add_job(job))
-    next_run = (
-        job.next_run.strftime("%Y-%m-%d %H:%M UTC") if job.next_run else "unknown"
-    )
+    next_run = job.next_run.strftime("%Y-%m-%d %H:%M UTC") if job.next_run else "unknown"
     if routing_note:
         routing = routing_note
     elif resolved_channel and resolved_target:
@@ -959,9 +945,7 @@ def cron_add(
     else:
         routing = ""
     tz_note = f" Timezone: {timezone}." if timezone else ""
-    return (
-        f"Scheduled job '{name}' ({schedule}). Next run: {next_run}.{routing}{tz_note}"
-    )
+    return f"Scheduled job '{name}' ({schedule}). Next run: {next_run}.{routing}{tz_note}"
 
 
 @tool
@@ -998,7 +982,6 @@ def cron_pause(name: str) -> str:
         Confirmation or error message.
     """
     try:
-
         from lightagent.scheduler.cron_manager import CronManager
         from lightagent.scheduler.executor import get_running_executor
 
@@ -1025,7 +1008,6 @@ def cron_resume(name: str) -> str:
         Confirmation or error message.
     """
     try:
-
         from lightagent.scheduler.cron_manager import CronManager
         from lightagent.scheduler.executor import get_running_executor
 
@@ -1067,9 +1049,7 @@ def get_current_time() -> str:
         offset_str = f"UTC{sign}{hours:02d}:{minutes:02d}"
     else:
         offset_str = "UTC offset unknown"
-    return (
-        f"{now_local.strftime('%Y-%m-%d %H:%M:%S')} {tz_name} ({offset_str})"
-    )
+    return f"{now_local.strftime('%Y-%m-%d %H:%M:%S')} {tz_name} ({offset_str})"
 
 
 @tool
@@ -1150,7 +1130,6 @@ def cron_remove(name: str) -> str:
         Confirmation or error message.
     """
     try:
-
         from lightagent.scheduler.cron_manager import CronManager
         from lightagent.scheduler.executor import get_running_executor
 
@@ -1198,7 +1177,7 @@ def remember_preference(section: str, fact: str) -> str:
             "workflow": "Flujo de Trabajo",
             "project_context": "Contexto del Proyecto",
         }.get(section, section)
-        return f"Remembered: \"{fact}\" → {section_label}"
+        return f'Remembered: "{fact}" → {section_label}'
     except Exception as exc:
         return f"Failed to save preference: {exc!s}"
 
@@ -1211,7 +1190,13 @@ RAG_AGENT_TOOLS: list[BaseTool] = [vector_search, doc_index, web_search]
 CRITIC_TOOLS: list[BaseTool] = [evaluate, score]
 DATA_ANALYST_TOOLS: list[BaseTool] = [duckdb_query, polars_transform, create_chart]
 FILE_MANAGER_TOOLS: list[BaseTool] = [
-    read_file, write_file, list_dir, find_files, create_dir, move_path, delete_path
+    read_file,
+    write_file,
+    list_dir,
+    find_files,
+    create_dir,
+    move_path,
+    delete_path,
 ]
 CRON_MANAGER_TOOLS: list[BaseTool] = [
     get_current_time,

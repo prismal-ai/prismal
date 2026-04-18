@@ -43,9 +43,7 @@ from lightagent.agents.subgraphs.financial.technical_analyst import (
 # ---------------------------------------------------------------------------
 
 
-def _market_state(
-    *, missing_fields: list[str], data_confidence: float
-) -> dict[str, Any]:
+def _market_state(*, missing_fields: list[str], data_confidence: float) -> dict[str, Any]:
     """Build a state dict whose market_snapshot has the given quality fields."""
     return {
         "metadata": {
@@ -114,9 +112,7 @@ class TestScoreMarketSnapshot:
         }
 
     def test_zero_price_counts_as_missing(self) -> None:
-        snap = MarketSnapshot(
-            symbol="AAPL", asset_type="equity", current_price=0.0
-        )
+        snap = MarketSnapshot(symbol="AAPL", asset_type="equity", current_price=0.0)
         _, missing = _score_market_snapshot(snap)
         assert "current_price" in missing
 
@@ -169,29 +165,21 @@ class TestScoreTechnicalIndicators:
         assert _score_technical_indicators(indicators) == 1.0
 
     def test_three_families(self) -> None:
-        c = _score_technical_indicators(
-            {"RSI": 50.0, "MACD": 0.1, "SMA_20": 100.0}
-        )
+        c = _score_technical_indicators({"RSI": 50.0, "MACD": 0.1, "SMA_20": 100.0})
         assert abs(c - 3 / 7) < 0.01
 
     def test_duplicates_in_same_family_not_inflated(self) -> None:
         """Three BB_* entries must still count as a single family."""
-        c = _score_technical_indicators(
-            {"BB_upper": 180.0, "BB_lower": 165.0, "BB_middle": 172.5}
-        )
+        c = _score_technical_indicators({"BB_upper": 180.0, "BB_lower": 165.0, "BB_middle": 172.5})
         assert abs(c - 1 / 7) < 0.01
 
     def test_non_canonical_indicators_ignored(self) -> None:
-        c = _score_technical_indicators(
-            {"RSI": 50.0, "OBV": 1_000_000, "ATR": 2.1}
-        )
+        c = _score_technical_indicators({"RSI": 50.0, "OBV": 1_000_000, "ATR": 2.1})
         # Only RSI matches a canonical family.
         assert abs(c - 1 / 7) < 0.01
 
     def test_case_insensitive_and_alias_match(self) -> None:
-        c = _score_technical_indicators(
-            {"rsi": 50.0, "macd": 0.1, "bollinger_upper": 180.0}
-        )
+        c = _score_technical_indicators({"rsi": 50.0, "macd": 0.1, "bollinger_upper": 180.0})
         assert abs(c - 3 / 7) < 0.01
 
 
@@ -221,9 +209,7 @@ class TestMarketDataGate:
             on_fail="insufficient_data_report",
             min_confidence=0.4,
         )
-        state = _market_state(
-            missing_fields=["market_cap"], data_confidence=0.9
-        )
+        state = _market_state(missing_fields=["market_cap"], data_confidence=0.9)
         assert gate(state) == "technical_analyst"
 
     def test_low_confidence_no_missing_fields_passes(self) -> None:
@@ -270,18 +256,12 @@ class TestMarketDataGate:
             on_pass="technical_analyst",
             on_fail="insufficient_data_report",
         )
-        state = _market_state(
-            missing_fields=["market_cap"], data_confidence=0.5
-        )
-        with patch(
-            "lightagent.agents.subgraphs.financial.builder.get_settings"
-        ) as mock_settings:
+        state = _market_state(missing_fields=["market_cap"], data_confidence=0.5)
+        with patch("lightagent.agents.subgraphs.financial.builder.get_settings") as mock_settings:
             mock_settings.return_value.financial_min_confidence = 0.3
             # 0.5 >= 0.3 → pass
             assert gate(state) == "technical_analyst"
-        with patch(
-            "lightagent.agents.subgraphs.financial.builder.get_settings"
-        ) as mock_settings:
+        with patch("lightagent.agents.subgraphs.financial.builder.get_settings") as mock_settings:
             mock_settings.return_value.financial_min_confidence = 0.9
             # 0.5 < 0.9 AND missing non-empty → fail
             assert gate(state) == "insufficient_data_report"
@@ -300,10 +280,7 @@ class TestTechnicalConfidenceGate:
             on_limited="limited_technical_disclaimer",
             min_confidence=0.6,
         )
-        assert (
-            gate(_technical_state(data_confidence=0.3))
-            == "limited_technical_disclaimer"
-        )
+        assert gate(_technical_state(data_confidence=0.3)) == "limited_technical_disclaimer"
 
     def test_high_technical_confidence_runs_fundamental(self) -> None:
         gate = _technical_confidence_gate(
@@ -311,10 +288,7 @@ class TestTechnicalConfidenceGate:
             on_limited="limited_technical_disclaimer",
             min_confidence=0.6,
         )
-        assert (
-            gate(_technical_state(data_confidence=0.8))
-            == "fundamental_analyst"
-        )
+        assert gate(_technical_state(data_confidence=0.8)) == "fundamental_analyst"
 
     def test_confidence_exactly_at_threshold_passes(self) -> None:
         gate = _technical_confidence_gate(
@@ -322,10 +296,7 @@ class TestTechnicalConfidenceGate:
             on_limited="limited_technical_disclaimer",
             min_confidence=0.6,
         )
-        assert (
-            gate(_technical_state(data_confidence=0.6))
-            == "fundamental_analyst"
-        )
+        assert gate(_technical_state(data_confidence=0.6)) == "fundamental_analyst"
 
     def test_missing_technical_artifact_limits(self) -> None:
         gate = _technical_confidence_gate(
@@ -333,10 +304,7 @@ class TestTechnicalConfidenceGate:
             on_limited="limited_technical_disclaimer",
             min_confidence=0.6,
         )
-        assert (
-            gate({"metadata": {}})
-            == "limited_technical_disclaimer"
-        )
+        assert gate({"metadata": {}}) == "limited_technical_disclaimer"
 
     def test_non_numeric_confidence_treated_as_zero(self) -> None:
         gate = _technical_confidence_gate(
@@ -399,9 +367,7 @@ class TestInsufficientDataReportNode:
 
 class TestLimitedTechnicalDisclaimerNode:
     async def test_flags_state_without_mutating_messages(self) -> None:
-        out = await _limited_technical_disclaimer_node(
-            {"metadata": {_FINANCIAL_METADATA_KEY: {}}}
-        )
+        out = await _limited_technical_disclaimer_node({"metadata": {_FINANCIAL_METADATA_KEY: {}}})
         assert out["current_agent"] == "limited_technical_disclaimer"
         # Passthrough — no user-facing message.
         assert "messages" not in out
@@ -432,17 +398,11 @@ class TestLimitedTechnicalDisclaimerNode:
 
 
 class TestFinancialTopology:
-    def _definition_with_settings(
-        self, *, hitl: bool
-    ) -> Any:
-        with patch(
-            "lightagent.agents.subgraphs.financial.builder.get_settings"
-        ) as mock_settings:
+    def _definition_with_settings(self, *, hitl: bool) -> Any:
+        with patch("lightagent.agents.subgraphs.financial.builder.get_settings") as mock_settings:
             mock_settings.return_value.financial_hitl_enabled = hitl
             mock_settings.return_value.financial_min_confidence = 0.4
-            mock_settings.return_value.financial_technical_min_confidence = (
-                0.6
-            )
+            mock_settings.return_value.financial_technical_min_confidence = 0.6
             return _make_definition()
 
     def test_baseline_topology_has_quality_nodes(self) -> None:
@@ -464,15 +424,10 @@ class TestFinancialTopology:
         tech_gate = d.conditional_edges["technical_analyst"]
 
         assert (
-            market_gate(
-                _market_state(missing_fields=[], data_confidence=1.0)
-            )
+            market_gate(_market_state(missing_fields=[], data_confidence=1.0))
             == "technical_analyst"
         )
-        assert (
-            tech_gate(_technical_state(data_confidence=1.0))
-            == "fundamental_analyst"
-        )
+        assert tech_gate(_technical_state(data_confidence=1.0)) == "fundamental_analyst"
         # Fundamental → risk_sentiment → report_generator → __end__
         assert ("fundamental_analyst", "risk_sentiment_analyst") in d.edges
         assert ("risk_sentiment_analyst", "report_generator") in d.edges

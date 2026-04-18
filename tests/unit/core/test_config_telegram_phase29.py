@@ -7,7 +7,6 @@ from pydantic import SecretStr, ValidationError
 
 from lightagent.core.config import Settings
 
-
 # ── Default values ─────────────────────────────────────────────────────────────
 
 
@@ -164,7 +163,9 @@ def test_env_override_telegram_parse_mode(monkeypatch: pytest.MonkeyPatch) -> No
     assert s.telegram_parse_mode == "MarkdownV2"
 
 
-def test_env_override_telegram_message_track_false(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_env_override_telegram_message_track_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """LIGHTAGENT_TELEGRAM_MESSAGE_TRACK=false disables tracking."""
     monkeypatch.setenv("LIGHTAGENT_TELEGRAM_MESSAGE_TRACK", "false")
     s = Settings(_env_file=None)  # type: ignore[call-arg]

@@ -219,9 +219,8 @@ def get_checkpointer() -> object:
             "Install with: pip install 'lightagent[postgres]'"
         ) from exc
     # Strip asyncpg/psycopg driver prefix — PostgresSaver uses psycopg directly.
-    pg_url = (
-        db_url.replace("postgresql+asyncpg://", "postgresql://")
-        .replace("postgresql+psycopg://", "postgresql://")
+    pg_url = db_url.replace("postgresql+asyncpg://", "postgresql://").replace(
+        "postgresql+psycopg://", "postgresql://"
     )
     return AsyncPostgresSaver.from_conn_string(pg_url)
 

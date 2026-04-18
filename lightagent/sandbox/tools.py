@@ -7,9 +7,6 @@ requieren ese flag.
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
 from langchain_core.tools import BaseTool, tool
 
 from lightagent.core.logging import get_logger
@@ -30,7 +27,7 @@ __all__ = [
 
 def _check_shell_enabled() -> str | None:
     """Verifica que shell_enabled=true; devuelve mensaje de error o None."""
-    from lightagent.core.config import get_settings  # noqa: PLC0415
+    from lightagent.core.config import get_settings
 
     if not get_settings().shell_enabled:
         return (
@@ -42,7 +39,7 @@ def _check_shell_enabled() -> str | None:
 
 def _get_manager() -> object:
     """Devuelve un SandboxManager con la configuración actual."""
-    from lightagent.sandbox.manager import SandboxManager  # noqa: PLC0415
+    from lightagent.sandbox.manager import SandboxManager
 
     return SandboxManager()
 
@@ -69,8 +66,8 @@ def sandbox_exec(code: str, language: str = "python", workdir: str = "") -> str:
     if err:
         return err
 
-    from lightagent.sandbox.executor import SandboxExecutor  # noqa: PLC0415
-    from lightagent.sandbox.manager import SandboxManager  # noqa: PLC0415
+    from lightagent.sandbox.executor import SandboxExecutor
+    from lightagent.sandbox.manager import SandboxManager
 
     mgr = SandboxManager()
     mgr.setup()
@@ -110,8 +107,8 @@ def sandbox_install(package: str, manager: str = "pip") -> str:
     if err:
         return err
 
-    from lightagent.sandbox.installer import SandboxInstaller  # noqa: PLC0415
-    from lightagent.sandbox.manager import SandboxManager  # noqa: PLC0415
+    from lightagent.sandbox.installer import SandboxInstaller
+    from lightagent.sandbox.manager import SandboxManager
 
     mgr = SandboxManager()
     mgr.setup()
@@ -144,8 +141,8 @@ def sandbox_shell(command: str, workdir: str = "") -> str:
     if err:
         return err
 
-    from lightagent.sandbox.executor import SandboxExecutor  # noqa: PLC0415
-    from lightagent.sandbox.manager import SandboxManager  # noqa: PLC0415
+    from lightagent.sandbox.executor import SandboxExecutor
+    from lightagent.sandbox.manager import SandboxManager
 
     mgr = SandboxManager()
     mgr.setup()
@@ -172,7 +169,7 @@ def sandbox_write_file(path: str, content: str) -> str:
     Returns:
         Confirmación con la ruta absoluta y número de caracteres escritos.
     """
-    from lightagent.sandbox.manager import SandboxManager  # noqa: PLC0415
+    from lightagent.sandbox.manager import SandboxManager
 
     mgr = SandboxManager()
     mgr.setup()
@@ -199,7 +196,7 @@ def sandbox_read_file(path: str) -> str:
         Contenido del archivo (truncado a 20 000 chars si es muy largo),
         o mensaje de error si no existe.
     """
-    from lightagent.sandbox.manager import SandboxManager  # noqa: PLC0415
+    from lightagent.sandbox.manager import SandboxManager
 
     mgr = SandboxManager()
 
@@ -230,9 +227,9 @@ def sandbox_ls(path: str = "") -> str:
     Returns:
         Listado con tipo (d/f), nombre, tamaño y fecha de modificación.
     """
-    import datetime  # noqa: PLC0415
+    import datetime
 
-    from lightagent.sandbox.manager import SandboxManager  # noqa: PLC0415
+    from lightagent.sandbox.manager import SandboxManager
 
     mgr = SandboxManager()
 
@@ -256,7 +253,9 @@ def sandbox_ls(path: str = "") -> str:
         try:
             stat = entry.stat()
             size = f"{stat.st_size:>10,}" if entry.is_file() else "         -"
-            mtime = datetime.datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+            mtime = datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.UTC).strftime(
+                "%Y-%m-%d %H:%M"
+            )
         except OSError:
             size, mtime = "?", "?"
         lines.append(f"  [{kind}] {entry.name:<40} {size}  {mtime}")
@@ -274,7 +273,7 @@ def sandbox_status() -> str:
     Returns:
         Informe de estado con versión de cada runtime y uso de disco.
     """
-    from lightagent.sandbox.manager import SandboxManager  # noqa: PLC0415
+    from lightagent.sandbox.manager import SandboxManager
 
     mgr = SandboxManager()
     mgr.setup()

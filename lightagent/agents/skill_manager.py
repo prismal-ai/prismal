@@ -349,17 +349,13 @@ def _detect_intent(user_message: str) -> str:
     # hyphenated names ("conventional-commit", "langgraph-docs") are captured
     # in full.  Priority: explicit "--skill"/"el skill" pattern, then bare name.
     if _RE_ACTIVATE.search(user_message):
-        m_name = _RE_SKILL_NAME_ARG.search(user_message) or _RE_BARE_NAME.search(
-            user_message
-        )
+        m_name = _RE_SKILL_NAME_ARG.search(user_message) or _RE_BARE_NAME.search(user_message)
         skill_name = m_name.group(1).strip().strip("\"'") if m_name else ""
         return f"ACTIVATE:{skill_name}"
 
     # DEACTIVATE — same two-step approach.
     if _RE_DEACTIVATE.search(user_message):
-        m_name = _RE_SKILL_NAME_ARG.search(user_message) or _RE_BARE_NAME.search(
-            user_message
-        )
+        m_name = _RE_SKILL_NAME_ARG.search(user_message) or _RE_BARE_NAME.search(user_message)
         skill_name = m_name.group(1).strip().strip("\"'") if m_name else ""
         return f"DEACTIVATE:{skill_name}"
 
@@ -453,8 +449,7 @@ def _format_skills_list(manager: SkillsManager) -> str:
         for s in custom:
             lines.append(f"  - `{s.name}` v{s.version} — {s.description}")
         lines.append(
-            "  Renombra `human_review_required.txt` → `validated_by_human.txt` "
-            "para activarlos."
+            "  Renombra `human_review_required.txt` → `validated_by_human.txt` para activarlos."
         )
 
     if errors:
@@ -490,7 +485,7 @@ def _install_from_path(
         ``(skill_name, None)`` on success, or ``("", error_message)`` on
         failure.
     """
-    from lightagent.skills.manager import SkillsManager  # noqa: PLC0415
+    from lightagent.skills.manager import SkillsManager
 
     src = Path(source_path).expanduser().resolve()
 
@@ -507,9 +502,7 @@ def _install_from_path(
         return "", f"Ruta no encontrada: {source_path}"
 
     if not src.is_dir():
-        return "", (
-            f"La ruta debe ser un directorio con skill.py o skill.md: {source_path}"
-        )
+        return "", (f"La ruta debe ser un directorio con skill.py o skill.md: {source_path}")
 
     skill_py = src / "skill.py"
     skill_md = src / "skill.md"
@@ -533,10 +526,10 @@ def _install_from_path(
     # ── Auto-generate skill.py for Markdown-based skill packages ─────────
     if not (dest / "skill.py").exists() and (dest / "skill.md").exists():
         try:
-            from lightagent.skills.base import generate_skill_py  # noqa: PLC0415
+            from lightagent.skills.base import generate_skill_py
 
             generate_skill_py(dest)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             shutil.rmtree(str(dest), ignore_errors=True)
             return "", f"Error generando skill.py desde skill.md: {exc}"
 
@@ -576,9 +569,7 @@ async def skill_manager_node(state: AgentState) -> dict[str, object]:
     if not user_message:
         return {
             "current_agent": "skill_manager",
-            "messages": [
-                AIMessage(content="No se recibió un mensaje para gestión de skills.")
-            ],
+            "messages": [AIMessage(content="No se recibió un mensaje para gestión de skills.")],
         }
 
     manager = SkillsManager()

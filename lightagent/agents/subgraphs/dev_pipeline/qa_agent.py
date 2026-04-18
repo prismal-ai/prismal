@@ -1,4 +1,4 @@
-# ruff: noqa: E501  # Prompt constants contain long JSON example lines.
+# Prompt constants contain long JSON example lines.
 """QA agent node for the dev_pipeline subgraph.
 
 Performs integration checks on a

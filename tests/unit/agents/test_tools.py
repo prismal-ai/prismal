@@ -8,7 +8,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from langchain_core.tools import BaseTool
 
 from lightagent.agents.tools import (
@@ -32,7 +31,6 @@ from lightagent.agents.tools import (
     web_search,
     write_file,
 )
-
 
 # ---------------------------------------------------------------------------
 # Individual stub tool outputs
@@ -182,9 +180,7 @@ def test_duckdb_query_stub_contains_sql_length() -> None:
 
 def test_polars_transform_stub_contains_operation_and_source() -> None:
     """polars_transform reads CSV and applies the operation, returning tabular output."""
-    with tempfile.NamedTemporaryFile(
-        suffix=".csv", mode="w", delete=False, encoding="utf-8"
-    ) as f:
+    with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False, encoding="utf-8") as f:
         f.write("region,sales\nnorth,100\nsouth,200\n")
         tmp_csv = f.name
     try:
@@ -200,7 +196,11 @@ def test_create_chart_stub_contains_chart_type_and_title() -> None:
     mock_saved = Path("/tmp/chart_Sales.png")
     with patch("lightagent.data.polars_utils.save_chart", return_value=mock_saved):
         result = create_chart.invoke(
-            {"data": '[{"month": "Jan", "sales": 120}]', "chart_type": "line", "title": "Sales"}
+            {
+                "data": '[{"month": "Jan", "sales": 120}]',
+                "chart_type": "line",
+                "title": "Sales",
+            }
         )
     assert isinstance(result, str)
     assert "Sales" in result
@@ -214,9 +214,18 @@ def test_create_chart_stub_contains_chart_type_and_title() -> None:
 def test_all_tools_are_base_tool_instances() -> None:
     """Every exported tool must be a BaseTool instance."""
     all_tools = [
-        web_search, rag_search, read_file, write_file, code_executor,
-        vector_search, doc_index, evaluate, score, duckdb_query,
-        polars_transform, create_chart,
+        web_search,
+        rag_search,
+        read_file,
+        write_file,
+        code_executor,
+        vector_search,
+        doc_index,
+        evaluate,
+        score,
+        duckdb_query,
+        polars_transform,
+        create_chart,
     ]
     for t in all_tools:
         assert isinstance(t, BaseTool), f"{t} is not a BaseTool"
@@ -225,9 +234,18 @@ def test_all_tools_are_base_tool_instances() -> None:
 def test_all_tools_have_non_empty_name() -> None:
     """Every tool must have a non-empty name attribute."""
     all_tools = [
-        web_search, rag_search, read_file, write_file, code_executor,
-        vector_search, doc_index, evaluate, score, duckdb_query,
-        polars_transform, create_chart,
+        web_search,
+        rag_search,
+        read_file,
+        write_file,
+        code_executor,
+        vector_search,
+        doc_index,
+        evaluate,
+        score,
+        duckdb_query,
+        polars_transform,
+        create_chart,
     ]
     for t in all_tools:
         assert t.name, f"{t} has empty name"
@@ -236,9 +254,18 @@ def test_all_tools_have_non_empty_name() -> None:
 def test_all_tools_have_description() -> None:
     """Every tool must have a non-empty description attribute."""
     all_tools = [
-        web_search, rag_search, read_file, write_file, code_executor,
-        vector_search, doc_index, evaluate, score, duckdb_query,
-        polars_transform, create_chart,
+        web_search,
+        rag_search,
+        read_file,
+        write_file,
+        code_executor,
+        vector_search,
+        doc_index,
+        evaluate,
+        score,
+        duckdb_query,
+        polars_transform,
+        create_chart,
     ]
     for t in all_tools:
         assert t.description, f"{t.name} has empty description"
@@ -297,7 +324,14 @@ def test_file_manager_tools_contains_read_and_write() -> None:
 
 def test_tool_groups_are_lists_of_base_tool() -> None:
     """All tool group constants must be lists of BaseTool."""
-    groups = [RESEARCHER_TOOLS, CODER_TOOLS, RAG_AGENT_TOOLS, CRITIC_TOOLS, DATA_ANALYST_TOOLS, FILE_MANAGER_TOOLS]
+    groups = [
+        RESEARCHER_TOOLS,
+        CODER_TOOLS,
+        RAG_AGENT_TOOLS,
+        CRITIC_TOOLS,
+        DATA_ANALYST_TOOLS,
+        FILE_MANAGER_TOOLS,
+    ]
     for group in groups:
         assert isinstance(group, list)
         for t in group:
@@ -334,13 +368,15 @@ def test_cron_add_tool_accepts_output_channel() -> None:
         )
         mock_cls.return_value = mock_manager
 
-        result = cron_add.invoke({
-            "name": "hb",
-            "schedule": "0 8 * * *",
-            "task": "Morning check",
-            "output_channel": "telegram",
-            "output_target": "12345",
-        })
+        result = cron_add.invoke(
+            {
+                "name": "hb",
+                "schedule": "0 8 * * *",
+                "task": "Morning check",
+                "output_channel": "telegram",
+                "output_target": "12345",
+            }
+        )
 
     mock_manager.add.assert_called_once_with(
         "hb",
@@ -362,18 +398,20 @@ def test_cron_add_auto_fills_from_channel_context() -> None:
     with patch("lightagent.agents.tools.CronManager") as mock_cls:
         mock_manager = MagicMock()
         mock_manager.add.return_value = MagicMock(
-            name="news", schedule="40 9 * * *", next_run=None,
+            name="news",
+            schedule="40 9 * * *",
+            next_run=None,
         )
         mock_cls.return_value = mock_manager
 
-        with use_channel_context(
-            {"channel": "telegram", "chat_id": "999", "user_id": "u1"}
-        ):
-            result = cron_add.invoke({
-                "name": "news",
-                "schedule": "40 9 * * *",
-                "task": "Linux news",
-            })
+        with use_channel_context({"channel": "telegram", "chat_id": "999", "user_id": "u1"}):
+            result = cron_add.invoke(
+                {
+                    "name": "news",
+                    "schedule": "40 9 * * *",
+                    "task": "Linux news",
+                }
+            )
 
     mock_manager.add.assert_called_once_with(
         "news",
@@ -397,15 +435,15 @@ def test_cron_add_honours_explicit_none_opt_out() -> None:
         mock_manager.add.return_value = MagicMock(next_run=None)
         mock_cls.return_value = mock_manager
 
-        with use_channel_context(
-            {"channel": "telegram", "chat_id": "999", "user_id": "u1"}
-        ):
-            cron_add.invoke({
-                "name": "silent",
-                "schedule": "0 9 * * *",
-                "task": "Silent job",
-                "output_channel": "none",
-            })
+        with use_channel_context({"channel": "telegram", "chat_id": "999", "user_id": "u1"}):
+            cron_add.invoke(
+                {
+                    "name": "silent",
+                    "schedule": "0 9 * * *",
+                    "task": "Silent job",
+                    "output_channel": "none",
+                }
+            )
 
     mock_manager.add.assert_called_once_with(
         "silent",
@@ -427,11 +465,13 @@ def test_cron_add_no_context_no_auto_fill() -> None:
         mock_manager.add.return_value = MagicMock(next_run=None)
         mock_cls.return_value = mock_manager
 
-        cron_add.invoke({
-            "name": "api_only",
-            "schedule": "0 0 * * *",
-            "task": "API job",
-        })
+        cron_add.invoke(
+            {
+                "name": "api_only",
+                "schedule": "0 0 * * *",
+                "task": "API job",
+            }
+        )
 
     kwargs = mock_manager.add.call_args.kwargs
     assert kwargs["output_channel"] is None
@@ -448,11 +488,13 @@ def test_cron_add_default_max_retries_is_two() -> None:
         mock_manager.add.return_value = MagicMock(next_run=None)
         mock_cls.return_value = mock_manager
 
-        cron_add.invoke({
-            "name": "plain",
-            "schedule": "0 0 * * *",
-            "task": "Plain job",
-        })
+        cron_add.invoke(
+            {
+                "name": "plain",
+                "schedule": "0 0 * * *",
+                "task": "Plain job",
+            }
+        )
 
     kwargs = mock_manager.add.call_args.kwargs
     assert kwargs["max_retries"] == 2
@@ -461,6 +503,7 @@ def test_cron_add_default_max_retries_is_two() -> None:
 def test_list_dir_returns_entries(tmp_path: Path) -> None:
     """list_dir returns [DIR] and [FILE] tagged entries for a directory."""
     from lightagent.agents.tools import list_dir
+
     (tmp_path / "file1.txt").write_text("a")
     (tmp_path / "subdir").mkdir()
     result = list_dir.invoke({"path": str(tmp_path)})
@@ -471,6 +514,7 @@ def test_list_dir_returns_entries(tmp_path: Path) -> None:
 def test_list_dir_blocks_system_path() -> None:
     """list_dir returns an error for blocked system paths."""
     from lightagent.agents.tools import list_dir
+
     result = list_dir.invoke({"path": "/etc"})
     assert "error" in result.lower() or "blocked" in result.lower()
 
@@ -478,6 +522,7 @@ def test_list_dir_blocks_system_path() -> None:
 def test_find_files_finds_by_pattern(tmp_path: Path) -> None:
     """find_files returns files matching the glob pattern."""
     from lightagent.agents.tools import find_files
+
     (tmp_path / "main.py").write_text("x")
     (tmp_path / "test_main.py").write_text("y")
     (tmp_path / "readme.md").write_text("z")
@@ -490,6 +535,7 @@ def test_find_files_finds_by_pattern(tmp_path: Path) -> None:
 def test_find_files_respects_max_results(tmp_path: Path) -> None:
     """find_files returns at most max_results entries."""
     from lightagent.agents.tools import find_files
+
     for i in range(20):
         (tmp_path / f"file{i}.txt").write_text("x")
     result = find_files.invoke({"root": str(tmp_path), "pattern": "*.txt", "max_results": 5})
@@ -505,6 +551,7 @@ def test_find_files_respects_max_results(tmp_path: Path) -> None:
 def test_create_dir_creates_nested(tmp_path: Path) -> None:
     """create_dir creates a nested directory structure."""
     from lightagent.agents.tools import create_dir
+
     new_dir = tmp_path / "a" / "b" / "c"
     result = create_dir.invoke({"path": str(new_dir)})
     assert new_dir.exists()
@@ -514,6 +561,7 @@ def test_create_dir_creates_nested(tmp_path: Path) -> None:
 def test_create_dir_is_idempotent(tmp_path: Path) -> None:
     """create_dir on an existing directory does not raise."""
     from lightagent.agents.tools import create_dir
+
     d = tmp_path / "existing"
     d.mkdir()
     result = create_dir.invoke({"path": str(d)})
@@ -523,6 +571,7 @@ def test_create_dir_is_idempotent(tmp_path: Path) -> None:
 def test_create_dir_blocks_system_path() -> None:
     """create_dir returns an error for blocked paths."""
     from lightagent.agents.tools import create_dir
+
     result = create_dir.invoke({"path": "/etc/newdir"})
     assert "error" in result.lower() or "blocked" in result.lower()
 
@@ -535,6 +584,7 @@ def test_create_dir_blocks_system_path() -> None:
 def test_move_path_renames_file(tmp_path: Path) -> None:
     """move_path moves a file from src to dst."""
     from lightagent.agents.tools import move_path
+
     src = tmp_path / "src.txt"
     dst = tmp_path / "dst.txt"
     src.write_text("hello")
@@ -547,7 +597,10 @@ def test_move_path_renames_file(tmp_path: Path) -> None:
 def test_move_path_returns_error_for_missing_src(tmp_path: Path) -> None:
     """move_path returns an error if source does not exist."""
     from lightagent.agents.tools import move_path
-    result = move_path.invoke({"src": str(tmp_path / "missing.txt"), "dst": str(tmp_path / "dst.txt")})
+
+    result = move_path.invoke(
+        {"src": str(tmp_path / "missing.txt"), "dst": str(tmp_path / "dst.txt")}
+    )
     assert "error" in result.lower()
 
 
@@ -560,7 +613,10 @@ def test_delete_path_removes_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     """delete_path removes a file when fs_delete_enabled is True."""
     from lightagent.agents.tools import delete_path
     from lightagent.core.config import Settings
-    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(fs_delete_enabled=True))
+
+    monkeypatch.setattr(
+        "lightagent.agents.tools.get_settings", lambda: Settings(fs_delete_enabled=True)
+    )
     f = tmp_path / "todelete.txt"
     f.write_text("bye")
     result = delete_path.invoke({"path": str(f)})
@@ -572,7 +628,11 @@ def test_delete_path_blocked_when_disabled(tmp_path: Path, monkeypatch: pytest.M
     """delete_path returns an error when fs_delete_enabled is False."""
     from lightagent.agents.tools import delete_path
     from lightagent.core.config import Settings
-    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(fs_delete_enabled=False))
+
+    monkeypatch.setattr(
+        "lightagent.agents.tools.get_settings",
+        lambda: Settings(fs_delete_enabled=False),
+    )
     f = tmp_path / "safe.txt"
     f.write_text("keep")
     result = delete_path.invoke({"path": str(f)})
@@ -589,7 +649,10 @@ def test_shell_exec_blocked_when_disabled(monkeypatch: pytest.MonkeyPatch) -> No
     """shell_exec returns an error when shell_enabled is False."""
     from lightagent.agents.tools import shell_exec
     from lightagent.core.config import Settings
-    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=False))
+
+    monkeypatch.setattr(
+        "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=False)
+    )
     result = shell_exec.invoke({"command": "echo hello"})
     assert "not enabled" in result.lower() or "disabled" in result.lower()
 
@@ -598,7 +661,10 @@ def test_shell_exec_returns_output(monkeypatch: pytest.MonkeyPatch) -> None:
     """shell_exec returns the stdout of the command."""
     from lightagent.agents.tools import shell_exec
     from lightagent.core.config import Settings
-    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
+
+    monkeypatch.setattr(
+        "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
+    )
     result = shell_exec.invoke({"command": "echo hello_world"})
     assert "hello_world" in result
 
@@ -607,7 +673,10 @@ def test_shell_exec_captures_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     """shell_exec returns stderr content instead of raising."""
     from lightagent.agents.tools import shell_exec
     from lightagent.core.config import Settings
-    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
+
+    monkeypatch.setattr(
+        "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
+    )
     result = shell_exec.invoke({"command": "ls /nonexistent_path_xyz_abc_123"})
     assert isinstance(result, str)
     assert len(result) > 0
@@ -617,7 +686,10 @@ def test_shell_exec_timeout_respected(monkeypatch: pytest.MonkeyPatch) -> None:
     """shell_exec returns a timeout error when the command exceeds the limit."""
     from lightagent.agents.tools import shell_exec
     from lightagent.core.config import Settings
-    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
+
+    monkeypatch.setattr(
+        "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
+    )
     result = shell_exec.invoke({"command": "sleep 60", "timeout": 1})
     assert "timeout" in result.lower() or "timed out" in result.lower()
 
@@ -626,7 +698,10 @@ def test_shell_exec_rejects_empty_command(monkeypatch: pytest.MonkeyPatch) -> No
     """shell_exec returns an error for blank commands."""
     from lightagent.agents.tools import shell_exec
     from lightagent.core.config import Settings
-    monkeypatch.setattr("lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
+
+    monkeypatch.setattr(
+        "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
+    )
     result = shell_exec.invoke({"command": "   "})
     assert "empty" in result.lower() or "error" in result.lower()
 
@@ -639,6 +714,7 @@ def test_shell_exec_rejects_empty_command(monkeypatch: pytest.MonkeyPatch) -> No
 def test_file_manager_tools_contains_new_tools() -> None:
     """FILE_MANAGER_TOOLS must include all filesystem tools."""
     from lightagent.agents.tools import FILE_MANAGER_TOOLS
+
     tool_names = {t.name for t in FILE_MANAGER_TOOLS}
     assert "list_dir" in tool_names
     assert "find_files" in tool_names
@@ -650,6 +726,7 @@ def test_file_manager_tools_contains_new_tools() -> None:
 def test_coder_tools_contains_shell_exec() -> None:
     """CODER_TOOLS must include shell_exec."""
     from lightagent.agents.tools import CODER_TOOLS
+
     tool_names = {t.name for t in CODER_TOOLS}
     assert "shell_exec" in tool_names
 
@@ -657,5 +734,13 @@ def test_coder_tools_contains_shell_exec() -> None:
 def test_all_exports_new_tools() -> None:
     """All new tools must appear in __all__."""
     import lightagent.agents.tools as m
-    for name in ["list_dir", "find_files", "create_dir", "move_path", "delete_path", "shell_exec"]:
+
+    for name in [
+        "list_dir",
+        "find_files",
+        "create_dir",
+        "move_path",
+        "delete_path",
+        "shell_exec",
+    ]:
         assert name in m.__all__, f"{name} missing from __all__"

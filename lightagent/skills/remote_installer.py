@@ -58,9 +58,7 @@ class RemoteSkillInstaller:
     Example::
 
         installer = RemoteSkillInstaller()
-        path = asyncio.run(
-            installer.install("anthropics/skills", "skill-creator")
-        )
+        path = asyncio.run(installer.install("anthropics/skills", "skill-creator"))
         print(f"Installed to: {path}")
     """
 
@@ -91,7 +89,7 @@ class RemoteSkillInstaller:
         url = url_or_slug.rstrip("/")
         for prefix in ("https://github.com/", "http://github.com/"):
             if url.startswith(prefix):
-                url = url[len(prefix):]
+                url = url[len(prefix) :]
                 break
         # Keep only the first two path components (owner/repo)
         parts = [p for p in url.split("/") if p][:2]
@@ -188,9 +186,7 @@ class RemoteSkillInstaller:
 
         files = await self._fetch_skill_files(slug, skill_name)
         if not files:
-            raise ValueError(
-                f"No files found for skill '{skill_name}' in repo '{slug}'."
-            )
+            raise ValueError(f"No files found for skill '{skill_name}' in repo '{slug}'.")
 
         if self._is_claude_code_skill(files):
             self._install_claude_code_skill(
@@ -222,9 +218,7 @@ class RemoteSkillInstaller:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    async def _fetch_skill_files(
-        self, repo_slug: str, skill_name: str
-    ) -> dict[str, str]:
+    async def _fetch_skill_files(self, repo_slug: str, skill_name: str) -> dict[str, str]:
         """Fetch all text files for a skill from a GitHub repository.
 
         Supports two repository layouts automatically:
@@ -343,17 +337,14 @@ class RemoteSkillInstaller:
         ) or sorted(
             str(item["name"])
             for item in root_items
-            if item.get("type") == "dir"
-            and not str(item.get("name", "")).startswith(".")
+            if item.get("type") == "dir" and not str(item.get("name", "")).startswith(".")
         )
         hint = (
             f"Available skills: {', '.join(skill_names[:20])}"
             if skill_names
             else "Run 'lightagent skills list-remote <repo>' to see available skills."
         )
-        raise ValueError(
-            f"Skill '{skill_name}' not found in repo '{repo_slug}'. {hint}"
-        )
+        raise ValueError(f"Skill '{skill_name}' not found in repo '{repo_slug}'. {hint}")
 
     @staticmethod
     async def _download_entries(
@@ -396,9 +387,7 @@ class RemoteSkillInstaller:
         """
         if "skill.py" in files:
             return False
-        return any(
-            name.endswith((".yaml", ".yml", ".md")) for name in files
-        )
+        return any(name.endswith((".yaml", ".yml", ".md")) for name in files)
 
     def _install_claude_code_skill(
         self,
@@ -462,10 +451,7 @@ class RemoteSkillInstaller:
             primary_file = next(iter(files))
 
         # Derive safe Python identifiers
-        class_name = (
-            "".join(part.capitalize() for part in installed_name.split("_"))
-            + "Skill"
-        )
+        class_name = "".join(part.capitalize() for part in installed_name.split("_")) + "Skill"
         tool_fn_name = f"get_{installed_name}_guide"
 
         wrapper_py = self._generate_wrapper_py(

@@ -320,12 +320,14 @@ async def test_extractor_returns_empty_for_whitespace_only() -> None:
 async def test_extractor_parses_llm_json_response() -> None:
     """PreferenceExtractor.extract() correctly parses a valid JSON response."""
     llm_response = MagicMock()
-    llm_response.content = json.dumps({
-        "communication_style": ["Spanish"],
-        "tech_stack": ["Python 3.13", "Uses uv"],
-        "workflow": ["Conventional commits"],
-        "project_context": ["LightAgent"],
-    })
+    llm_response.content = json.dumps(
+        {
+            "communication_style": ["Spanish"],
+            "tech_stack": ["Python 3.13", "Uses uv"],
+            "workflow": ["Conventional commits"],
+            "project_context": ["LightAgent"],
+        }
+    )
 
     mock_llm = AsyncMock()
     mock_llm.ainvoke = AsyncMock(return_value=llm_response)
@@ -348,12 +350,14 @@ async def test_extractor_parses_llm_json_response() -> None:
 @pytest.mark.asyncio
 async def test_extractor_strips_markdown_fences() -> None:
     """PreferenceExtractor.extract() strips ```json code fences from LLM output."""
-    raw_json = json.dumps({
-        "communication_style": ["English"],
-        "tech_stack": [],
-        "workflow": [],
-        "project_context": [],
-    })
+    raw_json = json.dumps(
+        {
+            "communication_style": ["English"],
+            "tech_stack": [],
+            "workflow": [],
+            "project_context": [],
+        }
+    )
     llm_response = MagicMock()
     llm_response.content = f"```json\n{raw_json}\n```"
 
@@ -376,9 +380,7 @@ async def test_extractor_returns_empty_on_llm_error() -> None:
     """PreferenceExtractor.extract() returns empty facts when the LLM fails."""
     with patch("lightagent.providers.registry.ProviderRegistry") as mock_registry_cls:
         mock_registry = MagicMock()
-        mock_registry.get_llm_with_fallback.side_effect = RuntimeError(
-            "LLM unavailable"
-        )
+        mock_registry.get_llm_with_fallback.side_effect = RuntimeError("LLM unavailable")
         mock_registry_cls.return_value = mock_registry
 
         extractor = PreferenceExtractor()

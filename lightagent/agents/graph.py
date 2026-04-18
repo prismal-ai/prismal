@@ -88,7 +88,7 @@ def _supervisor_router(state: AgentState) -> str:
     return supervisor_router(state)
 
 
-def _research_dispatcher(state: AgentState) -> Any:  # noqa: ANN401 -- Send | str return
+def _research_dispatcher(state: AgentState) -> Any:
     """Forward to the parallel research dispatcher with AgentState in scope.
 
     Same pattern as :func:`_supervisor_router` — LangGraph calls
@@ -137,7 +137,7 @@ def _extract_sqlite_path(db_url: str) -> str:
     return ":memory:"
 
 
-async def build_checkpointer(db_url: str | None = None) -> Any:  # noqa: ANN401 — no common base type
+async def build_checkpointer(db_url: str | None = None) -> Any:
     """Build an async checkpointer based on the configured DB URL.
 
     Selects between ``AsyncPostgresSaver`` (for ``postgresql://``-prefixed
@@ -197,10 +197,10 @@ async def build_checkpointer(db_url: str | None = None) -> Any:  # noqa: ANN401 
 
 def build_supervisor_graph(
     checkpoint_path: Path | None = None,
-    checkpointer: Any = None,  # noqa: ANN401 — no common base type for LangGraph checkpointers
-    dev_pipeline_graph: Any = None,  # noqa: ANN401 — CompiledStateGraph for dev_pipeline subgraph (Phase 24)
-    ml_pipeline_graph: Any = None,  # noqa: ANN401 — CompiledStateGraph for ml_pipeline subgraph (Phase 26)
-    financial_analyst_graph: Any = None,  # noqa: ANN401 — CompiledStateGraph for financial_analyst subgraph (Phase 27)
+    checkpointer: Any = None,
+    dev_pipeline_graph: Any = None,
+    ml_pipeline_graph: Any = None,
+    financial_analyst_graph: Any = None,
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Build and compile the LangGraph SUPERVISOR state machine.
@@ -243,9 +243,7 @@ def build_supervisor_graph(
         A fully compiled :class:`~langgraph.graph.state.CompiledStateGraph`
         ready for use with ``.invoke()`` or ``.ainvoke()``.
     """
-    db_path: Path = (
-        checkpoint_path if checkpoint_path is not None else _DEFAULT_CHECKPOINT_PATH
-    )
+    db_path: Path = checkpoint_path if checkpoint_path is not None else _DEFAULT_CHECKPOINT_PATH
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     logger.debug("building_supervisor_graph", checkpoint_path=str(db_path))
@@ -291,16 +289,12 @@ def build_supervisor_graph(
 
     # Phase 24: dev_pipeline subgraph node (opt-in via enable_subgraphs setting).
     # The compiled subgraph must be built externally (async) and passed in.
-    _include_dev_pipeline = (
-        get_settings().enable_subgraphs and dev_pipeline_graph is not None
-    )
+    _include_dev_pipeline = get_settings().enable_subgraphs and dev_pipeline_graph is not None
     if _include_dev_pipeline:
         builder.add_node("dev_pipeline", dev_pipeline_graph)
 
     # Phase 26: ml_pipeline subgraph node (opt-in via enable_subgraphs setting).
-    _include_ml_pipeline = (
-        get_settings().enable_subgraphs and ml_pipeline_graph is not None
-    )
+    _include_ml_pipeline = get_settings().enable_subgraphs and ml_pipeline_graph is not None
     if _include_ml_pipeline:
         builder.add_node("ml_pipeline", ml_pipeline_graph)
 
@@ -508,9 +502,7 @@ def _hierarchical_router(state: AgentState) -> str:
     return str(next_agent)
 
 
-async def _build_hierarchical_graph() -> (
-    CompiledStateGraph[AgentState, Any, Any, Any]
-):
+async def _build_hierarchical_graph() -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """Build the 3-level hierarchical graph (SPEC-042 AC-042-2).
 
     Topology::

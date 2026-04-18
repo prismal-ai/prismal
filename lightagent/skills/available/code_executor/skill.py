@@ -54,9 +54,7 @@ def _run_python(code: str, timeout: int) -> str:
     Returns:
         Combined stdout/stderr output from the subprocess, or an error message.
     """
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False, encoding="utf-8"
-    ) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as tmp:
         tmp.write(code)
         tmp_path = tmp.name
 
@@ -121,9 +119,7 @@ class CodeExecutorSkill(BaseSkill):
                     "Set LIGHTAGENT_SHELL_ENABLED=true to enable."
                 )
 
-            configured_timeout = int(
-                os.getenv("LIGHTAGENT_CODE_EXEC_TIMEOUT", str(timeout))
-            )
+            configured_timeout = int(os.getenv("LIGHTAGENT_CODE_EXEC_TIMEOUT", str(timeout)))
             logger.info(
                 "code_executor_run",
                 code_length=len(code),

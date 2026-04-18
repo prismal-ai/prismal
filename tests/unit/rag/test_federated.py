@@ -14,15 +14,9 @@ def test_merge_and_rerank_deduplicates_by_chunk_id() -> None:
     from lightagent.rag.crag import RetrievedChunk
 
     chunks = [
-        RetrievedChunk(
-            source="a.txt", chunk_id="c1", relevance_score=0.9, content="hello"
-        ),
-        RetrievedChunk(
-            source="b.txt", chunk_id="c1", relevance_score=0.7, content="hello"
-        ),
-        RetrievedChunk(
-            source="c.txt", chunk_id="c2", relevance_score=0.8, content="world"
-        ),
+        RetrievedChunk(source="a.txt", chunk_id="c1", relevance_score=0.9, content="hello"),
+        RetrievedChunk(source="b.txt", chunk_id="c1", relevance_score=0.7, content="hello"),
+        RetrievedChunk(source="c.txt", chunk_id="c2", relevance_score=0.8, content="world"),
     ]
     merged = _merge_and_rerank(chunks)
     assert len(merged) == 2
@@ -36,15 +30,9 @@ def test_merge_and_rerank_sorts_by_score_desc() -> None:
     from lightagent.rag.crag import RetrievedChunk
 
     chunks = [
-        RetrievedChunk(
-            source="a.txt", chunk_id="c1", relevance_score=0.5, content="a"
-        ),
-        RetrievedChunk(
-            source="b.txt", chunk_id="c2", relevance_score=0.9, content="b"
-        ),
-        RetrievedChunk(
-            source="c.txt", chunk_id="c3", relevance_score=0.7, content="c"
-        ),
+        RetrievedChunk(source="a.txt", chunk_id="c1", relevance_score=0.5, content="a"),
+        RetrievedChunk(source="b.txt", chunk_id="c2", relevance_score=0.9, content="b"),
+        RetrievedChunk(source="c.txt", chunk_id="c3", relevance_score=0.7, content="c"),
     ]
     merged = _merge_and_rerank(chunks)
     scores = [c.relevance_score for c in merged]
@@ -90,9 +78,7 @@ async def test_federated_search_merges_remote_results() -> None:
         remote_nodes=[{"url": "http://node1:8000", "name": "node1"}],
     )
 
-    with patch.object(
-        engine, "_query_remote_node", AsyncMock(return_value=[remote_chunk])
-    ):
+    with patch.object(engine, "_query_remote_node", AsyncMock(return_value=[remote_chunk])):
         results = await engine.search("test query", k=5)
 
     assert len(results) == 2
@@ -162,7 +148,7 @@ def test_federated_default_remote_nodes_loaded() -> None:
 
 def test_load_rag_nodes_returns_nodes_with_rag_capability() -> None:
     """_load_rag_nodes returns only nodes that have 'rag' in capabilities."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import patch
 
     from lightagent.agents.network_supervisor import NetworkNode
 
@@ -217,9 +203,7 @@ async def test_query_remote_node_raises_when_httpx_missing() -> None:
 
     with patch("lightagent.rag.federated.httpx", None):
         with pytest.raises(RuntimeError, match="httpx not installed"):
-            await engine._query_remote_node(
-                {"url": "http://test:8000", "name": "node"}, "query", 5
-            )
+            await engine._query_remote_node({"url": "http://test:8000", "name": "node"}, "query", 5)
 
 
 @pytest.mark.asyncio

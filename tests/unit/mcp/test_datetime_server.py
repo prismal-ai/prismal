@@ -12,10 +12,7 @@ from datetime import UTC, datetime
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-import pytest
-
 from lightagent.mcp.servers.datetime_server import (
-    ConvertResult,
     CronNextRunResult,
     CronValidateResult,
     SystemTimeResult,
@@ -30,7 +27,6 @@ from lightagent.mcp.servers.datetime_server import (
     datetime_list_timezones,
     datetime_validate_cron,
 )
-
 
 # ── _resolve_tz helper ────────────────────────────────────────────────────────
 
@@ -421,6 +417,7 @@ def test_utc_offset_str_none_offset() -> None:
 def test_is_dst_returns_false_when_dst_none() -> None:
     """When dst() returns None _is_dst returns False."""
     from unittest.mock import MagicMock
+
     from lightagent.mcp.servers.datetime_server import _is_dst
 
     tz = ZoneInfo("UTC")
@@ -464,7 +461,10 @@ def test_describe_cron_fallback_on_expand_error() -> None:
     from unittest.mock import patch as mpatch
 
     schedule = "0 9 * * *"
-    with mpatch("lightagent.mcp.servers.datetime_server.croniter.expand", side_effect=Exception("bad")):
+    with mpatch(
+        "lightagent.mcp.servers.datetime_server.croniter.expand",
+        side_effect=Exception("bad"),
+    ):
         result = _describe_cron(schedule)
     assert result == schedule
 
@@ -503,13 +503,16 @@ def test_convert_with_aware_dt_iso() -> None:
 
 def test_cron_next_run_naive_fire_time() -> None:
     """next_run attaches tzinfo when croniter returns a naive datetime."""
-    from unittest.mock import MagicMock, patch as mpatch
+    from unittest.mock import MagicMock
+    from unittest.mock import patch as mpatch
 
     naive_dt = datetime(2026, 4, 1, 9, 0, 0)  # no tzinfo
     mock_cron = MagicMock()
     mock_cron.get_next.return_value = naive_dt
 
-    with mpatch("lightagent.mcp.servers.datetime_server.croniter", return_value=mock_cron) as mock_cls:
+    with mpatch(
+        "lightagent.mcp.servers.datetime_server.croniter", return_value=mock_cron
+    ) as mock_cls:
         mock_cls.is_valid.return_value = True
         result = datetime_cron_next_run(schedule="0 9 * * *", count=1, timezone="UTC")
 

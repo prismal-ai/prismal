@@ -72,7 +72,7 @@ def _score_market_snapshot(
         if value is None:
             return False
         if name == "current_price":
-            return isinstance(value, (int, float)) and value > 0
+            return isinstance(value, int | float) and value > 0
         if name == "data_points_count":
             return isinstance(value, int) and value > 0
         if name in {"currency", "data_provider", "ohlcv_path"}:
@@ -81,7 +81,7 @@ def _score_market_snapshot(
                 "UNKNOWN",
             }
         # market_cap / volume_24h: any positive numeric value counts.
-        return isinstance(value, (int, float)) and value > 0
+        return isinstance(value, int | float) and value > 0
 
     for field in _EXPECTED_MARKET_FIELDS:
         if not _populated(field):
@@ -90,6 +90,7 @@ def _score_market_snapshot(
     populated = len(_EXPECTED_MARKET_FIELDS) - len(missing)
     confidence = populated / len(_EXPECTED_MARKET_FIELDS)
     return confidence, missing
+
 
 _SYSTEM = """You are a Market Data Collector for the financial subgraph.
 
@@ -231,9 +232,7 @@ async def market_data_collector_node(state: AgentState) -> dict[str, Any]:
             }
         )
 
-        fin: dict[str, Any] = dict(
-            state.get("metadata", {}).get("financial_analyst", {})
-        )
+        fin: dict[str, Any] = dict(state.get("metadata", {}).get("financial_analyst", {}))
         fin["market_snapshot"] = snapshot.model_dump()
 
         logger.info(

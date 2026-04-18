@@ -19,12 +19,8 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from lightagent.core.logging import get_logger
-
-if TYPE_CHECKING:
-    pass
 
 logger = get_logger("lightagent.sandbox.manager")
 
@@ -47,7 +43,7 @@ class SandboxManager:
                 ``settings.sandbox_path``.
         """
         if sandbox_root is None:
-            from lightagent.core.config import get_settings  # noqa: PLC0415
+            from lightagent.core.config import get_settings
 
             sandbox_root = get_settings().sandbox_path
 
@@ -90,13 +86,11 @@ class SandboxManager:
         node_bin = str(self.node_dir / "bin")
         go_bin = str(self.go_dir / "bin")
 
-        local_path = os.pathsep.join(
-            p for p in (node_bin, go_bin, python_bin) if Path(p).exists()
-        )
+        local_path = os.pathsep.join(p for p in (node_bin, go_bin, python_bin) if Path(p).exists())
         system_path = system_env.get("PATH", "")
         full_path = f"{local_path}{os.pathsep}{system_path}" if local_path else system_path
 
-        env = {
+        return {
             **system_env,
             "PATH": full_path,
             "GOPATH": str(self.go_dir),
@@ -111,7 +105,6 @@ class SandboxManager:
             # Variables informativas
             "LIGHTAGENT_SANDBOX_ROOT": str(self.root),
         }
-        return env
 
     # ── Validación de rutas ──────────────────────────────────────────
 
@@ -144,9 +137,7 @@ class SandboxManager:
         """
         resolved = (self.workspace / rel).resolve()
         if not self.is_safe_path(resolved):
-            raise ValueError(
-                f"Ruta '{rel}' sale de la sandbox (path traversal bloqueado)."
-            )
+            raise ValueError(f"Ruta '{rel}' sale de la sandbox (path traversal bloqueado).")
         return resolved
 
     def resolve_tmp(self) -> Path:
@@ -169,7 +160,7 @@ class SandboxManager:
         Returns:
             Dict ``{runtime_name: version_string}``.
         """
-        import subprocess  # noqa: PLC0415
+        import subprocess
 
         env = self.get_env()
         runtimes = {
@@ -191,7 +182,7 @@ class SandboxManager:
             else:
                 binary_str = str(binary)
             try:
-                result = subprocess.run(  # noqa: S603
+                result = subprocess.run(
                     [binary_str, "--version"],
                     capture_output=True,
                     text=True,
@@ -200,7 +191,7 @@ class SandboxManager:
                 )
                 version = (result.stdout or result.stderr).strip().splitlines()[0]
                 status[name] = version
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 status[name] = f"error: {exc}"
         return status
 
@@ -212,4 +203,3 @@ class SandboxManager:
         """
         total = sum(f.stat().st_size for f in self.root.rglob("*") if f.is_file())
         return round(total / 1_048_576, 1)
-

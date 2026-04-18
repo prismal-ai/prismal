@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 logger = get_logger("lightagent.subgraphs.gates")
 
 
-def _get_nested(data: dict[str, Any], dotted_path: str) -> Any:  # noqa: ANN401
+def _get_nested(data: dict[str, Any], dotted_path: str) -> Any:
     """Traverse a nested dict using a dot-separated path.
 
     Args:
@@ -239,9 +239,7 @@ async def human_approval_node(state: dict[str, Any]) -> Command[Any]:
     raw_action = str(decision.get("action", "reject")).lower()
     action = raw_action if raw_action in _HITL_ACTIONS else "reject"
     modifications: dict[str, Any] = (
-        decision.get("modifications", {})
-        if isinstance(decision.get("modifications"), dict)
-        else {}
+        decision.get("modifications", {}) if isinstance(decision.get("modifications"), dict) else {}
     )
 
     # Record the action so the routing wrapper from ``hitl_gate`` can read it.
@@ -384,7 +382,8 @@ def seed_hitl_metadata(
 
         nodes = {
             "approval_seed": seed_hitl_metadata(
-                "dev_pipeline.code_artifact", "HIGH",
+                "dev_pipeline.code_artifact",
+                "HIGH",
             ),
             "human_approval": human_approval_node,
         }

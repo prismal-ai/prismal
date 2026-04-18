@@ -1,4 +1,4 @@
-# ruff: noqa: E501  # Prompt constants contain long JSON example lines.
+# Prompt constants contain long JSON example lines.
 """
 EDA Analyst agent node for the ml_pipeline subgraph.
 

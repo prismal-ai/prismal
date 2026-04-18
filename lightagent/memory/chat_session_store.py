@@ -5,6 +5,7 @@ a LLM-generated title, timestamps, and a message counter.  Uses the
 same synchronous sqlite3 pattern as
 :class:`~lightagent.scheduler.cron_manager.CronManager`.
 """
+
 from __future__ import annotations
 
 import sqlite3

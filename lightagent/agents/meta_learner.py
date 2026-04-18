@@ -35,9 +35,7 @@ from lightagent.providers.registry import ProviderRegistry
 
 logger = get_logger("lightagent.agents.meta_learner")
 
-_DEFAULT_PROPOSALS_DIR = (
-    Path(__file__).parent.parent / "skills" / "custom" / "meta_proposals"
-)
+_DEFAULT_PROPOSALS_DIR = Path(__file__).parent.parent / "skills" / "custom" / "meta_proposals"
 
 _SCORE_THRESHOLD = 0.6  # traces with overall < this trigger proposals
 
@@ -110,18 +108,14 @@ class MetaLearner:
             )
             since = datetime.now(UTC) - timedelta(days=days)
             traces_page = client.fetch_traces(from_timestamp=since)
-            raw: list[dict[str, Any]] = [
-                t.__dict__ for t in (traces_page.data or [])
-            ]
+            raw: list[dict[str, Any]] = [t.__dict__ for t in (traces_page.data or [])]
             logger.info("meta_learner_traces_fetched", count=len(raw))
             return raw
         except Exception as exc:
             logger.warning("meta_learner_fetch_error", error=str(exc))
             return []
 
-    async def score_traces(
-        self, traces: list[dict[str, Any]]
-    ) -> list[TraceScore]:
+    async def score_traces(self, traces: list[dict[str, Any]]) -> list[TraceScore]:
         """Self-score traces using the LLM.
 
         Args:
@@ -156,14 +150,8 @@ class MetaLearner:
                 from langchain_core.messages import HumanMessage
 
                 response = await llm.ainvoke([HumanMessage(content=prompt)])
-                content = (
-                    response.content
-                    if hasattr(response, "content")
-                    else str(response)
-                )
-                content_str: str = (
-                    content if isinstance(content, str) else str(content)
-                )
+                content = response.content if hasattr(response, "content") else str(response)
+                content_str: str = content if isinstance(content, str) else str(content)
 
                 # Extract JSON from response
                 start = content_str.find("{")
@@ -195,9 +183,7 @@ class MetaLearner:
 
         return scores
 
-    async def generate_proposals(
-        self, low_scores: list[TraceScore]
-    ) -> str:
+    async def generate_proposals(self, low_scores: list[TraceScore]) -> str:
         """Ask the LLM to propose improvements for low-scoring traces.
 
         Args:
@@ -212,8 +198,7 @@ class MetaLearner:
         llm = ProviderRegistry().get_llm()
 
         issues_summary = "\n".join(
-            f"- Trace {s.trace_id}: overall={s.overall:.2f}, "
-            f"issues={', '.join(s.issues) or 'none'}"
+            f"- Trace {s.trace_id}: overall={s.overall:.2f}, issues={', '.join(s.issues) or 'none'}"
             for s in low_scores
         )
 
@@ -233,11 +218,7 @@ class MetaLearner:
             from langchain_core.messages import HumanMessage
 
             response = await llm.ainvoke([HumanMessage(content=prompt)])
-            content = (
-                response.content
-                if hasattr(response, "content")
-                else str(response)
-            )
+            content = response.content if hasattr(response, "content") else str(response)
             return content if isinstance(content, str) else str(content)
         except Exception as exc:
             logger.warning("meta_learner_proposals_error", error=str(exc))

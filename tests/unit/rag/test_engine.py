@@ -96,9 +96,7 @@ def test_init_creates_chroma_vector_store_with_collection_name() -> None:
 
         RAGEngine(collection_name="my_col", settings=settings)
 
-    mock_store_cls.assert_called_once_with(
-        collection_name="my_col", settings=settings
-    )
+    mock_store_cls.assert_called_once_with(collection_name="my_col", settings=settings)
 
 
 def test_init_creates_chroma_vector_store_with_settings() -> None:
@@ -641,9 +639,7 @@ async def test_query_creates_crag_pipeline_with_store_and_settings() -> None:
     """query() must create a CRAGPipeline(vector_store=self._store, settings=...) ."""
     settings = _make_settings()
     mock_store = MagicMock()
-    mock_crag_result = CRAGResult(
-        answer="the answer", sources=[], used_web_fallback=False
-    )
+    mock_crag_result = CRAGResult(answer="the answer", sources=[], used_web_fallback=False)
 
     with (
         patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
@@ -659,9 +655,7 @@ async def test_query_creates_crag_pipeline_with_store_and_settings() -> None:
         engine = RAGEngine(settings=settings)
         await engine.query("test question")
 
-    mock_pipeline_cls.assert_called_once_with(
-        vector_store=mock_store, settings=settings
-    )
+    mock_pipeline_cls.assert_called_once_with(vector_store=mock_store, settings=settings)
 
 
 @pytest.mark.asyncio
@@ -669,9 +663,7 @@ async def test_query_calls_pipeline_run_with_query() -> None:
     """query() must call pipeline.run(query) with the user query string."""
     settings = _make_settings()
     mock_store = MagicMock()
-    mock_crag_result = CRAGResult(
-        answer="answer", sources=[], used_web_fallback=False
-    )
+    mock_crag_result = CRAGResult(answer="answer", sources=[], used_web_fallback=False)
 
     with (
         patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
@@ -695,9 +687,7 @@ async def test_query_returns_crag_result() -> None:
     """query() must return the CRAGResult from the pipeline."""
     settings = _make_settings()
     mock_store = MagicMock()
-    expected_result = CRAGResult(
-        answer="specific answer text", sources=[], used_web_fallback=True
-    )
+    expected_result = CRAGResult(answer="specific answer text", sources=[], used_web_fallback=True)
 
     with (
         patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,

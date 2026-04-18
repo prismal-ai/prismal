@@ -141,12 +141,10 @@ class SkillsManager:
                 Path(d).expanduser().resolve() for d in external_dirs
             ]
         elif use_default_root:
-            from lightagent.core.config import get_settings  # noqa: PLC0415
+            from lightagent.core.config import get_settings
 
             self._external_dirs = [
-                Path(d).expanduser().resolve()
-                for d in get_settings().external_skills_dirs
-                if d
+                Path(d).expanduser().resolve() for d in get_settings().external_skills_dirs if d
             ]
         else:
             # Explicit skills_root provided (e.g. tests) — no external dirs
@@ -222,7 +220,7 @@ class SkillsManager:
         skill_py = skill_dir / "skill.py"
         if not skill_py.exists():
             if _find_skill_md(skill_dir) is not None:
-                from lightagent.skills.base import generate_skill_py  # noqa: PLC0415
+                from lightagent.skills.base import generate_skill_py
 
                 generate_skill_py(skill_dir)
             else:
@@ -250,9 +248,7 @@ class SkillsManager:
         meta = skill.metadata
 
         # Confirmation gate (AC-006-4, AC-006-5)
-        needs_confirm = (
-            bool(meta.requires_permissions) or not meta.safe_to_auto_activate
-        )
+        needs_confirm = bool(meta.requires_permissions) or not meta.safe_to_auto_activate
         if needs_confirm and not confirm:
             raise SkillValidationError(
                 name,
@@ -356,9 +352,7 @@ class SkillsManager:
             except Exception as exc:
                 logger.error("skill_reload_error", skill=name, error=str(exc))
 
-    def install_from_zip(
-        self, zip_path: str | Path
-    ) -> tuple[str, str | None]:
+    def install_from_zip(self, zip_path: str | Path) -> tuple[str, str | None]:
         """Install a skill from a zip archive containing a ``skill.md`` package.
 
         The zip must contain ``skill.md`` either at the archive root or inside a
@@ -370,13 +364,13 @@ class SkillsManager:
 
             # Root-level layout
             skill.md
-            scripts/my_tool.py
-            references/doc.md
+            scripts / my_tool.py
+            references / doc.md
 
             # Single top-level directory layout
-            my_skill/skill.md
-            my_skill/scripts/my_tool.py
-            my_skill/references/doc.md
+            my_skill / skill.md
+            my_skill / scripts / my_tool.py
+            my_skill / references / doc.md
 
         Args:
             zip_path: Filesystem path to the ``.zip`` archive.
@@ -385,7 +379,7 @@ class SkillsManager:
             ``(skill_name, None)`` on success, or ``("", error_message)`` on
             failure.
         """
-        from lightagent.skills.base import generate_skill_py  # noqa: PLC0415
+        from lightagent.skills.base import generate_skill_py
 
         src = Path(zip_path).expanduser().resolve()
         if not src.exists():
@@ -415,7 +409,7 @@ class SkillsManager:
 
                 dest.mkdir(parents=True)
                 for member in names:
-                    rel = member[len(prefix):]
+                    rel = member[len(prefix) :]
                     if not rel:
                         continue
                     target = dest / rel
@@ -428,13 +422,13 @@ class SkillsManager:
 
         except zipfile.BadZipFile:
             return "", f"Archivo zip inválido: {zip_path}"
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return "", f"Error al extraer el zip: {exc}"
 
         # Auto-generate skill.py from the extracted skill.md
         try:
             generate_skill_py(dest)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             shutil.rmtree(str(dest), ignore_errors=True)
             return "", f"Error generando skill.py desde skill.md: {exc}"
 
@@ -467,15 +461,13 @@ class SkillsManager:
             if not skill_py.exists():
                 if _find_skill_md(link) is not None:
                     try:
-                        from lightagent.skills.base import (  # noqa: PLC0415
+                        from lightagent.skills.base import (
                             generate_skill_py,
                         )
 
                         generate_skill_py(link)
-                    except Exception as exc:  # noqa: BLE001
-                        logger.warning(
-                            "skill_restore_md_error", skill=link.name, error=str(exc)
-                        )
+                    except Exception as exc:
+                        logger.warning("skill_restore_md_error", skill=link.name, error=str(exc))
                         continue
                 else:
                     logger.warning(
@@ -549,9 +541,7 @@ class SkillsManager:
             spec.loader.exec_module(module)
         except Exception as exc:
             sys.modules.pop(module_name, None)
-            raise SkillLoadError(
-                skill_py.parent.name, f"Error executing module: {exc}"
-            ) from exc
+            raise SkillLoadError(skill_py.parent.name, f"Error executing module: {exc}") from exc
 
         for attr_name in dir(module):
             attr = getattr(module, attr_name)
@@ -564,9 +554,7 @@ class SkillsManager:
             ):
                 return attr
 
-        raise SkillLoadError(
-            skill_py.parent.name, "No BaseSkill subclass found in skill.py"
-        )
+        raise SkillLoadError(skill_py.parent.name, "No BaseSkill subclass found in skill.py")
 
     def _scan_dir(
         self,
@@ -596,15 +584,13 @@ class SkillsManager:
             if not skill_py.exists():
                 if _find_skill_md(d) is not None:
                     try:
-                        from lightagent.skills.base import (  # noqa: PLC0415
+                        from lightagent.skills.base import (
                             generate_skill_py,
                         )
 
                         generate_skill_py(d)
-                    except Exception as exc:  # noqa: BLE001
-                        logger.warning(
-                            "skill_md_generate_error", skill=d.name, error=str(exc)
-                        )
+                    except Exception as exc:
+                        logger.warning("skill_md_generate_error", skill=d.name, error=str(exc))
                         infos.append(
                             SkillInfo(
                                 name=d.name,

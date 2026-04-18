@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-
 
 # ── _redact_sensitive ─────────────────────────────────────────────────────────
 
@@ -84,12 +83,12 @@ def test_memory_entry_not_expired() -> None:
     """MemoryEntry.is_expired() returns False for future expiry."""
     from lightagent.memory.long_term import MemoryEntry
 
-    future = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30)
+    future = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=30)
     entry = MemoryEntry(
         id="x",
         session_id="s",
         content="fresh",
-        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        created_at=datetime.now(UTC).replace(tzinfo=None),
         expires_at=future,
     )
     assert entry.is_expired() is False

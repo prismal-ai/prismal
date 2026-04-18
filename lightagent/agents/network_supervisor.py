@@ -193,9 +193,7 @@ class NetworkSupervisorAgent:
             logger.info("network_delegate_local", capability=capability)
             return await self._run_local(task, session_id)
 
-    async def _call_remote(
-        self, node: NetworkNode, task: str, session_id: str
-    ) -> dict[str, Any]:
+    async def _call_remote(self, node: NetworkNode, task: str, session_id: str) -> dict[str, Any]:
         """POST to remote node's /api/v1/agent/chat endpoint.
 
         Args:
@@ -225,9 +223,7 @@ class NetworkSupervisorAgent:
                 "current_agent": "network_supervisor",
             }
 
-    async def _run_local(
-        self, task: str, session_id: str
-    ) -> dict[str, Any]:
+    async def _run_local(self, task: str, session_id: str) -> dict[str, Any]:
         """Run the task on the local LangGraph graph.
 
         Args:

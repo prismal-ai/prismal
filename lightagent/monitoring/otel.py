@@ -126,9 +126,7 @@ class OTelManager:
             # PeriodicExportingMetricReader is created and no 404 errors appear.
             if getattr(s, "otel_metrics_enabled", False):
                 metric_reader = self._build_metric_reader(exporter_name, endpoint)
-                meter_provider = MeterProvider(
-                    resource=resource, metric_readers=[metric_reader]
-                )
+                meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
                 metrics.set_meter_provider(meter_provider)
                 self._meter = meter_provider.get_meter(service_name)
                 self._register_standard_metrics()
@@ -157,7 +155,7 @@ class OTelManager:
         except OSError:
             return False
 
-    def _build_span_exporter(self, exporter_name: str, endpoint: str) -> Any:  # noqa: ANN401
+    def _build_span_exporter(self, exporter_name: str, endpoint: str) -> Any:
         """Build and return the appropriate span exporter.
 
         Args:
@@ -191,7 +189,7 @@ class OTelManager:
 
         return OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces")
 
-    def _build_metric_reader(self, exporter_name: str, endpoint: str) -> Any:  # noqa: ANN401
+    def _build_metric_reader(self, exporter_name: str, endpoint: str) -> Any:
         """Build and return the appropriate metric reader.
 
         Args:
@@ -216,9 +214,7 @@ class OTelManager:
         )
         from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 
-        return PeriodicExportingMetricReader(
-            OTLPMetricExporter(endpoint=f"{endpoint}/v1/metrics")
-        )
+        return PeriodicExportingMetricReader(OTLPMetricExporter(endpoint=f"{endpoint}/v1/metrics"))
 
     def _register_standard_metrics(self) -> None:
         """Register standard LightAgent OTEL metrics."""

@@ -162,8 +162,7 @@ class SessionRegistry:
         """
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT session_id FROM channel_sessions"
-                " WHERE channel=? AND user_id=?",
+                "SELECT session_id FROM channel_sessions WHERE channel=? AND user_id=?",
                 (channel, user_id),
             ).fetchone()
         return row["session_id"] if row else None
@@ -187,9 +186,7 @@ class SessionRegistry:
         if not self._extract_ts_file.exists():
             return None
         try:
-            data: dict[str, str] = json.loads(
-                self._extract_ts_file.read_text(encoding="utf-8")
-            )
+            data: dict[str, str] = json.loads(self._extract_ts_file.read_text(encoding="utf-8"))
             ts = data.get(session_id)
             if ts:
                 return datetime.fromisoformat(ts)
@@ -210,9 +207,7 @@ class SessionRegistry:
         data: dict[str, str] = {}
         if self._extract_ts_file.exists():
             try:
-                data = json.loads(
-                    self._extract_ts_file.read_text(encoding="utf-8")
-                )
+                data = json.loads(self._extract_ts_file.read_text(encoding="utf-8"))
             except Exception as exc:
                 logger.debug(
                     "session_registry.set_last_extract_time.parse_error",
@@ -220,12 +215,8 @@ class SessionRegistry:
                 )
                 data = {}
         data[session_id] = datetime.now(UTC).isoformat()
-        self._extract_ts_file.write_text(
-            json.dumps(data, indent=2), encoding="utf-8"
-        )
-        logger.debug(
-            "session_registry.set_last_extract_time", session_id=session_id
-        )
+        self._extract_ts_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        logger.debug("session_registry.set_last_extract_time", session_id=session_id)
 
 
 __all__ = ["SessionRegistry"]

@@ -54,9 +54,7 @@ def test_log_input_genesis_prev_hash(audit: AuditLogger, audit_path: Path) -> No
 
 def test_log_blocked_entry(audit: AuditLogger, audit_path: Path) -> None:
     """A blocked event must record the event type and reasons list."""
-    audit.log_blocked(
-        "bad input", reasons=["injection:override_instructions"], session_id="s1"
-    )
+    audit.log_blocked("bad input", reasons=["injection:override_instructions"], session_id="s1")
     entries = _read_entries(audit_path)
     assert entries[0]["event"] == "blocked"
     assert entries[0]["reasons"] == ["injection:override_instructions"]
@@ -114,9 +112,7 @@ def test_hash_chain_links_entries(audit: AuditLogger, audit_path: Path) -> None:
     assert entries[2]["prev_hash"] == entries[1]["entry_hash"]
 
 
-def test_default_log_path_is_data_logs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_default_log_path_is_data_logs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Default log path must resolve to data/logs/audit.jsonl relative to cwd."""
     monkeypatch.chdir(tmp_path)
     audit_logger = AuditLogger()

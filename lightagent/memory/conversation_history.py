@@ -35,10 +35,7 @@ import structlog
 logger = structlog.get_logger("lightagent.memory.conversation_history")
 
 _DEFAULT_BASE = (
-    Path(__file__).resolve().parent.parent.parent
-    / "data"
-    / "workspace"
-    / "conversations"
+    Path(__file__).resolve().parent.parent.parent / "data" / "workspace" / "conversations"
 )
 
 
@@ -118,11 +115,7 @@ class ConversationHistory:
             else:
                 self._ensure_channel_in_header(p, channel)
 
-            entry = (
-                f"## {now} · {role} · {channel}\n\n"
-                f"{text.strip()}\n\n"
-                "---\n\n"
-            )
+            entry = f"## {now} · {role} · {channel}\n\n{text.strip()}\n\n---\n\n"
             with p.open("a", encoding="utf-8") as f:
                 f.write(entry)
 

@@ -31,9 +31,7 @@ from lightagent.agents.subgraphs.registry import (
     SubgraphRegistry,
 )
 
-logger = structlog.get_logger(
-    "lightagent.subgraphs.analysis_orchestrator.builder"
-)
+logger = structlog.get_logger("lightagent.subgraphs.analysis_orchestrator.builder")
 
 _NAME = "analysis_orchestrator"
 _DESCRIPTION = (
@@ -82,9 +80,9 @@ def _analysis_router(state: dict[str, Any]) -> str:
 
 async def _make_definition(
     *,
-    dev_pipeline_graph: Any = None,  # noqa: ANN401 — CompiledStateGraph
-    ml_pipeline_graph: Any = None,  # noqa: ANN401 — CompiledStateGraph
-    financial_analyst_graph: Any = None,  # noqa: ANN401
+    dev_pipeline_graph: Any = None,
+    ml_pipeline_graph: Any = None,
+    financial_analyst_graph: Any = None,
 ) -> SubgraphDefinition:
     """Build the :class:`SubgraphDefinition` for the analysis domain.
 
@@ -160,13 +158,11 @@ async def _make_definition(
 
 
 async def register_analysis_orchestrator(
-    checkpointer_path: str = (
-        "data/db/checkpoints_subgraph_analysis_orchestrator.db"
-    ),
+    checkpointer_path: str = ("data/db/checkpoints_subgraph_analysis_orchestrator.db"),
     *,
-    dev_pipeline_graph: Any = None,  # noqa: ANN401
-    ml_pipeline_graph: Any = None,  # noqa: ANN401
-    financial_analyst_graph: Any = None,  # noqa: ANN401
+    dev_pipeline_graph: Any = None,
+    ml_pipeline_graph: Any = None,
+    financial_analyst_graph: Any = None,
 ) -> None:
     """Compile and register the analysis orchestrator (idempotent).
 
@@ -189,9 +185,7 @@ async def register_analysis_orchestrator(
         financial_analyst_graph=financial_analyst_graph,
     )
     factory = SubgraphFactory()
-    compiled = await factory.build(
-        definition, checkpointer_path=checkpointer_path
-    )
+    compiled = await factory.build(definition, checkpointer_path=checkpointer_path)
     await registry.register(_NAME, definition)
 
     _COMPILED_GRAPHS[_NAME] = compiled
@@ -201,10 +195,10 @@ async def register_analysis_orchestrator(
 async def get_compiled_analysis_orchestrator(
     checkpointer_path: str = ":memory:",
     *,
-    dev_pipeline_graph: Any = None,  # noqa: ANN401
-    ml_pipeline_graph: Any = None,  # noqa: ANN401
-    financial_analyst_graph: Any = None,  # noqa: ANN401
-) -> Any:  # noqa: ANN401
+    dev_pipeline_graph: Any = None,
+    ml_pipeline_graph: Any = None,
+    financial_analyst_graph: Any = None,
+) -> Any:
     """Return (building if needed) the compiled analysis orchestrator."""
     if _NAME not in _COMPILED_GRAPHS:
         definition = await _make_definition(

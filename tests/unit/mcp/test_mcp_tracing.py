@@ -13,9 +13,7 @@ def test_mcp_span_attributes() -> None:
     """MCP spans support standard lightagent.mcp attributes."""
     OTelManager._instance = None
     OTelManager._initialized = False
-    with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-    ) as mock_settings:
+    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         s = MagicMock()
         s.otel_enabled = False
         mock_settings.return_value = s
@@ -31,14 +29,14 @@ def test_mcp_counter_increments() -> None:
     """mcp_tool_calls counter increments without error."""
     OTelManager._instance = None
     OTelManager._initialized = False
-    with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-    ) as mock_settings:
+    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         s = MagicMock()
         s.otel_enabled = False
         mock_settings.return_value = s
         otel = OTelManager()
-    otel.increment_counter("mcp_tool_calls", attributes={"server": "filesystem", "tool": "read_file"})
+    otel.increment_counter(
+        "mcp_tool_calls", attributes={"server": "filesystem", "tool": "read_file"}
+    )
 
 
 def test_mcp_adapter_imports_correctly() -> None:

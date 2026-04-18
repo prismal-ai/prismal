@@ -47,8 +47,7 @@ class TestPIISanitizer:
 
     def test_sanitize_credit_card_visa(self) -> None:
         assert (
-            PIISanitizer.sanitize("card 4111111111111111 expired")
-            == "card [CREDIT_CARD] expired"
+            PIISanitizer.sanitize("card 4111111111111111 expired") == "card [CREDIT_CARD] expired"
         )
 
     def test_sanitize_empty_string_is_idempotent(self) -> None:
@@ -59,9 +58,7 @@ class TestPIISanitizer:
         assert PIISanitizer.sanitize(text) == text
 
     def test_sanitize_multiple_patterns(self) -> None:
-        result = PIISanitizer.sanitize(
-            "contact alice@example.com or SSN 123-45-6789"
-        )
+        result = PIISanitizer.sanitize("contact alice@example.com or SSN 123-45-6789")
         assert "[EMAIL]" in result
         assert "[SSN]" in result
         assert "alice@example.com" not in result
@@ -113,9 +110,7 @@ class TestBackendSelection:
 
     def test_memory_backend_default_from_settings(self) -> None:
         """When ``backend`` is ``None`` the constructor reads the setting."""
-        with patch(
-            "lightagent.memory.long_term_store.get_settings"
-        ) as mock_settings:
+        with patch("lightagent.memory.long_term_store.get_settings") as mock_settings:
             mock_settings.return_value.memory_backend = "memory"
             store = LongTermMemoryStore()
         assert store.backend_name == "memory"
@@ -133,11 +128,14 @@ class TestBackendSelection:
         assert store.backend_name == "sqlite"
         # The warning is structured — ``caplog`` captures the rendered
         # message regardless of whether structlog routes through stdlib.
-        assert any(
-            "memory_sqlite_backend_fallback" in record.message
-            or "InMemoryStore fallback" in record.message
-            for record in caplog.records
-        ) or True  # structlog may not route to stdlib; tolerate either
+        assert (
+            any(
+                "memory_sqlite_backend_fallback" in record.message
+                or "InMemoryStore fallback" in record.message
+                for record in caplog.records
+            )
+            or True
+        )  # structlog may not route to stdlib; tolerate either
 
     def test_unknown_backend_raises_value_error(self) -> None:
         with pytest.raises(ValueError, match="Unknown memory backend"):
@@ -157,13 +155,9 @@ class TestBackendSelection:
         sys.modules["langgraph.store.postgres"] = pkg
         sys.modules["langgraph.store.postgres.aio"] = aio_mod
         try:
-            with patch(
-                "lightagent.memory.long_term_store.get_settings"
-            ) as mock_settings:
+            with patch("lightagent.memory.long_term_store.get_settings") as mock_settings:
                 mock_settings.return_value.memory_backend = "postgresql"
-                mock_settings.return_value.db_url = (
-                    "postgresql://user@host/db"
-                )
+                mock_settings.return_value.db_url = "postgresql://user@host/db"
                 store = LongTermMemoryStore(backend="postgresql")
         finally:
             sys.modules.pop("langgraph.store.postgres.aio", None)
@@ -187,9 +181,7 @@ def store() -> LongTermMemoryStore:
 class TestStoreAndRecall:
     """End-to-end roundtrips exercising the most common flows."""
 
-    async def test_store_and_recall_roundtrip(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_store_and_recall_roundtrip(self, store: LongTermMemoryStore) -> None:
         ns = preferences_namespace("alice")
         await store.store_fact(
             user_id="alice",
@@ -205,9 +197,7 @@ class TestStoreAndRecall:
         assert facts[0]["user_id"] == "alice"
         assert facts[0]["created_at"] is not None
 
-    async def test_pii_sanitization_applied_before_write(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_pii_sanitization_applied_before_write(self, store: LongTermMemoryStore) -> None:
         """Email in ``value`` is replaced with ``[EMAIL]`` *before* the
         value reaches the underlying store — AC-039-2.
 
@@ -260,16 +250,12 @@ class TestStoreAndRecall:
         facts = await store.recall_facts(ns, query="count", limit=5)
         assert facts[0]["value"] == "42"
 
-    async def test_default_ttl_comes_from_settings(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_default_ttl_comes_from_settings(self, store: LongTermMemoryStore) -> None:
         """When ``ttl_days`` is omitted the value from
         ``settings.memory_default_ttl_days`` is used.
         """
         ns = preferences_namespace("alice")
-        with patch(
-            "lightagent.memory.long_term_store.get_settings"
-        ) as mock_settings:
+        with patch("lightagent.memory.long_term_store.get_settings") as mock_settings:
             mock_settings.return_value.memory_default_ttl_days = 7
             await store.store_fact(
                 user_id="alice",
@@ -286,9 +272,7 @@ class TestStoreAndRecall:
         assert expires_at - time.time() > 6 * 86400
         assert expires_at - time.time() < 8 * 86400
 
-    async def test_zero_ttl_disables_expiry(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_zero_ttl_disables_expiry(self, store: LongTermMemoryStore) -> None:
         ns = preferences_namespace("alice")
         await store.store_fact(
             user_id="alice",
@@ -308,9 +292,7 @@ class TestStoreAndRecall:
 
 
 class TestTTL:
-    async def test_ttl_excludes_expired_facts(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_ttl_excludes_expired_facts(self, store: LongTermMemoryStore) -> None:
         """Facts whose ``expires_at`` is in the past are filtered out of
         recall results AND lazily deleted from the underlying store.
         """
@@ -354,45 +336,31 @@ class TestTTL:
 
 
 class TestGracefulDegradation:
-    async def test_graceful_degradation_on_empty_store(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_graceful_degradation_on_empty_store(self, store: LongTermMemoryStore) -> None:
         """``recall_facts`` on an empty namespace returns ``[]`` without error."""
-        facts = await store.recall_facts(
-            preferences_namespace("never-seen"), query="anything"
-        )
+        facts = await store.recall_facts(preferences_namespace("never-seen"), query="anything")
         assert facts == []
 
-    async def test_recall_returns_empty_on_backend_error(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_recall_returns_empty_on_backend_error(self, store: LongTermMemoryStore) -> None:
         """Any exception from ``asearch`` is swallowed and logged."""
         fake_store = MagicMock()
         fake_store.asearch = AsyncMock(side_effect=RuntimeError("boom"))
         store._store = fake_store
 
-        facts = await store.recall_facts(
-            preferences_namespace("alice"), query="q"
-        )
+        facts = await store.recall_facts(preferences_namespace("alice"), query="q")
         assert facts == []
 
-    async def test_recall_with_zero_limit_short_circuits(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_recall_with_zero_limit_short_circuits(self, store: LongTermMemoryStore) -> None:
         """``limit=0`` skips the store entirely."""
         fake_store = MagicMock()
         fake_store.asearch = AsyncMock()
         store._store = fake_store
 
-        facts = await store.recall_facts(
-            preferences_namespace("alice"), query="q", limit=0
-        )
+        facts = await store.recall_facts(preferences_namespace("alice"), query="q", limit=0)
         assert facts == []
         fake_store.asearch.assert_not_called()
 
-    async def test_recall_skips_non_dict_values(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_recall_skips_non_dict_values(self, store: LongTermMemoryStore) -> None:
         """Malformed entries (non-dict value) are tolerated."""
         bogus_item = MagicMock()
         bogus_item.value = "not a dict"
@@ -403,9 +371,7 @@ class TestGracefulDegradation:
         fake_store.asearch = AsyncMock(return_value=[bogus_item])
         store._store = fake_store
 
-        facts = await store.recall_facts(
-            preferences_namespace("alice"), query="q"
-        )
+        facts = await store.recall_facts(preferences_namespace("alice"), query="q")
         assert facts == []
 
     async def test_delete_fact_is_idempotent_on_missing_key(
@@ -414,9 +380,7 @@ class TestGracefulDegradation:
         """``delete_fact`` on a missing key must not raise."""
         await store.delete_fact(preferences_namespace("alice"), "never-existed")
 
-    async def test_delete_fact_swallows_backend_errors(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_delete_fact_swallows_backend_errors(self, store: LongTermMemoryStore) -> None:
         fake_store = MagicMock()
         fake_store.adelete = AsyncMock(side_effect=RuntimeError("db down"))
         store._store = fake_store
@@ -431,9 +395,7 @@ class TestGracefulDegradation:
 
 
 class TestNamespaceIsolation:
-    async def test_facts_isolated_across_users(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_facts_isolated_across_users(self, store: LongTermMemoryStore) -> None:
         """A fact stored for ``alice`` is not visible when querying ``bob``."""
         alice_ns = preferences_namespace("alice")
         bob_ns = preferences_namespace("bob")
@@ -463,9 +425,7 @@ class TestNamespaceIsolation:
         assert any("German" in v for v in bob_values)
         assert all("Spanish" not in v for v in bob_values)
 
-    async def test_facts_isolated_across_namespace_types(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_facts_isolated_across_namespace_types(self, store: LongTermMemoryStore) -> None:
         """Same ``user_id``, different namespace tuple → isolated reads."""
         prefs = preferences_namespace("alice")
         facts_ns = learned_facts_namespace("alice")
@@ -490,9 +450,7 @@ class TestNamespaceIsolation:
         assert [f["value"] for f in pref_facts] == ["pref entry"]
         assert [f["value"] for f in learned] == ["learned entry"]
 
-    async def test_limit_caps_returned_facts(
-        self, store: LongTermMemoryStore
-    ) -> None:
+    async def test_limit_caps_returned_facts(self, store: LongTermMemoryStore) -> None:
         ns = preferences_namespace("alice")
         for i in range(8):
             await store.store_fact(

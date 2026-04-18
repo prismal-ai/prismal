@@ -95,9 +95,7 @@ _MAX_CONSECUTIVE_FAILURES: int = 3
 _HISTORY_WINDOW: int = 8
 """Messages from state.messages sent to the LLM as context."""
 
-_CODE_BLOCK_RE: re.Pattern[str] = re.compile(
-    r"<code>(.*?)</code>", re.DOTALL | re.IGNORECASE
-)
+_CODE_BLOCK_RE: re.Pattern[str] = re.compile(r"<code>(.*?)</code>", re.DOTALL | re.IGNORECASE)
 
 _RESULT_MARKER: str = "__CODEACT_RESULT__"
 """Printed by the LLM's last line when the `result` variable is set.
@@ -179,9 +177,7 @@ _SHELL_DISABLED_REPLY: str = (
 def _get_import_allowlist() -> frozenset[str]:
     """Parse the allowlist from settings into a frozenset of top-level names."""
     raw = get_settings().codeact_import_allowlist or ""
-    return frozenset(
-        name.strip() for name in raw.split(",") if name.strip()
-    )
+    return frozenset(name.strip() for name in raw.split(",") if name.strip())
 
 
 # ---------------------------------------------------------------------------
@@ -367,19 +363,13 @@ def _validate_imports(code: str) -> tuple[bool, str]:
             # wrapped around a string literal) is rejected even when
             # every surrounding identifier is allowlisted.
             func = node.func
-            if (
-                isinstance(func, ast.Name)
-                and func.id in _DANGEROUS_NAME_CALLS
-            ):
+            if isinstance(func, ast.Name) and func.id in _DANGEROUS_NAME_CALLS:
                 return False, (
                     f"Call to built-in '{func.id}()' is forbidden "
                     f"in CodeAct blocks. This bypasses the import "
                     f"allowlist and is categorically denied."
                 )
-            if (
-                isinstance(func, ast.Attribute)
-                and func.attr in _DANGEROUS_ATTR_CALLS
-            ):
+            if isinstance(func, ast.Attribute) and func.attr in _DANGEROUS_ATTR_CALLS:
                 return False, (
                     f"Call to attribute '.{func.attr}()' is "
                     f"forbidden in CodeAct blocks. This is a known "
@@ -395,10 +385,7 @@ def _validate_imports(code: str) -> tuple[bool, str]:
             # list (``__name__``, ``__main__``, ``__doc__``,
             # ``__file__``) preserves the ``if __name__ == "__main__"``
             # idiom which is harmless.
-            if (
-                node.id.startswith("__")
-                and node.id not in _ALLOWED_DUNDERS
-            ):
+            if node.id.startswith("__") and node.id not in _ALLOWED_DUNDERS:
                 return False, (
                     f"Dunder identifier '{node.id}' is forbidden "
                     f"in CodeAct blocks. Dunder access is a known "
@@ -409,10 +396,7 @@ def _validate_imports(code: str) -> tuple[bool, str]:
             # AC-044-3: same rule for attribute access. Catches
             # ``foo.__class__.__bases__`` and every other chain that
             # traverses dunder attributes without calling them.
-            if (
-                node.attr.startswith("__")
-                and node.attr not in _ALLOWED_DUNDERS
-            ):
+            if node.attr.startswith("__") and node.attr not in _ALLOWED_DUNDERS:
                 return False, (
                     f"Dunder attribute access '.{node.attr}' is "
                     f"forbidden in CodeAct blocks. Dunder traversal "
@@ -426,19 +410,13 @@ def _validate_imports(code: str) -> tuple[bool, str]:
             # are denied.
             base = node.value
             if isinstance(base, ast.Name) and base.id == "__builtins__":
-                return False, (
-                    "Subscript on '__builtins__' is forbidden "
-                    "in CodeAct blocks."
-                )
+                return False, ("Subscript on '__builtins__' is forbidden in CodeAct blocks.")
             if (
                 isinstance(base, ast.Call)
                 and isinstance(base.func, ast.Name)
                 and base.func.id in {"globals", "locals"}
             ):
-                return False, (
-                    f"Subscript on '{base.func.id}()' is forbidden "
-                    f"in CodeAct blocks."
-                )
+                return False, (f"Subscript on '{base.func.id}()' is forbidden in CodeAct blocks.")
 
     return True, ""
 
@@ -493,9 +471,7 @@ async def _run_code_in_sandbox(code: str) -> tuple[bool, str, str, int]:
     return exit_code == 0, stdout, stderr, exit_code
 
 
-def _format_execution_feedback(
-    stdout: str, stderr: str, exit_code: int
-) -> str:
+def _format_execution_feedback(stdout: str, stderr: str, exit_code: int) -> str:
     """Render runtime output as a message the LLM can act on."""
     parts: list[str] = [f"Execution finished with exit code {exit_code}."]
     if stdout.strip():
@@ -566,9 +542,7 @@ async def codeact_node(state: AgentState) -> dict[str, Any]:
         code = _extract_code_block(raw_content)
         if code is None:
             # No more code blocks → LLM considers the task complete.
-            final_reply = raw_content.strip() or (
-                "CodeAct finished without emitting a code block."
-            )
+            final_reply = raw_content.strip() or ("CodeAct finished without emitting a code block.")
             logger.info(
                 "codeact_completed_without_code",
                 iteration=iteration,
@@ -622,11 +596,7 @@ async def codeact_node(state: AgentState) -> dict[str, Any]:
             # marker. The LLM is prompted to always print it on the last
             # successful step.
             if _RESULT_MARKER in stdout:
-                final_reply = (
-                    raw_content.strip()
-                    + "\n\n---\n"
-                    + feedback
-                )
+                final_reply = raw_content.strip() + "\n\n---\n" + feedback
                 logger.info(
                     "codeact_completed_with_result",
                     iteration=iteration,

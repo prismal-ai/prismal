@@ -74,9 +74,7 @@ def test_match_intent_handles_none() -> None:
 
 
 def test_match_intent_is_accent_insensitive() -> None:
-    assert match_intent("lista los crons activos") == match_intent(
-        "lista los cróns actívos"
-    )
+    assert match_intent("lista los crons activos") == match_intent("lista los cróns actívos")
     assert match_intent("cada día a las 8 envíame el reporte") == "cron_manager"
     assert match_intent("cada dia a las 8 enviame el reporte") == "cron_manager"
 
@@ -89,9 +87,7 @@ def test_match_intent_is_case_insensitive() -> None:
 def test_match_intent_is_pure_function() -> None:
     """The matcher module must depend only on the stdlib (re, unicodedata)."""
     module = importlib.import_module("lightagent.agents.intent_router")
-    referenced = {
-        name.split(".")[0] for name in dir(module) if not name.startswith("_")
-    }
+    referenced = {name.split(".")[0] for name in dir(module) if not name.startswith("_")}
     # Sanity: the module exposes only ``match_intent``.
     assert "match_intent" in referenced
     # Calling repeatedly is deterministic and side-effect-free.

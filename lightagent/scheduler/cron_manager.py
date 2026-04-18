@@ -122,23 +122,15 @@ class CronJob(BaseModel):
     status: CronStatus = "active"
     last_run: datetime | None = None
     next_run: datetime | None = None
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None)
-    )
-    max_retries: int = Field(
-        default=0, ge=0, description="Max retry attempts on failure."
-    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
+    max_retries: int = Field(default=0, ge=0, description="Max retry attempts on failure.")
     retry_delay_seconds: int = Field(
         default=60, ge=1, description="Base delay in seconds for exponential backoff."
     )
-    retry_count: int = Field(
-        default=0, ge=0, description="Current retry attempt count."
-    )
+    retry_count: int = Field(default=0, ge=0, description="Current retry attempt count.")
     output_channel: str | None = Field(
         default=None,
-        description=(
-            "Delivery channel for job output (e.g. 'telegram', 'slack', 'email')."
-        ),
+        description=("Delivery channel for job output (e.g. 'telegram', 'slack', 'email')."),
     )
     output_target: str | None = Field(
         default=None,
@@ -206,12 +198,9 @@ class CronManager:
             # Safe migration: add retry columns to existing DBs.
             # SQLite raises OperationalError on duplicate column — ignore it.
             _migrations = [
-                "ALTER TABLE cron_jobs"
-                " ADD COLUMN max_retries INTEGER NOT NULL DEFAULT 0",
-                "ALTER TABLE cron_jobs"
-                " ADD COLUMN retry_delay_seconds INTEGER NOT NULL DEFAULT 60",
-                "ALTER TABLE cron_jobs"
-                " ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE cron_jobs ADD COLUMN max_retries INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE cron_jobs ADD COLUMN retry_delay_seconds INTEGER NOT NULL DEFAULT 60",
+                "ALTER TABLE cron_jobs ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
             ]
             for sql in _migrations:
                 with contextlib.suppress(sqlite3.OperationalError):
@@ -220,23 +209,13 @@ class CronManager:
     def _migrate_db(self) -> None:
         """Apply additive schema migrations for columns added after initial release."""
         with self._conn() as conn:
-            existing = {
-                row[1]
-                for row in conn.execute("PRAGMA table_info(cron_jobs)").fetchall()
-            }
+            existing = {row[1] for row in conn.execute("PRAGMA table_info(cron_jobs)").fetchall()}
             if "output_channel" not in existing:
-                conn.execute(
-                    "ALTER TABLE cron_jobs ADD COLUMN output_channel TEXT"
-                )
+                conn.execute("ALTER TABLE cron_jobs ADD COLUMN output_channel TEXT")
             if "output_target" not in existing:
-                conn.execute(
-                    "ALTER TABLE cron_jobs ADD COLUMN output_target TEXT"
-                )
+                conn.execute("ALTER TABLE cron_jobs ADD COLUMN output_target TEXT")
             if "timezone" not in existing:
-                conn.execute(
-                    "ALTER TABLE cron_jobs"
-                    " ADD COLUMN timezone TEXT NOT NULL DEFAULT ''"
-                )
+                conn.execute("ALTER TABLE cron_jobs ADD COLUMN timezone TEXT NOT NULL DEFAULT ''")
 
     @staticmethod
     def _row_to_job(row: sqlite3.Row) -> CronJob:
@@ -332,9 +311,18 @@ class CronManager:
                 "  output_channel, output_target, timezone)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    name, schedule, task, job.status, created, next_stamp,
-                    max_retries, retry_delay_seconds, 0,
-                    output_channel, output_target, timezone,
+                    name,
+                    schedule,
+                    task,
+                    job.status,
+                    created,
+                    next_stamp,
+                    max_retries,
+                    retry_delay_seconds,
+                    0,
+                    output_channel,
+                    output_target,
+                    timezone,
                 ),
             )
 
@@ -405,9 +393,18 @@ class CronManager:
                 "  output_channel, output_target, timezone)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    name, schedule, task, job.status, now_str, run_at_str,
-                    0, 60, 0,
-                    output_channel, output_target, timezone,
+                    name,
+                    schedule,
+                    task,
+                    job.status,
+                    now_str,
+                    run_at_str,
+                    0,
+                    60,
+                    0,
+                    output_channel,
+                    output_target,
+                    timezone,
                 ),
             )
 
@@ -432,9 +429,7 @@ class CronManager:
         """
         self._require_job(name)
         with self._conn() as conn:
-            conn.execute(
-                "UPDATE cron_jobs SET status = 'paused' WHERE name = ?", (name,)
-            )
+            conn.execute("UPDATE cron_jobs SET status = 'paused' WHERE name = ?", (name,))
         logger.info("cron_job_paused", name=name)
 
     def resume(self, name: str) -> None:
@@ -455,9 +450,7 @@ class CronManager:
         from lightagent.scheduler.datetime_service import DateTimeService
 
         dts = DateTimeService.get()
-        tz: ZoneInfo | None = (
-            dts.resolve_timezone(job.timezone) if job.timezone else None
-        )
+        tz: ZoneInfo | None = dts.resolve_timezone(job.timezone) if job.timezone else None
         next_aware = dts.next_run(job.schedule, tz)
         next_naive = dts.to_utc_naive(next_aware)
         stamp = next_naive.strftime(_DT_FMT)
@@ -492,9 +485,7 @@ class CronManager:
         AC-007-3: Shows name, schedule, last run, next run, status.
         """
         with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM cron_jobs ORDER BY created_at"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM cron_jobs ORDER BY created_at").fetchall()
         return [self._row_to_job(r) for r in rows]
 
     def get_job(self, name: str) -> CronJob | None:
@@ -507,9 +498,7 @@ class CronManager:
             :class:`CronJob` if found, ``None`` otherwise.
         """
         with self._conn() as conn:
-            row = conn.execute(
-                "SELECT * FROM cron_jobs WHERE name = ?", (name,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM cron_jobs WHERE name = ?", (name,)).fetchone()
         return self._row_to_job(row) if row else None
 
     def update_timezone(self, name: str, timezone: str) -> None:
@@ -540,9 +529,7 @@ class CronManager:
         """
         stamp = (ts or datetime.now(UTC).replace(tzinfo=None)).strftime(_DT_FMT)
         with self._conn() as conn:
-            conn.execute(
-                "UPDATE cron_jobs SET last_run = ? WHERE name = ?", (stamp, name)
-            )
+            conn.execute("UPDATE cron_jobs SET last_run = ? WHERE name = ?", (stamp, name))
 
     def set_retry_count(self, name: str, count: int) -> None:
         """Set the current retry attempt counter for a job.
@@ -608,9 +595,7 @@ class CronManager:
             output=output,
             error=error,
         )
-        logger.debug(
-            "cron_run_recorded", job=job_name, outcome=outcome, duration=duration
-        )
+        logger.debug("cron_run_recorded", job=job_name, outcome=outcome, duration=duration)
         return record
 
     def get_run_history(self, job_name: str, limit: int = 20) -> list[CronRunRecord]:
@@ -701,9 +686,7 @@ class CronManager:
                 "cron_prefect_deployment_skipped",
                 name=job.name,
                 schedule=job.schedule,
-                reason=(
-                    "Prefect deployment API not yet wired; job persisted in SQLite only"
-                ),
+                reason=("Prefect deployment API not yet wired; job persisted in SQLite only"),
             )
         except Exception as exc:
             logger.warning(

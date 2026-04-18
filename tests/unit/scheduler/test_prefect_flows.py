@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
-
 # ── Task .fn tests (call underlying function directly, no Prefect context) ────
 
 
@@ -123,7 +120,6 @@ def test_config_reload_flow_delegates_to_task() -> None:
 
 def test_agent_run_flow_returns_string() -> None:
     """agent_run_flow.fn returns a result string from the graph."""
-    import asyncio as _asyncio
 
     from lightagent.scheduler.prefect_flows import agent_run_flow
 
@@ -135,7 +131,9 @@ def test_agent_run_flow_returns_string() -> None:
             coro.close()  # type: ignore[union-attr]
         return "Agent response text"
 
-    with patch("lightagent.scheduler.prefect_flows.asyncio.run", side_effect=fake_run_drain) as mock_run:
+    with patch(
+        "lightagent.scheduler.prefect_flows.asyncio.run", side_effect=fake_run_drain
+    ) as mock_run:
         result = agent_run_flow.fn("Summarise quarterly report")
 
     mock_run.assert_called_once()
@@ -177,7 +175,10 @@ def test_agent_run_flow_calls_graph() -> None:
 
     with (
         patch("lightagent.agents.graph.get_async_compiled_graph", mock_get_graph),
-        patch("lightagent.scheduler.prefect_flows.asyncio.run", side_effect=fake_asyncio_run),
+        patch(
+            "lightagent.scheduler.prefect_flows.asyncio.run",
+            side_effect=fake_asyncio_run,
+        ),
     ):
         result = agent_run_flow.fn("fetch latest stock prices")
 

@@ -82,6 +82,7 @@ def _parse_invest_response(content: str) -> tuple[str, float]:
         logger.warning("po_invest_parse_failed", error=str(exc))
         return (f"INVEST critique failed to parse: {exc}", 1.0)
 
+
 _SYSTEM = """You are a Product Owner for the dev_pipeline subgraph.
 
 ## Purpose

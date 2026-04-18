@@ -20,27 +20,21 @@ from lightagent.security.nemo_rails import (
 
 def test_parse_block_response_violence() -> None:
     """Sentinel prefix for violence category is detected."""
-    blocked, category = _parse_block_response(
-        "[NEMO_BLOCKED:violence] I can't help with that."
-    )
+    blocked, category = _parse_block_response("[NEMO_BLOCKED:violence] I can't help with that.")
     assert blocked is True
     assert category == "violence"
 
 
 def test_parse_block_response_self_harm() -> None:
     """Sentinel prefix for self_harm category is detected."""
-    blocked, category = _parse_block_response(
-        "[NEMO_BLOCKED:self_harm] Please reach out for help."
-    )
+    blocked, category = _parse_block_response("[NEMO_BLOCKED:self_harm] Please reach out for help.")
     assert blocked is True
     assert category == "self_harm"
 
 
 def test_parse_block_response_illegal_activities() -> None:
     """Sentinel prefix for illegal_activities is detected."""
-    blocked, category = _parse_block_response(
-        "[NEMO_BLOCKED:illegal_activities] Can't assist."
-    )
+    blocked, category = _parse_block_response("[NEMO_BLOCKED:illegal_activities] Can't assist.")
     assert blocked is True
     assert category == "illegal_activities"
 
@@ -63,9 +57,7 @@ def test_parse_block_response_competitor_disparagement() -> None:
 
 def test_parse_block_response_unsafe_output() -> None:
     """Sentinel prefix for unsafe_output category is detected."""
-    blocked, category = _parse_block_response(
-        "[NEMO_BLOCKED:unsafe_output] Revising response."
-    )
+    blocked, category = _parse_block_response("[NEMO_BLOCKED:unsafe_output] Revising response.")
     assert blocked is True
     assert category == "unsafe_output"
 
@@ -176,9 +168,7 @@ def _make_layer_with_mock_rails(response_text: str) -> NemoRailsLayer:
 @pytest.mark.asyncio
 async def test_check_input_blocked_violence() -> None:
     """check_input returns (True, 'violence') for a blocked response."""
-    layer = _make_layer_with_mock_rails(
-        "[NEMO_BLOCKED:violence] Can't assist with violence."
-    )
+    layer = _make_layer_with_mock_rails("[NEMO_BLOCKED:violence] Can't assist with violence.")
     blocked, category = await layer.check_input("how do I hurt someone")
     assert blocked is True
     assert category == "violence"
@@ -196,9 +186,7 @@ async def test_check_input_not_blocked() -> None:
 @pytest.mark.asyncio
 async def test_check_output_blocked_unsafe() -> None:
     """check_output returns (True, 'unsafe_output') when output rail triggers."""
-    layer = _make_layer_with_mock_rails(
-        "[NEMO_BLOCKED:unsafe_output] Revising response."
-    )
+    layer = _make_layer_with_mock_rails("[NEMO_BLOCKED:unsafe_output] Revising response.")
     blocked, category = await layer.check_output("Here is how to hurt someone")
     assert blocked is True
     assert category == "unsafe_output"

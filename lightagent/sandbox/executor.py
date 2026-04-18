@@ -16,31 +16,51 @@ import subprocess
 import threading
 import uuid
 from dataclasses import dataclass, field
-from pathlib import Path
 from time import monotonic
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from lightagent.core.logging import get_logger
 from lightagent.sandbox.manager import SandboxManager
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = get_logger("lightagent.sandbox.executor")
 
 __all__ = ["ExecutionResult", "SandboxExecutor"]
 
 _LangLiteral = Literal[
-    "python", "python3",
-    "javascript", "js", "node",
-    "typescript", "ts",
-    "go", "golang",
-    "bash", "sh",
+    "python",
+    "python3",
+    "javascript",
+    "js",
+    "node",
+    "typescript",
+    "ts",
+    "go",
+    "golang",
+    "bash",
+    "sh",
     "ruff-check",
     "tsc",
 ]
 
 _SUPPORTED_LANGUAGES: frozenset[str] = frozenset(
-    ["python", "python3", "javascript", "js", "node",
-     "typescript", "ts", "go", "golang", "bash", "sh",
-     "ruff-check", "tsc"]
+    [
+        "python",
+        "python3",
+        "javascript",
+        "js",
+        "node",
+        "typescript",
+        "ts",
+        "go",
+        "golang",
+        "bash",
+        "sh",
+        "ruff-check",
+        "tsc",
+    ]
 )
 
 
@@ -240,7 +260,7 @@ class SandboxExecutor:
 
     @staticmethod
     def _await_in_fresh_loop(
-        coro: Any,  # noqa: ANN401 -- async coroutine, dynamic type ok
+        coro: Any,
         language: str,
         workdir: str,
     ) -> ExecutionResult:
@@ -312,8 +332,7 @@ class SandboxExecutor:
     def _resolve_cwd(self, workdir: str) -> Path:
         """Resuelve el directorio de trabajo dentro de la sandbox."""
         if not workdir:
-            tmp = self._mgr.resolve_tmp()
-            return tmp
+            return self._mgr.resolve_tmp()
         cwd = self._mgr.resolve_workspace(workdir)
         cwd.mkdir(parents=True, exist_ok=True)
         return cwd
@@ -323,7 +342,7 @@ class SandboxExecutor:
         lang: str,
         code: str,
         run_id: str,
-        cwd: Path,
+        cwd: Path,  # noqa: ARG002 — reserved for future per-lang cwd handling
     ) -> tuple[list[str], list[Path]]:
         """Construye el comando a ejecutar y la lista de archivos temporales.
 
@@ -412,7 +431,7 @@ class SandboxExecutor:
         Returns:
             :class:`ExecutionResult` con el resultado.
         """
-        from lightagent.core.config import get_settings  # noqa: PLC0415
+        from lightagent.core.config import get_settings
 
         settings = get_settings()
         timeout = settings.sandbox_exec_timeout
@@ -429,7 +448,7 @@ class SandboxExecutor:
 
         t0 = monotonic()
         try:
-            proc = subprocess.run(  # noqa: S603
+            proc = subprocess.run(
                 cmd,
                 cwd=str(cwd),
                 env=env,
@@ -477,7 +496,7 @@ class SandboxExecutor:
                 duration_ms=0,
                 workdir=workdir_label,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return ExecutionResult(
                 stdout="",
                 stderr=f"Error de ejecución: {exc}",

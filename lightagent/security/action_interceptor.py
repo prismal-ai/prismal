@@ -67,7 +67,7 @@ class ActionInterceptor(BaseCallbackHandler):
         self,
         serialized: dict[str, Any],
         input_str: str,
-        **kwargs: Any,  # noqa: ANN401 — required by LangChain interface
+        **kwargs: Any,
     ) -> None:
         """Check permissions before a tool executes.
 
@@ -99,8 +99,8 @@ class ActionInterceptor(BaseCallbackHandler):
 
     async def on_tool_end(
         self,
-        output: Any,  # noqa: ANN401 — required by LangChain interface
-        **kwargs: Any,  # noqa: ANN401 — required by LangChain interface
+        output: Any,
+        **kwargs: Any,
     ) -> None:
         """Log successful tool execution to audit log.
 
@@ -108,9 +108,7 @@ class ActionInterceptor(BaseCallbackHandler):
             output: Tool output (any type; stored as string preview).
         """
         run_id_val = str(kwargs.get("run_id") or "")
-        tool_name, input_str, start_time = self._runs.pop(
-            run_id_val, ("unknown", "", 0.0)
-        )
+        tool_name, input_str, start_time = self._runs.pop(run_id_val, ("unknown", "", 0.0))
         duration_ms = int((time.monotonic() - start_time) * 1000)
         self._audit.log_tool_call(
             name=tool_name,
@@ -122,7 +120,7 @@ class ActionInterceptor(BaseCallbackHandler):
     async def on_tool_error(
         self,
         error: BaseException,
-        **kwargs: Any,  # noqa: ANN401 — required by LangChain interface
+        **kwargs: Any,
     ) -> None:
         """Log tool errors to audit log.
 
@@ -130,9 +128,7 @@ class ActionInterceptor(BaseCallbackHandler):
             error: The exception raised during tool execution.
         """
         run_id_val = str(kwargs.get("run_id") or "")
-        tool_name, input_str, start_time = self._runs.pop(
-            run_id_val, ("unknown", "", 0.0)
-        )
+        tool_name, input_str, start_time = self._runs.pop(run_id_val, ("unknown", "", 0.0))
         duration_ms = int((time.monotonic() - start_time) * 1000)
         self._audit.log_tool_call(
             name=tool_name,
@@ -140,7 +136,6 @@ class ActionInterceptor(BaseCallbackHandler):
             result=f"ERROR: {error!r}",
             duration_ms=duration_ms,
         )
-
 
     @staticmethod
     def check_shell(cmd: list[str]) -> bool:

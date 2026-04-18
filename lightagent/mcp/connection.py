@@ -18,15 +18,15 @@ import contextlib
 import os
 from typing import Any, Literal
 
-import mcp.types
 import psutil
-from mcp.client.sse import sse_client
-from mcp.client.stdio import StdioServerParameters, stdio_client
 from pydantic import BaseModel, Field, model_validator
 
+import mcp.types
 from lightagent.core.exceptions import MCPConnectionError, MCPToolError
 from lightagent.core.logging import get_logger
 from mcp import ClientSession
+from mcp.client.sse import sse_client
+from mcp.client.stdio import StdioServerParameters, stdio_client
 
 
 def _kill_process_tree(pids: list[int]) -> None:
@@ -61,6 +61,7 @@ def _kill_process_tree(pids: list[int]) -> None:
                 proc.kill()
     except Exception:  # noqa: S110 — best-effort cleanup; never raise
         pass
+
 
 logger = get_logger("lightagent.mcp.connection")
 
@@ -169,16 +170,10 @@ class MCPServerConfig(BaseModel):
             ValueError: If required transport fields are missing.
         """
         if self.type == "stdio" and not self.command:
-            msg = (
-                f"MCP server '{self.name}': "
-                "'command' is required for stdio transport."
-            )
+            msg = f"MCP server '{self.name}': 'command' is required for stdio transport."
             raise ValueError(msg)
         if self.type in {"sse", "streamable-http"} and not self.url:
-            msg = (
-                f"MCP server '{self.name}': "
-                f"'url' is required for {self.type!r} transport."
-            )
+            msg = f"MCP server '{self.name}': 'url' is required for {self.type!r} transport."
             raise ValueError(msg)
         return self
 
@@ -199,10 +194,7 @@ class MCPServerStatus(BaseModel):
     server_type: str = Field(..., description="Transport type ('stdio' or 'sse').")
     priority: int = Field(
         default=0,
-        description=(
-            "Dispatch priority — higher value means tools from this server"
-            " appear first."
-        ),
+        description=("Dispatch priority — higher value means tools from this server appear first."),
     )
 
 
@@ -225,8 +217,7 @@ class MCPServerConnection:
 
     Usage::
 
-        cfg = MCPServerConfig(name="myserver", type="stdio",
-                              command=["python", "-m", "myserver"])
+        cfg = MCPServerConfig(name="myserver", type="stdio", command=["python", "-m", "myserver"])
         conn = MCPServerConnection(cfg)
         await conn.connect()
         tools = await conn.list_tools()
@@ -419,9 +410,7 @@ class MCPServerConnection:
 
         # Snapshot existing child PIDs so we can identify the new subprocess.
         with contextlib.suppress(Exception):
-            before_pids: set[int] = {
-                p.pid for p in psutil.Process().children(recursive=True)
-            }
+            before_pids: set[int] = {p.pid for p in psutil.Process().children(recursive=True)}
 
         read, write = await stack.enter_async_context(stdio_client(params))
 

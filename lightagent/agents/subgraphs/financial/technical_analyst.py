@@ -72,6 +72,7 @@ def _score_technical_indicators(indicators: dict[str, float]) -> float:
 
     return present_families / len(_TECHNICAL_INDICATOR_FAMILIES)
 
+
 _SYSTEM = """You are a Technical Analyst for the financial subgraph.
 
 ## Purpose
@@ -195,9 +196,7 @@ async def technical_analyst_node(state: AgentState) -> dict[str, Any]:
         span.set_attribute("lightagent.subgraph", "financial_analyst")
         span.set_attribute("lightagent.agent", "technical_analyst")
 
-        fin: dict[str, Any] = dict(
-            state.get("metadata", {}).get("financial_analyst", {})
-        )
+        fin: dict[str, Any] = dict(state.get("metadata", {}).get("financial_analyst", {}))
         snapshot = fin.get("market_snapshot", {})
         symbol = snapshot.get("symbol", "UNKNOWN")
 
@@ -222,9 +221,7 @@ async def technical_analyst_node(state: AgentState) -> dict[str, Any]:
         # gate can decide whether to run fundamental analysis or skip
         # straight to risk/sentiment with a limited-data disclaimer.
         confidence = _score_technical_indicators(analysis.indicators)
-        analysis = analysis.model_copy(
-            update={"data_confidence": confidence}
-        )
+        analysis = analysis.model_copy(update={"data_confidence": confidence})
 
         fin["technical_analysis"] = analysis.model_dump()
 

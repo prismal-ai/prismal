@@ -13,9 +13,7 @@ def test_otel_manager_is_available_for_rag() -> None:
 
     OTelManager._instance = None
     OTelManager._initialized = False
-    with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-    ) as mock_settings:
+    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         s = MagicMock()
         s.otel_enabled = False
         mock_settings.return_value = s

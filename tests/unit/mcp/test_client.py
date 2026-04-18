@@ -387,9 +387,7 @@ class TestReload:
         assert "old-server" not in manager._connections
 
     @pytest.mark.asyncio
-    async def test_reload_disconnects_newly_disabled_server(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_reload_disconnects_newly_disabled_server(self, tmp_path: Path) -> None:
         """reload() must disconnect a server that is now disabled in the config."""
         cfg_file = tmp_path / "mcp_servers.yaml"
         cfg_file.write_text(_make_yaml([_STDIO_ENTRY_DISABLED]))

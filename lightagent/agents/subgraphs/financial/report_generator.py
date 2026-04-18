@@ -162,9 +162,7 @@ async def report_generator_node(state: AgentState) -> dict[str, Any]:
         span.set_attribute("lightagent.subgraph", "financial_analyst")
         span.set_attribute("lightagent.agent", "report_generator")
 
-        fin: dict[str, Any] = dict(
-            state.get("metadata", {}).get("financial_analyst", {})
-        )
+        fin: dict[str, Any] = dict(state.get("metadata", {}).get("financial_analyst", {}))
         snapshot = fin.get("market_snapshot", {})
         symbol = snapshot.get("symbol", "UNKNOWN")
 
@@ -176,17 +174,13 @@ async def report_generator_node(state: AgentState) -> dict[str, Any]:
         ]
         if ta := fin.get("technical_analysis"):
             context_parts.append(
-                f"Technical: trend={ta.get('trend')}, "
-                f"signals={ta.get('signals', [])[:3]}"
+                f"Technical: trend={ta.get('trend')}, signals={ta.get('signals', [])[:3]}"
             )
         if fa := fin.get("fundamental_analysis"):
-            context_parts.append(
-                f"Fundamental: score={fa.get('fundamental_score')}"
-            )
+            context_parts.append(f"Fundamental: score={fa.get('fundamental_score')}")
         if rs := fin.get("risk_sentiment_report"):
             context_parts.append(
-                f"Risk: level={rs.get('risk_level')}, "
-                f"sentiment={rs.get('sentiment_score')}"
+                f"Risk: level={rs.get('risk_level')}, sentiment={rs.get('sentiment_score')}"
             )
 
         llm = ProviderRegistry().get_llm()

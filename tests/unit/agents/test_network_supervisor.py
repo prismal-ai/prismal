@@ -63,9 +63,7 @@ async def test_delegate_falls_back_to_local_when_no_nodes() -> None:
     agent = NetworkSupervisorAgent(nodes=[])
 
     mock_local_result = {"messages": [MagicMock(content="local result")]}
-    with patch(
-        "lightagent.agents.network_supervisor.get_compiled_graph"
-    ) as mock_graph_fn:
+    with patch("lightagent.agents.network_supervisor.get_compiled_graph") as mock_graph_fn:
         mock_graph = MagicMock()
         mock_graph.ainvoke = AsyncMock(return_value=mock_local_result)
         mock_graph_fn.return_value = mock_graph
@@ -91,9 +89,7 @@ async def test_delegate_falls_back_on_http_error() -> None:
 
     with (
         patch("lightagent.agents.network_supervisor.httpx") as mock_httpx,
-        patch(
-            "lightagent.agents.network_supervisor.get_compiled_graph"
-        ) as mock_graph_fn,
+        patch("lightagent.agents.network_supervisor.get_compiled_graph") as mock_graph_fn,
     ):
         mock_httpx.AsyncClient.return_value.__aenter__.return_value.post = AsyncMock(
             side_effect=Exception("connection refused")
@@ -109,7 +105,6 @@ async def test_delegate_falls_back_on_http_error() -> None:
 
 def test_load_nodes_returns_empty_when_config_missing(tmp_path) -> None:
     """_load_nodes returns [] when the config file does not exist."""
-    from pathlib import Path
 
     non_existent = tmp_path / "does_not_exist.yaml"
     nodes = _load_nodes(non_existent)

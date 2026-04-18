@@ -32,7 +32,7 @@ import sqlite3
 import uuid
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS users (
 _DT_FMT = "%Y-%m-%dT%H:%M:%S"
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     """Role levels for the LightAgent RBAC system.
 
     Attributes:
@@ -152,9 +152,7 @@ class UserStore:
             username=row["username"],
             hashed_password=row["hashed_password"],
             role=UserRole(row["role"]),
-            created_at=datetime.strptime(row["created_at"], _DT_FMT).replace(
-                tzinfo=UTC
-            ),
+            created_at=datetime.strptime(row["created_at"], _DT_FMT).replace(tzinfo=UTC),
             is_active=bool(row["is_active"]),
         )
 
@@ -192,9 +190,7 @@ class UserStore:
                     (user_id, username, hashed, role.value, now),
                 )
             except sqlite3.IntegrityError as exc:
-                raise ValueError(
-                    f"Username '{username}' already exists."
-                ) from exc
+                raise ValueError(f"Username '{username}' already exists.") from exc
 
         logger.info("user_created", username=username, role=role.value)
         return User(

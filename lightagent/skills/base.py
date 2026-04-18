@@ -36,12 +36,13 @@ Example::
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from langchain_core.tools import BaseTool
 
 
@@ -153,7 +154,7 @@ def parse_skill_md(skill_dir: Path) -> dict[str, object]:
     Returns:
         Parsed frontmatter as a plain :class:`dict`; empty dict on any error.
     """
-    import yaml  # noqa: PLC0415
+    import yaml
 
     md_path = _find_skill_md(skill_dir)
     if md_path is None:
@@ -166,7 +167,7 @@ def parse_skill_md(skill_dir: Path) -> dict[str, object]:
         return {}
     try:
         return yaml.safe_load(text[3:end].strip()) or {}
-    except Exception:  # noqa: BLE001
+    except Exception:
         return {}
 
 
@@ -204,9 +205,7 @@ def _py_class_name(skill_name: str) -> str:
     Returns:
         PascalCase class name suitable for use in generated Python source.
     """
-    return "".join(
-        part.capitalize() for part in skill_name.replace("-", "_").split("_")
-    )
+    return "".join(part.capitalize() for part in skill_name.replace("-", "_").split("_"))
 
 
 def generate_skill_py(skill_dir: Path) -> None:
@@ -283,7 +282,7 @@ def _make_subprocess_tool(
     tool_name: str,
     script_path: str,
     description: str,
-) -> "BaseTool":
+) -> BaseTool:
     """Create a LangChain tool that invokes a Python script as a subprocess.
 
     Used when a ``scripts/`` file contains no ``@tool``-decorated functions —
@@ -297,11 +296,11 @@ def _make_subprocess_tool(
     Returns:
         A :class:`~langchain_core.tools.StructuredTool` that runs the script.
     """
-    import subprocess  # noqa: PLC0415
-    import sys as _sys  # noqa: PLC0415
+    import subprocess
+    import sys as _sys
 
-    from langchain_core.tools import StructuredTool  # noqa: PLC0415
-    from pydantic import BaseModel, Field  # noqa: PLC0415
+    from langchain_core.tools import StructuredTool
+    from pydantic import BaseModel, Field
 
     _script_path = script_path  # capture for closure
 
@@ -313,15 +312,13 @@ def _make_subprocess_tool(
 
     def _run(args: str = "") -> str:
         """Execute the script with optional arguments."""
-        from lightagent.core.config import get_settings  # noqa: PLC0415
+        from lightagent.core.config import get_settings
 
         if not get_settings().shell_enabled:
             return "Shell execution is disabled (LIGHTAGENT_SHELL_ENABLED=false)."
         cmd = [_sys.executable, _script_path] + (args.split() if args.strip() else [])
         try:
-            result = subprocess.run(  # noqa: S603
-                cmd, capture_output=True, text=True, timeout=60
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         except subprocess.TimeoutExpired:
             return "Script timed out after 60 s."
         out = result.stdout
@@ -341,7 +338,7 @@ def _make_reference_tools(
     skill_name: str,
     skill_dir: Path,
     skill_md_body: str,
-) -> "list[BaseTool]":
+) -> list[BaseTool]:
     """Create guide and reference-reading tools for a markdown skill.
 
     Generates two tools:
@@ -358,10 +355,10 @@ def _make_reference_tools(
         skill_md_body: Body text of ``SKILL.md`` (non-frontmatter content).
 
     Returns:
-        List of :class:`~langchain_core.tools.BaseTool` instances (0–2 items).
+        List of :class:`~langchain_core.tools.BaseTool` instances (0-2 items).
     """
-    from langchain_core.tools import StructuredTool  # noqa: PLC0415
-    from pydantic import BaseModel, Field  # noqa: PLC0415
+    from langchain_core.tools import StructuredTool
+    from pydantic import BaseModel, Field
 
     safe_name = skill_name.replace("-", "_")
     tools: list[BaseTool] = []
@@ -397,8 +394,7 @@ def _make_reference_tools(
                 filename: str = Field(
                     ...,
                     description=(
-                        "Name of the reference file to read. "
-                        f"Available: {', '.join(ref_files)}"
+                        f"Name of the reference file to read. Available: {', '.join(ref_files)}"
                     ),
                 )
 
@@ -406,9 +402,7 @@ def _make_reference_tools(
                 """Read a reference document from the skill's references directory."""
                 target = _refs_dir / filename
                 if not target.is_file():
-                    available = ", ".join(
-                        f.name for f in _refs_dir.iterdir() if f.is_file()
-                    )
+                    available = ", ".join(f.name for f in _refs_dir.iterdir() if f.is_file())
                     return f"File '{filename}' not found. Available: {available}"
                 return target.read_text(encoding="utf-8", errors="replace")
 
@@ -454,7 +448,7 @@ class MarkdownSkill(BaseSkill):
         self._skill_dir = skill_dir
 
     @property
-    def metadata(self) -> "SkillMetadata":
+    def metadata(self) -> SkillMetadata:
         """Return metadata parsed dynamically from ``skill.md`` frontmatter."""
         meta = parse_skill_md(self._skill_dir)
         return SkillMetadata(
@@ -467,7 +461,7 @@ class MarkdownSkill(BaseSkill):
             requires_permissions=list(meta.get("requires_permissions", [])),  # type: ignore[arg-type]
         )
 
-    def get_tools(self) -> "list[BaseTool]":
+    def get_tools(self) -> list[BaseTool]:
         """Return all tools for this skill.
 
         Combines three sources:
@@ -485,7 +479,7 @@ class MarkdownSkill(BaseSkill):
         tools.extend(_make_reference_tools(self.metadata.name, self._skill_dir, body))
         return tools
 
-    def _load_script_tools(self) -> "list[BaseTool]":
+    def _load_script_tools(self) -> list[BaseTool]:
         """Load tools from the ``scripts/`` subdirectory.
 
         For each ``.py`` file (not starting with ``_``):
@@ -498,10 +492,10 @@ class MarkdownSkill(BaseSkill):
         Returns:
             List of :class:`~langchain_core.tools.BaseTool` instances.
         """
-        import importlib.util  # noqa: PLC0415
-        import sys  # noqa: PLC0415
+        import importlib.util
+        import sys
 
-        from langchain_core.tools import BaseTool as _BaseTool  # noqa: PLC0415
+        from langchain_core.tools import BaseTool as _BaseTool
 
         tools: list[_BaseTool] = []
         scripts_dir = self._skill_dir / "scripts"
@@ -522,14 +516,12 @@ class MarkdownSkill(BaseSkill):
             sys.modules[mod_name] = mod
             try:
                 spec.loader.exec_module(mod)
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: S112 — skip modules whose import fails; log below
                 continue
 
             # Collect @tool-decorated objects from this module
             script_tools: list[_BaseTool] = [
-                getattr(mod, attr)
-                for attr in dir(mod)
-                if isinstance(getattr(mod, attr), _BaseTool)
+                getattr(mod, attr) for attr in dir(mod) if isinstance(getattr(mod, attr), _BaseTool)
             ]
 
             if script_tools:
@@ -542,9 +534,7 @@ class MarkdownSkill(BaseSkill):
                     or f"Run {script.name} with optional arguments."
                 )
                 tool_name = f"{safe_prefix}__{script.stem.replace('-', '_')}"
-                tools.append(
-                    _make_subprocess_tool(tool_name, str(script.resolve()), description)
-                )
+                tools.append(_make_subprocess_tool(tool_name, str(script.resolve()), description))
 
         return tools
 

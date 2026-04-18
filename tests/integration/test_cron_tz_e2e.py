@@ -15,16 +15,15 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 
-def _make_executor(tmp_path: Path) -> "tuple[object, MagicMock, MagicMock]":
+def _make_executor(tmp_path: Path) -> tuple[object, MagicMock, MagicMock]:
     """Return (executor, mock_scheduler, mock_manager) wired together.
 
     The CronManager is backed by a real temp-dir SQLite database so that
@@ -62,9 +61,7 @@ async def test_recurring_job_fires_in_user_timezone(tmp_path: Path) -> None:
 
     caracas_tz = ZoneInfo("America/Caracas")
 
-    with patch(
-        "lightagent.scheduler.executor.CronTrigger.from_crontab"
-    ) as mock_from_crontab:
+    with patch("lightagent.scheduler.executor.CronTrigger.from_crontab") as mock_from_crontab:
         mock_from_crontab.return_value = MagicMock()  # trigger stub
 
         # Simulate system timezone = UTC (container environment)
@@ -106,6 +103,7 @@ async def test_once_job_fires_correctly_in_utc_container(tmp_path: Path) -> None
 
     # DateTrigger is imported lazily inside _register_job; capture via sys.modules stub.
     import sys
+
     mock_date_trigger_cls = MagicMock()
     captured_trigger: list[object] = []
 
@@ -201,8 +199,6 @@ async def test_once_job_past_time_is_not_scheduled(
     # structlog writes warnings to stdout in test environments
     captured = capsys.readouterr()
     output = captured.out + captured.err
-    assert (
-        "skip" in output.lower()
-        or "expired" in output.lower()
-        or "expired-alert" in output
-    ), f"Expected a warning about the skipped job in stdout, got:\n{output}"
+    assert "skip" in output.lower() or "expired" in output.lower() or "expired-alert" in output, (
+        f"Expected a warning about the skipped job in stdout, got:\n{output}"
+    )

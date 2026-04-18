@@ -67,9 +67,7 @@ def captured_audit():
         ("PodmanBackend", "podman"),
     ],
 )
-async def test_container_backend_emits_audit(
-    captured_audit, backend_cls, backend_name
-) -> None:
+async def test_container_backend_emits_audit(captured_audit, backend_cls, backend_name) -> None:
     """Container backends call AuditLogger.log_tool_call with sandbox.run."""
     from lightagent.sandbox import isolation
 
@@ -103,9 +101,7 @@ async def test_container_backend_emits_audit(
         ("FirejailBackend", "firejail"),
     ],
 )
-async def test_namespace_backend_emits_audit(
-    captured_audit, backend_cls, backend_name
-) -> None:
+async def test_namespace_backend_emits_audit(captured_audit, backend_cls, backend_name) -> None:
     """Namespace backends emit a single sandbox.run audit row."""
     from lightagent.sandbox import isolation
 
@@ -142,7 +138,7 @@ async def test_none_backend_logs_degraded_warning(captured_audit) -> None:
         exit_code=0,
         language="python",
         duration_ms=1,
-        workdir="/tmp"  # noqa: S108 - test-only stub path,
+        workdir="/tmp",  # noqa: S108 - test-only stub path,
     )
 
     warnings: list[tuple[str, dict]] = []
@@ -150,16 +146,21 @@ async def test_none_backend_logs_degraded_warning(captured_audit) -> None:
     def _capture_warn(event, **kw):
         warnings.append((event, kw))
 
-    with patch(
-        "lightagent.sandbox.executor.SandboxExecutor._run",
-        return_value=fake_result,
-    ), patch(
-        "lightagent.sandbox.executor.SandboxExecutor._build_command",
-        return_value=(["python", "-c", "print(1)"], []),
-    ), patch(
-        "lightagent.sandbox.executor.SandboxExecutor._resolve_cwd",
-        return_value="/tmp"  # noqa: S108 - test-only stub path,
-    ), patch.object(isolation_mod.logger, "warning", side_effect=_capture_warn):
+    with (
+        patch(
+            "lightagent.sandbox.executor.SandboxExecutor._run",
+            return_value=fake_result,
+        ),
+        patch(
+            "lightagent.sandbox.executor.SandboxExecutor._build_command",
+            return_value=(["python", "-c", "print(1)"], []),
+        ),
+        patch(
+            "lightagent.sandbox.executor.SandboxExecutor._resolve_cwd",
+            return_value="/tmp",  # noqa: S108 - test-only stub path,
+        ),
+        patch.object(isolation_mod.logger, "warning", side_effect=_capture_warn),
+    ):
         result = await backend.run("print(1)", "python", timeout=5)
 
     assert result.exit_code == 0

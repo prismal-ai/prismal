@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
-
+from unittest.mock import MagicMock
 
 # ── FileWatcher construction ──────────────────────────────────────────────────
 
@@ -224,13 +221,9 @@ def test_create_default_watcher_uses_provided_callbacks() -> None:
     def my_cb(event_type: str, path: str) -> None:
         called.append(event_type)
 
-    watcher = create_default_watcher(
-        callbacks={"index_document_event": my_cb}
-    )
+    watcher = create_default_watcher(callbacks={"index_document_event": my_cb})
     # Verify our callback was registered (by checking the watch entries)
-    doc_watch = next(
-        w for w in watcher._watches if w.event_name == "index_document_event"
-    )
+    doc_watch = next(w for w in watcher._watches if w.event_name == "index_document_event")
     doc_watch.callback("index_document_event", "/some/doc.pdf")
     assert "index_document_event" in called
 

@@ -49,15 +49,16 @@ def validate_dataset(path: str, max_rows: int = 1_000_000) -> str:
             return json.dumps({"error": f"Unsupported format: {suffix}"})
 
         null_counts = {col: df[col].null_count() for col in df.columns}
-        return json.dumps({
-            "rows": df.height,
-            "columns": df.width,
-            "column_types": {
-                col: str(dtype)
-                for col, dtype in zip(df.columns, df.dtypes, strict=False)
-            },
-            "null_counts": null_counts,
-        })
+        return json.dumps(
+            {
+                "rows": df.height,
+                "columns": df.width,
+                "column_types": {
+                    col: str(dtype) for col, dtype in zip(df.columns, df.dtypes, strict=False)
+                },
+                "null_counts": null_counts,
+            }
+        )
     except ImportError:  # pragma: no cover
         try:
             import csv
@@ -66,12 +67,14 @@ def validate_dataset(path: str, max_rows: int = 1_000_000) -> str:
                 reader = csv.reader(f)
                 headers = next(reader)
                 rows = sum(1 for _ in reader)
-            return json.dumps({
-                "rows": rows,
-                "columns": len(headers),
-                "column_types": dict.fromkeys(headers, "unknown"),
-                "null_counts": {},
-            })
+            return json.dumps(
+                {
+                    "rows": rows,
+                    "columns": len(headers),
+                    "column_types": dict.fromkeys(headers, "unknown"),
+                    "null_counts": {},
+                }
+            )
         except Exception as exc:
             return json.dumps({"error": str(exc)})
     except Exception as exc:
@@ -93,18 +96,10 @@ def statistical_summary(path: str, target_column: str = "") -> str:
     try:
         import polars as pl
 
-        df = (
-            pl.read_csv(p)
-            if p.suffix.lower() == ".csv"
-            else pl.read_parquet(p)
-        )
-        numeric_types = {
-            pl.Float64, pl.Float32, pl.Int64, pl.Int32, pl.Int16, pl.Int8
-        }
+        df = pl.read_csv(p) if p.suffix.lower() == ".csv" else pl.read_parquet(p)
+        numeric_types = {pl.Float64, pl.Float32, pl.Int64, pl.Int32, pl.Int16, pl.Int8}
         numeric_cols = [
-            col
-            for col, dtype in zip(df.columns, df.dtypes, strict=False)
-            if dtype in numeric_types
+            col for col, dtype in zip(df.columns, df.dtypes, strict=False) if dtype in numeric_types
         ]
         numeric_summary: dict[str, Any] = {}
         for col in numeric_cols[:20]:
@@ -125,16 +120,13 @@ def statistical_summary(path: str, target_column: str = "") -> str:
             stats["target_distribution"] = dict(
                 zip(
                     [str(v) for v in vc[target_column].to_list()],
-                    vc["count"].to_list(), strict=False,
+                    vc["count"].to_list(),
+                    strict=False,
                 )
             )
         return json.dumps(stats)
     except ImportError:  # pragma: no cover
-        return json.dumps({
-            "error": (
-                "polars not installed; run: pip install 'lightagent[ml]'"
-            )
-        })
+        return json.dumps({"error": ("polars not installed; run: pip install 'lightagent[ml]'")})
     except Exception as exc:
         return json.dumps({"error": str(exc)})
 
@@ -161,11 +153,7 @@ def feature_transform(
         import polars as pl
 
         p = Path(dataset_path)
-        df = (
-            pl.read_csv(p)
-            if p.suffix.lower() == ".csv"
-            else pl.read_parquet(p)
-        )
+        df = pl.read_csv(p) if p.suffix.lower() == ".csv" else pl.read_parquet(p)
         rows_before, cols_before = df.height, df.width
         ops: list[dict[str, Any]] = json.loads(operations)
         dtype_map: dict[str, Any] = {
@@ -178,50 +166,42 @@ def feature_transform(
         for op in ops:
             t = op.get("type", "")
             if t == "drop":
-                df = df.drop(
-                    [c for c in op.get("columns", []) if c in df.columns]
-                )
+                df = df.drop([c for c in op.get("columns", []) if c in df.columns])
             elif t == "fill_null":
                 col = op.get("column", "")
                 if col in df.columns:
-                    df = df.with_columns(
-                        pl.col(col).fill_null(op.get("value", 0))
-                    )
+                    df = df.with_columns(pl.col(col).fill_null(op.get("value", 0)))
             elif t == "cast":
                 col, dtype_str = op.get("column", ""), op.get("dtype", "")
                 if col in df.columns and dtype_str in dtype_map:
-                    df = df.with_columns(
-                        pl.col(col).cast(dtype_map[dtype_str])
-                    )
+                    df = df.with_columns(pl.col(col).cast(dtype_map[dtype_str]))
             elif t == "log1p":
                 col = op.get("column", "")
                 if col in df.columns:
-                    df = df.with_columns(
-                        (pl.col(col) + 1).log(base=2.718281828).alias(col)
-                    )
+                    df = df.with_columns((pl.col(col) + 1).log(base=2.718281828).alias(col))
             elif t == "normalize":
                 col = op.get("column", "")
                 if col in df.columns:
                     s = df[col]
                     mn, mx = s.min(), s.max()
                     if mn != mx:
-                        df = df.with_columns(
-                            ((pl.col(col) - mn) / (mx - mn)).alias(col)
-                        )
+                        df = df.with_columns(((pl.col(col) - mn) / (mx - mn)).alias(col))
         out = Path(output_path)
         out.parent.mkdir(parents=True, exist_ok=True)
         if out.suffix.lower() == ".parquet":
             df.write_parquet(out)
         else:
             df.write_csv(out)
-        return json.dumps({
-            "status": "ok",
-            "rows_before": rows_before,
-            "cols_before": cols_before,
-            "rows_after": df.height,
-            "cols_after": df.width,
-            "output_path": output_path,
-        })
+        return json.dumps(
+            {
+                "status": "ok",
+                "rows_before": rows_before,
+                "cols_before": cols_before,
+                "rows_after": df.height,
+                "cols_after": df.width,
+                "output_path": output_path,
+            }
+        )
     except ImportError:  # pragma: no cover
         return json.dumps({"error": "polars not installed"})
     except Exception as exc:
@@ -246,19 +226,9 @@ def feature_select(
         import polars as pl
 
         p = Path(dataset_path)
-        df = (
-            pl.read_csv(p)
-            if p.suffix.lower() == ".csv"
-            else pl.read_parquet(p)
-        )
-        numeric_types = {
-            pl.Float64, pl.Float32, pl.Int64, pl.Int32, pl.Int16, pl.Int8
-        }
-        numeric = [
-            c
-            for c in df.columns
-            if c != target_column and df[c].dtype in numeric_types
-        ]
+        df = pl.read_csv(p) if p.suffix.lower() == ".csv" else pl.read_parquet(p)
+        numeric_types = {pl.Float64, pl.Float32, pl.Int64, pl.Int32, pl.Int16, pl.Int8}
+        numeric = [c for c in df.columns if c != target_column and df[c].dtype in numeric_types]
         scores: dict[str, float]
         if method == "variance":
             scores = {c: float(df[c].std() or 0.0) for c in numeric}  # type: ignore[arg-type]
@@ -279,9 +249,7 @@ def feature_select(
                 x_arr = df.select(numeric).to_numpy()
                 y = df[target_column].to_numpy()
                 mi = mutual_info_classif(x_arr, y, random_state=42)
-                scores = {
-                    c: float(v) for c, v in zip(numeric, mi, strict=False)
-                }
+                scores = {c: float(v) for c, v in zip(numeric, mi, strict=False)}
             except ImportError:
                 tgt = df[target_column].cast(pl.Float64)
                 scores = {
@@ -294,15 +262,15 @@ def feature_select(
                 }
         else:
             scores = dict.fromkeys(numeric, 1.0)
-        top = sorted(scores.items(), key=lambda x: x[1], reverse=True)[
-            :n_features
-        ]
-        return json.dumps({
-            "selected_features": [c for c, _ in top],
-            "selection_score": {c: round(s, 4) for c, s in top},
-            "method_used": method,
-            "n_selected": len(top),
-        })
+        top = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:n_features]
+        return json.dumps(
+            {
+                "selected_features": [c for c, _ in top],
+                "selection_score": {c: round(s, 4) for c, s in top},
+                "method_used": method,
+                "n_selected": len(top),
+            }
+        )
     except ImportError:  # pragma: no cover
         return json.dumps({"error": "polars not installed"})
     except Exception as exc:
@@ -328,11 +296,7 @@ def apply_sampling(
         import polars as pl
 
         p = Path(dataset_path)
-        df = (
-            pl.read_csv(p)
-            if p.suffix.lower() == ".csv"
-            else pl.read_parquet(p)
-        )
+        df = pl.read_csv(p) if p.suffix.lower() == ".csv" else pl.read_parquet(p)
         if method == "smote":
             try:
                 import pandas as pd
@@ -343,12 +307,8 @@ def apply_sampling(
                 y = df[target_column].to_numpy()
                 sm = SMOTE(random_state=random_seed)
                 x_res, y_res = sm.fit_resample(x_arr, y)
-                df_res = pl.from_pandas(
-                    pd.DataFrame(x_res, columns=feats)
-                )
-                df = df_res.with_columns(
-                    pl.Series(target_column, y_res)
-                )
+                df_res = pl.from_pandas(pd.DataFrame(x_res, columns=feats))
+                df = df_res.with_columns(pl.Series(target_column, y_res))
             except ImportError:
                 method = "oversample"
         if method in ("oversample", "undersample"):
@@ -367,26 +327,28 @@ def apply_sampling(
                         )
                         sub = pl.concat([sub, extra])
                     frames.append(sub)
-                df = pl.concat(frames).sample(
-                    fraction=1.0, shuffle=True, seed=random_seed
-                )
+                df = pl.concat(frames).sample(fraction=1.0, shuffle=True, seed=random_seed)
             else:
                 target_size = int(counts["count"].min())  # type: ignore[arg-type]
-                df = pl.concat([
-                    df.filter(pl.col(target_column) == v).sample(
-                        n=target_size, seed=random_seed
-                    )
-                    for v in df[target_column].unique().to_list()
-                ]).sample(fraction=1.0, shuffle=True, seed=random_seed)
+                df = pl.concat(
+                    [
+                        df.filter(pl.col(target_column) == v).sample(
+                            n=target_size, seed=random_seed
+                        )
+                        for v in df[target_column].unique().to_list()
+                    ]
+                ).sample(fraction=1.0, shuffle=True, seed=random_seed)
         out = Path(output_path)
         out.parent.mkdir(parents=True, exist_ok=True)
         df.write_csv(out)
-        return json.dumps({
-            "status": "ok",
-            "method": method,
-            "rows_after": df.height,
-            "output_path": output_path,
-        })
+        return json.dumps(
+            {
+                "status": "ok",
+                "method": method,
+                "rows_after": df.height,
+                "output_path": output_path,
+            }
+        )
     except ImportError:  # pragma: no cover
         return json.dumps({"error": "polars not installed"})
     except Exception as exc:
@@ -417,11 +379,7 @@ def automl_train(
         import polars as pl
 
         p = Path(dataset_path)
-        df = (
-            pl.read_csv(p)
-            if p.suffix.lower() == ".csv"
-            else pl.read_parquet(p)
-        )
+        df = pl.read_csv(p) if p.suffix.lower() == ".csv" else pl.read_parquet(p)
         feats = [c for c in df.columns if c != target_column]
         x_train = df.select(feats).to_pandas()
         y = df[target_column].to_pandas()
@@ -431,7 +389,10 @@ def automl_train(
 
             automl = AutoML()
             automl.fit(
-                x_train, y, task=task, time_budget=time_budget,
+                x_train,
+                y,
+                task=task,
+                time_budget=time_budget,
                 seed=random_seed,
             )
             out_dir = Path(model_output_dir)
@@ -439,33 +400,29 @@ def automl_train(
             model_path = str(out_dir / "model.joblib")
             joblib.dump(automl, model_path)
             best_model = str(type(automl.model.estimator).__name__)
-            score = float(
-                1.0 - automl.best_loss
-                if automl.best_loss is not None
-                else 0.0
+            score = float(1.0 - automl.best_loss if automl.best_loss is not None else 0.0)
+            train_time = float(automl.best_config_train_time or time_budget)
+            return json.dumps(
+                {
+                    "status": "ok",
+                    "best_model": best_model,
+                    "validation_score": round(score, 4),
+                    "training_time_seconds": round(train_time, 1),
+                    "framework": "flaml",
+                    "task": task,
+                    "model_path": model_path,
+                    "random_seed": random_seed,
+                }
             )
-            train_time = float(
-                automl.best_config_train_time or time_budget
-            )
-            return json.dumps({
-                "status": "ok",
-                "best_model": best_model,
-                "validation_score": round(score, 4),
-                "training_time_seconds": round(train_time, 1),
-                "framework": "flaml",
-                "task": task,
-                "model_path": model_path,
-                "random_seed": random_seed,
-            })
         except ImportError:
-            return json.dumps({
-                "status": "unavailable",
-                "error": (
-                    "flaml not installed; run: pip install 'lightagent[ml]'"
-                ),
-                "framework": "flaml",
-                "task": task,
-            })
+            return json.dumps(
+                {
+                    "status": "unavailable",
+                    "error": ("flaml not installed; run: pip install 'lightagent[ml]'"),
+                    "framework": "flaml",
+                    "task": task,
+                }
+            )
     except Exception as exc:
         logger.warning("automl_train.error", error=str(exc))
         return json.dumps({"error": str(exc)})
@@ -499,11 +456,7 @@ def train_dl_model(
         import polars as pl
 
         p = Path(dataset_path)
-        df = (
-            pl.read_csv(p)
-            if p.suffix.lower() == ".csv"
-            else pl.read_parquet(p)
-        )
+        df = pl.read_csv(p) if p.suffix.lower() == ".csv" else pl.read_parquet(p)
         feats = [c for c in df.columns if c != target_column]
         x_arr = df.select(feats).to_numpy().astype(float)
         y_raw = df[target_column].to_numpy()
@@ -525,11 +478,7 @@ def train_dl_model(
             else torch.FloatTensor(y_enc.astype(float))
         )
         opt = torch.optim.Adam(model.parameters(), lr=learning_rate)
-        loss_fn: nn.Module = (
-            nn.CrossEntropyLoss()
-            if task == "classification"
-            else nn.MSELoss()
-        )
+        loss_fn: nn.Module = nn.CrossEntropyLoss() if task == "classification" else nn.MSELoss()
         for _ in range(min(epochs, 10)):
             opt.zero_grad()
             out = model(x_t)
@@ -542,34 +491,31 @@ def train_dl_model(
                 if task == "classification"
                 else model(x_t).squeeze().numpy()
             )
-        acc = (
-            float((preds == y_enc).mean())
-            if task == "classification"
-            else 0.0
-        )
+        acc = float((preds == y_enc).mean()) if task == "classification" else 0.0
         out_dir = Path(model_output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         model_path = str(out_dir / "model.pt")
         torch.save(model.state_dict(), model_path)
-        return json.dumps({
-            "status": "ok",
-            "best_model": "MLP",
-            "validation_score": round(acc, 4),
-            "training_time_seconds": float(epochs),
-            "framework": "pytorch",
-            "task": task,
-            "model_path": model_path,
-            "random_seed": random_seed,
-        })
+        return json.dumps(
+            {
+                "status": "ok",
+                "best_model": "MLP",
+                "validation_score": round(acc, 4),
+                "training_time_seconds": float(epochs),
+                "framework": "pytorch",
+                "task": task,
+                "model_path": model_path,
+                "random_seed": random_seed,
+            }
+        )
     except ImportError:
-        return json.dumps({
-            "status": "unavailable",
-            "error": (
-                "torch not installed; "
-                "run: pip install 'lightagent[ml-dl]'"
-            ),
-            "framework": "pytorch",
-        })
+        return json.dumps(
+            {
+                "status": "unavailable",
+                "error": ("torch not installed; run: pip install 'lightagent[ml-dl]'"),
+                "framework": "pytorch",
+            }
+        )
     except Exception as exc:
         return json.dumps({"error": str(exc)})
 
@@ -597,55 +543,42 @@ def train_clustering(
         from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
         p = Path(dataset_path)
-        df = (
-            pl.read_csv(p)
-            if p.suffix.lower() == ".csv"
-            else pl.read_parquet(p)
-        )
+        df = pl.read_csv(p) if p.suffix.lower() == ".csv" else pl.read_parquet(p)
         x_arr = StandardScaler().fit_transform(df.to_numpy().astype(float))
         best_k = n_clusters
         best_sil = -1.0
         if n_clusters == 0 and method == "kmeans":
             upper = min(max_k + 1, max(3, x_arr.shape[0] // 10 + 2))
             for k in range(2, upper):
-                km = KMeans(
-                    n_clusters=k, random_state=random_seed, n_init=10
-                )
+                km = KMeans(n_clusters=k, random_state=random_seed, n_init=10)
                 labels = km.fit_predict(x_arr)
                 sil = float(silhouette_score(x_arr, labels))
                 if sil > best_sil:
                     best_sil, best_k = sil, k
         clf: KMeans | DBSCAN
         if method == "kmeans":
-            clf = KMeans(
-                n_clusters=best_k or 3, random_state=random_seed, n_init=10
-            )
+            clf = KMeans(n_clusters=best_k or 3, random_state=random_seed, n_init=10)
         else:
             clf = DBSCAN()
         labels = clf.fit_predict(x_arr)
         n_unique = len(set(labels) - {-1})
-        sil = (
-            float(silhouette_score(x_arr, labels)) if n_unique > 1 else 0.0
-        )
+        sil = float(silhouette_score(x_arr, labels)) if n_unique > 1 else 0.0
         out_dir = Path(model_output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         model_path = str(out_dir / "clustering_model.joblib")
         joblib.dump(clf, model_path)
-        return json.dumps({
-            "status": "ok",
-            "n_clusters_used": best_k or n_unique,
-            "silhouette_score": round(sil, 4),
-            "method": method,
-            "model_path": model_path,
-            "random_seed": random_seed,
-        })
+        return json.dumps(
+            {
+                "status": "ok",
+                "n_clusters_used": best_k or n_unique,
+                "silhouette_score": round(sil, 4),
+                "method": method,
+                "model_path": model_path,
+                "random_seed": random_seed,
+            }
+        )
     except ImportError:  # pragma: no cover
-        return json.dumps({
-            "error": (
-                "sklearn not installed; "
-                "run: pip install 'lightagent[ml]'"
-            )
-        })
+        return json.dumps({"error": ("sklearn not installed; run: pip install 'lightagent[ml]'")})
     except Exception as exc:
         return json.dumps({"error": str(exc)})
 
@@ -674,11 +607,7 @@ def evaluate_model(
         import polars as pl
 
         p = Path(dataset_path)
-        df = (
-            pl.read_csv(p)
-            if p.suffix.lower() == ".csv"
-            else pl.read_parquet(p)
-        )
+        df = pl.read_csv(p) if p.suffix.lower() == ".csv" else pl.read_parquet(p)
         feats = [c for c in df.columns if c != target_column]
         x_eval = df.select(feats).to_pandas()
         y = df[target_column].to_pandas()
@@ -693,15 +622,9 @@ def evaluate_model(
             )
 
             acc = float(accuracy_score(y, preds))
-            prec = float(
-                precision_score(y, preds, average="macro", zero_division=0)
-            )
-            rec = float(
-                recall_score(y, preds, average="macro", zero_division=0)
-            )
-            f1 = float(
-                f1_score(y, preds, average="macro", zero_division=0)
-            )
+            prec = float(precision_score(y, preds, average="macro", zero_division=0))
+            rec = float(recall_score(y, preds, average="macro", zero_division=0))
+            f1 = float(f1_score(y, preds, average="macro", zero_division=0))
             metrics = {
                 "accuracy": round(acc, 4),
                 "precision_macro": round(prec, 4),
@@ -728,19 +651,18 @@ def evaluate_model(
                 "r2": round(r2, 4),
             }
             primary_metric, primary_score = "r2", max(0.0, r2)
-        return json.dumps({
-            "status": "ok",
-            "metrics": metrics,
-            "primary_metric": primary_metric,
-            "primary_score": round(primary_score, 4),
-        })
+        return json.dumps(
+            {
+                "status": "ok",
+                "metrics": metrics,
+                "primary_metric": primary_metric,
+                "primary_score": round(primary_score, 4),
+            }
+        )
     except ImportError as exc:  # pragma: no cover
-        return json.dumps({
-            "error": (
-                f"Missing dependency: {exc}. "
-                "Run: pip install 'lightagent[ml]'"
-            )
-        })
+        return json.dumps(
+            {"error": (f"Missing dependency: {exc}. Run: pip install 'lightagent[ml]'")}
+        )
     except Exception as exc:
         return json.dumps({"error": str(exc)})
 
@@ -763,11 +685,7 @@ def explain_model(
         import polars as pl
 
         p = Path(dataset_path)
-        df = (
-            pl.read_csv(p)
-            if p.suffix.lower() == ".csv"
-            else pl.read_parquet(p)
-        )
+        df = pl.read_csv(p) if p.suffix.lower() == ".csv" else pl.read_parquet(p)
         x_df = df.to_pandas().head(max_samples)
         mdl = joblib.load(model_path)
         try:
@@ -787,7 +705,8 @@ def explain_model(
                 sorted(
                     zip(
                         x_df.columns.tolist(),
-                        [round(float(v), 4) for v in mean_abs], strict=False,
+                        [round(float(v), 4) for v in mean_abs],
+                        strict=False,
                     ),
                     key=lambda x: x[1],
                     reverse=True,
@@ -800,14 +719,14 @@ def explain_model(
             plt.tight_layout()
             plt.savefig(chart_path, dpi=100, bbox_inches="tight")
             plt.close()
-            return json.dumps({
-                "status": "ok",
-                "top_features": dict(
-                    list(feature_importance.items())[:20]
-                ),
-                "chart_path": chart_path,
-                "method": "shap",
-            })
+            return json.dumps(
+                {
+                    "status": "ok",
+                    "top_features": dict(list(feature_importance.items())[:20]),
+                    "chart_path": chart_path,
+                    "method": "shap",
+                }
+            )
         except ImportError:
             importances = getattr(mdl, "feature_importances_", None)
             if importances is None:
@@ -823,17 +742,15 @@ def explain_model(
                     reverse=True,
                 )
             )
-            return json.dumps({
-                "status": "ok",
-                "top_features": dict(
-                    list(feature_importance.items())[:20]
-                ),
-                "chart_path": None,
-                "method": "feature_importances_",
-                "note": (
-                    "install 'lightagent[ml]' for SHAP explanations"
-                ),
-            })
+            return json.dumps(
+                {
+                    "status": "ok",
+                    "top_features": dict(list(feature_importance.items())[:20]),
+                    "chart_path": None,
+                    "method": "feature_importances_",
+                    "note": ("install 'lightagent[ml]' for SHAP explanations"),
+                }
+            )
     except ImportError as exc:
         return json.dumps({"error": f"Missing dependency: {exc}"})
     except Exception as exc:
@@ -875,27 +792,29 @@ def export_model(
 
             mdl = joblib.load(model_path)
             n_features = getattr(mdl, "n_features_in_", 10)
-            initial_type = [
-                ("float_input", FloatTensorType([None, n_features]))
-            ]
+            initial_type = [("float_input", FloatTensorType([None, n_features]))]
             onx = convert_sklearn(mdl, initial_types=initial_type)
             exported_path = str(out / f"{model_name}.onnx")
             with Path(exported_path).open("wb") as f:
                 f.write(onx.SerializeToString())
-            return json.dumps({
-                "status": "ok",
-                "exported_path": exported_path,
-                "format": "onnx",
-            })
+            return json.dumps(
+                {
+                    "status": "ok",
+                    "exported_path": exported_path,
+                    "format": "onnx",
+                }
+            )
         except ImportError:
             format = "joblib"
     exported_path = str(out / f"{model_name}.joblib")
     shutil.copy2(model_path, exported_path)
-    return json.dumps({
-        "status": "ok",
-        "exported_path": exported_path,
-        "format": "joblib",
-    })
+    return json.dumps(
+        {
+            "status": "ok",
+            "exported_path": exported_path,
+            "format": "joblib",
+        }
+    )
 
 
 @tool
@@ -921,11 +840,7 @@ def generate_inference_code(
     except (json.JSONDecodeError, ValueError):
         schema = {}
     feature_names = list(schema.keys())
-    proba_fn = (
-        "model.predict_proba"
-        if task == "classification"
-        else "model.predict"
-    )
+    proba_fn = "model.predict_proba" if task == "classification" else "model.predict"
     script_lines = [
         "#!/usr/bin/env python3",
         f'"""Standalone inference script for {model_name}.',
@@ -982,18 +897,20 @@ def generate_inference_code(
     out.mkdir(parents=True, exist_ok=True)
     script_path = str(out / "predict.py")
     Path(script_path).write_text(script, encoding="utf-8")
-    return json.dumps({
-        "status": "ok",
-        "script_path": script_path,
-        "model_name": model_name,
-        "task": task,
-        "features": feature_names,
-        "description": (
-            f"Standalone inference script for {model_name} ({task}), "
-            f"source model: {model_basename}. "
-            f"Run: echo '{{...}}' | python {script_path}"
-        ),
-    })
+    return json.dumps(
+        {
+            "status": "ok",
+            "script_path": script_path,
+            "model_name": model_name,
+            "task": task,
+            "features": feature_names,
+            "description": (
+                f"Standalone inference script for {model_name} ({task}), "
+                f"source model: {model_basename}. "
+                f"Run: echo '{{...}}' | python {script_path}"
+            ),
+        }
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -181,9 +181,7 @@ def test_init_calls_get_settings_when_settings_is_none() -> None:
     fake_settings = _make_settings()
 
     with (
-        patch(
-            "lightagent.rag.vector_store.get_settings", return_value=fake_settings
-        ) as mock_gs,
+        patch("lightagent.rag.vector_store.get_settings", return_value=fake_settings) as mock_gs,
         patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
         patch(CHROMA_PATH) as mock_chroma_cls,
     ):
@@ -300,9 +298,7 @@ def test_similarity_search_delegates_to_chroma_with_score() -> None:
         store = ChromaVectorStore(collection_name="col", settings=settings)
         result = store.similarity_search("test query", k=2)
 
-    mock_chroma_instance.similarity_search_with_score.assert_called_once_with(
-        "test query", k=2
-    )
+    mock_chroma_instance.similarity_search_with_score.assert_called_once_with("test query", k=2)
     assert result == expected_results
 
 
@@ -343,9 +339,7 @@ def test_similarity_search_uses_default_k_of_5() -> None:
         store = ChromaVectorStore(collection_name="col", settings=settings)
         store.similarity_search("query")
 
-    mock_chroma_instance.similarity_search_with_score.assert_called_once_with(
-        "query", k=5
-    )
+    mock_chroma_instance.similarity_search_with_score.assert_called_once_with("query", k=5)
 
 
 def test_similarity_search_logs_query_and_k() -> None:
@@ -430,9 +424,7 @@ def test_delete_by_source_calls_chroma_delete_with_where_filter() -> None:
         store = ChromaVectorStore(collection_name="col", settings=settings)
         store.delete_by_source("/path/to/file.txt")
 
-    mock_chroma_instance.delete.assert_called_once_with(
-        where={"source": "/path/to/file.txt"}
-    )
+    mock_chroma_instance.delete.assert_called_once_with(where={"source": "/path/to/file.txt"})
 
 
 def test_delete_by_source_returns_none() -> None:
@@ -496,9 +488,7 @@ def test_similarity_search_raises_chroma_store_error_on_failure() -> None:
     """similarity_search() must wrap any underlying exception in ChromaStoreError."""
     settings = _make_settings()
     mock_chroma_instance = MagicMock()
-    mock_chroma_instance.similarity_search_with_score.side_effect = Exception(
-        "index corrupt"
-    )
+    mock_chroma_instance.similarity_search_with_score.side_effect = Exception("index corrupt")
 
     with (
         patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,

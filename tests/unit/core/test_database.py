@@ -21,7 +21,10 @@ async def test_get_session_factory_returns_sessionmaker() -> None:
     """get_session_factory returns an async_sessionmaker."""
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
-    from lightagent.core.database import create_async_engine_from_url, get_session_factory
+    from lightagent.core.database import (
+        create_async_engine_from_url,
+        get_session_factory,
+    )
 
     engine = create_async_engine_from_url("sqlite+aiosqlite:///:memory:")
     factory = get_session_factory(engine)
@@ -43,7 +46,7 @@ async def test_get_db_session_yields_async_session() -> None:
 @pytest.mark.asyncio
 async def test_init_db_creates_tables_without_error() -> None:
     """init_db() runs without error on a clean in-memory database."""
-    from lightagent.core.database import Base, create_async_engine_from_url, init_db
+    from lightagent.core.database import create_async_engine_from_url, init_db
 
     engine = create_async_engine_from_url("sqlite+aiosqlite:///:memory:")
     await init_db(engine)
@@ -104,10 +107,10 @@ def test_create_async_engine_postgresql_url() -> None:
     from lightagent.core.database import create_async_engine_from_url
 
     mock_engine = MagicMock()
-    with patch("lightagent.core.database.create_async_engine", return_value=mock_engine) as mock_create:
-        engine = create_async_engine_from_url(
-            "postgresql+asyncpg://user:pass@localhost/testdb"
-        )
+    with patch(
+        "lightagent.core.database.create_async_engine", return_value=mock_engine
+    ) as mock_create:
+        engine = create_async_engine_from_url("postgresql+asyncpg://user:pass@localhost/testdb")
 
     assert engine is mock_engine
     call_kwargs = mock_create.call_args[1]
@@ -176,9 +179,7 @@ def test_get_checkpointer_sqlite_returns_saver() -> None:
         checkpointer = get_checkpointer()
 
     assert checkpointer is mock_saver_instance
-    mock_saver_cls.from_conn_string.assert_called_once_with(
-        "data/db/lightagent.db"
-    )
+    mock_saver_cls.from_conn_string.assert_called_once_with("data/db/lightagent.db")
 
 
 def test_get_checkpointer_sqlite_import_error_raises() -> None:

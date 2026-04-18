@@ -125,9 +125,7 @@ async def test_send_email_skipped_when_no_smtp_config() -> None:
 @pytest.mark.asyncio
 async def test_send_email_import_error_does_not_raise() -> None:
     """send() does not raise when aiosmtplib is not installed."""
-    delivery = HeartbeatDelivery(
-        smtp_host="smtp.example.com", smtp_from="bot@example.com"
-    )
+    delivery = HeartbeatDelivery(smtp_host="smtp.example.com", smtp_from="bot@example.com")
     real_import = builtins.__import__
 
     def mock_import(name: str, *args: object, **kwargs: object) -> object:

@@ -15,7 +15,7 @@
 
 ## 1. Resumen Ejecutivo
 
-<!-- 
+<!--
   2-3 párrafos máximo. Debe responder:
   - ¿Qué vamos a construir?
   - ¿Para quién?

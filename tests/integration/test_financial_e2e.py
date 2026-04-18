@@ -4,6 +4,7 @@ Verifies that all 5 agents run sequentially and produce all 5 typed artifacts
 in ``state["metadata"]["financial_analyst"]`` without raising exceptions.
 No real API calls — all LLM responses are mocked.
 """
+
 from __future__ import annotations
 
 import json
@@ -50,34 +51,61 @@ async def test_full_pipeline_produces_all_artifacts(base_state: dict[str, Any]) 
         technical_analyst_node,
     )
 
-    snapshot_json = json.dumps({
-        "symbol": "AAPL", "asset_type": "equity", "current_price": 175.0,
-        "currency": "USD", "data_provider": "yfinance", "data_points_count": 180,
-    })
-    ta_json = json.dumps({
-        "symbol": "AAPL", "indicators": {"RSI": 62.5, "MACD": 0.42},
-        "signals": ["MACD bullish crossover"], "chart_paths": [], "trend": "bullish",
-    })
-    fa_json = json.dumps({
-        "symbol": "AAPL", "asset_type": "equity",
-        "metrics": {"trailingPE": 28.5}, "peer_comparison": {},
-        "fundamental_score": 0.72, "data_source": "yfinance",
-    })
-    rs_json = json.dumps({
-        "symbol": "AAPL", "volatility_annual": 0.25, "sharpe_ratio": 1.3,
-        "max_drawdown": 0.18, "var_95": 0.021, "sentiment_score": 0.65,
-        "sentiment_sources": [], "correlation_assets": {}, "risk_level": "medium",
-    })
-    report_json = json.dumps({
-        "symbol": "AAPL", "report_mode": "single_asset",
-        "executive_summary": "AAPL shows bullish momentum.",
-        "sections": {"technical": "RSI 62.5", "fundamental": "P/E 28.5"},
-        "chart_paths": [],
-        "disclaimer": (
-            "This analysis is for informational purposes only"
-            " and does not constitute financial advice."
-        ),
-    })
+    snapshot_json = json.dumps(
+        {
+            "symbol": "AAPL",
+            "asset_type": "equity",
+            "current_price": 175.0,
+            "currency": "USD",
+            "data_provider": "yfinance",
+            "data_points_count": 180,
+        }
+    )
+    ta_json = json.dumps(
+        {
+            "symbol": "AAPL",
+            "indicators": {"RSI": 62.5, "MACD": 0.42},
+            "signals": ["MACD bullish crossover"],
+            "chart_paths": [],
+            "trend": "bullish",
+        }
+    )
+    fa_json = json.dumps(
+        {
+            "symbol": "AAPL",
+            "asset_type": "equity",
+            "metrics": {"trailingPE": 28.5},
+            "peer_comparison": {},
+            "fundamental_score": 0.72,
+            "data_source": "yfinance",
+        }
+    )
+    rs_json = json.dumps(
+        {
+            "symbol": "AAPL",
+            "volatility_annual": 0.25,
+            "sharpe_ratio": 1.3,
+            "max_drawdown": 0.18,
+            "var_95": 0.021,
+            "sentiment_score": 0.65,
+            "sentiment_sources": [],
+            "correlation_assets": {},
+            "risk_level": "medium",
+        }
+    )
+    report_json = json.dumps(
+        {
+            "symbol": "AAPL",
+            "report_mode": "single_asset",
+            "executive_summary": "AAPL shows bullish momentum.",
+            "sections": {"technical": "RSI 62.5", "fundamental": "P/E 28.5"},
+            "chart_paths": [],
+            "disclaimer": (
+                "This analysis is for informational purposes only"
+                " and does not constitute financial advice."
+            ),
+        }
+    )
 
     def make_llm(resp: str) -> object:
         """Return a minimal fake LLM."""
@@ -92,16 +120,11 @@ async def test_full_pipeline_produces_all_artifacts(base_state: dict[str, Any]) 
         (report_generator_node, "report_generator", report_json),
     ]
     for node_fn, mod_name, resp in nodes:
-        mod_path = (
-            f"lightagent.agents.subgraphs.financial.{mod_name}"
-            ".ProviderRegistry.get_llm"
-        )
+        mod_path = f"lightagent.agents.subgraphs.financial.{mod_name}.ProviderRegistry.get_llm"
         with patch(mod_path, return_value=make_llm(resp)):
             update = await node_fn(state)  # type: ignore[arg-type]
         state.update(update)
-        state["messages"] = list(state.get("messages", [])) + list(
-            update.get("messages", [])
-        )
+        state["messages"] = list(state.get("messages", [])) + list(update.get("messages", []))
 
     fin = state["metadata"]["financial_analyst"]
     assert "market_snapshot" in fin

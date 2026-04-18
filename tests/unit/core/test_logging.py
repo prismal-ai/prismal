@@ -9,7 +9,7 @@ import structlog
 
 
 @pytest.fixture(autouse=True)
-def reset_structlog() -> Generator[None, None, None]:
+def reset_structlog() -> Generator[None]:
     """Reset structlog to default config between tests to prevent state leakage."""
     structlog.reset_defaults()
     yield

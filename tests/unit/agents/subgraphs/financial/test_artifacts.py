@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import pytest
+
 from lightagent.agents.subgraphs.financial.artifacts import (
-    FundamentalAnalysis,
     FinancialReport,
+    FundamentalAnalysis,
     MarketSnapshot,
     RiskSentimentReport,
     TechnicalAnalysis,
@@ -69,11 +70,19 @@ def test_financial_report_default_disclaimer_present() -> None:
 def test_all_5_artifacts_importable() -> None:
     """Test all 5 artifact classes are importable from the financial package."""
     from lightagent.agents.subgraphs.financial.artifacts import (
-        FundamentalAnalysis,
         FinancialReport,
+        FundamentalAnalysis,
         MarketSnapshot,
         RiskSentimentReport,
         TechnicalAnalysis,
     )
 
-    assert all([MarketSnapshot, TechnicalAnalysis, FundamentalAnalysis, RiskSentimentReport, FinancialReport])
+    assert all(
+        [
+            MarketSnapshot,
+            TechnicalAnalysis,
+            FundamentalAnalysis,
+            RiskSentimentReport,
+            FinancialReport,
+        ]
+    )

@@ -151,9 +151,7 @@ def make_parallel_dispatcher(
                 cap=effective_max,
             )
 
-        sends = [
-            Send(worker_node, {**state, task_key: task}) for task in limited
-        ]
+        sends = [Send(worker_node, {**state, task_key: task}) for task in limited]
         logger.debug(
             "parallel_dispatcher_fanout",
             worker_node=worker_node,

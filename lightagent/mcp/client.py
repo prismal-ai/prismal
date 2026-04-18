@@ -59,9 +59,7 @@ class MCPClientManager:
                 ``config/mcp_servers.yaml`` relative to the current working
                 directory when ``None``.
         """
-        self._config_path: Path = (
-            config_path if config_path is not None else _DEFAULT_CONFIG_PATH
-        )
+        self._config_path: Path = config_path if config_path is not None else _DEFAULT_CONFIG_PATH
         # Keyed by server name — only contains servers that have been connected
         # (or attempted) via ``connect()``.
         self._connections: dict[str, MCPServerConnection] = {}
@@ -409,7 +407,7 @@ class MCPClientManager:
         for name in names:
             try:
                 await self.disconnect(name)
-            except BaseException as exc:  # noqa: BLE001 — intentional: includes CancelledError
+            except BaseException as exc:
                 logger.warning(
                     "mcp_manager_close_error",
                     server=name,

@@ -2,6 +2,7 @@
 
 Covers AC-003-5 (state checkpointed) and AC-003-6 (resumable by session_id).
 """
+
 from __future__ import annotations
 
 import uuid

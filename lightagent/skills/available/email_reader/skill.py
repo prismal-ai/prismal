@@ -78,16 +78,12 @@ def _get_body(msg: Message) -> str:
             if part.get_content_type() == "text/plain":
                 payload = part.get_payload(decode=True)
                 if isinstance(payload, bytes):
-                    body = payload.decode(
-                        part.get_content_charset() or "utf-8", errors="replace"
-                    )
+                    body = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
                     break
     else:
         payload = msg.get_payload(decode=True)
         if isinstance(payload, bytes):
-            body = payload.decode(
-                msg.get_content_charset() or "utf-8", errors="replace"
-            )
+            body = payload.decode(msg.get_content_charset() or "utf-8", errors="replace")
     return body[:500]
 
 
@@ -141,9 +137,7 @@ def _fetch_emails(
                 sender = _decode_header_value(msg.get("From"))
                 date = msg.get("Date", "")
                 body = _get_body(msg)
-                summaries.append(
-                    f"From: {sender}\nDate: {date}\nSubject: {subject}\n{body}"
-                )
+                summaries.append(f"From: {sender}\nDate: {date}\nSubject: {subject}\n{body}")
 
             return "\n\n---\n\n".join(summaries) if summaries else "No emails found."
 
@@ -213,8 +207,6 @@ class EmailReaderSkill(BaseSkill):
                 )
 
             logger.info("email_reader_fetch", user=user, folder=folder, max=max_emails)
-            return _fetch_emails(
-                host, user, password, port, folder, max_emails, unread_only
-            )
+            return _fetch_emails(host, user, password, port, folder, max_emails, unread_only)
 
         return [read_emails]

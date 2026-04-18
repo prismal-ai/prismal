@@ -4,6 +4,7 @@ Mocks all LLM calls so no API key is required.  Verifies that the 6-agent
 pipeline produces all typed Pydantic artifacts in ``state["metadata"]``
 without raising exceptions.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -49,24 +50,25 @@ async def test_data_ingester_produces_profile(
         data_ingester_node,
     )
 
-    profile_json = json.dumps({
-        "name": "iris_sample",
-        "path": "tests/fixtures/datasets/iris_sample.csv",
-        "rows": 150,
-        "columns": 5,
-        "column_types": {"sepal_length": "float64", "species": "object"},
-        "null_counts": {},
-        "task_type": "classification",
-        "target_column": "species",
-        "class_distribution": {
-            "setosa": 50,
-            "versicolor": 50,
-            "virginica": 50,
-        },
-    })
+    profile_json = json.dumps(
+        {
+            "name": "iris_sample",
+            "path": "tests/fixtures/datasets/iris_sample.csv",
+            "rows": 150,
+            "columns": 5,
+            "column_types": {"sepal_length": "float64", "species": "object"},
+            "null_counts": {},
+            "task_type": "classification",
+            "target_column": "species",
+            "class_distribution": {
+                "setosa": 50,
+                "versicolor": 50,
+                "virginica": 50,
+            },
+        }
+    )
     with patch(
-        "lightagent.agents.subgraphs.ml_pipeline.data_ingester"
-        ".ProviderRegistry.get_llm",
+        "lightagent.agents.subgraphs.ml_pipeline.data_ingester.ProviderRegistry.get_llm",
         return_value=type("LLM", (), {"ainvoke": _ai(profile_json)})(),
     ):
         result = await data_ingester_node(base_state)
@@ -102,60 +104,72 @@ async def test_full_pipeline_produces_all_artifacts(
         model_trainer_node,
     )
 
-    profile_json = json.dumps({
-        "name": "iris",
-        "path": "iris.csv",
-        "rows": 150,
-        "columns": 5,
-        "column_types": {},
-        "null_counts": {},
-        "task_type": "classification",
-        "target_column": "species",
-    })
-    eda_json = json.dumps({
-        "correlations": {},
-        "outlier_columns": [],
-        "chart_paths": [],
-        "missing_pattern": "none",
-        "class_balance": "balanced",
-        "recommended_transforms": [],
-    })
-    feat_json = json.dumps({
-        "original_features": ["sepal_length"],
-        "engineered_features": [],
-        "selected_features": ["sepal_length"],
-        "encoding_map": {},
-        "scaling_method": "standard",
-        "train_shape": [120, 4],
-        "test_shape": [30, 4],
-    })
-    train_json = json.dumps({
-        "model_type": "LightGBM",
-        "framework": "flaml",
-        "task": "classification",
-        "model_path": "model.joblib",
-        "random_seed": 42,
-        "validation_score": 0.95,
-        "training_time_seconds": 5.0,
-        "hyperparameters": {},
-    })
-    eval_json = json.dumps({
-        "metrics": {"accuracy": 0.95},
-        "primary_metric": "accuracy",
-        "primary_score": 0.95,
-        "feature_importance": {},
-        "chart_paths": [],
-        "recommendation": "deploy",
-    })
-    export_json = json.dumps({
-        "model_path": "model.joblib",
-        "format": "joblib",
-        "inference_code_path": "predict.py",
-        "model_card": "Model card for iris",
-        "dependencies": ["scikit-learn"],
-        "input_schema": {},
-        "output_schema": {},
-    })
+    profile_json = json.dumps(
+        {
+            "name": "iris",
+            "path": "iris.csv",
+            "rows": 150,
+            "columns": 5,
+            "column_types": {},
+            "null_counts": {},
+            "task_type": "classification",
+            "target_column": "species",
+        }
+    )
+    eda_json = json.dumps(
+        {
+            "correlations": {},
+            "outlier_columns": [],
+            "chart_paths": [],
+            "missing_pattern": "none",
+            "class_balance": "balanced",
+            "recommended_transforms": [],
+        }
+    )
+    feat_json = json.dumps(
+        {
+            "original_features": ["sepal_length"],
+            "engineered_features": [],
+            "selected_features": ["sepal_length"],
+            "encoding_map": {},
+            "scaling_method": "standard",
+            "train_shape": [120, 4],
+            "test_shape": [30, 4],
+        }
+    )
+    train_json = json.dumps(
+        {
+            "model_type": "LightGBM",
+            "framework": "flaml",
+            "task": "classification",
+            "model_path": "model.joblib",
+            "random_seed": 42,
+            "validation_score": 0.95,
+            "training_time_seconds": 5.0,
+            "hyperparameters": {},
+        }
+    )
+    eval_json = json.dumps(
+        {
+            "metrics": {"accuracy": 0.95},
+            "primary_metric": "accuracy",
+            "primary_score": 0.95,
+            "feature_importance": {},
+            "chart_paths": [],
+            "recommendation": "deploy",
+        }
+    )
+    export_json = json.dumps(
+        {
+            "model_path": "model.joblib",
+            "format": "joblib",
+            "inference_code_path": "predict.py",
+            "model_card": "Model card for iris",
+            "dependencies": ["scikit-learn"],
+            "input_schema": {},
+            "output_schema": {},
+        }
+    )
 
     def make_llm(resp: str) -> object:
         """Return a minimal fake LLM that resolves to resp."""
@@ -171,16 +185,11 @@ async def test_full_pipeline_produces_all_artifacts(
         (model_exporter_node, "model_exporter", export_json),
     ]
     for node_fn, mod_name, resp in nodes:
-        mod_path = (
-            f"lightagent.agents.subgraphs.ml_pipeline.{mod_name}"
-            ".ProviderRegistry.get_llm"
-        )
+        mod_path = f"lightagent.agents.subgraphs.ml_pipeline.{mod_name}.ProviderRegistry.get_llm"
         with patch(mod_path, return_value=make_llm(resp)):
             update = await node_fn(state)  # type: ignore[arg-type]
         state.update(update)
-        state["messages"] = list(state.get("messages", [])) + list(
-            update.get("messages", [])
-        )
+        state["messages"] = list(state.get("messages", [])) + list(update.get("messages", []))
 
     ml = state["metadata"]["ml_pipeline"]
     assert "dataset_profile" in ml

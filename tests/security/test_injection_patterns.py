@@ -74,13 +74,10 @@ def engine() -> GuardrailsEngine:
 
 @pytest.mark.parametrize("payload", _INJECTION_PAYLOADS)
 @pytest.mark.asyncio
-async def test_injection_payload_blocked(
-    engine: GuardrailsEngine, payload: str
-) -> None:
+async def test_injection_payload_blocked(engine: GuardrailsEngine, payload: str) -> None:
     """Every known injection payload must yield risk_score >= 70 and safe=False."""
     result = await engine.validate_input(payload)
     assert result.risk_score >= 70, (
-        f"Payload not flagged: {payload!r} "
-        f"— score={result.risk_score}, reasons={result.reasons}"
+        f"Payload not flagged: {payload!r} — score={result.risk_score}, reasons={result.reasons}"
     )
     assert not result.safe

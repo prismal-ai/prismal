@@ -325,15 +325,17 @@ def _extract_retry_after(exc: BaseException) -> float | None:
 #: Keys we accept as the "final-answer" synthetic tool-call name.  Ollama
 #: and other open models commonly wrap their reply in one of these shapes
 #: when LiteLLM falls back to prompt-based function-call emulation.
-_SYNTHETIC_FINAL_NAMES: frozenset[str] = frozenset({
-    "respond",
-    "response",
-    "answer",
-    "final",
-    "final_answer",
-    "reply",
-    "say",
-})
+_SYNTHETIC_FINAL_NAMES: frozenset[str] = frozenset(
+    {
+        "respond",
+        "response",
+        "answer",
+        "final",
+        "final_answer",
+        "reply",
+        "say",
+    }
+)
 
 
 def _unwrap_synthetic_tool_call(content: str) -> str | None:
@@ -382,11 +384,7 @@ def _unwrap_synthetic_tool_call(content: str) -> str | None:
     name = payload.get("function") or payload.get("name") or payload.get("tool")
     if not isinstance(name, str) or name.lower() not in _SYNTHETIC_FINAL_NAMES:
         return None
-    args = (
-        payload.get("arguments")
-        or payload.get("parameters")
-        or payload.get("args")
-    )
+    args = payload.get("arguments") or payload.get("parameters") or payload.get("args")
     if isinstance(args, dict):
         for key in ("response", "text", "message", "content", "answer", "reply"):
             candidate = args.get(key)
@@ -727,9 +725,7 @@ async def react_loop(
                         )
                     else:
                         # Permanent-style failure: increment the failure budget.
-                        _tool_fail_counts[tool_name] = (
-                            _tool_fail_counts.get(tool_name, 0) + 1
-                        )
+                        _tool_fail_counts[tool_name] = _tool_fail_counts.get(tool_name, 0) + 1
                         logger.warning(
                             "react_loop.tool_error",
                             agent=agent_name,
@@ -743,9 +739,7 @@ async def react_loop(
             # Cap individual tool results to avoid token explosion.
             if len(result) > 4_000:
                 result = result[:4_000] + "\n…[truncated]"
-            loop_messages.append(
-                ToolMessage(content=result, tool_call_id=tc["id"])
-            )
+            loop_messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
 
         # ── All-tools-failed early exit ───────────────────────────────────
         # Fire only when every call in this iteration had a *permanent* error

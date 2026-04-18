@@ -50,9 +50,7 @@ def test_factory_build_crag_pattern(tmp_path: Path) -> None:
 def test_factory_build_plan_execute_pattern(tmp_path: Path) -> None:
     """build() with PLAN_EXECUTE must return a CompiledStateGraph."""
     factory = AgentFactory()
-    graph = factory.build(
-        AgentPattern.PLAN_EXECUTE, checkpoint_path=tmp_path / "plan_execute.db"
-    )
+    graph = factory.build(AgentPattern.PLAN_EXECUTE, checkpoint_path=tmp_path / "plan_execute.db")
     assert isinstance(graph, CompiledStateGraph)
 
 
@@ -87,8 +85,6 @@ def test_crag_graph_has_rag_and_researcher_nodes(tmp_path: Path) -> None:
 def test_reflexion_graph_has_critic_node(tmp_path: Path) -> None:
     """REFLEXION graph mermaid output must contain 'critic'."""
     factory = AgentFactory()
-    graph = factory.build(
-        AgentPattern.REFLEXION, checkpoint_path=tmp_path / "reflexion_nodes.db"
-    )
+    graph = factory.build(AgentPattern.REFLEXION, checkpoint_path=tmp_path / "reflexion_nodes.db")
     mermaid = graph.get_graph().draw_mermaid()
     assert "critic" in mermaid, "Expected 'critic' node in REFLEXION mermaid output"

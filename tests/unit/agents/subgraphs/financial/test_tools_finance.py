@@ -1,4 +1,5 @@
 """Unit tests for tools_finance.py — all external API calls mocked."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch

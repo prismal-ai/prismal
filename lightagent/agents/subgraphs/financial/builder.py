@@ -136,9 +136,7 @@ def _market_data_availability_gate(
             else get_settings().financial_min_confidence
         )
         meta = state.get("metadata", {})
-        snapshot = _get_nested(
-            meta, f"{_FINANCIAL_METADATA_KEY}.market_snapshot"
-        )
+        snapshot = _get_nested(meta, f"{_FINANCIAL_METADATA_KEY}.market_snapshot")
         if not isinstance(snapshot, dict):
             # No snapshot at all → treat as unusable.
             logger.warning(
@@ -191,9 +189,7 @@ def _technical_confidence_gate(
             else get_settings().financial_technical_min_confidence
         )
         meta = state.get("metadata", {})
-        tech = _get_nested(
-            meta, f"{_FINANCIAL_METADATA_KEY}.technical_analysis"
-        )
+        tech = _get_nested(meta, f"{_FINANCIAL_METADATA_KEY}.technical_analysis")
         if not isinstance(tech, dict):
             logger.warning(
                 "financial.technical_gate_missing_artifact",
@@ -256,8 +252,7 @@ async def _insufficient_data_report_node(
         executive_summary=_INSUFFICIENT_DATA_MESSAGE,
         sections={
             "Error": _INSUFFICIENT_DATA_MESSAGE,
-            "Missing Fields": ", ".join(snapshot.get("missing_fields", []))
-            or "(unknown)",
+            "Missing Fields": ", ".join(snapshot.get("missing_fields", [])) or "(unknown)",
         },
         disclaimer=_DISCLAIMER,
     )
@@ -273,11 +268,7 @@ async def _insufficient_data_report_node(
 
     return {
         "current_agent": "insufficient_data_report",
-        "messages": [
-            AIMessage(
-                content=f"{_INSUFFICIENT_DATA_MESSAGE} ({_DISCLAIMER})"
-            )
-        ],
+        "messages": [AIMessage(content=f"{_INSUFFICIENT_DATA_MESSAGE} ({_DISCLAIMER})")],
         "metadata": meta,
     }
 
@@ -365,9 +356,7 @@ def _make_definition() -> SubgraphDefinition:
     # delivered.
     if settings.financial_hitl_enabled:
         nodes["financial_report_approval_seed"] = seed_hitl_metadata(
-            artifact_field=(
-                f"{_FINANCIAL_METADATA_KEY}.financial_report"
-            ),
+            artifact_field=(f"{_FINANCIAL_METADATA_KEY}.financial_report"),
             risk_level="MEDIUM",
         )
         nodes["financial_report_human_approval"] = human_approval_node
@@ -379,15 +368,11 @@ def _make_definition() -> SubgraphDefinition:
             )
         )
         conditional_edges["financial_report_human_approval"] = hitl_gate(
-            artifact_field=(
-                f"{_FINANCIAL_METADATA_KEY}.financial_report"
-            ),
+            artifact_field=(f"{_FINANCIAL_METADATA_KEY}.financial_report"),
             on_approve="__end__",
             on_reject="__end__",
             risk_level="MEDIUM",
-            bypass_condition=lambda _s: (
-                not get_settings().financial_hitl_enabled
-            ),
+            bypass_condition=lambda _s: not get_settings().financial_hitl_enabled,
         )
     else:
         edges.append(("report_generator", "__end__"))

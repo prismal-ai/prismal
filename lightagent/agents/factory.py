@@ -186,9 +186,7 @@ class AgentFactory:
 
         factory = AgentFactory()
         graph = factory.build(AgentPattern.REFLEXION)
-        result = await graph.ainvoke(
-            state, config={"configurable": {"thread_id": "t1"}}
-        )
+        result = await graph.ainvoke(state, config={"configurable": {"thread_id": "t1"}})
     """
 
     # Maps each pattern to the method that builds it.
@@ -234,9 +232,7 @@ class AgentFactory:
         if builder_method_name is None:
             raise ValueError(f"No builder registered for pattern: {pattern!r}")
 
-        builder_method: Callable[
-            [Path], CompiledStateGraph[AgentState, Any, Any, Any]
-        ] = cast(
+        builder_method: Callable[[Path], CompiledStateGraph[AgentState, Any, Any, Any]] = cast(
             "Callable[[Path], CompiledStateGraph[AgentState, Any, Any, Any]]",
             getattr(self, builder_method_name),
         )
@@ -253,9 +249,7 @@ class AgentFactory:
                 pattern=pattern.value,
                 checkpoint_path=str(db_path),
             )
-            compiled: CompiledStateGraph[AgentState, Any, Any, Any] = (
-                builder_method(db_path)
-            )
+            compiled: CompiledStateGraph[AgentState, Any, Any, Any] = builder_method(db_path)
 
             # Log that the graph was built; attach Langfuse callback handler
             # if available
@@ -278,9 +272,7 @@ class AgentFactory:
     # Pattern builders (private)
     # ------------------------------------------------------------------
 
-    def _build_supervisor(
-        self, db_path: Path
-    ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    def _build_supervisor(self, db_path: Path) -> CompiledStateGraph[AgentState, Any, Any, Any]:
         """Build the SUPERVISOR topology.
 
         All 7 specialist sub-agents are registered.  The supervisor routes
@@ -317,9 +309,7 @@ class AgentFactory:
         )
         return _compile_with_checkpointer(builder, db_path)
 
-    def _build_react(
-        self, db_path: Path
-    ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    def _build_react(self, db_path: Path) -> CompiledStateGraph[AgentState, Any, Any, Any]:
         """Build the REACT topology (supervisor + researcher only).
 
         The supervisor routes to the researcher or END; the researcher
@@ -338,9 +328,7 @@ class AgentFactory:
         _add_standard_edges(builder, ["researcher"])
         return _compile_with_checkpointer(builder, db_path)
 
-    def _build_plan_execute(
-        self, db_path: Path
-    ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    def _build_plan_execute(self, db_path: Path) -> CompiledStateGraph[AgentState, Any, Any, Any]:
         """Build the PLAN_EXECUTE topology.
 
         The supervisor routes to the planner, researcher, or coder; all
@@ -361,9 +349,7 @@ class AgentFactory:
         _add_standard_edges(builder, ["planner", "researcher", "coder"])
         return _compile_with_checkpointer(builder, db_path)
 
-    def _build_swarm(
-        self, db_path: Path
-    ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    def _build_swarm(self, db_path: Path) -> CompiledStateGraph[AgentState, Any, Any, Any]:
         """Build the SWARM topology (v1.0 stub — uses SUPERVISOR topology).
 
         In v1.0 this is a stub that delegates to the full SUPERVISOR
@@ -378,16 +364,11 @@ class AgentFactory:
         """
         logger.info(
             "swarm_pattern_stub",
-            note=(
-                "SWARM uses SUPERVISOR topology in v1.0; "
-                "full peer-to-peer planned for v1.1.0"
-            ),
+            note=("SWARM uses SUPERVISOR topology in v1.0; full peer-to-peer planned for v1.1.0"),
         )
         return self._build_supervisor(db_path)
 
-    def _build_reflexion(
-        self, db_path: Path
-    ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    def _build_reflexion(self, db_path: Path) -> CompiledStateGraph[AgentState, Any, Any, Any]:
         """Build the REFLEXION topology.
 
         The supervisor routes to the researcher or the critic; the
@@ -418,9 +399,7 @@ class AgentFactory:
         # We remove the standard edge by rebuilding the wiring manually here.
         return _compile_with_checkpointer(builder, db_path)
 
-    def _build_codeact(
-        self, db_path: Path
-    ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    def _build_codeact(self, db_path: Path) -> CompiledStateGraph[AgentState, Any, Any, Any]:
         """Build the CODEACT topology.
 
         The supervisor routes to the coder or the critic; both sub-agents
@@ -440,9 +419,7 @@ class AgentFactory:
         _add_standard_edges(builder, ["coder", "critic"])
         return _compile_with_checkpointer(builder, db_path)
 
-    def _build_crag(
-        self, db_path: Path
-    ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    def _build_crag(self, db_path: Path) -> CompiledStateGraph[AgentState, Any, Any, Any]:
         """Build the CRAG (Corrective RAG) topology.
 
         The supervisor routes to the rag_agent for internal knowledge base
@@ -464,9 +441,7 @@ class AgentFactory:
         _add_standard_edges(builder, ["rag_agent", "researcher"])
         return _compile_with_checkpointer(builder, db_path)
 
-    def _build_debate(
-        self, db_path: Path
-    ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    def _build_debate(self, db_path: Path) -> CompiledStateGraph[AgentState, Any, Any, Any]:
         """Build the DEBATE topology (v1.0 stub — uses SUPERVISOR topology).
 
         In v1.0 this is a stub that delegates to the full SUPERVISOR

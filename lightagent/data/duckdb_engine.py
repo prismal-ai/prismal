@@ -149,7 +149,7 @@ class DuckDBEngine:
 
     # ── Polars integration ───────────────────────────────────────────────────
 
-    def register_polars(self, name: str, df: Any) -> None:  # noqa: ANN401 — accepts pl.DataFrame or pd.DataFrame
+    def register_polars(self, name: str, df: Any) -> None:
         """Register a Polars DataFrame as a queryable virtual table.
 
         Args:
@@ -165,8 +165,7 @@ class DuckDBEngine:
             List of table/view name strings.
         """
         rows = self._conn.execute(
-            "SELECT table_name FROM information_schema.tables "
-            "WHERE table_schema = 'main'"
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
         ).fetchall()
         return [r[0] for r in rows]
 

@@ -171,10 +171,7 @@ class TestExtractCodeBlock:
         assert _extract_code_block("<code>print(1)</code>") == "print(1)"
 
     def test_strips_surrounding_whitespace(self) -> None:
-        assert (
-            _extract_code_block("<code>  result = 1  </code>")
-            == "result = 1"
-        )
+        assert _extract_code_block("<code>  result = 1  </code>") == "result = 1"
 
     def test_multiline_block(self) -> None:
         src = "<code>a = 1\nb = 2\nprint(a + b)</code>"
@@ -202,9 +199,7 @@ class TestValidateImports:
         # SPEC-044 AC-044-5: ``os`` has been REMOVED from the default
         # allowlist, so we exercise the allowlist path with benign
         # standard-library modules that remain allowed.
-        ok, reason = _validate_imports(
-            "import pathlib\nimport json\nresult = 1"
-        )
+        ok, reason = _validate_imports("import pathlib\nimport json\nresult = 1")
         assert ok, reason
 
     def test_allows_from_imports_in_allowlist(self) -> None:
@@ -245,9 +240,7 @@ class TestValidateImports:
         assert "SyntaxError" in reason
 
     def test_comment_mentioning_import_is_ignored(self) -> None:
-        ok, _ = _validate_imports(
-            "# todo: import socket later\nresult = 42"
-        )
+        ok, _ = _validate_imports("# todo: import socket later\nresult = 42")
         assert ok
 
     def test_string_mentioning_import_is_ignored(self) -> None:
@@ -291,30 +284,22 @@ class TestValidateImportsDenylist:
         assert "exec" in reason
 
     def test_compile_rejected(self) -> None:
-        ok, reason = _validate_imports(
-            _call_src("compile", '"x", "<s>", "eval"')
-        )
+        ok, reason = _validate_imports(_call_src("compile", '"x", "<s>", "eval"'))
         assert not ok
         assert "compile" in reason
 
     def test_getattr_rejected(self) -> None:
-        ok, reason = _validate_imports(
-            'x = ' + _call_src("getattr", 'object, "__class__"')
-        )
+        ok, reason = _validate_imports("x = " + _call_src("getattr", 'object, "__class__"'))
         assert not ok
         assert "getattr" in reason
 
     def test_setattr_rejected(self) -> None:
-        ok, reason = _validate_imports(
-            _call_src("setattr", 'object, "x", 1')
-        )
+        ok, reason = _validate_imports(_call_src("setattr", 'object, "x", 1'))
         assert not ok
         assert "setattr" in reason
 
     def test_delattr_rejected(self) -> None:
-        ok, reason = _validate_imports(
-            _call_src("delattr", 'object, "x"')
-        )
+        ok, reason = _validate_imports(_call_src("delattr", 'object, "x"'))
         assert not ok
         assert "delattr" in reason
 
@@ -329,23 +314,17 @@ class TestValidateImportsDenylist:
         assert "locals" in reason
 
     def test_vars_rejected(self) -> None:
-        ok, reason = _validate_imports(
-            "x = " + _call_src("vars", "object")
-        )
+        ok, reason = _validate_imports("x = " + _call_src("vars", "object"))
         assert not ok
         assert "vars" in reason
 
     def test_open_rejected(self) -> None:
-        ok, reason = _validate_imports(
-            "f = " + _call_src("open", '"/etc/passwd"')
-        )
+        ok, reason = _validate_imports("f = " + _call_src("open", '"/etc/passwd"'))
         assert not ok
         assert "open" in reason
 
     def test_input_rejected(self) -> None:
-        ok, reason = _validate_imports(
-            "x = " + _call_src("input", '"prompt"')
-        )
+        ok, reason = _validate_imports("x = " + _call_src("input", '"prompt"'))
         assert not ok
         assert "input" in reason
 
@@ -447,15 +426,10 @@ class TestValidateImportsDenylist:
         """Traversal chain without a final call trips at the first
         dunder Attribute encountered by ``ast.walk``.
         """
-        ok, reason = _validate_imports(
-            "y = a.__class__.__base__.__subclasses__"
-        )
+        ok, reason = _validate_imports("y = a.__class__.__base__.__subclasses__")
         assert not ok
         # Any of the three dunders will do — assert at least one fires.
-        assert any(
-            name in reason
-            for name in ("__class__", "__base__", "__subclasses__")
-        )
+        assert any(name in reason for name in ("__class__", "__base__", "__subclasses__"))
 
     def test_allowed_dunders_still_pass(self) -> None:
         """``__name__``, ``__main__``, ``__doc__``, ``__file__`` are
@@ -463,9 +437,7 @@ class TestValidateImportsDenylist:
         ``__doc__`` / ``__file__`` introspection continue to work.
         """
         # Check the main-module-guard idiom.
-        ok, reason = _validate_imports(
-            'if __name__ == "__main__":\n    result = 42'
-        )
+        ok, reason = _validate_imports('if __name__ == "__main__":\n    result = 42')
         assert ok, reason
 
         # __doc__ lookup
@@ -504,10 +476,7 @@ class TestValidateImportsDenylist:
     def test_ordinary_subscript_still_works(self) -> None:
         """Dict / list / string subscripts unaffected by AC-044-4."""
         ok, reason = _validate_imports(
-            "d = {'a': 1}\n"
-            "lst = [1, 2, 3]\n"
-            "s = 'hello'\n"
-            "result = d['a'] + lst[0] + len(s[:3])"
+            "d = {'a': 1}\nlst = [1, 2, 3]\ns = 'hello'\nresult = d['a'] + lst[0] + len(s[:3])"
         )
         assert ok, reason
 
@@ -519,17 +488,14 @@ class TestValidateImportsDenylist:
         snippet. Any of them is a correct rejection.
         """
         payload = (
-            'x = '
+            "x = "
             + _call_src("getattr", '__builtins__, "__import__"')
             + '\nx.system("echo hello")\n'
         )
         ok, reason = _validate_imports(payload)
         assert not ok
         # At least one of the independent rules must fire.
-        assert any(
-            token in reason
-            for token in ("getattr", "__builtins__", "system")
-        )
+        assert any(token in reason for token in ("getattr", "__builtins__", "system"))
 
     def test_subclass_traversal_bypass_rejected(self) -> None:
         """``().__class__.__base__.__subclasses__()[N](...)`` from the
@@ -558,16 +524,11 @@ class TestValidateImportsDenylist:
         the other involved rules (``__builtins__`` dunder Name,
         ``open`` name-call, subscript base) would also be correct.
         """
-        payload = (
-            'x = globals()["__builtins__"]["open"]("/etc/passwd").read()'
-        )
+        payload = 'x = globals()["__builtins__"]["open"]("/etc/passwd").read()'
         ok, reason = _validate_imports(payload)
         assert not ok
         # Any one of these must appear in the rejection reason.
-        assert any(
-            token in reason
-            for token in ("globals", "__builtins__", "open")
-        )
+        assert any(token in reason for token in ("globals", "__builtins__", "open"))
 
     # -------- Allowlist minimization (AC-044-5) at validator level --
 
@@ -606,11 +567,7 @@ class TestValidateImportsDenylist:
         assert ok, reason
 
     def test_legit_json_code_still_works(self) -> None:
-        src = (
-            "import json\n"
-            "data = json.loads('{\"k\": 1}')\n"
-            "result = data['k']\n"
-        )
+        src = "import json\ndata = json.loads('{\"k\": 1}')\nresult = data['k']\n"
         ok, reason = _validate_imports(src)
         assert ok, reason
 
@@ -644,17 +601,11 @@ class TestGetImportAllowlist:
         """
         allowlist = _get_import_allowlist()
         for pkg in ("os", "sys", "subprocess"):
-            assert pkg not in allowlist, (
-                f"'{pkg}' should NOT be in the default CodeAct allowlist"
-            )
+            assert pkg not in allowlist, f"'{pkg}' should NOT be in the default CodeAct allowlist"
 
     def test_custom_allowlist_from_settings(self) -> None:
-        with patch(
-            "lightagent.agents.codeact_agent.get_settings"
-        ) as mock_settings:
-            mock_settings.return_value.codeact_import_allowlist = (
-                "alpha, beta ,gamma"
-            )
+        with patch("lightagent.agents.codeact_agent.get_settings") as mock_settings:
+            mock_settings.return_value.codeact_import_allowlist = "alpha, beta ,gamma"
             allowlist = _get_import_allowlist()
         assert allowlist == frozenset({"alpha", "beta", "gamma"})
 
@@ -692,9 +643,7 @@ class TestFormatExecutionFeedback:
 class TestCodeactNodeSuccess:
     async def test_single_successful_code_block(self) -> None:
         """Happy path: one block, ``__CODEACT_RESULT__`` in stdout, done."""
-        llm = _make_llm_sequence(
-            f'<code>result = 2 + 2\nprint("{_RESULT_MARKER}", result)</code>'
-        )
+        llm = _make_llm_sequence(f'<code>result = 2 + 2\nprint("{_RESULT_MARKER}", result)</code>')
         with _patch_codeact(
             llm,
             sandbox_results=[(True, f"{_RESULT_MARKER} 4", "", 0)],
@@ -709,9 +658,7 @@ class TestCodeactNodeSuccess:
 
     async def test_no_code_block_returns_direct_response(self) -> None:
         """When the LLM answers with prose only, that prose is the reply."""
-        llm = _make_llm_sequence(
-            "This is a pure explanation; no code needed. The answer is 42."
-        )
+        llm = _make_llm_sequence("This is a pure explanation; no code needed. The answer is 42.")
         with _patch_codeact(llm) as mocks:
             out = await codeact_node(_make_state("explain X"))
 
@@ -743,8 +690,7 @@ class TestCodeactNodeAutoCorrection:
     async def test_auto_correction_on_sandbox_error(self) -> None:
         """Failed block → error fed to LLM → fixed block succeeds."""
         llm = _make_llm_sequence(
-            "<code>result = undefined_var\n"
-            f'print("{_RESULT_MARKER}", result)</code>',
+            f'<code>result = undefined_var\nprint("{_RESULT_MARKER}", result)</code>',
             f'<code>result = 42\nprint("{_RESULT_MARKER}", result)</code>',
         )
         with _patch_codeact(
@@ -764,9 +710,7 @@ class TestCodeactNodeAutoCorrection:
         # most recent message so it can auto-correct.
         second_call_args = mocks["llm"].ainvoke.await_args_list[1]
         messages = second_call_args.args[0]
-        feedback_texts = [
-            getattr(m, "content", "") for m in messages if m is not None
-        ]
+        feedback_texts = [getattr(m, "content", "") for m in messages if m is not None]
         assert any("NameError" in text for text in feedback_texts)
 
     async def test_consecutive_failures_trigger_best_effort(self) -> None:
@@ -867,9 +811,7 @@ class TestCodeactNodeShellGate:
         """
         call_log: list[str] = []
 
-        llm = _make_llm_sequence(
-            f'<code>result = 1\nprint("{_RESULT_MARKER}", result)</code>'
-        )
+        llm = _make_llm_sequence(f'<code>result = 1\nprint("{_RESULT_MARKER}", result)</code>')
 
         def _shell_side_effect(cmd: list[str]) -> bool:
             call_log.append("check_shell")
@@ -935,12 +877,8 @@ class TestCodeactDisabled:
         llm = MagicMock()
         llm.ainvoke = AsyncMock()
         with (
-            patch(
-                "lightagent.agents.codeact_agent.get_settings"
-            ) as mock_settings,
-            patch(
-                "lightagent.agents.codeact_agent.ProviderRegistry"
-            ) as pr,
+            patch("lightagent.agents.codeact_agent.get_settings") as mock_settings,
+            patch("lightagent.agents.codeact_agent.ProviderRegistry") as pr,
         ):
             mock_settings.return_value.codeact_enabled = False
             pr.return_value.get_llm_with_fallback.return_value = llm

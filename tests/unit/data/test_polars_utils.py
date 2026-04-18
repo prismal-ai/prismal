@@ -17,13 +17,12 @@ from lightagent.data.polars_utils import (
     to_records,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixture
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
+@pytest.fixture
 def sales_df() -> pl.DataFrame:
     """A small sales DataFrame used across multiple tests."""
     return pl.DataFrame(

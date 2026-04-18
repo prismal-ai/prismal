@@ -1,4 +1,5 @@
 """Unit tests for subgraph artifact Pydantic models."""
+
 import pytest
 from pydantic import ValidationError
 
@@ -7,8 +8,10 @@ from lightagent.agents.subgraphs.artifacts import (
     QAReport,
     ReviewResult,
     TechnicalSpec,
-    TestReport as UnitTestReport,
     UserStory,
+)
+from lightagent.agents.subgraphs.artifacts import (
+    TestReport as UnitTestReport,
 )
 
 

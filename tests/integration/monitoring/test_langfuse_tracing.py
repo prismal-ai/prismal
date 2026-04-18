@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 def _enabled_settings(pub: str = "pk-test", sec: str = "sk-test") -> MagicMock:
     """Return a mock settings object with Langfuse enabled."""

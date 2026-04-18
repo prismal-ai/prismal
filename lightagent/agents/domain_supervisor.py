@@ -150,9 +150,7 @@ def make_domain_supervisor(
         )
 
     valid_routes: frozenset[str] = frozenset(agents) | {"END"}
-    system_prompt = _build_system_prompt(
-        domain_name, domain_description, agents
-    )
+    system_prompt = _build_system_prompt(domain_name, domain_description, agents)
     supervisor_node_name = f"{domain_name}_supervisor"
 
     async def domain_supervisor_node(
@@ -232,9 +230,7 @@ def make_domain_supervisor(
                         last_agent=last_agent,
                         session_id=session_id,
                     )
-                    span.set_attribute(
-                        "lightagent.routing_decision", "END"
-                    )
+                    span.set_attribute("lightagent.routing_decision", "END")
                     return _update_state(
                         supervisor_node_name,
                         next_agent=None,

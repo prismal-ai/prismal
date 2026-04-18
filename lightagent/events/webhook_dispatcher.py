@@ -55,9 +55,7 @@ class WebhookDispatcher:
                 self._deliver_with_retry(wh, event, payload)
             )
 
-    async def _get_matching_webhooks(
-        self, event: str
-    ) -> list[dict[str, Any]]:
+    async def _get_matching_webhooks(self, event: str) -> list[dict[str, Any]]:
         """Fetch active webhooks that subscribe to this event.
 
         Args:
@@ -99,9 +97,7 @@ class WebhookDispatcher:
             event: Event name.
             payload: Event data dict.
         """
-        body = json.dumps(
-            {"event": event, "payload": payload, "timestamp": time.time()}
-        )
+        body = json.dumps({"event": event, "payload": payload, "timestamp": time.time()})
         secret = webhook.get("secret", "")
         if not secret:
             logger.warning(
@@ -163,9 +159,7 @@ class WebhookDispatcher:
             import aiosqlite
 
             async with aiosqlite.connect(self._db_path) as db:
-                await db.execute(
-                    "UPDATE webhooks SET active = 0 WHERE id = ?", (webhook_id,)
-                )
+                await db.execute("UPDATE webhooks SET active = 0 WHERE id = ?", (webhook_id,))
                 await db.commit()
         except Exception as exc:
             logger.error("webhook_dispatcher.mark_inactive_failed", error=str(exc))

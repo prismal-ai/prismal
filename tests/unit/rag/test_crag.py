@@ -61,9 +61,9 @@ def _make_mock_llm(grade_responses: list[str], generate_response: str) -> AsyncM
     """Build an async LLM mock that returns grade_responses then generate_response."""
     llm = MagicMock()
     # ainvoke returns coroutines; configure side_effect list
-    side_effects = [
-        _make_llm_response(r) for r in grade_responses
-    ] + [_make_llm_response(generate_response)]
+    side_effects = [_make_llm_response(r) for r in grade_responses] + [
+        _make_llm_response(generate_response)
+    ]
     llm.ainvoke = AsyncMock(side_effect=side_effects)
     return llm
 
@@ -92,9 +92,7 @@ def test_retrieved_chunk_can_be_instantiated() -> None:
 
 def test_crag_result_can_be_instantiated() -> None:
     """CRAGResult must be instantiable with answer, sources, and used_web_fallback."""
-    chunk = RetrievedChunk(
-        source="file.txt", chunk_id="0", relevance_score=0.8, content="content"
-    )
+    chunk = RetrievedChunk(source="file.txt", chunk_id="0", relevance_score=0.8, content="content")
     result = CRAGResult(
         answer="The answer",
         sources=[chunk],
@@ -174,9 +172,7 @@ def test_init_uses_get_settings_when_none() -> None:
     fake_settings = _make_settings()
     with (
         patch(PROVIDER_REGISTRY_PATH),
-        patch(
-            "lightagent.rag.crag.get_settings", return_value=fake_settings
-        ) as mock_gs,
+        patch("lightagent.rag.crag.get_settings", return_value=fake_settings) as mock_gs,
     ):
         CRAGPipeline(vector_store=mock_store, settings=None)
     mock_gs.assert_called_once()

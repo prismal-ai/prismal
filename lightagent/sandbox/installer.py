@@ -73,15 +73,12 @@ class SandboxInstaller:
             "pip": self._pip_install,
             "npm": self._npm_install,
             "go": self._go_get,
-            "ruff": lambda p, _wd: self._pip_install("ruff", None),
-            "typescript": lambda p, _wd: self._npm_global_install("typescript ts-node"),
+            "ruff": lambda p, _wd: self._pip_install("ruff", None),  # noqa: ARG005 — dispatch signature
+            "typescript": lambda p, _wd: self._npm_global_install("typescript ts-node"),  # noqa: ARG005 — dispatch signature
         }
         fn = dispatch.get(mgr)
         if fn is None:
-            return (
-                f"Gestor '{manager}' no soportado. "
-                "Usa: pip, npm, go, ruff, typescript."
-            )
+            return f"Gestor '{manager}' no soportado. Usa: pip, npm, go, ruff, typescript."
         return fn(package, workdir)
 
     # ── Bootstrap de runtimes ────────────────────────────────────────
@@ -96,7 +93,7 @@ class SandboxInstaller:
         Returns:
             Mensaje de éxito con la versión instalada.
         """
-        from lightagent.core.config import get_settings  # noqa: PLC0415
+        from lightagent.core.config import get_settings
 
         ver = version or get_settings().sandbox_node_version
         url = _NODE_URL_TMPL.format(version=ver)
@@ -115,7 +112,7 @@ class SandboxInstaller:
         Returns:
             Mensaje de éxito con la versión instalada.
         """
-        from lightagent.core.config import get_settings  # noqa: PLC0415
+        from lightagent.core.config import get_settings
 
         ver = version or get_settings().sandbox_go_version
         url = _GO_URL_TMPL.format(version=ver)
@@ -137,7 +134,7 @@ class SandboxInstaller:
 
         if not python_bin.exists():
             logger.info("sandbox_create_venv", path=str(venv_dir))
-            result = subprocess.run(  # noqa: S603
+            result = subprocess.run(
                 ["python3", "-m", "venv", str(venv_dir)],
                 capture_output=True,
                 text=True,
@@ -148,7 +145,7 @@ class SandboxInstaller:
 
         # Instalar herramientas base
         pip = str(venv_dir / "bin" / "pip")
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             [pip, "install", "--upgrade", "pip", "ruff", "mypy"],
             capture_output=True,
             text=True,
@@ -170,7 +167,7 @@ class SandboxInstaller:
             if "Error" in setup_result:
                 return setup_result
 
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             [str(pip), "install", *package.split()],
             capture_output=True,
             text=True,
@@ -199,7 +196,7 @@ class SandboxInstaller:
         cwd = str(self._mgr.resolve_workspace(workdir)) if workdir else str(self._mgr.workspace)
         cmd = [str(npm), "install", *package.split()]
 
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
@@ -218,7 +215,7 @@ class SandboxInstaller:
         if not npm.exists():
             return "Node.js no instalado en sandbox."
 
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             [str(npm), "install", "-g", *packages.split()],
             capture_output=True,
             text=True,
@@ -235,7 +232,7 @@ class SandboxInstaller:
         """Descarga un módulo Go en la sandbox."""
         go_bin = self._mgr.go_dir / "bin" / "go"
         if not go_bin.exists():
-            go_bin_path = subprocess.run(  # noqa: S603
+            go_bin_path = subprocess.run(
                 ["which", "go"], capture_output=True, text=True
             ).stdout.strip()
             if not go_bin_path:
@@ -245,7 +242,7 @@ class SandboxInstaller:
                 )
             go_bin = Path(go_bin_path)
 
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             [str(go_bin), "get", package],
             capture_output=True,
             text=True,
@@ -287,7 +284,7 @@ class SandboxInstaller:
                     tmp_path = Path(tmp.name)
                     for chunk in resp.iter_bytes(chunk_size=65536):
                         tmp.write(chunk)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return f"Error descargando {url}: {exc}"
 
         try:
@@ -302,6 +299,6 @@ class SandboxInstaller:
                     tar.extract(member, path=str(dest), filter="data")
             tmp_path.unlink(missing_ok=True)
             return f"Instalado en {dest}"
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             tmp_path.unlink(missing_ok=True)
             return f"Error extrayendo archivo: {exc}"

@@ -117,9 +117,7 @@ async def test_create_skill_writes_files(tmp_path: Path) -> None:
         patch("lightagent.agents.skill_creator._run_ruff", return_value=(True, "")),
     ):
         mock_registry.return_value.get_llm.return_value = mock_llm
-        await create_skill(
-            "Convert units between metric and imperial", skills_root=tmp_path
-        )
+        await create_skill("Convert units between metric and imperial", skills_root=tmp_path)
 
     custom_dirs = list((tmp_path / "custom").iterdir())
     assert len(custom_dirs) == 1
@@ -186,7 +184,7 @@ async def test_create_skill_ruff_failure_reported(tmp_path: Path) -> None:
         result = await create_skill("unit converter", skills_root=tmp_path)
 
     assert "ruff" in result.lower()
-    assert "✗" in result          # ruff failure shown as ✗ icon
+    assert "✗" in result  # ruff failure shown as ✗ icon
 
 
 # ── skill_creator_node ────────────────────────────────────────────────────────

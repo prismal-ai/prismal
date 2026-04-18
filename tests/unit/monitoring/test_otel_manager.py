@@ -23,9 +23,7 @@ def test_otel_manager_is_singleton() -> None:
 def test_start_span_returns_noop_when_disabled() -> None:
     """start_span returns a _NoOpSpan context manager when OTEL disabled."""
     _reset_singleton()
-    with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-    ) as mock_settings:
+    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -50,9 +48,7 @@ def test_noop_span_methods() -> None:
 def test_increment_counter_noop_when_disabled() -> None:
     """increment_counter is safe no-op when OTEL disabled."""
     _reset_singleton()
-    with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-    ) as mock_settings:
+    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -65,9 +61,7 @@ def test_increment_counter_noop_when_disabled() -> None:
 def test_record_histogram_noop_when_disabled() -> None:
     """record_histogram is safe no-op when OTEL disabled."""
     _reset_singleton()
-    with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-    ) as mock_settings:
+    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -80,9 +74,7 @@ def test_record_histogram_noop_when_disabled() -> None:
 def test_start_span_with_attributes_noop() -> None:
     """start_span accepts attributes when disabled."""
     _reset_singleton()
-    with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-    ) as mock_settings:
+    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -199,12 +191,8 @@ def test_start_span_when_enabled_uses_tracer() -> None:
 
     mock_span = MagicMock()
     mgr, mock_tracer, _ = _make_enabled_otel()
-    mock_tracer.start_as_current_span.return_value.__enter__ = MagicMock(
-        return_value=mock_span
-    )
-    mock_tracer.start_as_current_span.return_value.__exit__ = MagicMock(
-        return_value=False
-    )
+    mock_tracer.start_as_current_span.return_value.__enter__ = MagicMock(return_value=mock_span)
+    mock_tracer.start_as_current_span.return_value.__exit__ = MagicMock(return_value=False)
 
     with mgr.start_span("test.op") as span:
         assert span is mock_span
@@ -218,12 +206,8 @@ def test_start_span_with_attributes_sets_them() -> None:
 
     mock_span = MagicMock()
     mgr, mock_tracer, _ = _make_enabled_otel()
-    mock_tracer.start_as_current_span.return_value.__enter__ = MagicMock(
-        return_value=mock_span
-    )
-    mock_tracer.start_as_current_span.return_value.__exit__ = MagicMock(
-        return_value=False
-    )
+    mock_tracer.start_as_current_span.return_value.__enter__ = MagicMock(return_value=mock_span)
+    mock_tracer.start_as_current_span.return_value.__exit__ = MagicMock(return_value=False)
 
     with mgr.start_span("op", attributes={"key": "val"}):
         pass
@@ -256,9 +240,7 @@ def test_start_span_records_exception_and_reraises() -> None:
 def test_shutdown_noop_when_disabled() -> None:
     """shutdown() returns immediately when not enabled."""
     _reset_singleton()
-    with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-    ) as mock_settings:
+    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -359,9 +341,7 @@ def test_setup_disables_otel_when_endpoint_unreachable() -> None:
 
     _reset_singleton()
     with (
-        patch(
-            "lightagent.monitoring._settings_proxy.get_monitoring_settings"
-        ) as mock_settings,
+        patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings,
         patch(
             "lightagent.monitoring.otel.socket.create_connection",
             side_effect=OSError(111, "Connection refused"),
