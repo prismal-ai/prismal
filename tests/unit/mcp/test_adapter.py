@@ -13,9 +13,9 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
+import mcp.types
 import pytest
 
-import mcp.types
 from lightagent.core.exceptions import MCPToolError, PermissionDeniedError
 from lightagent.mcp.adapter import MCPToolAdapter
 from lightagent.mcp.connection import MCPServerConfig, MCPServerConnection

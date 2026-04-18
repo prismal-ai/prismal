@@ -12,10 +12,9 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import mcp.types
 import pytest
 from pydantic import ValidationError
-
-import mcp.types
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
