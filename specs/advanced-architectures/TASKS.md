@@ -679,8 +679,63 @@ Para cerrar el proyecto de expansión como COMPLETED:
 
 ---
 
+---
+
+## FASE E — MCP Capability Routing ✅ DONE
+
+**Duración real:** 1 día | **Objetivo:** enrutar tools MCP específicas a cada patrón y subgraph según sus capabilities, evitando que agentes reciban tools irrelevantes o peligrosas.
+
+| ID | Tarea | Estado |
+|---|---|---|
+| E1 | Crear `config/mcp_servers.yaml` con campo `capabilities: list[str]` en cada entrada | ✅ DONE (el archivo no existía; se creó con 4 servidores de ejemplo: filesystem, web_search, code_sandbox, rag_store — todos con `enabled: false` y capabilities apropiadas) |
+| E2 | Extender `MCPClientManager.get_all_langchain_tools()` con parámetro `capabilities: list[str] \| None = None` | ✅ DONE — filtrado a nivel de servidor, `general` siempre incluido, `None` mantiene backward compatibility |
+| E3 | Extender `get_tools_for_agent()` con `required_capabilities: list[str] \| None = None` y propagarlo a `get_mcp_tools()` | ✅ DONE — la firma legacy (`get_tools_for_agent("researcher")`) sigue funcionando sin cambios |
+| E4 | Actualizar registros en `graph.py` con mapping por nodo | ⚠️ ADAPTADO — los nodos de Fase D (tot_agent, lats_agent, llm_compiler, etc.) siguen diferidos (D1-01 no se completó); en su lugar se expone `DEFAULT_CAPABILITY_MAP` + `get_recommended_capabilities(node_name)` en `tool_registry.py` para que operador use al hacer el wiring. Mapping idéntico al especificado en el prompt. |
+| E5 | Tests unitarios en `tests/unit/mcp/test_capability_routing.py` | ✅ DONE — **13 tests**, todos pasan; cubren: default capability, filtro None, filtro positivo/negativo, servidor `general` universal, plumbing end-to-end a `get_tools_for_agent`, mapping de E4, legacy path. |
+| E6 | Actualizar TASKS.md + SPEC.md | ✅ DONE |
+
+**Criterios de Done Fase E:**
+- ✅ `MCPServerConfig.capabilities: list[str]` con default `["general"]` (backward compatible — configs YAML sin el campo tratados como universales).
+- ✅ `MCPClientManager.get_all_langchain_tools(capabilities=None)` comportamiento idéntico al previo a Fase E.
+- ✅ Con `capabilities=[...]`: solo servidores con intersección de capabilities O tagged `"general"` contribuyen tools.
+- ✅ `get_tools_for_agent()` firma retro-compatible — agentes legacy (researcher, coder, …) siguen recibiendo pool completo.
+- ✅ **Tests: 13 pasan** — cubren los 6 casos del prompt + mapping de E4 + legacy path + universal capability.
+- ✅ Regresión: **688 tests totales pasan** (10 nuevos + 678 previos), 0 fallos.
+- ✅ `ruff check lightagent/agents/tool_registry.py lightagent/mcp/client.py tests/unit/mcp/test_capability_routing.py` → All checks passed!
+- ✅ `mypy --strict` → Success en `lightagent/mcp/client.py` + `lightagent/agents/tool_registry.py` (2 source files checked).
+- ✅ `bandit -r lightagent/mcp/client.py lightagent/agents/tool_registry.py -c pyproject.toml` → High=0, Medium=0.
+- ✅ Coverage `lightagent/mcp/client.py`: **83%**; las líneas nuevas de E2 (filtrado) cubiertas al 100% por test_capability_routing.
+
+**Archivos modificados (4) + creados (2):**
+- **Creado**: `config/mcp_servers.yaml` — nuevo catálogo con capabilities.
+- **Creado**: `tests/unit/mcp/test_capability_routing.py` — 13 tests.
+- **Modificado**: `lightagent/mcp/connection.py` — añadido `capabilities` a `MCPServerConfig`.
+- **Modificado**: `lightagent/mcp/client.py` — firma `get_all_langchain_tools(capabilities=None)` + filtrado.
+- **Modificado**: `lightagent/agents/tool_registry.py` — firma `get_tools_for_agent(..., required_capabilities=None)`, `get_mcp_tools(capabilities=None)`, `DEFAULT_CAPABILITY_MAP`, `get_recommended_capabilities()`.
+
+**Mapping canónico (según prompt)** expuesto como `DEFAULT_CAPABILITY_MAP` público en `tool_registry.py`:
+
+| Node | Capabilities |
+|---|---|
+| `tot_agent` | `["general", "research"]` |
+| `lats_agent` | `["general", "research", "file_management"]` |
+| `llm_compiler` | `["general", "research", "file_management", "code_execution"]` |
+| `mixture_agent` | `["general", "research"]` |
+| `customer_service` | `["customer_service", "rag", "general"]` |
+| `code_review` | `["code_review", "code_execution", "file_management"]` |
+| `data_etl` | `["data_etl", "file_management", "general"]` |
+| `document_generation` | `["document_generation", "research", "file_management"]` |
+| `debate_consensus` | `["research", "general"]` |
+
+**Desviaciones respecto al prompt:**
+1. `config/mcp_servers.yaml` **no existía** en el repo — se creó desde cero (el prompt asumía que existía). Contiene 4 servidores de muestra con `enabled: false` para no afectar el runtime.
+2. D1-01/02/03 siguen diferidos (documentado en sección Fase D) — los nodos Fase B/C no están en `graph.py`. Por eso E4 se adaptó: en lugar de modificar llamadas a `get_tools_for_agent()` en `graph.py` (llamadas que no existen), se expone el mapping canónico como constante pública `DEFAULT_CAPABILITY_MAP` y helper `get_recommended_capabilities()`. Cuando operación ejecute D1-01, tendrá que pasar `required_capabilities=get_recommended_capabilities(node_name)` en sus llamadas.
+
+---
+
 ## Historial de Cambios
 
 | Versión | Fecha | Autor | Cambios |
 |---|---|---|---|
 | 1.0 | 2026-04-19 | Ernesto Crespo | Versión inicial — 102 subtareas en 4 fases, 9 semanas |
+| 1.1 | 2026-04-19 | Claude Code | Fase E — MCP capability routing (6 subtareas, 13 tests nuevos, 688 total) |

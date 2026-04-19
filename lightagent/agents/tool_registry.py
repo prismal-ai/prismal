@@ -83,8 +83,18 @@ async def init_mcp(config_path: Path | None = None) -> None:
             _mcp_initialized = True
 
 
-def get_mcp_tools() -> list[BaseTool]:
+def get_mcp_tools(
+    capabilities: list[str] | None = None,
+) -> list[BaseTool]:
     """Return all tools currently available from connected MCP servers.
+
+    Args:
+        capabilities: Fase E capability filter forwarded to
+            :meth:`MCPClientManager.get_all_langchain_tools`. ``None``
+            (default) preserves the legacy behaviour and returns every
+            connected server's tools. A non-empty list restricts the result
+            to servers whose ``capabilities`` intersect the request; servers
+            tagged ``"general"`` are always included.
 
     Returns:
         Empty list when MCP has not been initialised or no servers are
@@ -96,7 +106,7 @@ def get_mcp_tools() -> list[BaseTool]:
         from lightagent.mcp.client import MCPClientManager
 
         if isinstance(_mcp_manager, MCPClientManager):
-            return _mcp_manager.get_all_langchain_tools()
+            return _mcp_manager.get_all_langchain_tools(capabilities=capabilities)
     except Exception as exc:
         logger.warning("tool_registry.get_mcp_tools_error", error=str(exc))
     return []
@@ -139,12 +149,44 @@ _MAX_TOTAL_TOOLS: int = 120
 # limit.  These agents only need their own stub tools to function correctly.
 _FIXED_TOOL_AGENTS: frozenset[str] = frozenset({"cron_manager", "critic"})
 
+
+# Fase E — recommended capability filter per new pattern / subgraph.
+# Operators wiring D1-01/02/03 (deferred) should pass these lists to
+# ``get_tools_for_agent(name, required_capabilities=DEFAULT_CAPABILITY_MAP[name])``
+# when registering each node.  Pre-Fase-A agents (researcher, coder, …) are
+# **absent** from this map on purpose — they continue to receive the full
+# MCP pool (backward compatibility).
+DEFAULT_CAPABILITY_MAP: dict[str, list[str]] = {
+    # Patterns from Fase B.
+    "tot_agent": ["general", "research"],
+    "lats_agent": ["general", "research", "file_management"],
+    "llm_compiler": ["general", "research", "file_management", "code_execution"],
+    "mixture_agent": ["general", "research"],
+    # Subgraphs from Fase C.
+    "customer_service": ["customer_service", "rag", "general"],
+    "code_review": ["code_review", "code_execution", "file_management"],
+    "data_etl": ["data_etl", "file_management", "general"],
+    "document_generation": ["document_generation", "research", "file_management"],
+    "debate_consensus": ["research", "general"],
+}
+
+
+def get_recommended_capabilities(node_name: str) -> list[str] | None:
+    """Return the recommended Fase E capability filter for *node_name*.
+
+    Unknown names return ``None`` — legacy agents get the full MCP pool.
+    """
+    return DEFAULT_CAPABILITY_MAP.get(node_name)
+
 # ---------------------------------------------------------------------------
 # Per-agent tool merge
 # ---------------------------------------------------------------------------
 
 
-def get_tools_for_agent(agent_name: str) -> list[BaseTool]:
+def get_tools_for_agent(
+    agent_name: str,
+    required_capabilities: list[str] | None = None,
+) -> list[BaseTool]:
     """Return the merged tool list for a named agent.
 
     Merge strategy (highest priority first):
@@ -157,6 +199,12 @@ def get_tools_for_agent(agent_name: str) -> list[BaseTool]:
     Args:
         agent_name: One of the known agent names (``"researcher"``,
             ``"coder"``, etc.).
+        required_capabilities: Fase E capability filter for MCP servers.
+            ``None`` (default) preserves the legacy full pool — zero
+            regressions for pre-Fase-E callers. A non-empty list restricts
+            MCP tools to servers whose ``capabilities`` overlap the
+            requested set; servers tagged ``"general"`` are always kept.
+            Skill tools and stubs are **not** filtered — only the MCP pool.
 
     Returns:
         Deduplicated list of ``BaseTool`` instances.
@@ -220,7 +268,8 @@ def get_tools_for_agent(agent_name: str) -> list[BaseTool]:
         )
         return stubs
 
-    mcp_tools = get_mcp_tools()[:_MAX_MCP_TOOLS]  # cap to avoid token explosion
+    # Cap MCP pool to avoid token explosion.
+    mcp_tools = get_mcp_tools(capabilities=required_capabilities)[:_MAX_MCP_TOOLS]
     skill_tools = get_skill_tools()
     live_tools: list[BaseTool] = mcp_tools + skill_tools
     live_names = {t.name for t in live_tools}
@@ -860,7 +909,9 @@ async def react_loop(
 
 
 __all__ = [
+    "DEFAULT_CAPABILITY_MAP",
     "get_mcp_tools",
+    "get_recommended_capabilities",
     "get_skill_tools",
     "get_tools_for_agent",
     "init_mcp",

@@ -1,0 +1,52 @@
+# MCP server catalogue — used by ``MCPClientManager.load_from_config``.
+#
+# Each entry is an ``MCPServerConfig``. The ``capabilities`` field is
+# consumed by the Fase E routing layer: agents / subgraphs may request
+# tools by capability via ``get_tools_for_agent(..., required_capabilities=)``.
+#
+# Valid capabilities (as of Fase E):
+#   general              — universal tools; always included in any filter.
+#   research             — web search, knowledge base lookup.
+#   file_management      — read / write / list files.
+#   code_execution       — sandboxed code execution.
+#   code_review          — static analysis, linting.
+#   customer_service     — CRM, ticketing, FAQ lookup.
+#   data_etl             — databases, DataFrame transformations.
+#   document_generation  — templates, formatting, export.
+#   rag                  — document indexing and vector search.
+#
+# If ``capabilities`` is omitted the server is treated as ``["general"]``
+# — universally included in every filter.
+
+servers:
+  - name: filesystem
+    type: stdio
+    enabled: false
+    command: ["npx", "-y", "@modelcontextprotocol/server-filesystem"]
+    description: Read / write files in a sandboxed workspace.
+    capabilities: ["file_management", "general"]
+    priority: 1
+
+  - name: web_search
+    type: stdio
+    enabled: false
+    command: ["npx", "-y", "@modelcontextprotocol/server-brave-search"]
+    description: Brave web search — fresh info and citations.
+    capabilities: ["research"]
+    priority: 2
+
+  - name: code_sandbox
+    type: stdio
+    enabled: false
+    command: ["python", "-m", "lightagent.mcp.servers.sandbox"]
+    description: Sandboxed Python / shell execution for code-review and dev.
+    capabilities: ["code_execution", "code_review"]
+    priority: 1
+
+  - name: rag_store
+    type: sse
+    enabled: false
+    url: http://localhost:8080/rag
+    description: Vector-store / knowledge-base RAG index.
+    capabilities: ["rag", "research"]
+    priority: 1

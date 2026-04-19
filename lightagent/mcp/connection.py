@@ -161,6 +161,17 @@ class MCPServerConfig(BaseModel):
         default=None,
         description="Human-readable description of this server.",
     )
+    capabilities: list[str] = Field(
+        default_factory=lambda: ["general"],
+        description=(
+            "Tags consumed by Fase E capability-routing. A server is included "
+            "in an agent's tool pool when its ``capabilities`` overlap with "
+            "the ``required_capabilities`` passed to ``get_tools_for_agent`` "
+            "(or when it has the ``general`` tag — which is universal). "
+            "Omitting the field defaults to ``['general']`` so legacy configs "
+            "remain visible to every agent."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_transport_fields(self) -> MCPServerConfig:

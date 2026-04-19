@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo |
-| **Estado** | `PHASE A + B + C + D — DONE` (D1-01/02/03 deferidos a migración operacional) |
+| **Estado** | `PHASE A + B + C + D + E — DONE` (D1-01/02/03 deferidos a migración operacional) |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-04-19 |
 | **PRD** | `specs/advanced-architectures/PRD.md` |
@@ -1481,6 +1481,30 @@ El wiring de los nuevos patrones como nodos top-level en `agents/graph.py` + `ag
 
 Cuando operación decida activar estas arquitecturas, el trabajo es: (a) llamar `register_<name>()` durante el startup, (b) añadir sus nombres a `VALID_NEXT_NODES` en supervisor, (c) añadir regex patterns a `intent_router`. Tiempo estimado: 1-2 días si se hace en ventana controlada.
 
+## Resumen de implementación — Fase E (MCP Capability Routing) — ✅ DONE
+
+| ID | Tarea | Estado |
+|---|---|---|
+| E1 | `config/mcp_servers.yaml` con `capabilities` | ✅ DONE — creado (no existía) |
+| E2 | `MCPClientManager.get_all_langchain_tools(capabilities=)` | ✅ DONE — filtrado server-level, `general` siempre incluido |
+| E3 | `get_tools_for_agent(..., required_capabilities=)` | ✅ DONE — backward compatible |
+| E4 | `DEFAULT_CAPABILITY_MAP` + `get_recommended_capabilities()` | ⚠️ ADAPTADO — el wiring a `graph.py` sigue diferido (D1-01); se expone el mapping como constante pública para operación |
+| E5 | Tests `test_capability_routing.py` | ✅ DONE — 13 tests |
+| E6 | Docs | ✅ DONE |
+
+**Propiedades de la routing:**
+- Servidor con `capabilities=["general"]` → **siempre incluido** (universal).
+- Servidor sin `capabilities` en YAML → default `["general"]` (backward compat).
+- `MCPClientManager.get_all_langchain_tools(capabilities=None)` → pool completo (legacy).
+- `get_tools_for_agent("researcher")` sin `required_capabilities` → pool completo (legacy).
+
+**Totales Fase E:**
+- 2 archivos creados (YAML + test).
+- 3 archivos modificados (`connection.py`, `client.py`, `tool_registry.py`).
+- 13 tests nuevos, **688 tests totales** (0 fallos, 0 regresiones).
+- Coverage `mcp/client.py`: **83%**.
+- ruff + mypy strict + bandit (High=0 Medium=0) clean.
+
 ## Historial de Cambios
 
 | Versión | Fecha | Autor | Cambios |
@@ -1490,3 +1514,4 @@ Cuando operación decida activar estas arquitecturas, el trabajo es: (a) llamar 
 | 1.2 | 2026-04-19 | Claude Code | Implementación Fase B (7 agent patterns) — 102 tests nuevos, ≥90% coverage |
 | 1.3 | 2026-04-19 | Claude Code | Implementación Fase C (5 subgraph pipelines) — 111 tests nuevos, ≥82% coverage |
 | 1.4 | 2026-04-19 | Claude Code | Implementación Fase D hardening — 12 excepciones centralizadas, bandit clean, coverage audit, `register_<name>()` helpers. D1-01/02/03 deferidos a migración operacional de `supervisor.py` |
+| 1.5 | 2026-04-19 | Claude Code | Implementación Fase E — MCP capability routing. Nuevo `config/mcp_servers.yaml`, `capabilities: list[str]` en `MCPServerConfig`, filtrado en `MCPClientManager` y `get_tools_for_agent`, `DEFAULT_CAPABILITY_MAP` para los 9 nodos nuevos. 13 tests, 688 total. |
