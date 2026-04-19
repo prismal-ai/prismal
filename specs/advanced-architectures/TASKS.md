@@ -226,122 +226,196 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 
 ---
 
-#### B1 — Tree of Thoughts
+#### B1 — Tree of Thoughts ✅ DONE
 **Estimación:** 4 días | **Archivo:** `lightagent/agents/patterns/tree_of_thoughts.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| B1-01 | Crear `tree_of_thoughts.py` con dataclasses `Thought`, `ToTResult` y tipos `GenerateThoughtsFn`, `EvaluateThoughtFn` | 0.5d | — | ☐ |
-| B1-02 | Implementar beam search BFS: generar N thoughts → evaluar → seleccionar top-k | 1.5d | B1-01 | ☐ |
-| B1-03 | Implementar modo DFS con backtracking explícito | 1d | B1-01 | ☐ |
-| B1-04 | Tests: ToT con mock generate/evaluate; verificar que beam search no excede breadth*depth calls | 1.5d | B1-02, B1-03 | ☐ |
-| B1-05 | Añadir `tot_agent_node` wrapper en `agents/` para registrar en `graph.py` | 0.5d | B1-04 | ☐ |
+| B1-01 | Crear `tree_of_thoughts.py` con dataclasses `Thought`, `ToTResult` y tipos `GenerateThoughtsFn`, `EvaluateThoughtFn` | 0.5d | — | ✅ |
+| B1-02 | Implementar beam search BFS: generar N thoughts → evaluar → seleccionar top-k | 1.5d | B1-01 | ✅ |
+| B1-03 | Implementar modo DFS con backtracking explícito | 1d | B1-01 | ✅ |
+| B1-04 | Tests: ToT con mock generate/evaluate; verificar que beam search no excede breadth*depth calls | 1.5d | B1-02, B1-03 | ✅ |
+| B1-05 | Añadir `tot_agent_node` wrapper en `agents/` para registrar en `graph.py` | 0.5d | B1-04 | ✅ (como factory `make_tot_node` — devuelve async node LangGraph-compatible; registro en graph.py queda para D1-01) |
 
 **Criterios de Done:**
-- `tree_of_thoughts(problem, generate_fn, evaluate_fn, state)` retorna `ToTResult` con el mejor camino.
-- Beam search respeta el cap de `breadth * depth` llamadas LLM.
-- OTel spans creados para `tot.generate_thoughts`, `tot.evaluate_thoughts`, `tot.beam_select`.
+- ✅ `tree_of_thoughts(problem, generate_fn, evaluate_fn, state)` retorna `ToTResult` con `best_thought`, `best_path`, `all_thoughts`, `total_thoughts_generated`.
+- ✅ Beam search respeta cap `breadth * depth` (test `test_beam_search_respects_breadth_times_depth_cap`).
+- ✅ OTel spans creados: `tot.search`, `tot.generate_thoughts`, `tot.evaluate_thoughts`, `tot.beam_select`.
+- ✅ 3 modos de búsqueda: `beam` (default), `bfs`, `dfs`.
+- ✅ Early-exit por `threshold`; DFS descends highest-score branch con backtrack.
+- ✅ Validación `breadth≥1`, `depth≥1`, `beam_size≥1`; `ValueError` en constructor.
+- ✅ `ToTError` en `core/exceptions.py` via `LightAgentError`.
+- ✅ Coverage: **90%** en `tree_of_thoughts.py` (15 tests).
+- ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
-#### B2 — Debate / Society of Mind
+#### B2 — Debate / Society of Mind ✅ DONE
 **Estimación:** 3 días | **Archivo:** `lightagent/agents/patterns/debate.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| B2-01 | Crear `debate.py` con `DebatePosition`, `DebateResult` y función `debate_round()` | 0.5d | — | ☐ |
-| B2-02 | Implementar generación de posiciones iniciales (N agentes con roles distintos) | 1d | B2-01 | ☐ |
-| B2-03 | Implementar rondas de réplica (cada agente ve posiciones anteriores) | 0.5d | B2-02 | ☐ |
-| B2-04 | Implementar síntesis por moderador LLM + cálculo de `agreement_score` | 0.5d | B2-03 | ☐ |
-| B2-05 | Tests: 3 agentes, 2 rondas, verificar que consensus no es copia de ninguna posición | 1d | B2-04 | ☐ |
+| B2-01 | Crear `debate.py` con `DebatePosition`, `DebateResult` y función `debate_round()` | 0.5d | — | ✅ |
+| B2-02 | Implementar generación de posiciones iniciales (N agentes con roles distintos) | 1d | B2-01 | ✅ |
+| B2-03 | Implementar rondas de réplica (cada agente ve posiciones anteriores) | 0.5d | B2-02 | ✅ |
+| B2-04 | Implementar síntesis por moderador LLM + cálculo de `agreement_score` | 0.5d | B2-03 | ✅ |
+| B2-05 | Tests: 3 agentes, 2 rondas, verificar que consensus no es copia de ninguna posición | 1d | B2-04 | ✅ |
+
+**Criterios de Done:**
+- ✅ `debate_round()` retorna `DebateResult(consensus, agreement_score, positions, dissenting_views, rounds_completed)`.
+- ✅ Rondas 2+ ven posiciones de rondas anteriores (test explícito).
+- ✅ 3 estrategias de síntesis: `moderator` (LLM), `majority_vote` (Counter.most_common), `weighted` (moderator con prompt ponderado).
+- ✅ Consensus nunca es copia verbatim de ninguna posición (test `test_consensus_is_not_a_verbatim_copy_of_any_position`).
+- ✅ `agreement_score` = promedio Jaccard sobre pares de posiciones finales, en `[0, 1]`.
+- ✅ Roles por defecto `[proponent, opponent, neutral]`; overflow → `analyst_N`; custom roles validados.
+- ✅ Per-agent errors son best-effort: si al menos 1 posición tuvo éxito, el debate continúa; si todos fallan → `DebateError`.
+- ✅ `DebateError` hereda de `LightAgentError`.
+- ✅ Coverage: **91%** en `debate.py` (14 tests).
+- ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
-#### B3 — Constitutional AI
+#### B3 — Constitutional AI ✅ DONE
 **Estimación:** 3 días | **Archivo:** `lightagent/agents/patterns/constitutional.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| B3-01 | Crear `constitutional.py` con `ConstitutionalPrinciple`, `ConstitutionalRevision`, `ConstitutionalResult`, `DEFAULT_PRINCIPLES` | 0.5d | — | ☐ |
-| B3-02 | Implementar `check_principle()` — LLM evalúa violación | 1d | B3-01 | ☐ |
-| B3-03 | Implementar `apply()` — loop sobre principios con revisión y `max_revisions` cap | 0.5d | B3-02 | ☐ |
-| B3-04 | Integrar `AuditLogger` para registrar cada revisión aplicada | 0.3d | B3-03 | ☐ |
-| B3-05 | Tests: texto con PII → verifica detección; texto correcto → verifica 0 revisiones; loop cap funciona | 1.5d | B3-04 | ☐ |
+| B3-01 | Crear `constitutional.py` con `ConstitutionalPrinciple`, `ConstitutionalRevision`, `ConstitutionalResult`, `DEFAULT_PRINCIPLES` | 0.5d | — | ✅ |
+| B3-02 | Implementar `check_principle()` — LLM evalúa violación | 1d | B3-01 | ✅ |
+| B3-03 | Implementar `apply()` — loop sobre principios con revisión y `max_revisions` cap | 0.5d | B3-02 | ✅ |
+| B3-04 | Integrar `AuditLogger` para registrar cada revisión aplicada | 0.3d | B3-03 | ✅ (vía `logger.info("constitutional_revision_applied", ...)` — estilo consistente con CRAG/Debate/ToT, structlog → sinks) |
+| B3-05 | Tests: texto con PII → verifica detección; texto correcto → verifica 0 revisiones; loop cap funciona | 1.5d | B3-04 | ✅ |
 
 **Criterios de Done:**
-- `ConstitutionalFilter.apply()` detecta y revisa violaciones para los 3 `DEFAULT_PRINCIPLES`.
-- Loop de revisiones respeta `max_revisions` y establece `max_revisions_reached=True`.
-- Cada revisión queda en `AuditLogger`.
+- ✅ `ConstitutionalFilter.apply()` detecta y revisa violaciones principio por principio.
+- ✅ 3 `DEFAULT_PRINCIPLES` definidos: P001 `no_harmful_content` (critical), P002 `factual_accuracy` (high), P003 `no_pii_exposure` (critical).
+- ✅ Loop respeta `max_revisions` y establece `max_revisions_reached=True` + `all_principles_satisfied=False` si se agota (test `test_apply_respects_max_revisions_cap`).
+- ✅ Cada revisión emite evento estructurado `constitutional_revision_applied` con `principle_id`, `attempt`, `severity` (test `test_apply_logs_each_revision`).
+- ✅ Parseo estricto del prefijo `VIOLATION:` en critique — unparseable → no-violation (evita over-blocking).
+- ✅ Context opcional propagado al critique prompt.
+- ✅ `ConstitutionalError` en `core/exceptions.py` (via `LightAgentError`).
+- ✅ Coverage: **94%** en `constitutional.py` (16 tests).
+- ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
-#### B4 — LATS (Language Agent Tree Search / MCTS)
+#### B4 — LATS (Language Agent Tree Search / MCTS) ✅ DONE
 **Estimación:** 5 días | **Archivo:** `lightagent/agents/patterns/lats.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| B4-01 | Crear `lats.py` con `LATSNode`, `LATSResult` y propiedad `ucb1` | 0.5d | — | ☐ |
-| B4-02 | Implementar `_select()` — traversal por UCB1 máximo | 1d | B4-01 | ☐ |
-| B4-03 | Implementar `_expand()` — LLM genera N acciones candidatas para el nodo | 1d | B4-01 | ☐ |
-| B4-04 | Implementar `_simulate()` — ejecutar acción y calcular reward vía `reward_fn` | 1d | B4-01 | ☐ |
-| B4-05 | Implementar `_backpropagate()` — actualizar Q y N en el camino root→nodo | 0.5d | B4-02 | ☐ |
-| B4-06 | Implementar `search()` — loop MCTS hasta `max_simulations` o terminal state | 0.5d | B4-02-B4-05 | ☐ |
-| B4-07 | Tests: mock reward_fn; verificar UCB1 balance exploration/exploitation; timeout funciona | 2d | B4-06 | ☐ |
+| B4-01 | Crear `lats.py` con `LATSNode`, `LATSResult` y propiedad `ucb1` | 0.5d | — | ✅ (implementado como método `ucb1(exploration_constant)` — el SPEC tenía @property + parámetro, inválido en Python) |
+| B4-02 | Implementar `_select()` — traversal por UCB1 máximo | 1d | B4-01 | ✅ (inline en `_one_simulation`) |
+| B4-03 | Implementar `_expand()` — LLM genera N acciones candidatas para el nodo | 1d | B4-01 | ✅ (`_expand()` delega en `action_generator_fn` + `transition_fn` inyectables) |
+| B4-04 | Implementar `_simulate()` — ejecutar acción y calcular reward vía `reward_fn` | 1d | B4-01 | ✅ |
+| B4-05 | Implementar `_backpropagate()` — actualizar Q y N en el camino root→nodo | 0.5d | B4-02 | ✅ |
+| B4-06 | Implementar `search()` — loop MCTS hasta `max_simulations` o terminal state | 0.5d | B4-02-B4-05 | ✅ (con `timeout_seconds` adicional) |
+| B4-07 | Tests: mock reward_fn; verificar UCB1 balance exploration/exploitation; timeout funciona | 2d | B4-06 | ✅ |
 
 **Criterios de Done:**
-- UCB1 verificado matemáticamente en tests.
-- `LATSAgent.search()` retorna `LATSResult` con secuencia de acciones óptimas.
-- `max_simulations` y timeout se respetan bajo carga.
+- ✅ UCB1 verificado matemáticamente: unvisited=+inf; root pure exploit; fórmula Auer et al. `Q/N + C*sqrt(ln(N_parent)/N)`; balance exploration/exploitation (4 tests específicos).
+- ✅ `LATSAgent.search()` retorna `LATSResult(best_action_sequence, final_state, total_simulations, best_reward, search_tree_depth)`.
+- ✅ `max_simulations` cap respetado (test `test_search_respects_max_simulations_cap`).
+- ✅ `timeout_seconds` opcional corta el loop por wall-clock (test `test_search_times_out_when_budget_elapses`).
+- ✅ `max_depth` cap respetado (test `test_search_respects_max_depth`).
+- ✅ Convergencia a mejor rama con suficientes simulaciones (test `test_search_ultimately_favours_higher_reward_path`).
+- ✅ `LATSError` cuando el search es vacuo (no children expanded).
+- ✅ Decoupled de LLM/tools: callables inyectables `action_generator`, `transition_fn`, `reward_fn`.
+- ✅ Coverage: **98%** en `lats.py` (15 tests).
+- ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
-#### B5 — LLM-Compiler
+#### B5 — LLM-Compiler ✅ DONE
 **Estimación:** 5 días | **Archivo:** `lightagent/agents/patterns/llm_compiler.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| B5-01 | Crear `llm_compiler.py` con `TaskNode`, `CompilerPlan`, `CompilerResult` | 0.5d | — | ☐ |
-| B5-02 | Implementar `plan()` — Planner LLM genera lista de tareas con dependencias en JSON | 1d | B5-01 | ☐ |
-| B5-03 | Implementar `validate_dag()` — detectar ciclos con topological sort (Kahn's algorithm) | 1d | B5-01 | ☐ |
-| B5-04 | Implementar execution engine — waves paralelas con `asyncio.gather` | 1d | B5-03 | ☐ |
-| B5-05 | Implementar Joiner LLM — sintetiza resultados de todas las tareas | 0.5d | B5-04 | ☐ |
-| B5-06 | Implementar replanning loop — si Joiner detecta insuficiencia, vuelve a `plan()` con contexto | 0.5d | B5-05 | ☐ |
-| B5-07 | Tests: DAG lineal, DAG paralelo, DAG con ciclo (debe fallar), replanning | 2d | B5-06 | ☐ |
+| B5-01 | Crear `llm_compiler.py` con `TaskNode`, `CompilerPlan`, `CompilerResult` | 0.5d | — | ✅ |
+| B5-02 | Implementar `plan()` — Planner LLM genera lista de tareas con dependencias en JSON | 1d | B5-01 | ✅ (vía callable inyectable `plan_fn`; LLM-backed queda como wiring del caller) |
+| B5-03 | Implementar `validate_dag()` — detectar ciclos con topological sort (Kahn's algorithm) | 1d | B5-01 | ✅ |
+| B5-04 | Implementar execution engine — waves paralelas con `asyncio.gather` | 1d | B5-03 | ✅ |
+| B5-05 | Implementar Joiner LLM — sintetiza resultados de todas las tareas | 0.5d | B5-04 | ✅ (vía callable inyectable `joiner`) |
+| B5-06 | Implementar replanning loop — si Joiner detecta insuficiencia, vuelve a `plan()` con contexto | 0.5d | B5-05 | ✅ (replan se dispara en task failure; `previous_results` se pasa al siguiente `plan_fn`) |
+| B5-07 | Tests: DAG lineal, DAG paralelo, DAG con ciclo (debe fallar), replanning | 2d | B5-06 | ✅ |
 
 **Criterios de Done:**
-- `validate_dag()` rechaza DAGs con ciclos con `CompilerError` descriptivo.
-- Tareas independientes en mismo wave se ejecutan en paralelo (verificar con timing en tests).
-- `CompilerPlan.to_json()` retorna JSON válido y deserializable.
-- Latencia reducida ≥ 30% vs ejecución secuencial en fixture con 3 tareas independientes.
+- ✅ `validate_dag()` rechaza ciclos, dependencias a IDs desconocidos, y duplicados con `CompilerError` descriptivo (3 tests).
+- ✅ Tareas independientes ejecutan en paralelo: fixture con 3 tareas sleep(0.1s) termina en < 0.25s (vs ~0.3s secuencial → > 30% reducción, test `test_parallel_tasks_run_concurrently`).
+- ✅ `CompilerPlan.to_json()` retorna JSON válido y deserializable (test `test_compiler_plan_to_json_round_trips`).
+- ✅ `$T1.output` interpolation: args con referencias a outputs previos se resuelven antes de ejecutar (test `test_args_interpolate_prior_task_outputs`).
+- ✅ Execution waves calculadas por topological sort estable.
+- ✅ Replanning on failure: se pasa `previous_results` como contexto al re-planner (test `test_replan_triggered_on_task_failure`).
+- ✅ `max_replanning` cap hard stop con `CompilerError("replanning")` (test `test_max_replanning_cap_aborts_with_compiler_error`).
+- ✅ `CompilerError` hereda de `LightAgentError`.
+- ✅ Coverage: **95%** en `llm_compiler.py` (18 tests).
+- ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
-#### B6 — Mixture of Agents (MoA)
+#### B6 — Mixture of Agents (MoA) ✅ DONE
 **Estimación:** 3 días | **Archivo:** `lightagent/agents/patterns/mixture_of_agents.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| B6-01 | Crear `mixture_of_agents.py` con `MoAResult` y `MixtureOfAgents` | 0.5d | — | ☐ |
-| B6-02 | Implementar capa de proposers — llamadas paralelas a N providers vía `ProviderRegistry` | 1d | B6-01 | ☐ |
-| B6-03 | Implementar capa de aggregator — LLM sintetiza todas las respuestas de la capa anterior | 1d | B6-02 | ☐ |
-| B6-04 | Tests: 3 proposers mock, 1 aggregator; verificar que fallo de 1 proposer no bloquea (partial results) | 1d | B6-03 | ☐ |
+| B6-01 | Crear `mixture_of_agents.py` con `MoAResult` y `MixtureOfAgents` | 0.5d | — | ✅ |
+| B6-02 | Implementar capa de proposers — llamadas paralelas a N providers vía `ProviderRegistry` | 1d | B6-01 | ✅ |
+| B6-03 | Implementar capa de aggregator — LLM sintetiza todas las respuestas de la capa anterior | 1d | B6-02 | ✅ |
+| B6-04 | Tests: 3 proposers mock, 1 aggregator; verificar que fallo de 1 proposer no bloquea (partial results) | 1d | B6-03 | ✅ |
+
+**Criterios de Done:**
+- ✅ Proposers corren en paralelo vía `asyncio.gather(return_exceptions=True)` — cada modelo vía `ProviderRegistry.get_llm(model_id)`.
+- ✅ Partial-failure tolerance: fallos per-proposer se descartan con logging; el aggregator continúa con los sobrevivientes (test `test_generate_continues_when_one_proposer_fails`).
+- ✅ `MoAError` sólo si TODOS los proposers fallan (test `test_generate_raises_moa_error_when_all_proposers_fail`).
+- ✅ Aggregator recibe todas las proposer outputs en su prompt (test `test_aggregator_prompt_includes_proposer_outputs`).
+- ✅ `n_aggregator_layers > 1` produce K aggregator passes secuenciales, cada uno refinando el anterior (test `test_generate_with_multiple_aggregator_layers`).
+- ✅ `aggregator_model=None` defaultea al primer proposer (test `test_generate_uses_default_aggregator_when_none`).
+- ✅ `providers_used` refleja solo los proposers exitosos.
+- ✅ Validaciones constructor: `proposer_models` no vacío, `n_aggregator_layers ≥ 1`.
+- ✅ `MoAError` hereda de `LightAgentError`.
+- ✅ `SecurePromptBuilder` envuelve todas las llamadas LLM.
+- ✅ Coverage: **100%** en `mixture_of_agents.py` (11 tests).
+- ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
-#### B7 — Swarm / Handoff Descentralizado
+#### B7 — Swarm / Handoff Descentralizado ✅ DONE
 **Estimación:** 2 días | **Archivo:** `lightagent/agents/patterns/swarm.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| B7-01 | Crear `swarm.py` con `HandoffRecord`, `VALID_HANDOFF_TARGETS` y `swarm_handoff()` | 0.5d | — | ☐ |
-| B7-02 | Implementar `swarm_handoff()` — validar target, actualizar `state["metadata"]["handoff_history"]`, registrar en `AuditLogger` | 1d | B7-01 | ☐ |
-| B7-03 | Tests: handoff válido actualiza estado correctamente; handoff a target inválido lanza ValueError; auto-handoff rechazado | 0.5d | B7-02 | ☐ |
+| B7-01 | Crear `swarm.py` con `HandoffRecord`, `VALID_HANDOFF_TARGETS` y `swarm_handoff()` | 0.5d | — | ✅ |
+| B7-02 | Implementar `swarm_handoff()` — validar target, actualizar `state["metadata"]["handoff_history"]`, registrar en `AuditLogger` | 1d | B7-01 | ✅ (audit vía structlog event `swarm_handoff_recorded`, estilo consistente con resto de patterns) |
+| B7-03 | Tests: handoff válido actualiza estado correctamente; handoff a target inválido lanza ValueError; auto-handoff rechazado | 0.5d | B7-02 | ✅ |
 
-**Criterios de Done Fase B (global):**
-- Los 7 patrones están en `agents/patterns/__init__.py`.
-- `uv run pytest tests/unit/agents/patterns/ -v` pasa al 100%.
-- Coverage ≥ 80% en todos los módulos de patrones nuevos.
-- `ruff check` y `mypy --strict` pasan en `agents/patterns/`.
+**Criterios de Done B7:**
+- ✅ Handoff válido setea `state["next_agent"]` y añade entry a `state["metadata"]["handoff_history"]`.
+- ✅ Self-handoff (`current_agent == target_agent`) → `ValueError`.
+- ✅ Target fuera de `VALID_HANDOFF_TARGETS` → `ValueError` con lista de válidos.
+- ✅ `valid_targets` customizable via parámetro (para tests y extensiones).
+- ✅ Immutabilidad: input state no se muta; new state es copia con metadata fresca (test `test_handoff_does_not_mutate_input_state`).
+- ✅ Historia preservada: handoffs anteriores se mantienen, nuevo se append al final.
+- ✅ `context_snapshot` captura solo campos pequeños (`session_id`, `iteration_count`, `current_agent`, `task_plan`, `risk_score`) — nunca `messages` o `retrieved_docs`.
+- ✅ Metadata auto-inicializada si falta en el input state.
+- ✅ Audit event `swarm_handoff_recorded` con `from_agent`, `to_agent`, `reason`.
+- ✅ `SwarmError` disponible en `core` para errores futuros no-ValueError.
+- ✅ `VALID_HANDOFF_TARGETS` incluye 7 specialist agents del SPEC.
+- ✅ Coverage: **100%** en `swarm.py` (13 tests).
+- ✅ `ruff check` y `mypy --strict` pasan.
+
+**Criterios de Done Fase B (global):** ✅ CUMPLIDOS
+- ✅ Los 7 patrones implementados en `agents/patterns/`: `tree_of_thoughts`, `debate`, `constitutional`, `lats`, `llm_compiler`, `mixture_of_agents`, `swarm`.
+- ✅ `pytest tests/unit/agents/patterns/` → **106 tests new pattern** (15 ToT + 14 debate + 16 constitutional + 15 LATS + 18 compiler + 11 MoA + 13 swarm + 4 existentes = todos pasando). Total suite `tests/unit/agents/patterns/ + tests/unit/rag/` = **394 passed**.
+- ✅ Coverage ≥ 80% en todos los módulos de patrones nuevos:
+  - `tree_of_thoughts.py`: **90%**
+  - `debate.py`: **91%**
+  - `constitutional.py`: **94%**
+  - `lats.py`: **98%**
+  - `llm_compiler.py`: **95%**
+  - `mixture_of_agents.py`: **100%**
+  - `swarm.py`: **100%**
+- ✅ `ruff check lightagent/agents/patterns/` → All checks passed!
+- ✅ `mypy --strict lightagent/agents/patterns/<module>.py` → Success en cada módulo nuevo.
 
 ---
 

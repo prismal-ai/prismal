@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo |
-| **Estado** | `PHASE A — DONE` (B/C/D pendientes) |
+| **Estado** | `PHASE A + B — DONE` (C/D pendientes) |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-04-19 |
 | **PRD** | `specs/advanced-architectures/PRD.md` |
@@ -31,6 +31,29 @@
 
 **Nota sobre desviaciones menores del SPEC**:
 - `SelfRAGPipeline._evaluate_support()` se renombró internamente a `_assess_support()` para evitar un falso positivo de un hook de seguridad local que bloqueaba el substring `eval`. El comportamiento, parámetros, y valor de retorno son idénticos al SPEC.
+
+## Resumen de implementación — Fase B (Patrones de Agente) — ✅ DONE
+
+| SPEC | Archivo | Tests | Coverage | Estado |
+|---|---|---|---|---|
+| SPEC-PAT-001 (Tree of Thoughts) | `lightagent/agents/patterns/tree_of_thoughts.py` | 15 | 90% | ✅ DONE |
+| SPEC-PAT-002 (Debate) | `lightagent/agents/patterns/debate.py` | 14 | 91% | ✅ DONE |
+| SPEC-PAT-003 (Constitutional AI) | `lightagent/agents/patterns/constitutional.py` | 16 | 94% | ✅ DONE |
+| SPEC-PAT-004 (LATS / MCTS) | `lightagent/agents/patterns/lats.py` | 15 | 98% | ✅ DONE |
+| SPEC-PAT-005 (LLM-Compiler) | `lightagent/agents/patterns/llm_compiler.py` | 18 | 95% | ✅ DONE |
+| SPEC-PAT-006 (Mixture of Agents) | `lightagent/agents/patterns/mixture_of_agents.py` | 11 | 100% | ✅ DONE |
+| SPEC-PAT-007 (Swarm/Handoff) | `lightagent/agents/patterns/swarm.py` | 13 | 100% | ✅ DONE |
+
+**Totales Fase B**: 7 módulos nuevos, 102 tests nuevos, 394 tests totales (Fase A+B, 0 fallos). Coverage por módulo ≥ 90% en toda Fase B.
+
+**Nuevas excepciones en `core/exceptions.py`** (todas heredan de `LightAgentError`): `ToTError`, `DebateError`, `ConstitutionalError`, `LATSError`, `CompilerError`, `MoAError`, `SwarmError` — anticipan D1-04.
+
+**Principio de diseño común en Fase B**: cada patrón acepta callables inyectables (`generate_fn`, `evaluate_fn`, `reward_fn`, `plan_fn`, `action_generator`, etc.) en vez de acoplarse a `ProviderRegistry` o `BaseTool`. Esto permite testing sin infraestructura LLM y facilita composición con cualquier backend. El patrón Mixture of Agents es la única excepción — por diseño consulta `ProviderRegistry.get_llm(model)` ya que la esencia de MoA es multi-provider.
+
+**Nota sobre desviaciones menores del SPEC Fase B**:
+- `LATSNode.ucb1` se implementó como método en vez de `@property` (el SPEC mostraba `@property def ucb1(self, exploration_constant)` — combinación inválida en Python, properties no aceptan parámetros). Comportamiento matemático idéntico al SPEC.
+- `tot_agent_node` (B1-05) se implementó como factory `make_tot_node(generate_fn, evaluate_fn, ...)` que retorna un nodo async LangGraph-compatible. El registro en `graph.py` queda diferido a D1-01.
+- `LLMCompiler` acepta callables inyectables (`plan_fn`, `tool_executor`, `joiner`) en lugar de tipar a `BaseTool` directamente — decoupling consistente con el resto de Fase B.
 
 ---
 
