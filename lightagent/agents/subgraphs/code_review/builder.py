@@ -97,4 +97,22 @@ def build_code_review_subgraph(
     return definition
 
 
-__all__ = ["build_code_review_subgraph"]
+async def register_code_review(
+    approval_threshold: float = 0.8,
+    settings: Settings | None = None,
+) -> None:
+    """Register the code_review subgraph (idempotent)."""
+    from lightagent.agents.subgraphs.registry import SubgraphRegistry
+
+    registry = SubgraphRegistry.get_instance()
+    if registry.get(_NAME) is not None:
+        logger.info("code_review.already_registered")
+        return
+    definition = build_code_review_subgraph(
+        approval_threshold=approval_threshold, settings=settings
+    )
+    await registry.register(_NAME, definition)
+    logger.info("code_review.registered")
+
+
+__all__ = ["build_code_review_subgraph", "register_code_review"]

@@ -59,7 +59,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from lightagent.core.config import get_settings
-from lightagent.core.exceptions import LightAgentError
+from lightagent.core.exceptions import LATSError
 from lightagent.core.logging import get_logger
 from lightagent.monitoring.otel import OTelManager
 
@@ -67,10 +67,6 @@ if TYPE_CHECKING:
     from lightagent.core.config import Settings
 
 logger = get_logger("lightagent.agents.patterns.lats")
-
-
-class LATSError(LightAgentError):
-    """Raised when LATS cannot produce any informative result."""
 
 
 @dataclass

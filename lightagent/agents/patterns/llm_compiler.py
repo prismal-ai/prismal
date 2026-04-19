@@ -49,7 +49,7 @@ from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
 from lightagent.core.config import get_settings
-from lightagent.core.exceptions import LightAgentError
+from lightagent.core.exceptions import CompilerError
 from lightagent.core.logging import get_logger
 from lightagent.monitoring.otel import OTelManager
 
@@ -59,10 +59,6 @@ if TYPE_CHECKING:
 logger = get_logger("lightagent.agents.patterns.llm_compiler")
 
 _REFERENCE_RE = re.compile(r"\$(\w+)\.output")
-
-
-class CompilerError(LightAgentError):
-    """Raised on DAG validation failure or when replanning cap is exceeded."""
 
 
 TaskStatus = Literal["pending", "running", "completed", "failed"]

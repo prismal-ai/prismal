@@ -30,12 +30,7 @@ from lightagent.agents.subgraphs.document_generation.researcher_node import (
 from lightagent.agents.subgraphs.document_generation.writer_node import (
     make_writer_node,
 )
-from lightagent.core.exceptions import LightAgentError
-
-
-class DocumentGenerationError(LightAgentError):
-    """Raised when the document_generation subgraph hits a terminal fault."""
-
+from lightagent.core.exceptions import DocumentGenerationError
 
 __all__ = [
     "DocumentGenerationError",

@@ -21,12 +21,7 @@ from lightagent.agents.subgraphs.data_etl.validator_node import (
     make_etl_branching_gate,
     make_validator_node,
 )
-from lightagent.core.exceptions import LightAgentError
-
-
-class DataETLError(LightAgentError):
-    """Raised when the data_etl subgraph hits a terminal fault."""
-
+from lightagent.core.exceptions import DataETLError
 
 __all__ = [
     "DataETLError",

@@ -101,4 +101,24 @@ def build_document_generation_subgraph(
     return definition
 
 
-__all__ = ["build_document_generation_subgraph"]
+async def register_document_generation(
+    llm: Any | None = None,
+    rag_engine: Any | None = None,
+    format: Literal["markdown", "plain", "html"] = "markdown",
+    settings: Settings | None = None,
+) -> None:
+    """Register the document_generation subgraph (idempotent)."""
+    from lightagent.agents.subgraphs.registry import SubgraphRegistry
+
+    registry = SubgraphRegistry.get_instance()
+    if registry.get(_NAME) is not None:
+        logger.info("document_generation.already_registered")
+        return
+    definition = build_document_generation_subgraph(
+        llm=llm, rag_engine=rag_engine, format=format, settings=settings
+    )
+    await registry.register(_NAME, definition)
+    logger.info("document_generation.registered")
+
+
+__all__ = ["build_document_generation_subgraph", "register_document_generation"]

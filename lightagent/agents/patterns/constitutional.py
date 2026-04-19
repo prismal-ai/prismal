@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from lightagent.core.config import get_settings
-from lightagent.core.exceptions import LightAgentError
+from lightagent.core.exceptions import ConstitutionalError
 from lightagent.core.logging import get_logger
 from lightagent.monitoring.otel import OTelManager
 from lightagent.providers.registry import ProviderRegistry
@@ -45,10 +45,6 @@ if TYPE_CHECKING:
     from lightagent.core.config import Settings
 
 logger = get_logger("lightagent.agents.patterns.constitutional")
-
-
-class ConstitutionalError(LightAgentError):
-    """Raised when the constitutional filter cannot process its input."""
 
 
 @dataclass

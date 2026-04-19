@@ -114,4 +114,19 @@ def build_data_etl_subgraph(
     return definition
 
 
-__all__ = ["build_data_etl_subgraph"]
+async def register_data_etl(
+    settings: Settings | None = None,
+) -> None:
+    """Register the data_etl subgraph (idempotent). Uses default polars IO."""
+    from lightagent.agents.subgraphs.registry import SubgraphRegistry
+
+    registry = SubgraphRegistry.get_instance()
+    if registry.get(_NAME) is not None:
+        logger.info("data_etl.already_registered")
+        return
+    definition = build_data_etl_subgraph(settings=settings)
+    await registry.register(_NAME, definition)
+    logger.info("data_etl.registered")
+
+
+__all__ = ["build_data_etl_subgraph", "register_data_etl"]

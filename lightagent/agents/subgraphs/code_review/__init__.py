@@ -38,12 +38,7 @@ from lightagent.agents.subgraphs.code_review.types import (
     CodeReviewReport,
     Severity,
 )
-from lightagent.core.exceptions import LightAgentError
-
-
-class CodeReviewError(LightAgentError):
-    """Raised when the code_review subgraph hits a terminal fault."""
-
+from lightagent.core.exceptions import CodeReviewError
 
 __all__ = [
     "Category",

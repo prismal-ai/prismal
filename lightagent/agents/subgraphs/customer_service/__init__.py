@@ -30,12 +30,7 @@ from lightagent.agents.subgraphs.customer_service.response_generator_node import
 from lightagent.agents.subgraphs.customer_service.ticket_creator_node import (
     make_ticket_creator_node,
 )
-from lightagent.core.exceptions import LightAgentError
-
-
-class CustomerServiceError(LightAgentError):
-    """Raised when the customer_service subgraph encounters a terminal fault."""
-
+from lightagent.core.exceptions import CustomerServiceError
 
 __all__ = [
     "CUSTOMER_SERVICE_CATEGORIES",

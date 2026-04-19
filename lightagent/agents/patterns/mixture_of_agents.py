@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from lightagent.core.config import get_settings
-from lightagent.core.exceptions import LightAgentError
+from lightagent.core.exceptions import MoAError
 from lightagent.core.logging import get_logger
 from lightagent.monitoring.otel import OTelManager
 from lightagent.providers.registry import ProviderRegistry
@@ -53,10 +53,6 @@ _AGGREGATOR_PROMPT = (
     "from each expert response. Paraphrase — do not copy any single response "
     "verbatim."
 )
-
-
-class MoAError(LightAgentError):
-    """Raised when mixture-of-agents cannot produce a final answer."""
 
 
 @dataclass

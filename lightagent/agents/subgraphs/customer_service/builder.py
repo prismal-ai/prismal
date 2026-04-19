@@ -118,4 +118,32 @@ def build_customer_service_subgraph(
     return definition
 
 
-__all__ = ["build_customer_service_subgraph"]
+async def register_customer_service(
+    rag_engine: Any | None = None,
+    escalation_threshold: float = 0.6,
+    settings: Settings | None = None,
+    llm: Any | None = None,
+) -> None:
+    """Register the customer_service subgraph in :class:`SubgraphRegistry`.
+
+    Idempotent — skips if already registered. Mirrors the style of
+    :func:`register_ml_pipeline` so operators can wire new subgraphs into
+    the main graph uniformly.
+    """
+    from lightagent.agents.subgraphs.registry import SubgraphRegistry
+
+    registry = SubgraphRegistry.get_instance()
+    if registry.get(_NAME) is not None:
+        logger.info("customer_service.already_registered")
+        return
+    definition = build_customer_service_subgraph(
+        rag_engine=rag_engine,
+        escalation_threshold=escalation_threshold,
+        settings=settings,
+        llm=llm,
+    )
+    await registry.register(_NAME, definition)
+    logger.info("customer_service.registered")
+
+
+__all__ = ["build_customer_service_subgraph", "register_customer_service"]

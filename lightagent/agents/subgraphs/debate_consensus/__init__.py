@@ -32,12 +32,7 @@ from lightagent.agents.subgraphs.debate_consensus.opponent_node import (
 from lightagent.agents.subgraphs.debate_consensus.proponent_node import (
     make_proponent_node,
 )
-from lightagent.core.exceptions import LightAgentError
-
-
-class DebateConsensusError(LightAgentError):
-    """Raised when the debate_consensus subgraph hits a terminal fault."""
-
+from lightagent.core.exceptions import DebateConsensusError
 
 __all__ = [
     "DebateConsensusError",

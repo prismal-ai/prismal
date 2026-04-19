@@ -884,6 +884,36 @@ class Settings(BaseSettings):
         description="Maximum concurrent Send() dispatches per fan-out node.",
     )
 
+    # ── Constitutional AI (Advanced Architectures / SPEC-PAT-003) ─────
+    constitutional_enabled: bool = Field(
+        default=False,
+        description=(
+            "Global toggle for the Constitutional AI filter. When True, "
+            "the supervisor may route through ConstitutionalFilter.apply() "
+            "before emitting agent output to the user."
+        ),
+    )
+    constitutional_max_revisions: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description=(
+            "Per-principle cap on revision attempts before marking "
+            "``max_revisions_reached=True``."
+        ),
+    )
+    constitutional_principles: list[str] = Field(
+        default_factory=lambda: ["P001", "P002", "P003"],
+        description=(
+            "IDs of the principles enabled by default. The canonical set "
+            "lives in ``lightagent.agents.patterns.constitutional.DEFAULT_PRINCIPLES`` "
+            "(``P001 no_harmful_content``, ``P002 factual_accuracy``, "
+            "``P003 no_pii_exposure``). Custom deployments may override with "
+            "their own list via env var as a JSON array: "
+            "``LIGHTAGENT_CONSTITUTIONAL_PRINCIPLES='[\"P001\",\"custom-P999\"]'``."
+        ),
+    )
+
     # ── Reflection Loop Framework (Phase 33) ──────────────────────────
     reflection_enabled: bool = Field(
         default=True,

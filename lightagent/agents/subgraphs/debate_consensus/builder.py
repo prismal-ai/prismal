@@ -90,4 +90,20 @@ def build_debate_consensus_subgraph(
     return definition
 
 
-__all__ = ["build_debate_consensus_subgraph"]
+async def register_debate_consensus(
+    llm: Any | None = None,
+    settings: Settings | None = None,
+) -> None:
+    """Register the debate_consensus subgraph (idempotent)."""
+    from lightagent.agents.subgraphs.registry import SubgraphRegistry
+
+    registry = SubgraphRegistry.get_instance()
+    if registry.get(_NAME) is not None:
+        logger.info("debate_consensus.already_registered")
+        return
+    definition = build_debate_consensus_subgraph(llm=llm, settings=settings)
+    await registry.register(_NAME, definition)
+    logger.info("debate_consensus.registered")
+
+
+__all__ = ["build_debate_consensus_subgraph", "register_debate_consensus"]

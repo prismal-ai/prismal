@@ -62,6 +62,30 @@ The core is a LangGraph `StateGraph[AgentState]` assembled in `lightagent/agents
 
 `agents/subgraphs/` holds composed multi-node pipelines wrapped as reusable subgraphs: `dev_pipeline` (PO → Architect → Developer → Tests → QA → Reviewer), `ml_pipeline` (Ingester → EDA → Features → Trainer → Evaluator → Exporter), `financial` (Collector → Technical → Fundamental → Risk → Report), plus `analysis_orchestrator`, `engineering_orchestrator`, `research_orchestrator`. They are built by `SubgraphFactory` and registered in `SubgraphRegistry`.
 
+**Advanced architectures (Fase A/B/C — `specs/advanced-architectures/`)** adds 7 RAG engines, 7 agent patterns, and 5 subgraph pipelines. All follow the same factory-injection pattern: business logic accepts callables (`generate_fn`, `evaluate_fn`, `reward_fn`, `plan_fn`, `tool_executor`, `linter_fn`, …) so tests run without LLM backends. Defaults wire `ProviderRegistry().get_llm()` lazily.
+
+- `rag/hyde.py` — HyDE retriever (hypothetical doc embeddings).
+- `rag/fusion.py` — RAG-Fusion (multi-query + `reciprocal_rank_fusion`).
+- `rag/hybrid.py` — BM25 + semantic hybrid (`rank-bm25` dep).
+- `rag/self_rag.py` — retrieval on demand + self-assessment.
+- `rag/hierarchical.py` — parent/child chunk indexing.
+- `rag/multi_vector.py` — chunk + summary + N hypothetical questions.
+- `rag/adaptive.py` — facade routing to the above by query type.
+- `agents/patterns/tree_of_thoughts.py` — ToT with beam / BFS / DFS.
+- `agents/patterns/debate.py` — N-agent multi-round debate + Jaccard agreement.
+- `agents/patterns/constitutional.py` — principle-driven self-revision + audit.
+- `agents/patterns/lats.py` — MCTS (UCB1 balanced exploration).
+- `agents/patterns/llm_compiler.py` — DAG of tasks, Kahn validation, parallel waves.
+- `agents/patterns/mixture_of_agents.py` — parallel proposers + aggregator synthesis.
+- `agents/patterns/swarm.py` — decentralised agent handoff with audit.
+- `agents/subgraphs/customer_service/` — classifier → faq_retrieval → (escalation gate) → response | ticket.
+- `agents/subgraphs/document_generation/` — planner → researcher → writer → editor → formatter.
+- `agents/subgraphs/data_etl/` — extractor → validator → (gate) → transformer → loader → auditor.
+- `agents/subgraphs/code_review/` — linter → security_scanner → logic_reviewer → suggester → report_generator.
+- `agents/subgraphs/debate_consensus/` — proponent → opponent → moderator → consensus.
+
+Each subgraph exports both `build_<name>_subgraph()` (returns `SubgraphDefinition`) and `register_<name>()` (idempotent registry install), mirroring the existing `register_ml_pipeline`.
+
 `agents/patterns/` provides composable primitives: `reflection_loop()` (generate → critique → refine) and `make_parallel_dispatcher()` (fan-out via LangGraph `Send()`).
 
 `agents/subgraphs/gates.py::hitl_gate()` uses `interrupt()` for Human-in-the-Loop pauses.

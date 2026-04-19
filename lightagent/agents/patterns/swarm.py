@@ -38,15 +38,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from lightagent.core.exceptions import LightAgentError
+from lightagent.core.exceptions import SwarmError
 from lightagent.core.logging import get_logger
 from lightagent.monitoring.otel import OTelManager
 
 logger = get_logger("lightagent.agents.patterns.swarm")
-
-
-class SwarmError(LightAgentError):
-    """Raised for swarm-handoff failures not covered by a built-in exception."""
 
 
 @dataclass

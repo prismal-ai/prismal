@@ -40,15 +40,11 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 from uuid import uuid4
 
-from lightagent.core.exceptions import LightAgentError
+from lightagent.core.exceptions import ToTError
 from lightagent.core.logging import get_logger
 from lightagent.monitoring.otel import OTelManager
 
 logger = get_logger("lightagent.agents.patterns.tree_of_thoughts")
-
-
-class ToTError(LightAgentError):
-    """Raised when a Tree of Thoughts search cannot produce a result."""
 
 
 @dataclass
