@@ -1,0 +1,389 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+# ============================================================
+# PROJECT METADATA
+# ============================================================
+[project]
+name = "lightagent-agents"
+version = "2.0.0"
+description = "LightAgent AI Agent Framework — LangGraph multi-agent orchestration, security, RAG, MCP, and observability"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Ernesto Crespo", email = "ecrespo@gmail.com" }]
+maintainers = [{ name = "Ernesto Crespo", email = "ecrespo@gmail.com" }]
+keywords = [
+  "ai",
+  "agent",
+  "langgraph",
+  "langchain",
+  "mcp",
+  "rag",
+  "llm",
+  "guardrails",
+  "security",
+  "multi-agent",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+
+# ============================================================
+# CORE DEPENDENCIES (agent framework only — no API/UI/CLI)
+# ============================================================
+dependencies = [
+  # ── LLM Orchestration ──────────────────────────────────────
+  "langchain>=0.3.14",
+  "langgraph>=0.2.66",
+  "langchain-community>=0.3.14",
+  "langchain-core>=0.3.28",
+  "litellm>=1.58.0",                # Provider-agnostic LLM proxy (Claude/OpenAI/Gemini/Ollama)
+  "langchain-anthropic>=0.3.3",     # Anthropic Claude integration
+  "langchain-openai>=0.3.1",        # OpenAI integration
+  "langchain-google-genai>=2.0.8",  # Google Gemini integration
+  "langchain-litellm>=0.6.1",       # LiteLLM LangChain integration
+  "langgraph-checkpoint-sqlite>=2.0.1", # LangGraph SQLite checkpointing
+  # ── Data Layer ────────────────────────────────────────────
+  "polars>=1.17.0",                 # High-performance DataFrame library
+  "duckdb>=1.1.3",                  # In-process analytical SQL engine
+  "pyarrow>=19.0.0",                # Required by DuckDB ↔ Polars interchange
+  "sqlalchemy>=2.0.36",             # ORM + async support
+  "alembic>=1.14.0",                # Database migrations
+  "aiosqlite>=0.20.0",              # Async SQLite driver
+  # ── Vector Database ───────────────────────────────────────
+  "chromadb>=0.6.2",                # Embedding database for RAG
+  # ── Document Processing ───────────────────────────────────
+  "pypdf>=5.1.0",                   # PDF loader
+  "docx2txt>=0.8",                  # DOCX loader
+  "unstructured>=0.16.10",          # Universal document parser
+  "python-magic>=0.4.27",           # File type detection
+  "icalendar>=6.0.0",               # iCalendar (.ics) parsing for calendar skill
+  # ── Embeddings ────────────────────────────────────────────
+  "sentence-transformers>=3.3.1",   # Local embeddings (HuggingFace)
+  "tiktoken>=0.8.0",                # Token counting for OpenAI models
+  # ── Scheduler ─────────────────────────────────────────────
+  "prefect>=3.1.10",                # Workflow orchestration
+  "watchdog>=6.0.0",                # Filesystem event monitoring
+  "apscheduler>=3.10",              # AsyncIOScheduler for cron execution
+  "croniter>=2.0",                  # Cron expression parsing
+  "tzlocal>=5.2",                   # OS timezone detection for DateTimeService
+  # ── MCP (Model Context Protocol) ─────────────────────────
+  "mcp>=1.2.0",                     # MCP client + protocol types
+  # ── Security & Guardrails ─────────────────────────────────
+  "nemoguardrails>=0.10.1",         # NVIDIA NeMo Guardrails for LLMs
+  "bandit>=1.8.0",                  # Security linter (used in skill validation)
+  # ── Configuration ─────────────────────────────────────────
+  "pydantic>=2.10.3",               # Data validation
+  "pydantic-settings>=2.7.0",       # Settings from env vars / .env files
+  "python-dotenv>=1.0.1",           # .env file loading
+  "pyyaml>=6.0.2",                  # YAML config files
+  "toml>=0.10.2",                   # TOML config support
+  "tomli_w>=1.0.0",                 # TOML serialisation for pyproject.toml writes
+  # ── HTTP & Networking ─────────────────────────────────────
+  "httpx>=0.28.1",                  # Async HTTP client
+  "httpx-sse>=0.4.0",               # SSE support for httpx
+  "aiohttp>=3.11.10",               # Async HTTP for MCP SSE transport
+  # ── Observability ─────────────────────────────────────────
+  "structlog>=24.4.0",              # Structured logging
+  "loguru>=0.7.0",                  # Log sink: file rotation, retention, compression
+  "langfuse>=2.0.0",                # LLM observability (traces, evals, costs)
+  "opentelemetry-api>=1.29.0",      # OTEL API (tracing + metrics)
+  "opentelemetry-exporter-otlp-proto-http>=1.29.0",  # OTLP HTTP exporter
+  "opentelemetry-sdk>=1.29.0",      # Distributed tracing
+  "psutil>=6.1.1",                  # System resource monitoring
+  # ── Reliability ───────────────────────────────────────────
+  "tenacity>=9.0.0",                # Retry logic with backoff
+  "circuitbreaker>=2.0.0",          # Circuit breaker pattern
+  # ── Security Primitives ───────────────────────────────────
+  "python-jose[cryptography]>=3.3.0", # JWT tokens for auth
+  "passlib[bcrypt]>=1.7.4",         # Password hashing
+  "cryptography>=43.0.3",           # Crypto primitives (canary tokens)
+  "xxhash>=3.5.0",                  # Fast hashing for audit log chain
+]
+
+# ============================================================
+# OPTIONAL DEPENDENCIES
+# ============================================================
+[project.optional-dependencies]
+
+# PostgreSQL support
+postgres = [
+  "psycopg2-binary>=2.9.10",
+  "asyncpg>=0.30.0",
+  "langgraph-checkpoint-postgres>=2.0.7",
+]
+
+# MongoDB support
+mongodb = [
+  "motor>=3.6.0",
+  "beanie>=1.27.0",
+]
+
+# Full local embeddings (HuggingFace, no API required)
+local-embeddings = [
+  "torch>=2.5.1",
+  "transformers>=4.47.1",
+  "accelerate>=1.2.1",
+]
+
+# Ollama local LLM support
+ollama = [
+  "ollama>=0.4.4",
+  "langchain-ollama>=0.2.1",
+]
+
+# Analytics extras
+analytics = [
+  "matplotlib>=3.9.4",
+  "plotly>=5.24.1",
+  "pandas>=2.2.3",
+]
+
+# ML/AutoML pipeline (Phase 26)
+ml = [
+  "flaml>=2.3.0",
+  "scikit-learn>=1.5.0",
+  "xgboost>=2.1.0",
+  "lightgbm>=4.5.0",
+  "shap>=0.45.0",
+  "imbalanced-learn>=0.12.0",
+  "optuna>=3.6.0",
+  "onnx>=1.16.0",
+  "onnxruntime>=1.18.0",
+]
+
+# ML + Deep Learning (Phase 26)
+ml-dl = [
+  "lightagent-agents[ml]",
+  "torch>=2.5.1",
+  "lightning>=2.4.0",
+]
+
+# Financial analysis (Phase 27)
+finance = [
+  "yfinance>=0.2.50",
+  "pandas>=2.2.3",
+  "pandas-ta>=0.3.14b",
+]
+
+# DateTime & timezone extras (Phase 28)
+datetime = [
+  "tzdata>=2024.1",
+  "ntplib>=0.4.0",
+]
+
+# Package security & maintenance extras (Phase 30)
+maintenance = [
+  "pip-audit>=2.7.0",
+]
+
+# All optional extras combined
+all = [
+  "lightagent-agents[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance]",
+]
+
+# Development tools
+dev = [
+  "pytest>=8.3.4",
+  "pytest-asyncio>=0.24.0",
+  "pytest-cov>=6.0.0",
+  "pytest-mock>=3.14.0",
+  "pytest-xdist>=3.6.1",
+  "httpx>=0.28.1",
+  "faker>=33.1.0",
+  "respx>=0.21.1",
+  "ruff>=0.8.4",
+  "mypy>=1.13.0",
+  "ty>=0.0.1a5",
+  "docformatter>=1.7.5",
+  "pyupgrade>=3.19.0",
+  "pre-commit>=4.0.1",
+  "bandit[toml]>=1.8.0",
+  "radon>=6.0.1",
+  "lizard>=1.17.0",
+  "pip-audit>=2.7.0",
+  "types-pyyaml>=6.0.12.20240917",
+  "types-toml>=0.10.8.20240310",
+  "types-passlib>=1.7.7.20240819",
+  "mkdocs>=1.6.1",
+  "mkdocs-material>=9.5.49",
+  "mkdocstrings[python]>=0.27.0",
+  "hatchling>=1.25.0",
+  "build>=1.2.2",
+  "twine>=6.0.1",
+]
+
+# ============================================================
+# ENTRY POINTS
+# ============================================================
+[project.urls]
+Homepage = "https://github.com/your-org/lightagent"
+Documentation = "https://lightagent.readthedocs.io/agents/"
+Repository = "https://github.com/your-org/lightagent"
+"Bug Tracker" = "https://github.com/your-org/lightagent/issues"
+Changelog = "https://github.com/your-org/lightagent/blob/main/packages/lightagent-agents/CHANGELOG.md"
+
+# ============================================================
+# HATCH BUILD CONFIG — namespace package (PEP 420)
+# lightagent/ has NO __init__.py → implicit namespace package
+# Both lightagent-agents and lightagent (app) contribute to
+# the same 'lightagent' namespace without conflicts.
+# ============================================================
+[tool.hatch.build.targets.wheel]
+packages = ["lightagent"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.github",
+  "/docs",
+  "/tests",
+  "/data/",
+  ".env",
+  ".env.*",
+]
+
+# ============================================================
+# RUFF — LINTER + FORMATTER
+# ============================================================
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["lightagent", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W", "F", "I", "N", "UP", "ANN", "S", "B", "C4",
+  "DTZ", "EM", "ISC", "ICN", "PIE", "PT", "RET", "SIM",
+  "TCH", "ARG", "PTH", "ERA", "RUF", "C90",
+]
+ignore = [
+  "S101", "S603", "S607", "EM101", "EM102",
+  "RUF012", "ANN401", "ERA001",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 40
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+  "S101", "S104", "S105", "S106", "S108", "S110", "S112",
+  "S311", "ANN", "ARG", "DTZ", "N802", "N806", "N817",
+  "E402", "E501", "SIM117", "F841", "TC", "PT", "PTH",
+  "RUF", "RET504", "B017", "B904",
+]
+"lightagent/skills/available/**/*.py" = ["S603", "S607"]
+"lightagent/skills/custom/**/*.py" = ["S603", "S607"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["lightagent"]
+force-single-line = false
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+# ============================================================
+# MYPY — TYPE CHECKING
+# ============================================================
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_reexport = true
+show_error_codes = true
+show_column_numbers = true
+# Namespace packages support
+namespace_packages = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = [
+  "litellm.*", "chromadb.*", "prefect.*", "watchdog.*",
+  "nemoguardrails.*", "mcp.*", "structlog.*", "docx2txt.*",
+  "unstructured.*", "circuitbreaker.*", "alembic", "alembic.*",
+  "apscheduler.*", "croniter.*",
+]
+ignore_missing_imports = true
+
+# ============================================================
+# PYTEST
+# ============================================================
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+  "--strict-markers",
+  "--strict-config",
+  "--tb=short",
+  "-v",
+  "-p", "no:freezegun",
+]
+markers = [
+  "unit: Unit tests (no external services)",
+  "integration: Integration tests (requires running services)",
+  "security: Security-specific tests",
+  "slow: Tests that take > 5 seconds",
+  "live_api: Tests that call real LLM APIs (require API keys)",
+]
+filterwarnings = [
+  "error",
+  "ignore::DeprecationWarning:pydantic.*",
+  "ignore::DeprecationWarning:chromadb.*",
+  "ignore::DeprecationWarning:distutils.*",
+  "ignore::DeprecationWarning:setuptools.*",
+  "ignore::ResourceWarning:sqlite3",
+  "ignore:.*unclosed.*:ResourceWarning",
+  "ignore::ResourceWarning:aiosqlite",
+  "ignore::pytest.PytestUnraisableExceptionWarning",
+  "ignore:.*flow run id.*:UserWarning",
+  "ignore:.*PREFECT_LOGGING.*:UserWarning",
+]
+
+# ============================================================
+# COVERAGE
+# ============================================================
+[tool.coverage.run]
+source = ["lightagent"]
+branch = true
+omit = [
+  "lightagent/skills/custom/*",
+  "*/__init__.py",
+  "*/migrations/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "def __repr__",
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  "@abstractmethod",
+  "if __name__ == .__main__.:",
+]
+fail_under = 80
+show_missing = true
+
+# ============================================================
+# BANDIT — SECURITY LINTING
+# ============================================================
+[tool.bandit]
+exclude_dirs = ["tests", "lightagent/skills/custom"]
+skips = ["B101", "B104", "B608"]
+severity_level = "medium"
+confidence_level = "medium"
