@@ -65,5 +65,5 @@ lightagent/skills/active/
 
 # Secrets
 .env
-.env.*
-!.env.example
+env.example
+!env.example

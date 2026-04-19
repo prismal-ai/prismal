@@ -242,6 +242,34 @@ class RAGIndexError(RAGError):  # reserved for future use by the indexing pipeli
         super().__init__(f"Indexing failed: {reason}")
 
 
+class HyDEError(RAGError):
+    """Raised when HyDE hypothesis generation or embedding fails."""
+
+
+class FusionError(RAGError):
+    """Raised when RAG-Fusion query-variant generation or fusion fails."""
+
+
+class HybridSearchError(RAGError):
+    """Raised when hybrid BM25+semantic search fails."""
+
+
+class SelfRAGError(RAGError):
+    """Raised when Self-RAG decision, generation, or self-assessment fails."""
+
+
+class HierarchicalRAGError(RAGError):
+    """Raised when hierarchical parent-child RAG operations fail."""
+
+
+class MultiVectorError(RAGError):
+    """Raised when multi-vector indexing or search fails."""
+
+
+class AdaptiveRAGError(RAGError):
+    """Raised when adaptive RAG routing or dispatch fails."""
+
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 
@@ -296,10 +324,15 @@ class MemoryRedactionError(MemoryError):
 
 
 __all__ = [
+    "AdaptiveRAGError",
     "CanaryLeakError",
     "CronJobExistsError",
     "CronJobNotFoundError",
     "DocumentLoadError",
+    "FusionError",
+    "HierarchicalRAGError",
+    "HyDEError",
+    "HybridSearchError",
     "InjectionDetectedError",
     "LightAgentError",
     "MCPConnectionError",
@@ -308,6 +341,7 @@ __all__ = [
     "MemoryError",
     "MemoryRedactionError",
     "ModelNotFoundError",
+    "MultiVectorError",
     "PermissionDeniedError",
     "ProviderError",
     "ProviderTimeoutError",
@@ -315,6 +349,7 @@ __all__ = [
     "RAGIndexError",
     "SchedulerError",
     "SecurityError",
+    "SelfRAGError",
     "SkillError",
     "SkillLoadError",
     "SkillValidationError",

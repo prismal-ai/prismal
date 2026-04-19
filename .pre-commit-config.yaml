@@ -1,0 +1,279 @@
+# .pre-commit-config.yaml
+# CuidaSalud — cuida-integrations (FastAPI + uv)
+# ============================================================
+# Gate local: lint, tipos, complejidad, SAST, secrets, deps
+# Tests y Trivy quedan en CI (demasiado lentos para pre-commit)
+#
+# Instalacion:
+#   uv add --dev pre-commit
+#   uv run pre-commit install
+#   uv run pre-commit install --hook-type commit-msg
+#   uv run pre-commit run --all-files   # primera ejecucion completa
+# ============================================================
+
+default_language_version:
+  python: python3.13
+
+# Excluye globalmente: venv, migraciones, tests de hooks pesados,
+# plantillas Helm (Jinja, no YAML puro), datos y artefactos runtime.
+exclude: |
+  (?x)^(
+    \.venv/.*|
+    migrations/.*|
+    \.git/.*|
+    helm/.*|
+    data/.*|
+    dist/.*|
+    docs/.*|
+    chat_history/.*|
+    assets/.*|
+    node_modules/.*
+  )$
+
+
+repos:
+
+  # ----------------------------------------------------------
+  # 1. SECRETS — Gitleaks
+  # Detecta API keys, tokens, passwords, JWTs hardcodeados
+  # ----------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+        name: "secrets: Gitleaks"
+
+  # ----------------------------------------------------------
+  # 2. CALIDAD GENERAL
+  # Hooks estandar: whitespace, EOF, YAML, TOML, JSON, merge
+  # ----------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: "fmt: trailing whitespace"
+      - id: end-of-file-fixer
+        name: "fmt: end of file"
+      - id: check-yaml
+        name: "lint: YAML valido"
+        args: [--unsafe]         # permite tags custom en docker-compose
+      - id: check-toml
+        name: "lint: TOML valido"
+      - id: check-json
+        name: "lint: JSON valido"
+      - id: check-merge-conflict
+        name: "git: sin conflict markers"
+      - id: check-added-large-files
+        name: "git: archivos grandes (max 500KB)"
+        args: [--maxkb=500]
+      - id: detect-private-key
+        name: "secrets: private keys"
+        # file_manager.py docstring lists the PEM header literally as a pattern
+        # the agent must refuse to write -- excluded as false positive.
+        # Exclude both old path (monolith) and new path (extracted package).
+        exclude: ^(lightagent/agents/file_manager\.py|packages/lightagent-agents/lightagent/agents/file_manager\.py)$
+      - id: debug-statements
+        name: "python: sin breakpoint() / pdb / set_trace()"
+      - id: check-ast
+        name: "python: AST valido (sintaxis)"
+
+  # ----------------------------------------------------------
+  # 3. DOCKERFILE — Hadolint
+  # Malas practicas, instrucciones inseguras, :latest tags
+  # ----------------------------------------------------------
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.13.1-beta
+    hooks:
+      - id: hadolint-docker
+        name: "docker: Hadolint"
+        args:
+          - --failure-threshold=warning
+          - --ignore=DL3008     # apt-get sin pin version (ok en CI images)
+          - --ignore=DL3013     # pip install sin pin version (gestionado por uv.lock en este repo)
+          - --ignore=SC2015     # "A && B || C" idiom intencional en Dockerfile
+
+  # ----------------------------------------------------------
+  # 4. LINTING + COMPLEJIDAD CICLOMATICA — Ruff
+  # C901: max-complexity = 10 (configurado en pyproject.toml)
+  # Tambien aplica formato (reemplaza black + isort)
+  # ----------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Mantener alineado con .gitlab-ci.yml -> ruff-lint (ruff==0.15.10).
+    # Si actualizas aqui, actualiza tambien el CI para evitar drift.
+    rev: v0.15.10
+    hooks:
+      - id: ruff
+        name: "lint: Ruff (lint + C901)"
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+        name: "fmt: Ruff format"
+
+  # ----------------------------------------------------------
+  # 5. TYPE CHECKING — ty (Astral)
+  # Tipos, flujo de datos, None no manejado, retornos incorrectos
+  # Solo corre si hay cambios en app/
+  # ----------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: ty-check
+        name: "types: ty (informational)"
+        language: system
+        # ty (Astral) aun en alpha v0.0.x — los errores actuales son informativos
+        # y no bloquean el commit. El type-check autoritativo es `mypy --strict`
+        # (ver CLAUDE.md > "Before Every Commit"). Migrar a `ty` cuando estabilice.
+        # Se invoca por path al venv para no depender de `uv` ni del PATH del IDE.
+        entry: .venv/bin/ty
+        args: [check, --exit-zero, --output-format=concise, lightagent/]
+        pass_filenames: false
+        types: [python]
+        files: ^lightagent/
+
+  # ----------------------------------------------------------
+  # 6. COMPLEJIDAD COGNITIVA — flake8 + CCR001
+  # Complementa Ruff C901 con la metrica cognitiva de SonarSource
+  # Umbral: 12 (mas estricto que ciclomatica por su naturaleza)
+  # ----------------------------------------------------------
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.2.0
+    hooks:
+      - id: flake8
+        name: "complexity: cognitive CCR001 (baseline=100)"
+        additional_dependencies:
+          - flake8-cognitive-complexity==0.1.0
+        args:
+          - --select=CCR001
+          # Umbral alineado con el peor caso actual (_repl_async: 98).
+          # TODO: bajar progresivamente a 12 conforme se refactoren
+          #   supervisor_node, _repl_async, react_loop, skill_manager_node.
+          - --max-cognitive-complexity=100
+        files: ^lightagent/
+        exclude: ^tests/
+
+  # ----------------------------------------------------------
+  # 7. COMPLEJIDAD — Radon (reporte, no bloquea)
+  # Muestra funciones con CC >= C (10+) como informacion
+  # verbose: true para ver output aunque no falle
+  # ----------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: radon-cc
+        name: "complexity: Radon CC report (warning)"
+        language: system
+        # Path al venv en vez de `uv run ...` para no depender de `uv` en el PATH del IDE.
+        entry: .venv/bin/radon
+        args: [cc, lightagent/, -s, -n, C]
+        pass_filenames: false
+        files: ^lightagent/
+        verbose: true
+
+  # ----------------------------------------------------------
+  # 8. COMPLEJIDAD — Lizard (bloquea)
+  # CCN <= 10 y cognitive <= 12 por funcion
+  # Tambien valida parametros (<= 5) y longitud (<= 60 lineas)
+  # ----------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: lizard
+        name: "complexity: Lizard CCN+args+length (baseline)"
+        language: system
+        # Umbrales alineados con codebase actual. Meta: CCN=10 / args=5 / length=200.
+        # TODO: bajar progresivamente al refactorizar _repl_async, supervisor_node,
+        #   react_loop, skill_manager_node, cua_node, codeact _validate_imports.
+        # Path al venv en vez de `uv run ...` para no depender de `uv` en el PATH del IDE.
+        entry: .venv/bin/lizard
+        args: [lightagent/, --CCN, "40", --arguments, "15", --length, "350", -w]
+        pass_filenames: false
+        files: ^lightagent/
+        exclude: ^tests/
+
+  # ----------------------------------------------------------
+  # 9. SAST — Bandit
+  # Vulnerabilidades Python: eval, subprocess, shell=True,
+  # pickle inseguro, hardcoded passwords, assert en produccion
+  # ----------------------------------------------------------
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.3
+    hooks:
+      - id: bandit
+        name: "sast: Bandit (medium+)"
+        additional_dependencies: ["bandit[toml]"]
+        args:
+          - -r
+          - lightagent/
+          - -c
+          - pyproject.toml
+          - --severity-level=medium
+          - -q
+        pass_filenames: false
+        files: ^lightagent/
+        exclude: ^tests/
+
+  # ----------------------------------------------------------
+  # 10. SAST — Semgrep
+  # Deshabilitado en pre-commit: opentelemetry-instrumentation (dep. de semgrep)
+  # usa pkg_resources que no está disponible en Python 3.13.
+  # Semgrep se ejecuta en CI (Bitbucket Pipelines) con todas las reglas:
+  #   p/python, p/secrets, p/owasp-top-ten, p/fastapi
+  # ----------------------------------------------------------
+  # - repo: https://github.com/semgrep/semgrep
+  #   rev: v1.116.0
+  #   hooks:
+  #     - id: semgrep
+  #       name: "sast: Semgrep (python + secrets)"
+  #       args: [--config=p/python, --config=p/secrets, --error, --quiet, --exclude=tests]
+  #       pass_filenames: false
+
+  # ----------------------------------------------------------
+  # 11. SEGURIDAD DEPENDENCIAS — pip-audit
+  # Solo corre si cambia pyproject.toml o uv.lock
+  # CVEs en paquetes del entorno gestionado por uv
+  # ----------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: pip-audit
+        name: "sca: pip-audit (CVEs en deps)"
+        language: system
+        # Triage activo de CVEs en `lightagent doctor security-check` (Phase 30).
+        # Las CVEs en paquetes pineados aqui no se pueden actualizar sin romper
+        # el stack Reflex 0.7.x + sqlmodel<0.0.25 + pydantic<2.11. Se ignoran
+        # explicitamente en pre-commit y se revisan manualmente.
+        # Path al venv en vez de `uv run ...` para no depender de `uv` en el PATH del IDE.
+        entry: .venv/bin/pip-audit
+        args:
+          - --ignore-vuln=GHSA-r7w7-9xr2-qq2r
+          - --ignore-vuln=GHSA-fv5p-p927-qmxr
+          - --ignore-vuln=GHSA-rr7j-v2q5-chgv
+          - --ignore-vuln=CVE-2025-66416
+          - --ignore-vuln=CVE-2026-25990
+          - --ignore-vuln=CVE-2026-40192
+          - --ignore-vuln=GHSA-jj6c-8h6c-hppx
+          - --ignore-vuln=GHSA-4pxv-j86v-mhcw
+          - --ignore-vuln=GHSA-7gw9-cf7v-778f
+          - --ignore-vuln=GHSA-x284-j5p8-9c5p
+          - --ignore-vuln=CVE-2025-62379
+          - --skip-editable
+        pass_filenames: false
+        files: ^(pyproject\.toml|uv\.lock)$
+
+  # ----------------------------------------------------------
+  # 12. CONVENTIONAL COMMITS
+  # Formato: feat:, fix:, chore:, docs:, refactor:, test:, ci:
+  # Requiere: uv run pre-commit install --hook-type commit-msg
+  # ----------------------------------------------------------
+#   - repo: https://github.com/compilerla/conventional-pre-commit
+#     rev: v3.4.0
+#     hooks:
+#       - id: conventional-pre-commit
+#         name: "git: conventional commit message"
+#         stages: [commit-msg]
+#         args:
+#           - feat
+#           - fix
+#           - chore
+#           - docs
+#           - style
+#           - refactor
+#           - test
+#           - ci
+#           - perf
+#           - revert

@@ -38,25 +38,59 @@ Typical usage::
 
 from __future__ import annotations
 
+from lightagent.rag.adaptive import AdaptiveRAGEngine, AdaptiveResult, QueryType
 from lightagent.rag.crag import CRAGPipeline, CRAGResult, RetrievedChunk
 from lightagent.rag.embeddings import EmbeddingsFactory
 from lightagent.rag.engine import RAGEngine
+from lightagent.rag.fusion import FusionResult, RAGFusionEngine, reciprocal_rank_fusion
+from lightagent.rag.hierarchical import (
+    HierarchicalRAGEngine,
+    HierarchicalSearchResult,
+    ParentChunk,
+)
+from lightagent.rag.hybrid import HybridSearchEngine
+from lightagent.rag.hyde import HyDEResult, HyDERetriever
 from lightagent.rag.loaders import (
     SUPPORTED_EXTENSIONS,
     DocumentProcessorFactory,
     UnsupportedDocumentTypeError,
 )
+from lightagent.rag.multi_vector import MultiVectorRAGEngine, MultiVectorResult
+from lightagent.rag.self_rag import (
+    RetrievalDecision,
+    SelfRAGPipeline,
+    SelfRAGResult,
+    SupportedDecision,
+)
 from lightagent.rag.vector_store import ChromaStoreError, ChromaVectorStore
 
 __all__ = [
     "SUPPORTED_EXTENSIONS",
+    "AdaptiveRAGEngine",
+    "AdaptiveResult",
     "CRAGPipeline",
     "CRAGResult",
     "ChromaStoreError",
     "ChromaVectorStore",
     "DocumentProcessorFactory",
     "EmbeddingsFactory",
+    "FusionResult",
+    "HierarchicalRAGEngine",
+    "HierarchicalSearchResult",
+    "HyDEResult",
+    "HyDERetriever",
+    "HybridSearchEngine",
+    "MultiVectorRAGEngine",
+    "MultiVectorResult",
+    "ParentChunk",
+    "QueryType",
     "RAGEngine",
+    "RAGFusionEngine",
+    "RetrievalDecision",
     "RetrievedChunk",
+    "SelfRAGPipeline",
+    "SelfRAGResult",
+    "SupportedDecision",
     "UnsupportedDocumentTypeError",
+    "reciprocal_rank_fusion",
 ]

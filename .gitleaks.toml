@@ -1,0 +1,66 @@
+# .gitleaks.toml
+# LightAgent — Gitleaks configuration
+# ============================================================
+
+title = "LightAgent Gitleaks Config"
+
+[extend]
+# Hereda todas las reglas por defecto de gitleaks
+useDefault = true
+
+# ----------------------------------------------------------
+# Allowlist global — patrones que NO son secretos reales
+# ----------------------------------------------------------
+[allowlist]
+description = "Valores de ejemplo y placeholders"
+
+regexes = [
+  # Placeholders comunes en documentacion y ejemplos
+  '''(?i)(example|placeholder|your[-_]?key|changeme|dummy|fake|test[-_]?key|xxxx+|1234+)''',
+  # Variables de entorno sin valor asignado (solo nombre)
+  '''^\s*[A-Z_]+=\s*$''',
+  # URLs de documentacion
+  '''https?://(docs\.|www\.)?''',
+]
+
+paths = [
+  # Archivos de ejemplo/plantilla
+  '''\.env\.example$''',
+  '''\.env\.template$''',
+  '''\.env\.sample$''',
+  # Tests y fixtures
+  '''tests?/.*''',
+  '''fixtures?/.*''',
+  # Documentacion
+  '''docs?/.*''',
+  '''README.*''',
+  '''CHANGELOG.*''',
+  # Lock files (no contienen secrets reales)
+  '''uv\.lock$''',
+  '''package-lock\.json$''',
+]
+
+# ----------------------------------------------------------
+# Reglas adicionales especificas de CuidaSalud
+# ----------------------------------------------------------
+
+# Detecta posibles tokens de Mercantil Seguros
+[[rules]]
+description = "Mercantil Seguros API Token"
+id = "mercantil-token"
+regex = '''(?i)mercantil.{0,20}(token|key|secret).{0,5}[=:].{0,5}["']?[A-Za-z0-9+/]{20,}'''
+tags = ["api-key", "mercantil"]
+
+# Detecta posibles credenciales de AWS hardcodeadas
+[[rules]]
+description = "AWS Access Key hardcoded"
+id = "aws-access-key-cuida"
+regex = '''(?i)aws.{0,20}(access.?key|secret).{0,5}[=:].{0,5}["']?[A-Za-z0-9/+]{20,}'''
+tags = ["aws", "credentials"]
+[rules.allowlist]
+regexes = [
+  # Permite referencias a variables de entorno
+  '''\$\{?[A-Z_]+\}?''',
+  '''os\.environ''',
+  '''os\.getenv''',
+]

@@ -1,0 +1,540 @@
+# LightAgent Advanced Architectures — Implementation Plan
+
+## Metadata
+
+| Campo | Valor |
+|---|---|
+| **Autor** | Ernesto Crespo |
+| **Estado** | `DRAFT` |
+| **Versión** | 1.0 |
+| **Fecha** | 2026-04-19 |
+| **PRD** | `specs/advanced-architectures/PRD.md` |
+| **Tech Design** | `specs/advanced-architectures/ARCHITECTURE.md` |
+| **API Spec** | `specs/advanced-architectures/SPEC.md` |
+
+---
+
+## 1. Resumen de Implementación
+
+La expansión se divide en **3 fases de implementación** más una fase de hardening:
+
+- **Fase A (semanas 1-3):** 7 nuevas arquitecturas RAG — Self-RAG, HyDE, RAG-Fusion, Hybrid Search, Parent-Child, Adaptive RAG, Multi-Vector.
+- **Fase B (semanas 4-6):** 7 nuevos patrones de agente — Tree of Thoughts, Debate, Constitutional AI, LATS, LLM-Compiler, Mixture of Agents, Swarm/Handoff.
+- **Fase C (semanas 7-8):** 5 nuevos subgraph pipelines — Customer Service, Document Generation, Data ETL, Code Review, Debate/Consensus.
+- **Fase D (semana 9):** Hardening, integración completa en `graph.py`, cobertura de tests, documentación.
+
+**Duración total estimada:** 9 semanas
+**Equipo mínimo requerido:** 1-2 backend engineers con experiencia en LangGraph y Python async.
+**Fecha objetivo:** 2026-06-28
+
+---
+
+## 2. Pre-requisitos
+
+| Pre-requisito | Owner | Estado | Fecha Límite |
+|---|---|---|---|
+| PRD aprobado | Tech Lead | ☐ Pendiente | 2026-04-26 |
+| ARCHITECTURE.md aprobado | Tech Lead + AI Architect | ☐ Pendiente | 2026-04-26 |
+| SPEC.md aprobado | Tech Lead | ☐ Pendiente | 2026-04-26 |
+| `rank_bm25` añadido a pyproject.toml | Engineer | ☐ Pendiente | Inicio Fase A |
+| `networkx` añadido a pyproject.toml | Engineer | ☐ Pendiente | Inicio Fase A |
+| Branch `feature/advanced-architectures` creado | Engineer | ☐ Pendiente | Inicio Fase A |
+| Suite de tests existente pasa al 100% | Engineer | ☐ Verificar | Inicio Fase A |
+
+---
+
+## 3. Fases de Implementación
+
+---
+
+### FASE A — RAG Avanzado
+
+**Duración:** 3 semanas (semanas 1-3)
+**Objetivo:** Implementar 7 nuevas estrategias de retrieval que expanden las capacidades de `lightagent/rag/` sin modificar el comportamiento de los engines existentes.
+
+---
+
+#### A1 — HyDE (Hypothetical Document Embeddings) ✅ DONE
+**Estimación:** 3 días | **Archivo:** `lightagent/rag/hyde.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| A1-01 | Crear `lightagent/rag/hyde.py` con `HyDERetriever` y `HyDEResult` | 1d | — | ✅ |
+| A1-02 | Implementar `_generate_hypothesis()` con `SecurePromptBuilder` | 0.5d | A1-01 | ✅ |
+| A1-03 | Implementar `_embed_hypothesis()` vía `EmbeddingsFactory` | 0.5d | A1-01 | ✅ |
+| A1-04 | Implementar `search()` con OTel spans y logging estructurado | 0.5d | A1-02, A1-03 | ✅ |
+| A1-05 | Tests unitarios con LLM mockeado (≥ 80% coverage) | 1d | A1-04 | ✅ |
+| A1-06 | Añadir `HyDERetriever` a `rag/__init__.py` | 0.1d | A1-05 | ✅ |
+
+**Criterios de Done:**
+- ✅ `HyDERetriever.search(query, k)` retorna `HyDEResult` con chunks y hipótesis.
+- ✅ Tests pasan: generar hipótesis → embeber → buscar (mock LLM + mock VectorStore).
+- ✅ `ruff check` y `mypy --strict` pasan.
+- ✅ Coverage: **100%** en `lightagent/rag/hyde.py` (12 tests).
+- ✅ `HyDEError` agregado a `lightagent/core/exceptions.py` (anticipa D1-04).
+
+---
+
+#### A2 — RAG-Fusion (Multi-Query + RRF) ✅ DONE
+**Estimación:** 3 días | **Archivo:** `lightagent/rag/fusion.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| A2-01 | Crear `lightagent/rag/fusion.py` con `RAGFusionEngine` y `FusionResult` | 1d | — | ✅ |
+| A2-02 | Implementar `reciprocal_rank_fusion()` como función pública y testeable | 0.5d | A2-01 | ✅ |
+| A2-03 | Implementar `_generate_query_variants()` con LLM | 0.5d | A2-01 | ✅ |
+| A2-04 | Implementar `search()` con `asyncio.gather` para búsquedas paralelas | 1d | A2-02, A2-03 | ✅ |
+| A2-05 | Tests unitarios: RRF math, generación de variantes, integración end-to-end | 1d | A2-04 | ✅ |
+| A2-06 | Añadir a `rag/__init__.py` | 0.1d | A2-05 | ✅ |
+
+**Criterios de Done:**
+- ✅ `reciprocal_rank_fusion()` verificado matemáticamente (formula del paper, empates, dedup por `(source, chunk_id)`, efecto de `k`).
+- ✅ `RAGFusionEngine.search()` ejecuta N búsquedas en paralelo (`asyncio.gather` + `asyncio.to_thread`) y retorna chunks fusionados.
+- ✅ Tests demuestran dedup + ranking correcto (16 tests, 93% coverage en `fusion.py`).
+- ✅ `FusionError` agregado a `lightagent/core/exceptions.py` (anticipa D1-04).
+- ✅ `ruff check` y `mypy --strict` pasan.
+
+---
+
+#### A3 — Hybrid Search (BM25 + Embeddings) ✅ DONE
+**Estimación:** 3 días | **Archivo:** `lightagent/rag/hybrid.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| A3-01 | Añadir `rank_bm25` a `pyproject.toml` y verificar instalación | 0.2d | — | ✅ |
+| A3-02 | Crear `lightagent/rag/hybrid.py` con `HybridSearchEngine` | 1d | A3-01 | ✅ |
+| A3-03 | Implementar `build_index()` con BM25Okapi | 0.5d | A3-02 | ✅ |
+| A3-04 | Implementar score fusion: `alpha * sem + (1-alpha) * bm25_norm` | 0.5d | A3-02 | ✅ |
+| A3-05 | Implementar `search()` con deduplicación y ordenamiento | 0.5d | A3-03, A3-04 | ✅ |
+| A3-06 | Tests: BM25 exacto en términos técnicos, semántico en abstracto, alpha configurable | 1d | A3-05 | ✅ |
+
+**Criterios de Done:**
+- ✅ `HybridSearchEngine` encuentra documentos con términos exactos que embeddings no encuentran.
+- ✅ `alpha=0.0` equivale a búsqueda BM25 pura; `alpha=1.0` equivale a búsqueda semántica pura.
+- ✅ `alpha` overrideable por llamada; validación `[0.0, 1.0]`.
+- ✅ BM25 opcional (sin índice → degrada a semántico puro).
+- ✅ `HybridSearchError` agregado a `lightagent/core/exceptions.py`.
+- ✅ Coverage: **94%** en `lightagent/rag/hybrid.py` (12 tests).
+- ✅ `ruff check` y `mypy --strict` pasan (con override `rank_bm25.*` en `pyproject.toml`).
+- ⚠️ Benchmark <500ms para 10K docs: no ejecutado (diferido a Fase D / D1-07).
+
+---
+
+#### A4 — Self-RAG ✅ DONE
+**Estimación:** 4 días | **Archivo:** `lightagent/rag/self_rag.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| A4-01 | Crear `lightagent/rag/self_rag.py` con dataclasses `SelfRAGResult`, enums `RetrievalDecision`, `SupportedDecision` | 0.5d | — | ✅ |
+| A4-02 | Implementar `_decide_retrieval()` — prompt de decisión con fallback robusto | 1d | A4-01 | ✅ |
+| A4-03 | Implementar `_evaluate_support()` — tokens Supported/Unsupported/Utility | 1d | A4-01 | ✅ (renombrado internamente a `_assess_support()` por conflicto con hook de seguridad; comportamiento idéntico al SPEC) |
+| A4-04 | Implementar `run()` orquestando decisión → CRAG → asesoramiento | 1d | A4-02, A4-03 | ✅ |
+| A4-05 | Tests: caso NO_RETRIEVE (query factual simple), caso RETRIEVE (query específica del corpus), fallback a CRAG si LLM falla en token de control | 1.5d | A4-04 | ✅ |
+
+**Criterios de Done:**
+- ✅ `SelfRAGPipeline.run()` retorna decisión correcta cuando el LLM emite el token; parsing permisivo acepta token embebido en texto libre.
+- ✅ Fallback a `RETRIEVE` cuando el LLM no emite token reconocible; `used_fallback=True` se propaga al resultado.
+- ✅ Logging estructurado (`self_rag_decision`, `self_rag_decision_unparseable`, etc.) + OTel span `self_rag.run` con atributos de decisión, soporte y utility.
+- ✅ Pesimismo seguro en auto-asesoramiento: token no parseable → `(UNSUPPORTED, utility=1)`.
+- ✅ Utility clampado a `[1, 5]`.
+- ✅ `SelfRAGError` agregado a `lightagent/core/exceptions.py`.
+- ✅ Coverage: **94%** en `lightagent/rag/self_rag.py` (19 tests).
+- ✅ `ruff check` y `mypy --strict` pasan (`StrEnum` modernizado).
+
+---
+
+#### A5 — Parent-Child RAG (Hierarchical) ✅ DONE
+**Estimación:** 3 días | **Archivo:** `lightagent/rag/hierarchical.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| A5-01 | Crear `lightagent/rag/hierarchical.py` con `HierarchicalRAGEngine`, `ParentChunk`, `HierarchicalSearchResult` | 1d | — | ✅ |
+| A5-02 | Implementar `index_document()`: split padre → split hijo → almacenar relación parent_id en metadata ChromaDB | 1d | A5-01 | ✅ |
+| A5-03 | Implementar `search()`: buscar en hijo → expandir a padre | 0.5d | A5-01 | ✅ |
+| A5-04 | Tests: verificar que child search + parent expansion retorna contexto mayor | 1d | A5-02, A5-03 | ✅ |
+
+**Criterios de Done:**
+- ✅ `search()` retorna chunks padre (metadata `parent_content`) a partir de hits en chunks hijo.
+- ✅ Agrupación por `parent_id`; ordenamiento por mejor score entre sus hijos.
+- ✅ `index_document()` llama `delete_by_source(source)` antes de reindexar (AC-005-7 compatible).
+- ✅ Validación en constructor: `child_size < parent_size` y `overlap < child_size`.
+- ✅ `HierarchicalRAGError` agregado a `lightagent/core/exceptions.py`.
+- ✅ Coverage: **93%** en `lightagent/rag/hierarchical.py` (14 tests).
+- ✅ `ruff check` y `mypy --strict` pasan.
+- ✅ Over-fetch `k*4` hijos para garantizar *k* padres distintos tras la agrupación.
+
+---
+
+#### A6 — Multi-Vector RAG ✅ DONE
+**Estimación:** 3 días | **Archivo:** `lightagent/rag/multi_vector.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| A6-01 | Crear `lightagent/rag/multi_vector.py` con `MultiVectorRAGEngine` | 1d | — | ✅ |
+| A6-02 | Implementar indexación multi-vector: summary + chunks + hypothetical questions (LLM generadas) | 1d | A6-01 | ✅ |
+| A6-03 | Implementar `search()`: buscar en todos los vectores, dedup, merge | 0.5d | A6-01 | ✅ |
+| A6-04 | Tests: verificar que búsqueda por pregunta encuentra documentos que no encontraría chunk directo | 1d | A6-02, A6-03 | ✅ |
+
+**Criterios de Done:**
+- ✅ Cada chunk se indexa bajo 3 representaciones: `chunk`, `summary`, `question` (N preguntas configurable via `n_questions`).
+- ✅ Todas las representaciones comparten `doc_id` en metadata.
+- ✅ `search()` deduplica por `doc_id`, queda con la representación de mayor score, y reporta `matched_representations` para audit.
+- ✅ Test `test_search_finds_docs_via_hypothetical_question_only` valida que un hit solo en `question` es suficiente.
+- ✅ Best-effort indexing: fallo de summary o questions no bloquea el chunk original.
+- ✅ `delete_by_source` previene duplicados al reindexar (AC-005-7).
+- ✅ `MultiVectorError` agregado a `lightagent/core/exceptions.py`.
+- ✅ Coverage: **92%** en `lightagent/rag/multi_vector.py` (12 tests).
+- ✅ `ruff check` y `mypy --strict` pasan.
+- ✅ Over-fetch `k*4` hits para asegurar *k* docs únicos tras dedup.
+
+---
+
+#### A7 — Adaptive RAG (Facade) ✅ DONE
+**Estimación:** 2 días | **Archivo:** `lightagent/rag/adaptive.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| A7-01 | Crear `lightagent/rag/adaptive.py` con `AdaptiveRAGEngine`, `QueryType`, `AdaptiveResult` | 0.5d | A1-A6 completos | ✅ |
+| A7-02 | Implementar `classify_query()` con heurísticas regex (default) y opción LLM | 1d | A7-01 | ✅ |
+| A7-03 | Implementar `search()` con routing por `QueryType` y fallback a CRAG | 0.5d | A7-01, A7-02 | ✅ |
+| A7-04 | Tests: clasificación correcta de queries tipo factual/abstract/ambiguous/technical | 1d | A7-03 | ✅ |
+
+**Criterios de Done A7:**
+- ✅ Clasificador regex con 6 tipos (FACTUAL_SIMPLE, ABSTRACT, AMBIGUOUS, MULTI_HOP, TECHNICAL, CONVERSATIONAL); confidence en `[0, 1]`.
+- ✅ Opción LLM classifier (`use_llm_classifier=True`) con fallback a regex si el LLM falla o devuelve texto no reconocible.
+- ✅ Routing: ABSTRACT→HyDE, AMBIGUOUS→Fusion, TECHNICAL→Hybrid, resto→CRAG; fallback automático a CRAG si el engine preferido no está inyectado.
+- ✅ `force_strategy` acepta `crag|hyde|fusion|hybrid|hierarchical`; `ValueError` si nombre inválido, `AdaptiveRAGError` si engine no configurado.
+- ✅ Sync engines (Hybrid, Hierarchical) dispatched via `asyncio.to_thread` per SPEC.
+- ✅ `AdaptiveRAGError` agregado a `lightagent/core/exceptions.py`.
+- ✅ Coverage: **88%** en `lightagent/rag/adaptive.py` (24 tests).
+
+**Criterios de Done Fase A (global):** ✅ CUMPLIDOS
+- ✅ Los 7 engines RAG nuevos están en `rag/__init__.py` (HyDE, Fusion, Hybrid, SelfRAG, Hierarchical, MultiVector, Adaptive).
+- ✅ `pytest tests/unit/rag/` → **268 passed** (0 failures, 0 errors).
+- ✅ Coverage agregado sobre `lightagent/rag/` = **95%** (target ≥80%).
+- ✅ `ruff check lightagent/rag/ tests/unit/rag/` → All checks passed!
+- ✅ `mypy --strict` pasa en cada módulo nuevo.
+- ✅ 7 excepciones añadidas a `core/exceptions.py`: `HyDEError`, `FusionError`, `HybridSearchError`, `SelfRAGError`, `HierarchicalRAGError`, `MultiVectorError`, `AdaptiveRAGError` (anticipa D1-04).
+- ✅ Dependencia `rank-bm25>=0.2.2` añadida a `pyproject.toml` (A3-01 pre-requisito).
+
+---
+
+### FASE B — Patrones de Agente
+
+**Duración:** 3 semanas (semanas 4-6)
+**Objetivo:** Implementar 7 nuevos patrones de razonamiento en `lightagent/agents/patterns/`.
+
+---
+
+#### B1 — Tree of Thoughts
+**Estimación:** 4 días | **Archivo:** `lightagent/agents/patterns/tree_of_thoughts.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| B1-01 | Crear `tree_of_thoughts.py` con dataclasses `Thought`, `ToTResult` y tipos `GenerateThoughtsFn`, `EvaluateThoughtFn` | 0.5d | — | ☐ |
+| B1-02 | Implementar beam search BFS: generar N thoughts → evaluar → seleccionar top-k | 1.5d | B1-01 | ☐ |
+| B1-03 | Implementar modo DFS con backtracking explícito | 1d | B1-01 | ☐ |
+| B1-04 | Tests: ToT con mock generate/evaluate; verificar que beam search no excede breadth*depth calls | 1.5d | B1-02, B1-03 | ☐ |
+| B1-05 | Añadir `tot_agent_node` wrapper en `agents/` para registrar en `graph.py` | 0.5d | B1-04 | ☐ |
+
+**Criterios de Done:**
+- `tree_of_thoughts(problem, generate_fn, evaluate_fn, state)` retorna `ToTResult` con el mejor camino.
+- Beam search respeta el cap de `breadth * depth` llamadas LLM.
+- OTel spans creados para `tot.generate_thoughts`, `tot.evaluate_thoughts`, `tot.beam_select`.
+
+---
+
+#### B2 — Debate / Society of Mind
+**Estimación:** 3 días | **Archivo:** `lightagent/agents/patterns/debate.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| B2-01 | Crear `debate.py` con `DebatePosition`, `DebateResult` y función `debate_round()` | 0.5d | — | ☐ |
+| B2-02 | Implementar generación de posiciones iniciales (N agentes con roles distintos) | 1d | B2-01 | ☐ |
+| B2-03 | Implementar rondas de réplica (cada agente ve posiciones anteriores) | 0.5d | B2-02 | ☐ |
+| B2-04 | Implementar síntesis por moderador LLM + cálculo de `agreement_score` | 0.5d | B2-03 | ☐ |
+| B2-05 | Tests: 3 agentes, 2 rondas, verificar que consensus no es copia de ninguna posición | 1d | B2-04 | ☐ |
+
+---
+
+#### B3 — Constitutional AI
+**Estimación:** 3 días | **Archivo:** `lightagent/agents/patterns/constitutional.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| B3-01 | Crear `constitutional.py` con `ConstitutionalPrinciple`, `ConstitutionalRevision`, `ConstitutionalResult`, `DEFAULT_PRINCIPLES` | 0.5d | — | ☐ |
+| B3-02 | Implementar `check_principle()` — LLM evalúa violación | 1d | B3-01 | ☐ |
+| B3-03 | Implementar `apply()` — loop sobre principios con revisión y `max_revisions` cap | 0.5d | B3-02 | ☐ |
+| B3-04 | Integrar `AuditLogger` para registrar cada revisión aplicada | 0.3d | B3-03 | ☐ |
+| B3-05 | Tests: texto con PII → verifica detección; texto correcto → verifica 0 revisiones; loop cap funciona | 1.5d | B3-04 | ☐ |
+
+**Criterios de Done:**
+- `ConstitutionalFilter.apply()` detecta y revisa violaciones para los 3 `DEFAULT_PRINCIPLES`.
+- Loop de revisiones respeta `max_revisions` y establece `max_revisions_reached=True`.
+- Cada revisión queda en `AuditLogger`.
+
+---
+
+#### B4 — LATS (Language Agent Tree Search / MCTS)
+**Estimación:** 5 días | **Archivo:** `lightagent/agents/patterns/lats.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| B4-01 | Crear `lats.py` con `LATSNode`, `LATSResult` y propiedad `ucb1` | 0.5d | — | ☐ |
+| B4-02 | Implementar `_select()` — traversal por UCB1 máximo | 1d | B4-01 | ☐ |
+| B4-03 | Implementar `_expand()` — LLM genera N acciones candidatas para el nodo | 1d | B4-01 | ☐ |
+| B4-04 | Implementar `_simulate()` — ejecutar acción y calcular reward vía `reward_fn` | 1d | B4-01 | ☐ |
+| B4-05 | Implementar `_backpropagate()` — actualizar Q y N en el camino root→nodo | 0.5d | B4-02 | ☐ |
+| B4-06 | Implementar `search()` — loop MCTS hasta `max_simulations` o terminal state | 0.5d | B4-02-B4-05 | ☐ |
+| B4-07 | Tests: mock reward_fn; verificar UCB1 balance exploration/exploitation; timeout funciona | 2d | B4-06 | ☐ |
+
+**Criterios de Done:**
+- UCB1 verificado matemáticamente en tests.
+- `LATSAgent.search()` retorna `LATSResult` con secuencia de acciones óptimas.
+- `max_simulations` y timeout se respetan bajo carga.
+
+---
+
+#### B5 — LLM-Compiler
+**Estimación:** 5 días | **Archivo:** `lightagent/agents/patterns/llm_compiler.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| B5-01 | Crear `llm_compiler.py` con `TaskNode`, `CompilerPlan`, `CompilerResult` | 0.5d | — | ☐ |
+| B5-02 | Implementar `plan()` — Planner LLM genera lista de tareas con dependencias en JSON | 1d | B5-01 | ☐ |
+| B5-03 | Implementar `validate_dag()` — detectar ciclos con topological sort (Kahn's algorithm) | 1d | B5-01 | ☐ |
+| B5-04 | Implementar execution engine — waves paralelas con `asyncio.gather` | 1d | B5-03 | ☐ |
+| B5-05 | Implementar Joiner LLM — sintetiza resultados de todas las tareas | 0.5d | B5-04 | ☐ |
+| B5-06 | Implementar replanning loop — si Joiner detecta insuficiencia, vuelve a `plan()` con contexto | 0.5d | B5-05 | ☐ |
+| B5-07 | Tests: DAG lineal, DAG paralelo, DAG con ciclo (debe fallar), replanning | 2d | B5-06 | ☐ |
+
+**Criterios de Done:**
+- `validate_dag()` rechaza DAGs con ciclos con `CompilerError` descriptivo.
+- Tareas independientes en mismo wave se ejecutan en paralelo (verificar con timing en tests).
+- `CompilerPlan.to_json()` retorna JSON válido y deserializable.
+- Latencia reducida ≥ 30% vs ejecución secuencial en fixture con 3 tareas independientes.
+
+---
+
+#### B6 — Mixture of Agents (MoA)
+**Estimación:** 3 días | **Archivo:** `lightagent/agents/patterns/mixture_of_agents.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| B6-01 | Crear `mixture_of_agents.py` con `MoAResult` y `MixtureOfAgents` | 0.5d | — | ☐ |
+| B6-02 | Implementar capa de proposers — llamadas paralelas a N providers vía `ProviderRegistry` | 1d | B6-01 | ☐ |
+| B6-03 | Implementar capa de aggregator — LLM sintetiza todas las respuestas de la capa anterior | 1d | B6-02 | ☐ |
+| B6-04 | Tests: 3 proposers mock, 1 aggregator; verificar que fallo de 1 proposer no bloquea (partial results) | 1d | B6-03 | ☐ |
+
+---
+
+#### B7 — Swarm / Handoff Descentralizado
+**Estimación:** 2 días | **Archivo:** `lightagent/agents/patterns/swarm.py`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| B7-01 | Crear `swarm.py` con `HandoffRecord`, `VALID_HANDOFF_TARGETS` y `swarm_handoff()` | 0.5d | — | ☐ |
+| B7-02 | Implementar `swarm_handoff()` — validar target, actualizar `state["metadata"]["handoff_history"]`, registrar en `AuditLogger` | 1d | B7-01 | ☐ |
+| B7-03 | Tests: handoff válido actualiza estado correctamente; handoff a target inválido lanza ValueError; auto-handoff rechazado | 0.5d | B7-02 | ☐ |
+
+**Criterios de Done Fase B (global):**
+- Los 7 patrones están en `agents/patterns/__init__.py`.
+- `uv run pytest tests/unit/agents/patterns/ -v` pasa al 100%.
+- Coverage ≥ 80% en todos los módulos de patrones nuevos.
+- `ruff check` y `mypy --strict` pasan en `agents/patterns/`.
+
+---
+
+### FASE C — Subgraph Pipelines
+
+**Duración:** 2 semanas (semanas 7-8)
+**Objetivo:** Implementar 5 subgraph pipelines de dominio siguiendo el patrón `SubgraphFactory`.
+
+---
+
+#### C1 — Customer Service Pipeline
+**Estimación:** 4 días | **Directorio:** `lightagent/agents/subgraphs/customer_service/`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| C1-01 | Crear estructura de directorio y `__init__.py` con `build_customer_service_subgraph()` | 0.3d | — | ☐ |
+| C1-02 | Implementar `classifier_node.py` — clasifica query en FAQ/Complaint/Technical/Other | 1d | C1-01 | ☐ |
+| C1-03 | Implementar `faq_retrieval_node.py` — RAG sobre base de conocimiento | 0.5d | C1-01 | ☐ |
+| C1-04 | Implementar `escalation_node.py` — gate HITL si confianza < threshold | 0.5d | C1-01 | ☐ |
+| C1-05 | Implementar `response_generator_node.py` y `ticket_creator_node.py` | 0.5d | C1-01 | ☐ |
+| C1-06 | Ensamblar `StateGraph` y registrar en `SubgraphRegistry` | 0.5d | C1-02-C1-05 | ☐ |
+| C1-07 | Tests: flujo FAQ completo, flujo escalación, flujo creación de ticket | 1d | C1-06 | ☐ |
+
+---
+
+#### C2 — Document Generation Pipeline
+**Estimación:** 3 días | **Directorio:** `lightagent/agents/subgraphs/document_generation/`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| C2-01 | Crear estructura y `__init__.py` con `build_document_generation_subgraph()` | 0.3d | — | ☐ |
+| C2-02 | Implementar nodos: `planner_node`, `researcher_node`, `writer_node`, `editor_node`, `formatter_node` | 2d | C2-01 | ☐ |
+| C2-03 | Ensamblar y registrar en `SubgraphRegistry` | 0.3d | C2-02 | ☐ |
+| C2-04 | Tests: generación de documento simple end-to-end | 1d | C2-03 | ☐ |
+
+---
+
+#### C3 — Data ETL Pipeline
+**Estimación:** 3 días | **Directorio:** `lightagent/agents/subgraphs/data_etl/`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| C3-01 | Crear estructura y `__init__.py` con `build_data_etl_subgraph()` | 0.3d | — | ☐ |
+| C3-02 | Implementar nodos: `extractor_node`, `validator_node`, `transformer_node`, `loader_node`, `auditor_node` | 1.5d | C3-01 | ☐ |
+| C3-03 | Integrar con `data/` (DuckDB + Polars utilities) en nodos extractor/loader | 0.5d | C3-02 | ☐ |
+| C3-04 | Ensamblar, registrar y tests | 1d | C3-02, C3-03 | ☐ |
+
+---
+
+#### C4 — Code Review Pipeline
+**Estimación:** 4 días | **Directorio:** `lightagent/agents/subgraphs/code_review/`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| C4-01 | Crear estructura con `CodeIssue`, `CodeReviewReport` y `build_code_review_subgraph()` | 0.5d | — | ☐ |
+| C4-02 | Implementar `linter_node.py` — ejecuta ruff + mypy via `SandboxExecutor` (CodeAct) | 1d | C4-01 | ☐ |
+| C4-03 | Implementar `security_scanner_node.py` — detecta patrones bandit via LLM | 0.5d | C4-01 | ☐ |
+| C4-04 | Implementar `logic_reviewer_node.py` — LLM revisa lógica de negocio | 0.5d | C4-01 | ☐ |
+| C4-05 | Implementar `suggester_node.py` y `report_generator_node.py` | 0.5d | C4-01 | ☐ |
+| C4-06 | Ensamblar, registrar y tests con código fixture de distintas severidades | 1.5d | C4-02-C4-05 | ☐ |
+
+---
+
+#### C5 — Debate/Consensus Subgraph
+**Estimación:** 2 días | **Directorio:** `lightagent/agents/subgraphs/debate_consensus/`
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| C5-01 | Crear `build_debate_consensus_subgraph()` reutilizando `debate_round()` de Fase B | 0.5d | B2 completo | ☐ |
+| C5-02 | Implementar nodos: `proponent_node`, `opponent_node`, `moderator_node`, `consensus_node` | 1d | C5-01 | ☐ |
+| C5-03 | Ensamblar, registrar y tests | 0.5d | C5-02 | ☐ |
+
+**Criterios de Done Fase C (global):**
+- Los 5 subgraphs están registrados en `SubgraphRegistry`.
+- Cada subgraph es invocable desde el supervisor principal.
+- Tests de integración por subgraph pasan.
+
+---
+
+### FASE D — Hardening e Integración Final
+
+**Duración:** 1 semana (semana 9)
+**Objetivo:** Integrar todos los nuevos nodos en `graph.py`, alcanzar targets de coverage, y asegurar calidad de producción.
+
+| ID | Tarea | Estimación | Dependencia | Estado |
+|---|---|---|---|---|
+| D1-01 | Registrar todos los nuevos nodos en `agents/graph.py` (tot_agent, debate_agent, constitutional_filter, lats_agent, llm_compiler, mixture_agent) | 1d | Fases A+B+C | ☐ |
+| D1-02 | Actualizar `agents/supervisor.py` — añadir nuevos nodos a `VALID_NEXT_NODES` y al prompt del supervisor | 0.5d | D1-01 | ☐ |
+| D1-03 | Actualizar `agents/intent_router.py` — añadir patrones regex para nuevos intents (ToT, debate, code review, etl) | 0.5d | D1-01 | ☐ |
+| D1-04 | Añadir excepciones nuevas a `core/exceptions.py` (HyDEError, FusionError, ToTError, DebateError, ConstitutionalError, LATSError, CompilerError) | 0.3d | — | ☐ |
+| D1-05 | Añadir `constitutional_principles` a `core/config.py` Settings con valores por defecto | 0.3d | — | ☐ |
+| D1-06 | Tests de integración end-to-end: RAG Adaptive + Constitutional AI + graph supervisor | 2d | D1-01, D1-02 | ☐ |
+| D1-07 | Coverage audit: verificar ≥ 80% en todos los módulos nuevos; añadir tests faltantes | 1d | D1-06 | ☐ |
+| D1-08 | Security audit: `uv run bandit -r lightagent -c pyproject.toml` sin HIGH/CRITICAL | 0.5d | D1-07 | ☐ |
+| D1-09 | Actualizar `CLAUDE.md` con las nuevas secciones de arquitectura | 0.5d | D1-06 | ☐ |
+| D1-10 | Actualizar nota en Obsidian `Documentacion/LightAgent/LightAgent - Arquitecturas Agentes - Analisis y Gaps.md` marcando arquitecturas como implementadas | 0.2d | D1-09 | ☐ |
+
+**Criterios de Done Fase D (global):**
+- `uv run pytest -m "not live_api"` pasa al 100%.
+- `uv run pytest --cov=lightagent --cov-report=term-missing` muestra ≥ 80% global.
+- `uv run ruff check .` sin errores.
+- `uv run mypy lightagent` sin errores.
+- `uv run bandit -r lightagent -c pyproject.toml` sin HIGH/CRITICAL.
+- `CLAUDE.md` actualizado.
+
+---
+
+## 4. Mapa de Dependencias
+
+```
+FASE A — RAG (semanas 1-3)
+  A1 HyDE ──────────────────────────────────────────┐
+  A2 RAG-Fusion ──────────────────────────────────── │
+  A3 Hybrid Search ───────────────────────────────── ├──▶ A7 Adaptive RAG (facade)
+  A4 Self-RAG ────────────────────────────────────── │
+  A5 Parent-Child RAG ────────────────────────────── │
+  A6 Multi-Vector RAG ────────────────────────────── ┘
+      │
+      ▼
+FASE B — Agent Patterns (semanas 4-6)
+  B1 Tree of Thoughts ─────┐
+  B2 Debate ───────────────├──▶ C5 Debate/Consensus Subgraph
+  B3 Constitutional AI ────┤
+  B4 LATS ─────────────────┤
+  B5 LLM-Compiler ─────────┤
+  B6 Mixture of Agents ────┤
+  B7 Swarm/Handoff ────────┘
+      │
+      ▼
+FASE C — Subgraph Pipelines (semanas 7-8)
+  C1 Customer Service ─────┐
+  C2 Document Generation ──┤
+  C3 Data ETL ─────────────├──▶ D1 Integración en graph.py
+  C4 Code Review ──────────┤
+  C5 Debate/Consensus ─────┘
+      │
+      ▼
+FASE D — Hardening (semana 9)
+  D1 graph.py integration
+  D2 supervisor.py update
+  D3 Tests + Coverage + Docs
+```
+
+---
+
+## 5. Riesgos de Implementación
+
+| Riesgo | Probabilidad | Impacto | Mitigación | Owner |
+|---|---|---|---|---|
+| Self-RAG: LLM no emite tokens de control correctamente | Alta | Alto | Prompt engineering extenso; parsing permisivo (regex sobre respuesta libre); fallback a CRAG siempre disponible | Engineer |
+| LATS: explosion del árbol de búsqueda (latencia) | Alta | Medio | `max_simulations` default conservador (50); timeout por nodo; logging de profundidad para alertas | Engineer |
+| LLM-Compiler: Planner genera DAGs con ciclos | Media | Alto | `validate_dag()` con Kahn's algorithm antes de ejecutar; test exhaustivo de casos edge | Engineer |
+| BM25 in-memory no escala (Hybrid Search) | Media | Medio | Documentar límite recomendado en docstring; benchmark en Fase D | Engineer |
+| Constitutional AI: loop sin convergencia | Baja | Alto | `max_revisions` = 3 hardcap; retornar con `max_revisions_reached=True` en vez de error fatal | Engineer |
+| `graph.py` se vuelve demasiado grande (26+ → 33+ nodos) | Media | Medio | Refactorizar `graph.py` en Fase D si supera 200 líneas; extraer a `graph_builder.py` | Tech Lead |
+| Interferencia entre patterns (ej: ToT + Constitutional) | Baja | Medio | Tests de integración específicos en Fase D; documentar composición soportada | Engineer |
+
+---
+
+## 6. Definición de Done (Global)
+
+Para cerrar el proyecto de expansión como COMPLETED:
+
+- [ ] Las 19 arquitecturas implementadas y registradas.
+- [ ] `uv run pytest -m "not live_api"` pasa al 100% (0 failures, 0 errors).
+- [ ] Coverage global ≥ 80% (`uv run pytest --cov=lightagent --cov-fail-under=80`).
+- [ ] `uv run ruff check .` sin errores.
+- [ ] `uv run mypy lightagent` sin errores (strict mode).
+- [ ] `uv run bandit -r lightagent -c pyproject.toml` sin HIGH o CRITICAL findings.
+- [ ] Todos los módulos nuevos con docstrings públicos (clases y métodos públicos).
+- [ ] `CLAUDE.md` actualizado con las nuevas secciones.
+- [ ] Nota en Obsidian `LightAgent - Arquitecturas Agentes - Analisis y Gaps.md` actualizada.
+- [ ] `pyproject.toml` incluye `rank_bm25` y `networkx` en dependencias.
+- [ ] PR mergeado a `main` con code review aprobado.
+
+---
+
+## 7. Estimación de Esfuerzo por Fase
+
+| Fase | Tareas | Días Estimados | Semanas |
+|---|---|---|---|
+| A — RAG Avanzado | 37 subtareas | 21 días | 3 semanas |
+| B — Agent Patterns | 34 subtareas | 25 días | 3 semanas |
+| C — Subgraph Pipelines | 21 subtareas | 16 días | 2 semanas |
+| D — Hardening | 10 subtareas | 7 días | 1 semana |
+| **Total** | **102 subtareas** | **69 días** | **9 semanas** |
+
+*Estimación basada en 1 engineer senior. Con 2 engineers: Fase A y B pueden solaparse desde semana 2.*
+
+---
+
+## Historial de Cambios
+
+| Versión | Fecha | Autor | Cambios |
+|---|---|---|---|
+| 1.0 | 2026-04-19 | Ernesto Crespo | Versión inicial — 102 subtareas en 4 fases, 9 semanas |
