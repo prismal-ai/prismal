@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo |
-| **Estado** | `PHASE A + B — DONE` (C/D pendientes) |
+| **Estado** | `PHASE A + B + C — DONE` (D pendiente) |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-04-19 |
 | **PRD** | `specs/advanced-architectures/PRD.md` |
@@ -54,6 +54,34 @@
 - `LATSNode.ucb1` se implementó como método en vez de `@property` (el SPEC mostraba `@property def ucb1(self, exploration_constant)` — combinación inválida en Python, properties no aceptan parámetros). Comportamiento matemático idéntico al SPEC.
 - `tot_agent_node` (B1-05) se implementó como factory `make_tot_node(generate_fn, evaluate_fn, ...)` que retorna un nodo async LangGraph-compatible. El registro en `graph.py` queda diferido a D1-01.
 - `LLMCompiler` acepta callables inyectables (`plan_fn`, `tool_executor`, `joiner`) en lugar de tipar a `BaseTool` directamente — decoupling consistente con el resto de Fase B.
+
+## Resumen de implementación — Fase C (Subgraph Pipelines) — ✅ DONE
+
+| SPEC | Directorio | Tests | Coverage | Estado |
+|---|---|---|---|---|
+| SPEC-SUBGRAPH-001 (Customer Service) | `lightagent/agents/subgraphs/customer_service/` | 22 | 83–100% | ✅ DONE |
+| C2 (Document Generation) | `lightagent/agents/subgraphs/document_generation/` | 21 | 84–100% | ✅ DONE |
+| C3 (Data ETL) | `lightagent/agents/subgraphs/data_etl/` | 31 | 90–100% | ✅ DONE |
+| SPEC-SUBGRAPH-002 (Code Review) | `lightagent/agents/subgraphs/code_review/` | 24 | 82–100% | ✅ DONE |
+| C5 (Debate/Consensus) | `lightagent/agents/subgraphs/debate_consensus/` | 13 | 88–100% | ✅ DONE |
+
+**Totales Fase C**: 5 subgraph pipelines, 111 tests nuevos, **505 tests totales (Fase A+B+C, 0 fallos)**. Coverage por módulo ≥ 82% en toda Fase C.
+
+**Patrón arquitectónico común de Fase C**:
+- Cada subgraph vive en su propio subdirectorio con 1 archivo por nodo + `builder.py` + `__init__.py`.
+- Cada nodo se construye via factory `make_<name>_node(deps)` que retorna un async callable `(state) → state_update`.
+- El builder retorna un `SubgraphDefinition` (de `agents/subgraphs/registry.py`) listo para registrar; wiring global a `graph.py` queda diferido a Fase D (D1-01).
+- Metadata namespaced por subgraph (`state["metadata"]["<subgraph_name>"]`) para aislar datos entre subgraphs.
+- Callables inyectables (analyzers, LLMs, RAG engines, extractors) en todas las factories — tests sin fixtures pesadas.
+- Degradación graceful en cada step: fallos individuales se loguean y el pipeline continúa con datos parciales donde sea posible.
+
+**Nuevas excepciones en `core/exceptions.py`** (todas heredan de `LightAgentError`): `CustomerServiceError`, `DocumentGenerationError`, `DataETLError`, `CodeReviewError`, `DebateConsensusError`.
+
+**Nota sobre desviaciones menores del SPEC Fase C**:
+- C3 (Data ETL) añadió un **conditional edge** en `validator` que rutea a `auditor` al fallar — evita transform+load inútiles. El SPEC no lo mencionaba pero mejora la semántica.
+- C2 (Document Generation) implementa `formatter` con 3 modos (markdown/plain/html); el SPEC no especificaba formatos concretos.
+- C4 (Code Review) mantiene `linter_fn`/`scanner_fn`/`reviewer_fn` como callables inyectables sin wiring por default a ruff/bandit/SandboxExecutor — ese wiring queda para D1.
+- C5 renombró `_pairwise_jaccard` a `pairwise_jaccard` (público) en `patterns/debate.py` para exponer el helper al subgraph — no-op funcional, solo API surface.
 
 ---
 

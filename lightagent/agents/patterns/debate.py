@@ -118,7 +118,7 @@ def _tokens(text: str) -> set[str]:
     return set(_TOKEN_RE.findall(text.lower()))
 
 
-def _pairwise_jaccard(texts: list[str]) -> float:
+def pairwise_jaccard(texts: list[str]) -> float:
     """Mean Jaccard similarity over all unique pairs of token sets."""
     if len(texts) < 2:
         return 1.0
@@ -242,7 +242,7 @@ async def debate_round(
             positions=final_positions,
             strategy=synthesis_strategy,
         )
-        agreement = _pairwise_jaccard([p.content for p in final_positions])
+        agreement = pairwise_jaccard([p.content for p in final_positions])
         dissenting = _dissenting_views(final_positions, consensus, agreement)
 
         span.set_attribute("lightagent.debate.agreement", agreement)
@@ -359,4 +359,5 @@ __all__ = [
     "DebatePosition",
     "DebateResult",
     "debate_round",
+    "pairwise_jaccard",
 ]
