@@ -67,3 +67,5 @@ lightagent/skills/active/
 .env
 env.example
 !env.example
+lightagent_agents_presentation.pptx
+lightagent_infografias.html
