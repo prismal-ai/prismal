@@ -120,6 +120,8 @@ uv run python examples/rag/08_multi_vector_rag.py
 | 6 | `06_customer_service.py` | Customer Service | **ATIS + Amazon Reviews** | classifier → faq_retrieval [RAG] → escalation_gate → response_generator \| ticket_creator |
 | 7 | `07_document_generation.py` | Document Generation | **Wikipedia Technical Docs** | planner → researcher → writer → editor → formatter (markdown/html/plain) |
 | 8 | `08_debate_consensus.py` | Debate Consensus | **AI Policy & Tech Ethics** | proponent → opponent → moderator → consensus [Jaccard agreement score] |
+| 9 | `09_hitl_approval.py` | HITL Approval | **AI Governance Decisions** (custom) | proposal_writer → risk_assessor → approval_seed → interrupt() → hitl_gate → approve \| reject \| request_changes |
+| 10 | `10_analysis_orchestrator.py` | Analysis Orchestrator | **Business Intelligence Center** (custom) | analysis_supervisor (LLM router) → data_analyst \| ml_pipeline \| dev_pipeline \| financial_analyst → END |
 
 ```bash
 uv run python examples/subgraphs/01_ml_pipeline.py
@@ -130,6 +132,8 @@ uv run python examples/subgraphs/05_data_etl.py
 uv run python examples/subgraphs/06_customer_service.py
 uv run python examples/subgraphs/07_document_generation.py
 uv run python examples/subgraphs/08_debate_consensus.py
+uv run python examples/subgraphs/09_hitl_approval.py
+uv run python examples/subgraphs/10_analysis_orchestrator.py
 ```
 
 ---
@@ -146,6 +150,8 @@ uv run python examples/subgraphs/08_debate_consensus.py
 | Soporte al cliente con FAQ automático y escalación humana | Customer Service |
 | Generación de documentos técnicos o reportes | Document Generation |
 | Análisis de decisiones complejas con múltiples perspectivas | Debate Consensus |
+| Cambios críticos que requieren aprobación humana antes de ejecutar | HITL Approval |
+| Tareas analíticas mixtas (SQL, ML, dev, finanzas) con enrutamiento LLM | Analysis Orchestrator |
 
 ---
 
