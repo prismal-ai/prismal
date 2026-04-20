@@ -1,0 +1,61 @@
+# .trivyignore — LightAgent
+# ============================================================
+# CVEs/GHSAs en dependencias pineadas que NO se pueden actualizar sin
+# romper el stack (Reflex 0.7.x + sqlmodel<0.0.25 + pydantic<2.11).
+#
+# Mismos IDs que `pip-audit --ignore-vuln` en `.gitlab-ci.yml` y en
+# `.pre-commit-config.yaml` -> hook `pip-audit`.
+#
+# Triage activo: `lightagent doctor security-check` (Phase 30 maintenance).
+# Cualquier nuevo ignore debe documentarse aqui Y en .gitlab-ci.yml/pip-audit.
+# ============================================================
+
+# --- langchain-openai 1.1.12 -> fix 1.1.14 -------------------
+GHSA-r7w7-9xr2-qq2r
+
+# --- langchain-text-splitters 1.1.1 -> fix 1.1.2 -------------
+GHSA-fv5p-p927-qmxr
+
+# --- langsmith 0.7.30 -> fix 0.7.31 --------------------------
+GHSA-rr7j-v2q5-chgv
+
+# --- mcp 1.12.4 -> fix 1.23.0 (DNS rebinding HIGH) -----------
+CVE-2025-66416
+
+# --- pillow 11.3.0 -> fix 12.1.1 / 12.2.0 --------------------
+CVE-2026-25990
+CVE-2026-40192
+
+# --- pypdf 6.10.0 -> fix 6.10.1 / 6.10.2 ---------------------
+GHSA-jj6c-8h6c-hppx
+GHSA-4pxv-j86v-mhcw
+GHSA-7gw9-cf7v-778f
+GHSA-x284-j5p8-9c5p
+
+# --- reflex 0.7.14 -> CVE-2025-62379 (sin fix upstream aun) --
+CVE-2025-62379
+
+# ============================================================
+# TODO: TRIAGE — detectados por Trivy (mas reciente que pip-audit DB).
+# Pendientes de revisar via `lightagent doctor security-check` (Phase 30).
+# Son upgrades minor con constraints abiertas, pero NO se auto-aplican
+# sin aprobacion explicita. Quitar de aqui en cuanto se actualice uv.lock.
+# ============================================================
+
+# --- litellm 1.81.16 -> fix 1.83.0 (auth bypass + RCE) -------
+# litellm>=1.58.0 (sin tope) — upgrade compatible pero requiere validacion
+CVE-2026-35030  # CRITICAL — OIDC userinfo cache key auth bypass
+CVE-2026-35029  # HIGH — RCE via unrestricted proxy config
+GHSA-69x8-hrgq-fjj8  # HIGH — password hash exposure / pass-the-hash
+
+# --- pyasn1 0.6.2 -> fix 0.6.3 (DoS via recursion) -----------
+# Transitiva (cryptography / python-jose). Patch upgrade.
+CVE-2026-30922
+
+# --- pyjwt 2.11.0 -> fix 2.12.0 (RFC 7515 crit header) -------
+# Transitiva (python-jose). Patch upgrade.
+CVE-2026-32597
+
+# --- simpleeval 1.0.3 -> fix 1.0.5 (sandbox escape) ----------
+# Transitiva (langchain). Patch upgrade.
+CVE-2026-32640

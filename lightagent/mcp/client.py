@@ -288,7 +288,10 @@ class MCPClientManager:
     # Tool access
     # ------------------------------------------------------------------
 
-    def get_all_langchain_tools(self) -> list[BaseTool]:
+    def get_all_langchain_tools(
+        self,
+        capabilities: list[str] | None = None,
+    ) -> list[BaseTool]:
         """Return all MCP tools from connected servers as LangChain BaseTool instances.
 
         Servers are ordered by their configured ``priority`` (highest first) so
@@ -308,6 +311,15 @@ class MCPClientManager:
         module does not hard-depend on T-052 at import time.  If the adapter
         module is not yet available an empty list is returned with a warning.
 
+        Args:
+            capabilities: Fase E capability filter (server-level). When
+                ``None`` (the default) **all** connected servers contribute
+                their tools — backward-compatible with pre-Fase-E callers.
+                When a non-empty list is supplied, a server is included only
+                if its ``capabilities`` intersects the requested list.
+                Servers tagged ``"general"`` are always included regardless
+                of the filter — they are universal.
+
         Returns:
             A flat list of ``BaseTool`` instances, one per (server, tool) pair,
             sorted highest priority first.
@@ -322,10 +334,20 @@ class MCPClientManager:
             )
             return []
 
+        # Fase E: capability filter. Servers tagged ``general`` are always
+        # kept — they are universal. None means "no filter" (legacy path).
+        def _passes_filter(conn: MCPServerConnection) -> bool:
+            if capabilities is None:
+                return True
+            server_caps = set(conn._config.capabilities)
+            if "general" in server_caps:
+                return True
+            return bool(server_caps.intersection(capabilities))
+
         # Sort connected servers by priority descending; stable sort preserves
         # config-file order within the same priority tier.
         sorted_conns = sorted(
-            (c for c in self._connections.values() if c.connected),
+            (c for c in self._connections.values() if c.connected and _passes_filter(c)),
             key=lambda c: c._config.priority,
             reverse=True,
         )

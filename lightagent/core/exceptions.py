@@ -242,6 +242,34 @@ class RAGIndexError(RAGError):  # reserved for future use by the indexing pipeli
         super().__init__(f"Indexing failed: {reason}")
 
 
+class HyDEError(RAGError):
+    """Raised when HyDE hypothesis generation or embedding fails."""
+
+
+class FusionError(RAGError):
+    """Raised when RAG-Fusion query-variant generation or fusion fails."""
+
+
+class HybridSearchError(RAGError):
+    """Raised when hybrid BM25+semantic search fails."""
+
+
+class SelfRAGError(RAGError):
+    """Raised when Self-RAG decision, generation, or self-assessment fails."""
+
+
+class HierarchicalRAGError(RAGError):
+    """Raised when hierarchical parent-child RAG operations fail."""
+
+
+class MultiVectorError(RAGError):
+    """Raised when multi-vector indexing or search fails."""
+
+
+class AdaptiveRAGError(RAGError):
+    """Raised when adaptive RAG routing or dispatch fails."""
+
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 
@@ -295,12 +323,102 @@ class MemoryRedactionError(MemoryError):
         super().__init__(f"Memory redaction failed: {reason}")
 
 
+# ── Agent patterns (Fase B / SPEC-PAT-001..007) ─────────────────────────────
+# Canonical definitions live in ``lightagent/agents/patterns/*.py``;
+# re-exported here so callers can ``from lightagent.core.exceptions import
+# DebateError`` without needing to know which module owns each pattern.
+
+class ToTError(LightAgentError):
+    """Tree-of-Thoughts search error (SPEC-PAT-001).
+
+    Canonical class in :mod:`lightagent.agents.patterns.tree_of_thoughts`.
+    """
+
+
+class DebateError(LightAgentError):
+    """Debate pattern error (SPEC-PAT-002).
+
+    Canonical class in :mod:`lightagent.agents.patterns.debate`.
+    """
+
+
+class ConstitutionalError(LightAgentError):
+    """Constitutional-AI filter error (SPEC-PAT-003).
+
+    Canonical class in :mod:`lightagent.agents.patterns.constitutional`.
+    """
+
+
+class LATSError(LightAgentError):
+    """Language-Agent-Tree-Search / MCTS error (SPEC-PAT-004).
+
+    Canonical class in :mod:`lightagent.agents.patterns.lats`.
+    """
+
+
+class CompilerError(LightAgentError):
+    """LLM-Compiler plan / execution error (SPEC-PAT-005).
+
+    Canonical class in :mod:`lightagent.agents.patterns.llm_compiler`.
+    """
+
+
+class MoAError(LightAgentError):
+    """Mixture-of-Agents error (SPEC-PAT-006).
+
+    Canonical class in :mod:`lightagent.agents.patterns.mixture_of_agents`.
+    """
+
+
+class SwarmError(LightAgentError):
+    """Swarm handoff error (SPEC-PAT-007).
+
+    Canonical class in :mod:`lightagent.agents.patterns.swarm`.
+    """
+
+
+# ── Subgraph pipelines (Fase C) ──────────────────────────────────────────────
+
+class CustomerServiceError(LightAgentError):
+    """Customer-service subgraph error (SPEC-SUBGRAPH-001)."""
+
+
+class DocumentGenerationError(LightAgentError):
+    """Document-generation subgraph error (C2)."""
+
+
+class DataETLError(LightAgentError):
+    """Data-ETL subgraph error (C3)."""
+
+
+class CodeReviewError(LightAgentError):
+    """Code-review subgraph error (SPEC-SUBGRAPH-002)."""
+
+
+class DebateConsensusError(LightAgentError):
+    """Debate/consensus subgraph error (C5)."""
+
+
 __all__ = [
+    "AdaptiveRAGError",
     "CanaryLeakError",
+    "CodeReviewError",
+    "CompilerError",
+    "ConstitutionalError",
     "CronJobExistsError",
     "CronJobNotFoundError",
+    "CustomerServiceError",
+    "DataETLError",
+    "DebateConsensusError",
+    "DebateError",
+    "DocumentGenerationError",
     "DocumentLoadError",
+    "FusionError",
+    "HierarchicalRAGError",
+    "HyDEError",
+    "HybridSearchError",
     "InjectionDetectedError",
+    "LATSError",
     "LightAgentError",
     "MCPConnectionError",
     "MCPError",
@@ -308,6 +426,8 @@ __all__ = [
     "MemoryError",
     "MemoryRedactionError",
     "ModelNotFoundError",
+    "MoAError",
+    "MultiVectorError",
     "PermissionDeniedError",
     "ProviderError",
     "ProviderTimeoutError",
@@ -315,7 +435,10 @@ __all__ = [
     "RAGIndexError",
     "SchedulerError",
     "SecurityError",
+    "SelfRAGError",
     "SkillError",
     "SkillLoadError",
     "SkillValidationError",
+    "SwarmError",
+    "ToTError",
 ]

@@ -16,12 +16,13 @@ This package is the **agent framework layer** extracted from the [LightAgent](ht
 - **SUPERVISOR state machine** — central supervisor routes each turn to the right specialist, then back to `END`
 - **Security-first (5-layer defense)** — `InputSanitizer` → `GuardrailsEngine` (+ NeMo Guardrails L3) → `ActionInterceptor` → `AuditLogger` (hash-chained) + `SecurePromptBuilder` + `PermissionManager`
 - **Provider-agnostic** — Anthropic Claude, OpenAI GPT, Google Gemini, Ollama via LiteLLM (isolated in `lightagent/providers/`)
-- **RAG engine** — ChromaDB + CRAG pipeline + federated search + document loaders
-- **MCP client** — [Model Context Protocol](https://modelcontextprotocol.io) with auto-discovery
+- **7 RAG engines** — standard + CRAG, HyDE, RAG-Fusion (RRF), Hybrid (BM25 + semantic), Self-RAG, Parent-Child hierarchical, Multi-Vector, and Adaptive facade
+- **7 agent reasoning patterns** — Tree of Thoughts, Debate, Constitutional AI, LATS (MCTS), LLM-Compiler (parallel DAG), Mixture of Agents, Swarm/Handoff
+- **5 domain subgraph pipelines** — Customer Service, Document Generation, Data ETL, Code Review, Debate/Consensus — on top of the existing dev/ml/financial pipelines
+- **MCP client with capability routing** — [Model Context Protocol](https://modelcontextprotocol.io) with auto-discovery and per-agent capability-based tool filtering (`config/mcp_servers.yaml`)
 - **Process isolation** — `SandboxExecutor` with docker/podman/nsjail/bwrap/firejail backends
 - **Human-in-the-Loop** — `hitl_gate()` with LangGraph `interrupt()` support
-- **Reflection loops** — composable generate-critique-refine pattern
-- **Map-Reduce** — fan-out / fan-in with LangGraph `Send()`
+- **Composable primitives** — `reflection_loop()` (generate → critique → refine) and `make_parallel_dispatcher()` (fan-out via `Send()`)
 - **Cron engine** — APScheduler + timezone-aware `DateTimeService` (single time source of truth)
 - **Long-term memory** — PII-sanitized cross-session store (SQLite + ChromaDB; optional MongoDB)
 - **Observability** — Langfuse traces, OpenTelemetry spans, structlog
@@ -83,6 +84,54 @@ A synchronous `get_compiled_graph()` entry point is also available for non-async
 
 ---
 
+## Advanced architectures
+
+The package ships 19 composable architectures under `specs/advanced-architectures/` (Fases A/B/C, ≥82% coverage per module, 0 bandit issues). Every component follows a **callable-injection pattern** — business logic accepts `generate_fn`, `evaluate_fn`, `reward_fn`, `plan_fn`, `tool_executor`, … so tests run without LLM backends. Defaults wire `ProviderRegistry().get_llm()` lazily.
+
+### RAG engines (`lightagent/rag/`)
+
+| Engine | Module | Purpose |
+|--------|--------|---------|
+| **HyDE** | `hyde.py` | Generates a hypothetical answer and searches by its embedding (recall boost on abstract queries) |
+| **RAG-Fusion** | `fusion.py` | N query variants + `reciprocal_rank_fusion()` (RRF, k=60) over parallel searches |
+| **Hybrid Search** | `hybrid.py` | BM25 (`rank-bm25`) + semantic linear fusion with configurable `alpha` |
+| **Self-RAG** | `self_rag.py` | LLM decides whether to retrieve (`RETRIEVE`/`NO_RETRIEVE`) and self-assesses support (`SUPPORTED`/`PARTIALLY_SUPPORTED`/`UNSUPPORTED`) + utility score |
+| **Parent-Child** | `hierarchical.py` | Indexes small child chunks (~100 tok) for precision but returns parent context (~500 tok) to the LLM |
+| **Multi-Vector** | `multi_vector.py` | Indexes each chunk plus a summary and N hypothetical questions per chunk |
+| **Adaptive RAG** | `adaptive.py` | Facade that classifies queries (`FACTUAL_SIMPLE` / `ABSTRACT` / `AMBIGUOUS` / `MULTI_HOP` / `TECHNICAL` / `CONVERSATIONAL`) and routes to the engine above |
+
+### Agent reasoning patterns (`lightagent/agents/patterns/`)
+
+| Pattern | Module | Purpose |
+|---------|--------|---------|
+| **Tree of Thoughts** | `tree_of_thoughts.py` | Explores a tree of candidate thoughts with BFS / DFS / beam search |
+| **Debate** | `debate.py` | N-agent multi-round debate with moderator / majority-vote / weighted synthesis and Jaccard agreement score |
+| **Constitutional AI** | `constitutional.py` | Principle-driven self-critique + revision loop with audit log (3 default principles: `no_harmful_content`, `factual_accuracy`, `no_pii_exposure`) |
+| **LATS** | `lats.py` | Monte Carlo Tree Search (UCB1) over the action space — real backtracking when a branch fails |
+| **LLM-Compiler** | `llm_compiler.py` | Compiles a DAG of tasks, validates with Kahn topological sort, executes independent tasks in parallel waves |
+| **Mixture of Agents** | `mixture_of_agents.py` | Parallel proposers across multiple providers + aggregator synthesis layers |
+| **Swarm/Handoff** | `swarm.py` | Decentralised agent-to-agent handoff with `HandoffRecord` audit trail and allow-list validation |
+
+### Domain subgraph pipelines (`lightagent/agents/subgraphs/`)
+
+| Pipeline | Directory | Flow |
+|----------|-----------|------|
+| **Customer Service** | `customer_service/` | classifier → faq_retrieval → escalation_gate → response \| ticket_creator |
+| **Document Generation** | `document_generation/` | planner → researcher → writer → editor → formatter (markdown/plain/html) |
+| **Data ETL** | `data_etl/` | extractor → validator → (conditional gate) → transformer → loader → auditor |
+| **Code Review** | `code_review/` | linter → security_scanner → logic_reviewer → suggester → report_generator |
+| **Debate/Consensus** | `debate_consensus/` | proponent → opponent → moderator → consensus |
+
+Each subgraph exports both `build_<name>_subgraph()` (returns a `SubgraphDefinition`) and an idempotent `register_<name>()` mirroring the existing `register_ml_pipeline`. Wiring into the top-level supervisor is opt-in operational work — the primitives are ready to register.
+
+### MCP capability routing
+
+`config/mcp_servers.yaml` declares each server's `capabilities: list[str]`. `MCPClientManager.get_all_langchain_tools(capabilities=…)` and `get_tools_for_agent(agent, required_capabilities=…)` filter the tool pool per agent. Servers tagged `general` are always included; omitting `capabilities` from a YAML entry defaults to `["general"]` for backward compatibility.
+
+See [`specs/advanced-architectures/SPEC.md`](./specs/advanced-architectures/SPEC.md) for the full interface contracts.
+
+---
+
 ## Development
 
 Python 3.13+ is required. `uv` is the recommended package manager.
@@ -131,26 +180,49 @@ lightagent/                ← PEP 420 namespace package (NO __init__.py at root
 │   ├── supervisor.py      ← Central router
 │   ├── state.py           ← AgentState (TypedDict; messages uses add_messages reducer)
 │   ├── intent_router.py   ← Deterministic regex routing
-│   ├── tool_registry.py   ← MAX 120 tools global cap
+│   ├── tool_registry.py   ← MAX 120 tools global cap; capability-based MCP filtering
 │   ├── patterns/
-│   │   ├── reflection.py  ← reflection_loop()
-│   │   └── parallel.py    ← make_parallel_dispatcher() via Send()
+│   │   ├── reflection.py           ← reflection_loop()
+│   │   ├── parallel.py             ← make_parallel_dispatcher() via Send()
+│   │   ├── tree_of_thoughts.py     ← ToT with BFS/DFS/beam
+│   │   ├── debate.py               ← N-agent multi-round debate + Jaccard
+│   │   ├── constitutional.py       ← principle-driven self-revision + audit
+│   │   ├── lats.py                 ← MCTS with UCB1
+│   │   ├── llm_compiler.py         ← DAG compilation + Kahn validation + parallel waves
+│   │   ├── mixture_of_agents.py    ← multi-provider proposers + aggregator
+│   │   └── swarm.py                ← decentralised handoff with audit
 │   └── subgraphs/
-│       ├── factory.py     ← SubgraphFactory
-│       ├── registry.py    ← SubgraphRegistry
-│       ├── gates.py       ← hitl_gate() with interrupt()
-│       ├── dev_pipeline/       ← PO → Architect → Developer → Tests → QA → Reviewer
-│       ├── ml_pipeline/        ← Ingester → EDA → Features → Trainer → Evaluator → Exporter
-│       ├── financial/          ← Collector → Technical → Fundamental → Risk → Report
+│       ├── factory.py              ← SubgraphFactory
+│       ├── registry.py             ← SubgraphRegistry
+│       ├── gates.py                ← hitl_gate() with interrupt()
+│       ├── dev_pipeline/           ← PO → Architect → Developer → Tests → QA → Reviewer
+│       ├── ml_pipeline/            ← Ingester → EDA → Features → Trainer → Evaluator → Exporter
+│       ├── financial/              ← Collector → Technical → Fundamental → Risk → Report
+│       ├── customer_service/       ← classifier → faq_retrieval → gate → response | ticket
+│       ├── document_generation/    ← planner → researcher → writer → editor → formatter
+│       ├── data_etl/               ← extractor → validator → gate → transformer → loader → auditor
+│       ├── code_review/            ← linter → security_scanner → logic_reviewer → suggester → report
+│       ├── debate_consensus/       ← proponent → opponent → moderator → consensus
 │       ├── analysis_orchestrator/
 │       ├── engineering_orchestrator/
 │       └── research_orchestrator/
 ├── core/                  ← Pydantic Settings, logging, exceptions, DB, user model
 ├── providers/             ← LiteLLM wrapper (ONLY location for provider-specific imports)
 ├── memory/                ← Short-term history + long-term PII-sanitized store
-├── mcp/                   ← MCP client, adapter, connection manager
+├── mcp/                   ← MCP client, adapter, connection manager, capability routing
 ├── security/              ← 5-layer defense-in-depth (see below)
-├── rag/                   ← RAG engine, CRAG pipeline, ChromaDB, federated search
+├── rag/                   ← 7 retrieval engines:
+│   ├── engine.py          ← standard RAGEngine
+│   ├── crag.py            ← CRAG pipeline
+│   ├── hyde.py            ← Hypothetical Document Embeddings
+│   ├── fusion.py          ← RAG-Fusion (RRF)
+│   ├── hybrid.py          ← BM25 + semantic hybrid search
+│   ├── self_rag.py        ← Self-RAG (conditional retrieval + self-assessment)
+│   ├── hierarchical.py    ← Parent-Child chunking
+│   ├── multi_vector.py    ← chunk + summary + N hypothetical questions
+│   ├── adaptive.py        ← facade routing by query type
+│   ├── federated.py       ← federated search
+│   └── vector_store.py    ← ChromaDB vector store
 ├── skills/                ← available/ (source) · active/ (gitignored) · custom/ (gitignored)
 ├── scheduler/             ← APScheduler CronExecutor, DateTimeService, Prefect flows
 ├── monitoring/            ← Langfuse, OpenTelemetry, structlog

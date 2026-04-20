@@ -70,6 +70,8 @@ dependencies = [
   # ── Embeddings ────────────────────────────────────────────
   "sentence-transformers>=3.3.1",   # Local embeddings (HuggingFace)
   "tiktoken>=0.8.0",                # Token counting for OpenAI models
+  # ── Lexical Retrieval ─────────────────────────────────────
+  "rank-bm25>=0.2.2",               # BM25 ranking for hybrid search (SPEC-RAG-003)
   # ── Scheduler ─────────────────────────────────────────────
   "prefect>=3.1.10",                # Workflow orchestration
   "watchdog>=6.0.0",                # Filesystem event monitoring
@@ -314,7 +316,7 @@ module = [
   "litellm.*", "chromadb.*", "prefect.*", "watchdog.*",
   "nemoguardrails.*", "mcp.*", "structlog.*", "docx2txt.*",
   "unstructured.*", "circuitbreaker.*", "alembic", "alembic.*",
-  "apscheduler.*", "croniter.*",
+  "apscheduler.*", "croniter.*", "rank_bm25.*",
 ]
 ignore_missing_imports = true
 
