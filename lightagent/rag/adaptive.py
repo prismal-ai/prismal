@@ -85,9 +85,7 @@ _FACTUAL_RE = re.compile(
     re.IGNORECASE,
 )
 _ABSTRACT_RE = re.compile(r"\b(why|how come|por qu[eé])\b", re.IGNORECASE)
-_MULTI_HOP_RE = re.compile(
-    r"(first .+ then|step by step|and then|paso a paso)", re.IGNORECASE
-)
+_MULTI_HOP_RE = re.compile(r"(first .+ then|step by step|and then|paso a paso)", re.IGNORECASE)
 _CONVERSATIONAL_RE = re.compile(
     r"\b(we|us|our|earlier|previous|previously|before this|above|discussed|expand on)\b",
     re.IGNORECASE,
@@ -95,13 +93,9 @@ _CONVERSATIONAL_RE = re.compile(
 _TECHNICAL_RE = re.compile(
     r"(\b(API|SDK|CLI|HTTP|JSON|SQL|URL|UUID|JWT)\b|\w+_\w+|\b[a-z]+\.[a-z]+\()"
 )
-_AMBIGUOUS_VAGUE_RE = re.compile(
-    r"\b(stuff|something|anything|things)\b", re.IGNORECASE
-)
+_AMBIGUOUS_VAGUE_RE = re.compile(r"\b(stuff|something|anything|things)\b", re.IGNORECASE)
 
-_VALID_FORCED_STRATEGIES = frozenset(
-    {"crag", "hyde", "fusion", "hybrid", "hierarchical"}
-)
+_VALID_FORCED_STRATEGIES = frozenset({"crag", "hyde", "fusion", "hybrid", "hierarchical"})
 
 _LLM_CLASSIFIER_PROMPT = (
     "Classify the user's query into exactly one category and respond with the "
@@ -145,9 +139,7 @@ class AdaptiveRAGEngine:
         self._use_llm_classifier = use_llm_classifier
         self._settings = settings if settings is not None else get_settings()
         self._llm = (
-            ProviderRegistry(settings=self._settings).get_llm()
-            if use_llm_classifier
-            else None
+            ProviderRegistry(settings=self._settings).get_llm() if use_llm_classifier else None
         )
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -263,9 +255,7 @@ class AdaptiveRAGEngine:
         chunks = await self._dispatch(strategy, query, k)
         return strategy, chunks
 
-    async def _dispatch(
-        self, strategy: str, query: str, k: int
-    ) -> list[RetrievedChunk]:
+    async def _dispatch(self, strategy: str, query: str, k: int) -> list[RetrievedChunk]:
         """Execute the named engine, bridging sync engines via ``to_thread``."""
         if strategy == "crag":
             crag_result = await self._crag.run(query)

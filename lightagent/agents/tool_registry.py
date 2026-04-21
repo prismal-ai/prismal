@@ -178,6 +178,7 @@ def get_recommended_capabilities(node_name: str) -> list[str] | None:
     """
     return DEFAULT_CAPABILITY_MAP.get(node_name)
 
+
 # ---------------------------------------------------------------------------
 # Per-agent tool merge
 # ---------------------------------------------------------------------------

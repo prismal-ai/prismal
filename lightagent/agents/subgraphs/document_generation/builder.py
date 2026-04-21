@@ -37,10 +37,7 @@ if TYPE_CHECKING:
 logger = get_logger("lightagent.subgraphs.document_generation.builder")
 
 _NAME = "document_generation"
-_DESCRIPTION = (
-    "Document generation pipeline: "
-    "planner → researcher → writer → editor → formatter."
-)
+_DESCRIPTION = "Document generation pipeline: planner → researcher → writer → editor → formatter."
 
 
 def build_document_generation_subgraph(

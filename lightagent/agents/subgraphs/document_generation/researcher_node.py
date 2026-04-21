@@ -58,9 +58,7 @@ def make_researcher_node(
                         error=str(exc),
                     )
                     chunks = []
-                rag_snippet = "\n".join(
-                    f"- {getattr(c, 'content', str(c))}" for c in chunks
-                )
+                rag_snippet = "\n".join(f"- {getattr(c, 'content', str(c))}" for c in chunks)
 
             builder = SecurePromptBuilder()
             user = f"Section: {section}"

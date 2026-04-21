@@ -36,12 +36,13 @@ from typing import Any
 # Dataset — propuestas de cambio en sistemas de IA
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class Proposal:
     id: str
     title: str
     description: str
-    risk_level: str          # LOW | MEDIUM | HIGH
+    risk_level: str  # LOW | MEDIUM | HIGH
     risk_reasons: list[str]
     expected_impact: str
     rollback_plan: str
@@ -52,7 +53,7 @@ PROPOSALS: list[Proposal] = [
         id="PROP-001",
         title="Activar modelo GPT-4o en producción para soporte al cliente",
         description="Reemplazar el modelo actual (GPT-3.5) por GPT-4o en el chatbot "
-                    "de soporte. Afecta a ~50 000 usuarios/día.",
+        "de soporte. Afecta a ~50 000 usuarios/día.",
         risk_level="HIGH",
         risk_reasons=[
             "Cambio en comportamiento de respuestas no completamente evaluado",
@@ -66,7 +67,7 @@ PROPOSALS: list[Proposal] = [
         id="PROP-002",
         title="Habilitar memoria a largo plazo para usuarios premium",
         description="Almacenar resúmenes de conversación en ChromaDB persistente "
-                    "(PII incluida). Solo usuarios opt-in con consentimiento explícito.",
+        "(PII incluida). Solo usuarios opt-in con consentimiento explícito.",
         risk_level="HIGH",
         risk_reasons=[
             "Almacenamiento de PII requiere revisión legal (GDPR, LOPD)",
@@ -80,7 +81,7 @@ PROPOSALS: list[Proposal] = [
         id="PROP-003",
         title="Desplegar agente autónomo de revisión de PRs",
         description="Integrar lightagent code_review subgraph con GitHub Actions para "
-                    "revisar PRs automáticamente y hacer merge si score >= 0.95.",
+        "revisar PRs automáticamente y hacer merge si score >= 0.95.",
         risk_level="MEDIUM",
         risk_reasons=[
             "Auto-merge sin revisión humana en casos edge",
@@ -93,7 +94,7 @@ PROPOSALS: list[Proposal] = [
         id="PROP-004",
         title="Activar RAG sobre base de conocimiento interna",
         description="Indexar 12 000 documentos internos en ChromaDB y conectarlos "
-                    "al asistente. Documentos marcados como CONFIDENTIAL incluidos.",
+        "al asistente. Documentos marcados como CONFIDENTIAL incluidos.",
         risk_level="MEDIUM",
         risk_reasons=[
             "Documentos CONFIDENTIAL podrían filtrarse en respuestas",
@@ -106,7 +107,7 @@ PROPOSALS: list[Proposal] = [
         id="PROP-005",
         title="Actualizar sistema de prompts de safety a v2.1",
         description="Actualizar SecurePromptBuilder y guardrails con nuevas reglas "
-                    "de seguridad. Mejora detección de jailbreak del 71% al 89%.",
+        "de seguridad. Mejora detección de jailbreak del 71% al 89%.",
         risk_level="LOW",
         risk_reasons=[
             "Posible aumento de falsos positivos en queries legítimas (~2%)",
@@ -142,7 +143,7 @@ def proposal_writer(proposal: Proposal) -> dict[str, Any]:
         "rollback_plan": proposal.rollback_plan,
         "status": "DRAFT",
     }
-    print(f"\n{CYAN}{'─'*64}{RESET}")
+    print(f"\n{CYAN}{'─' * 64}{RESET}")
     print(f"{BOLD}[1/5] proposal_writer{RESET}  →  {proposal.id}: {proposal.title}")
     print(f"      {DIM}{textwrap.shorten(proposal.description, 72)}{RESET}")
     return artifact
@@ -164,7 +165,9 @@ def risk_assessor(proposal: Proposal, artifact: dict[str, Any]) -> dict[str, Any
 
 def approval_seed(artifact_field: str, risk_level: str) -> dict[str, Any]:
     """Nodo 3 — Siembra metadatos HITL en el estado."""
-    print(f"{BOLD}[3/5] approval_seed{RESET}    →  artifact_field={artifact_field!r}  risk={_risk_badge(risk_level)}")
+    print(
+        f"{BOLD}[3/5] approval_seed{RESET}    →  artifact_field={artifact_field!r}  risk={_risk_badge(risk_level)}"
+    )
     return {
         "_hitl_artifact_field": artifact_field,
         "_hitl_risk_level": risk_level,
@@ -178,7 +181,7 @@ def finalizer(proposal: Proposal, decision: str, modifications: dict[str, Any]) 
     print(f"      Propuesta: {title}")
     if modifications:
         print(f"      Modificaciones incorporadas: {list(modifications.keys())}")
-    print(f"      Estado final: DEPLOYED")
+    print("      Estado final: DEPLOYED")
 
 
 def revision_handler(proposal: Proposal, modifications: dict[str, Any]) -> Proposal:
@@ -197,13 +200,16 @@ def revision_handler(proposal: Proposal, modifications: dict[str, Any]) -> Propo
         print(f"      ← {k}: {v}")
     return updated
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Simulador HITL — interrupt() + Command(resume=...)
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class HitlInterrupt:
     """Representa el estado suspendido en un interrupt()."""
+
     artifact_field: str
     artifact: dict[str, Any]
     risk_level: str
@@ -213,7 +219,7 @@ class HitlInterrupt:
 
 @dataclass
 class HitlDecision:
-    action: str                                  # approve | reject | request_changes
+    action: str  # approve | reject | request_changes
     modifications: dict[str, Any] = field(default_factory=dict)
     feedback: str = ""
 
@@ -221,18 +227,20 @@ class HitlDecision:
 def _print_interrupt_payload(it: HitlInterrupt) -> None:
     """Muestra el payload del interrupt al revisor humano."""
     badge = _risk_badge(it.risk_level)
-    print(f"\n{'═'*64}")
-    print(f"  ⏸  INTERRUPT — Aprobación requerida  {badge}  (iter {it.iteration+1})")
-    print(f"{'═'*64}")
+    print(f"\n{'═' * 64}")
+    print(f"  ⏸  INTERRUPT — Aprobación requerida  {badge}  (iter {it.iteration + 1})")
+    print(f"{'═' * 64}")
     print(f"  {BOLD}Propuesta:{RESET} {it.artifact.get('id')} — {it.artifact.get('title')}")
     print(f"  {BOLD}Impacto:{RESET}   {it.artifact.get('expected_impact')}")
     print(f"  {BOLD}Rollback:{RESET}  {it.artifact.get('rollback_plan')}")
     print(f"  {BOLD}Razones de riesgo:{RESET}")
     for r in it.proposal.risk_reasons:
         print(f"    • {r}")
-    print(f"{'─'*64}")
-    print(f"  Opciones válidas:  {BOLD}approve{RESET} | {BOLD}reject{RESET} | {BOLD}request_changes{RESET}")
-    print(f"{'─'*64}")
+    print(f"{'─' * 64}")
+    print(
+        f"  Opciones válidas:  {BOLD}approve{RESET} | {BOLD}reject{RESET} | {BOLD}request_changes{RESET}"
+    )
+    print(f"{'─' * 64}")
 
 
 def _human_input_interactive(it: HitlInterrupt) -> HitlDecision:
@@ -242,7 +250,7 @@ def _human_input_interactive(it: HitlInterrupt) -> HitlDecision:
         raw = input("  Decisión [approve/reject/request_changes]: ").strip().lower()
         if raw in ("approve", "reject", "request_changes"):
             break
-        print(f"  ⚠  Opción inválida. Escribe: approve, reject, o request_changes")
+        print("  ⚠  Opción inválida. Escribe: approve, reject, o request_changes")
 
     modifications = {}
     feedback = ""
@@ -284,7 +292,7 @@ MAX_ITERATIONS = 3
 
 def run_hitl_pipeline(
     proposal: Proposal,
-    decision_fn,               # callable(HitlInterrupt) -> HitlDecision
+    decision_fn,  # callable(HitlInterrupt) -> HitlDecision
     bypass: bool = False,
 ) -> str:
     """
@@ -319,9 +327,13 @@ def run_hitl_pipeline(
         # ── Bypass por configuración (CI/CD mode) ────────────────────────────
         if bypass or not risk["requires_hitl"]:
             if bypass:
-                print(f"{BOLD}[hitl]{RESET}           →  ⚡ BYPASS (CI/CD mode) — aprobación automática")
+                print(
+                    f"{BOLD}[hitl]{RESET}           →  ⚡ BYPASS (CI/CD mode) — aprobación automática"
+                )
             else:
-                print(f"{BOLD}[hitl]{RESET}           →  ✅ Riesgo LOW — no requiere aprobación humana")
+                print(
+                    f"{BOLD}[hitl]{RESET}           →  ✅ Riesgo LOW — no requiere aprobación humana"
+                )
             finalizer(current_proposal, "approve", {})
             return "approved"
 
@@ -334,7 +346,7 @@ def run_hitl_pipeline(
         # ── Nodo 4: human_approval (interrupt) ──────────────────────────────
         interrupt_state = HitlInterrupt(
             artifact_field=seed_meta["_hitl_artifact_field"],
-            artifact={**artifact, **{"risk_reasons": risk["reasons"]}},
+            artifact={**artifact, "risk_reasons": risk["reasons"]},
             risk_level=seed_meta["_hitl_risk_level"],
             proposal=current_proposal,
             iteration=iteration,
@@ -346,25 +358,31 @@ def run_hitl_pipeline(
         decision = decision_fn(interrupt_state)
 
         # ── Nodo 5: hitl_gate ────────────────────────────────────────────────
-        print(f"\n{BOLD}[hitl_gate]{RESET}          →  acción recibida: {BOLD}{decision.action}{RESET}")
+        print(
+            f"\n{BOLD}[hitl_gate]{RESET}          →  acción recibida: {BOLD}{decision.action}{RESET}"
+        )
 
         if decision.action == "approve":
             finalizer(current_proposal, decision.action, decision.modifications)
             return "approved"
 
-        elif decision.action == "reject":
+        if decision.action == "reject":
             print(f"\n{BOLD}[END]{RESET}              →  ❌  {BOLD}RECHAZADO{RESET}")
             if decision.feedback:
                 print(f"      Motivo: {decision.feedback}")
             return "rejected"
 
-        elif decision.action == "request_changes":
+        if decision.action == "request_changes":
             current_proposal = revision_handler(current_proposal, decision.modifications)
             iteration += 1
             if iteration >= MAX_ITERATIONS:
-                print(f"\n{BOLD}[hitl_gate]{RESET}  →  ⚠  Máximo de iteraciones ({MAX_ITERATIONS}) alcanzado → rechazado automáticamente")
+                print(
+                    f"\n{BOLD}[hitl_gate]{RESET}  →  ⚠  Máximo de iteraciones ({MAX_ITERATIONS}) alcanzado → rechazado automáticamente"
+                )
                 return "max_iterations"
-            print(f"\n  → Re-sometiendo propuesta revisada (iteración {iteration+1}/{MAX_ITERATIONS})…")
+            print(
+                f"\n  → Re-sometiendo propuesta revisada (iteración {iteration + 1}/{MAX_ITERATIONS})…"
+            )
             continue
 
     return "max_iterations"
@@ -374,23 +392,24 @@ def run_hitl_pipeline(
 # DEMO 1 — Interactivo (el usuario decide en consola)
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def demo_interactive() -> None:
     """Pipeline interactivo: el usuario actúa como revisor humano."""
-    print(f"\n{'═'*64}")
+    print(f"\n{'═' * 64}")
     print(f"  {BOLD}DEMO 1 — HITL Interactivo{RESET}")
-    print(f"  Actúas como revisor humano del Comité de IA")
-    print(f"{'═'*64}")
+    print("  Actúas como revisor humano del Comité de IA")
+    print(f"{'═' * 64}")
 
     for i, proposal in enumerate(PROPOSALS[:3], 1):
-        print(f"\n\n{'░'*64}")
+        print(f"\n\n{'░' * 64}")
         print(f"  Propuesta {i}/3  —  Riesgo {_risk_badge(proposal.risk_level)}")
-        print(f"{'░'*64}")
+        print(f"{'░' * 64}")
         result = run_hitl_pipeline(proposal, _human_input_interactive)
         print(f"\n  → Resultado final: {BOLD}{result.upper()}{RESET}")
 
-    print(f"\n{'═'*64}")
-    print(f"  Demo interactivo completado")
-    print(f"{'═'*64}")
+    print(f"\n{'═' * 64}")
+    print("  Demo interactivo completado")
+    print(f"{'═' * 64}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -402,7 +421,9 @@ BATCH_SCRIPTS: dict[str, list[HitlDecision]] = {
     "PROP-001": [  # HIGH risk — pide cambios primero, luego aprueba
         HitlDecision(
             action="request_changes",
-            modifications={"rollback_plan": "Canary 5% → 25% → 100% con rollback automático si error_rate > 1%"},
+            modifications={
+                "rollback_plan": "Canary 5% → 25% → 100% con rollback automático si error_rate > 1%"
+            },
             feedback="Implementar canary release antes de aprobación final",
         ),
         HitlDecision(action="approve"),
@@ -416,7 +437,9 @@ BATCH_SCRIPTS: dict[str, list[HitlDecision]] = {
     "PROP-003": [  # MEDIUM risk — aprobado con modificación
         HitlDecision(
             action="request_changes",
-            modifications={"rollback_plan": "Deshabilitar auto-merge para archivos en security/; mantener revisión manual allí"},
+            modifications={
+                "rollback_plan": "Deshabilitar auto-merge para archivos en security/; mantener revisión manual allí"
+            },
             feedback="Excluir directorio security/ del auto-merge",
         ),
         HitlDecision(action="approve"),
@@ -432,55 +455,59 @@ BATCH_SCRIPTS: dict[str, list[HitlDecision]] = {
 
 def demo_batch() -> None:
     """Pipeline con decisiones predefinidas — muestra los 5 escenarios."""
-    print(f"\n{'═'*64}")
+    print(f"\n{'═' * 64}")
     print(f"  {BOLD}DEMO 2 — Batch (decisiones simuladas){RESET}")
-    print(f"  Simula un comité de revisión con respuestas pre-programadas")
-    print(f"{'═'*64}")
+    print("  Simula un comité de revisión con respuestas pre-programadas")
+    print(f"{'═' * 64}")
 
     results: list[tuple[str, str, str]] = []
 
     for proposal in PROPOSALS:
         script = BATCH_SCRIPTS[proposal.id]
-        decision_fn = lambda it, s=script: _human_input_scripted(it, s)
 
-        print(f"\n\n{'░'*64}")
+        def decision_fn(it, s=script):
+            return _human_input_scripted(it, s)
+
+        print(f"\n\n{'░' * 64}")
         print(f"  {proposal.id} — {proposal.title}")
         print(f"  Riesgo: {_risk_badge(proposal.risk_level)}")
-        print(f"{'░'*64}")
+        print(f"{'░' * 64}")
 
         result = run_hitl_pipeline(proposal, decision_fn)
         results.append((proposal.id, proposal.risk_level, result))
         print(f"\n  → Resultado: {BOLD}{result.upper()}{RESET}")
 
     # Resumen
-    print(f"\n\n{'═'*64}")
+    print(f"\n\n{'═' * 64}")
     print(f"  {BOLD}Resumen del Comité de Revisión{RESET}")
-    print(f"{'═'*64}")
+    print(f"{'═' * 64}")
     print(f"  {'ID':<12} {'Riesgo':<10} {'Resultado'}")
-    print(f"  {'─'*11} {'─'*9} {'─'*20}")
+    print(f"  {'─' * 11} {'─' * 9} {'─' * 20}")
     for pid, risk, res in results:
         badge = _risk_badge(risk)
         result_fmt = (
-            f"\033[92m{BOLD}{res.upper()}{RESET}" if res == "approved"
+            f"\033[92m{BOLD}{res.upper()}{RESET}"
+            if res == "approved"
             else f"\033[91m{BOLD}{res.upper()}{RESET}"
         )
         print(f"  {pid:<12} {badge:<22} {result_fmt}")
 
     approved = sum(1 for _, _, r in results if r == "approved")
     print(f"\n  Aprobadas: {approved}/{len(results)}")
-    print(f"{'═'*64}")
+    print(f"{'═' * 64}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # DEMO 3 — CI/CD Bypass
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def demo_bypass() -> None:
     """Muestra el comportamiento de CI/CD: hitl_enabled=False → aprobación automática."""
-    print(f"\n{'═'*64}")
+    print(f"\n{'═' * 64}")
     print(f"  {BOLD}DEMO 3 — CI/CD Bypass (hitl_enabled=False){RESET}")
-    print(f"  Todas las propuestas se aprueban automáticamente sin interrupt")
-    print(f"{'═'*64}")
+    print("  Todas las propuestas se aprueban automáticamente sin interrupt")
+    print(f"{'═' * 64}")
 
     for proposal in PROPOSALS:
         print(f"\n  {proposal.id} — Riesgo {_risk_badge(proposal.risk_level)}")
@@ -491,13 +518,14 @@ def demo_bypass() -> None:
         )
         print(f"  Resultado: {BOLD}{result}{RESET}")
 
-    print(f"\n  → Todas las propuestas procesadas sin intervención humana.")
-    print(f"{'═'*64}")
+    print("\n  → Todas las propuestas procesadas sin intervención humana.")
+    print(f"{'═' * 64}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # DEMO 4 — LangGraph real con MemorySaver e interrupt()
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 async def demo_real_langgraph() -> None:
     """
@@ -520,12 +548,12 @@ async def demo_real_langgraph() -> None:
         )
     except ImportError as e:
         print(f"\n  ⚠  Dependencia no disponible: {e}")
-        print(f"     Instala con: uv pip install -e '.[dev,all]'")
+        print("     Instala con: uv pip install -e '.[dev,all]'")
         return
 
-    print(f"\n{'═'*64}")
+    print(f"\n{'═' * 64}")
     print(f"  {BOLD}DEMO 4 — LangGraph real con MemorySaver + interrupt(){RESET}")
-    print(f"{'═'*64}")
+    print(f"{'═' * 64}")
 
     proposal = PROPOSALS[0]  # PROP-001 (HIGH risk)
 
@@ -570,7 +598,7 @@ async def demo_real_langgraph() -> None:
         return {"result": "DEPLOYED"}
 
     def _rejected_node(state: ReviewState) -> ReviewState:
-        print(f"  [rejected]  ❌ Propuesta rechazada.")
+        print("  [rejected]  ❌ Propuesta rechazada.")
         return {"result": "REJECTED"}
 
     # ── Construir grafo ───────────────────────────────────────────────────────
@@ -582,20 +610,20 @@ async def demo_real_langgraph() -> None:
     )
 
     builder = StateGraph(ReviewState)
-    builder.add_node("writer",         _writer_node)
-    builder.add_node("risk",           _risk_node)
-    builder.add_node("approval_seed",  _seed_node)
+    builder.add_node("writer", _writer_node)
+    builder.add_node("risk", _risk_node)
+    builder.add_node("approval_seed", _seed_node)
     builder.add_node("human_approval", human_approval_node)
-    builder.add_node("finalizer",      _finalizer_node)
-    builder.add_node("rejected",       _rejected_node)
+    builder.add_node("finalizer", _finalizer_node)
+    builder.add_node("rejected", _rejected_node)
 
     builder.set_entry_point("writer")
-    builder.add_edge("writer",         "risk")
-    builder.add_edge("risk",           "approval_seed")
-    builder.add_edge("approval_seed",  "human_approval")
+    builder.add_edge("writer", "risk")
+    builder.add_edge("risk", "approval_seed")
+    builder.add_edge("approval_seed", "human_approval")
     builder.add_conditional_edges("human_approval", _gate)
-    builder.add_edge("finalizer",      END)
-    builder.add_edge("rejected",       END)
+    builder.add_edge("finalizer", END)
+    builder.add_edge("rejected", END)
 
     checkpointer = MemorySaver()
     graph = builder.compile(checkpointer=checkpointer, interrupt_before=["human_approval"])
@@ -612,7 +640,7 @@ async def demo_real_langgraph() -> None:
     }
 
     print(f"\n  Invocando grafo para {proposal.id}…")
-    snapshot = graph.invoke(initial_state, config)
+    graph.invoke(initial_state, config)
 
     # Detectar que estamos en interrupt
     state_snapshot = graph.get_state(config)
@@ -621,12 +649,12 @@ async def demo_real_langgraph() -> None:
     print(f"  Artefacto en estado: {state_snapshot.values.get('artifact', {}).get('title', '?')}")
 
     # ── Simular decisión humana 1: request_changes ────────────────────────────
-    print(f"\n  [humano] Decisión: request_changes — añadir canary release")
+    print("\n  [humano] Decisión: request_changes — añadir canary release")
     decision_1 = {
         "action": "request_changes",
         "modifications": {"rollback_plan": "Canary 5%→25%→100% con auto-rollback"},
     }
-    snapshot2 = graph.invoke(Command(resume=decision_1), config)
+    graph.invoke(Command(resume=decision_1), config)
 
     # El grafo llega a rejected (on_reject) porque request_changes → on_reject
     # En este grafo simplificado, on_reject = "rejected". En el dev_pipeline real
@@ -637,31 +665,32 @@ async def demo_real_langgraph() -> None:
 
     # ── Segunda ejecución: approve ────────────────────────────────────────────
     config2 = {"configurable": {"thread_id": "demo-hitl-002"}}
-    print(f"\n  ─── Segunda ejecución (thread diferente) → approve ───")
+    print("\n  ─── Segunda ejecución (thread diferente) → approve ───")
     graph.invoke(initial_state, config2)
-    print(f"\n  [humano] Decisión: approve")
-    final = graph.invoke(Command(resume={"action": "approve"}), config2)
+    print("\n  [humano] Decisión: approve")
+    graph.invoke(Command(resume={"action": "approve"}), config2)
     state_final = graph.get_state(config2)
     print(f"\n  Estado final: {state_final.values.get('result')}")
 
-    print(f"\n{'═'*64}")
-    print(f"  Demo LangGraph real completado.")
-    print(f"  Patrón clave:")
-    print(f"    graph.invoke(state, config)              → suspende")
-    print(f"    graph.invoke(Command(resume=...), config) → reanuda")
-    print(f"{'═'*64}")
+    print(f"\n{'═' * 64}")
+    print("  Demo LangGraph real completado.")
+    print("  Patrón clave:")
+    print("    graph.invoke(state, config)              → suspende")
+    print("    graph.invoke(Command(resume=...), config) → reanuda")
+    print(f"{'═' * 64}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Explicación del patrón HITL
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def print_pattern_explanation() -> None:
     """Imprime el diagrama del patrón y la guía de uso."""
     print(f"""
-{'═'*64}
+{"═" * 64}
   {BOLD}Patrón HITL — Human-in-the-Loop{RESET}
-{'═'*64}
+{"═" * 64}
 
   {BOLD}Flujo completo:{RESET}
 
@@ -720,20 +749,21 @@ def print_pattern_explanation() -> None:
     # O por código (tests):
     hitl_gate(..., bypass_condition=lambda _: True)
 
-{'═'*64}""")
+{"═" * 64}""")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # main
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 async def main() -> None:
     print(f"""
-{'═'*64}
+{"═" * 64}
   {BOLD}HITL Approval — Patrones de Revisión Humana en Agentes IA{RESET}
   Dataset: AI Governance Decisions (5 propuestas de despliegue)
   Framework: lightagent-agents / LangGraph interrupt()
-{'═'*64}
+{"═" * 64}
   Modos disponibles:
     1. Interactivo  — tú eres el revisor (consola)
     2. Batch        — decisiones simuladas (demo automático)
@@ -741,7 +771,7 @@ async def main() -> None:
     4. LangGraph    — grafo real con MemorySaver + interrupt()
     5. Todos        — ejecuta demos 2, 3 y 4 en secuencia
     6. Patrón       — muestra explicación del patrón HITL
-{'─'*64}""")
+{"─" * 64}""")
 
     choice = input("  Selecciona modo [1-6] (Enter = 2): ").strip() or "2"
 

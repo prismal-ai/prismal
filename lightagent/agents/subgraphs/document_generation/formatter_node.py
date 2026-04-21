@@ -35,9 +35,7 @@ def make_formatter_node(
 ) -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:
     """Return an async LangGraph node that formats the final document."""
     if format not in _VALID_FORMATS:
-        raise ValueError(
-            f"format={format!r} not in {sorted(_VALID_FORMATS)}"
-        )
+        raise ValueError(f"format={format!r} not in {sorted(_VALID_FORMATS)}")
 
     async def formatter_node(state: dict[str, Any]) -> dict[str, Any]:
         existing = dict(state.get("metadata") or {}).get("document_generation") or {}

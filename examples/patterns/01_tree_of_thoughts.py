@@ -22,7 +22,6 @@ Uso:
 from __future__ import annotations
 
 import asyncio
-import os
 import re
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -169,18 +168,17 @@ async def solve_with_tot(sample: dict, strategy: str = "beam") -> ToTResult:
         "metadata": {},
     }
 
-    result = await tree_of_thoughts(
+    return await tree_of_thoughts(
         problem=sample["question"],
         generate_fn=generate_solution_steps,
         evaluate_fn=evaluate_solution,
         state=state,
-        breadth=3,        # 3 candidatos por nodo
-        depth=3,          # máximo 3 niveles de profundidad
-        beam_size=2,      # retener top-2 en búsqueda beam
-        threshold=0.9,    # detener si algún pensamiento puntúa >= 0.9
+        breadth=3,  # 3 candidatos por nodo
+        depth=3,  # máximo 3 niveles de profundidad
+        beam_size=2,  # retener top-2 en búsqueda beam
+        threshold=0.9,  # detener si algún pensamiento puntúa >= 0.9
         search_strategy=strategy,  # type: ignore[arg-type]
     )
-    return result
 
 
 async def main() -> None:

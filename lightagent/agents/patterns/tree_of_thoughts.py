@@ -19,8 +19,10 @@ Example::
     async def generate(problem, state, path):
         return await llm_generate_N_candidates(problem, n=3)
 
+
     async def evaluate(thought_text, state):
         return await llm_score(thought_text)
+
 
     result = await tree_of_thoughts(
         problem="Plan a refactor of the supervisor node",

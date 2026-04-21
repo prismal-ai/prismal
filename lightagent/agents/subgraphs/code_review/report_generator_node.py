@@ -61,9 +61,7 @@ def _summarise(
     counts = dict.fromkeys(_SEVERITY_WEIGHT, 0)
     for i in issues:
         counts[i.severity] = counts.get(i.severity, 0) + 1
-    breakdown = ", ".join(
-        f"{n} {sev}" for sev, n in counts.items() if n > 0
-    )
+    breakdown = ", ".join(f"{n} {sev}" for sev, n in counts.items() if n > 0)
     status = "APPROVED" if approved else "REJECTED"
     return (
         f"Code review {status} (score={score:.2f}, {len(issues)} total: "
@@ -76,9 +74,7 @@ def make_report_generator_node(
 ) -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:
     """Return an async LangGraph node that assembles the final report."""
     if not 0.0 <= approval_threshold <= 1.0:
-        raise ValueError(
-            f"approval_threshold must be in [0, 1]; got {approval_threshold}"
-        )
+        raise ValueError(f"approval_threshold must be in [0, 1]; got {approval_threshold}")
 
     async def report_generator_node(state: dict[str, Any]) -> dict[str, Any]:
         existing = dict(state.get("metadata") or {}).get("code_review") or {}

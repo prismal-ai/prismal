@@ -33,12 +33,15 @@ Uso:
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
 from langchain_core.documents import Document
 
-from lightagent.rag.crag import RetrievedChunk
 from lightagent.rag.hybrid import HybridSearchEngine
 from lightagent.rag.vector_store import ChromaVectorStore
+
+if TYPE_CHECKING:
+    from lightagent.rag.crag import RetrievedChunk
 
 # ── Dataset: artículos AG News ────────────────────────────────────────────────
 # Muestra representativa de 4 categorías de AG News.
@@ -289,7 +292,7 @@ async def main() -> None:
         print(f"\n[{query_info['id']}] Tipo: {query_info['type']}")
         print(f"  Query   : {query_info['query']}")
         print(f"  Razón   : {query_info['reason']}")
-        print(f"  Top-3 resultados:")
+        print("  Top-3 resultados:")
         for chunk in chunks[:3]:
             mark = "→" if chunk.source == query_info["expected_source"] else " "
             print(f"    {mark} [{chunk.relevance_score:.3f}] {chunk.source}")
@@ -300,7 +303,6 @@ async def main() -> None:
     print("  Comparando α en 3 queries representativas...")
     print()
 
-    alpha_labels = ["α=0.0\n(BM25)", "α=0.3", "α=0.5\n(default)", "α=0.7", "α=1.0\n(semántico)"]
     sample_queries = HYBRID_QUERIES[:3]  # 1 keyword, 1 semántico, 1 hybrid
 
     for query_info in sample_queries:
@@ -308,8 +310,7 @@ async def main() -> None:
         print(f"  [{query_info['id']}] {query_info['type']}")
         print(f"    Query: {query_info['query'][:60]}...")
         result_line = "    " + " | ".join(
-            f"α={a:.1f}:{'✓' if ok else '✗'}"
-            for a, ok in alpha_results.items()
+            f"α={a:.1f}:{'✓' if ok else '✗'}" for a, ok in alpha_results.items()
         )
         print(result_line)
         print()

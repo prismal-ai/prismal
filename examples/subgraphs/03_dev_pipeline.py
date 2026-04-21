@@ -54,6 +54,7 @@ try:
         build_dev_pipeline_subgraph,
         register_dev_pipeline,
     )
+
     DEV_PIPELINE_AVAILABLE = True
 except ImportError:
     DEV_PIPELINE_AVAILABLE = False
@@ -139,6 +140,7 @@ GITHUB_ISSUES = [
 
 # ── Configuración del pipeline ────────────────────────────────────────────────
 
+
 def format_issue_as_task(issue: dict) -> str:
     """Convierte una GitHub Issue en una instrucción para el Dev Pipeline."""
     return (
@@ -164,6 +166,7 @@ async def run_dev_pipeline_real(issue: dict) -> dict:
     subgraph_def = build_dev_pipeline_subgraph()
 
     from lightagent.agents.subgraphs.factory import SubgraphFactory
+
     compiled = SubgraphFactory.compile(subgraph_def)
 
     state = initial_state()
@@ -190,14 +193,16 @@ async def run_dev_pipeline_real(issue: dict) -> dict:
 
 def simulate_dev_pipeline(issue: dict) -> None:
     """Simula la ejecución del Dev Pipeline mostrando la salida esperada."""
-    print(f"\n  [Nodo 1: PO Agent]")
+    print("\n  [Nodo 1: PO Agent]")
     print(f"    Analizando issue #{issue['id']}...")
-    print(f"    → User Stories definidas:")
+    print("    → User Stories definidas:")
     print(f"      AS a developer, I WANT {issue['title'].lower()}")
-    print(f"      SO THAT the system handles rate limits gracefully")
-    print(f"    → Criterios de aceptación extraídos: {len(issue['description'].split(chr(10)))} líneas")
+    print("      SO THAT the system handles rate limits gracefully")
+    print(
+        f"    → Criterios de aceptación extraídos: {len(issue['description'].split(chr(10)))} líneas"
+    )
 
-    print(f"\n  [Nodo 2: Architect Agent]")
+    print("\n  [Nodo 2: Architect Agent]")
     print(f"    Diseñando arquitectura para: {issue['title'][:50]}...")
     arch_patterns = {
         "rate limiting": "Token Bucket + CircuitBreaker pattern",
@@ -205,57 +210,57 @@ def simulate_dev_pipeline(issue: dict) -> None:
         "CLI tool": "Command pattern + Observer (streaming)",
     }
     pattern = next(
-        (v for k, v in arch_patterns.items() if k in issue['title'].lower()),
-        "Adapter + Factory pattern"
+        (v for k, v in arch_patterns.items() if k in issue["title"].lower()),
+        "Adapter + Factory pattern",
     )
     print(f"    → Patrón arquitectural: {pattern}")
-    print(f"    → Módulos identificados: 3-4 módulos")
-    print(f"    → Interfaces definidas: Protocol classes con type hints")
+    print("    → Módulos identificados: 3-4 módulos")
+    print("    → Interfaces definidas: Protocol classes con type hints")
 
-    print(f"\n  [Nodo 3: Developer Agent]")
-    print(f"    Implementando código...")
+    print("\n  [Nodo 3: Developer Agent]")
+    print("    Implementando código...")
     complexity_map = {"high": "~250 líneas", "medium": "~150 líneas", "low": "~80 líneas"}
-    lines = complexity_map.get(issue['complexity'], "~120 líneas")
+    lines = complexity_map.get(issue["complexity"], "~120 líneas")
     print(f"    → Código generado: {lines} de Python")
-    print(f"    → Type annotations: 100% (mypy strict)")
-    print(f"    → Docstrings: Google style en todas las funciones públicas")
+    print("    → Type annotations: 100% (mypy strict)")
+    print("    → Docstrings: Google style en todas las funciones públicas")
 
-    print(f"\n  [Nodo 4: Unit Test Agent]")
-    cov = {"high": 94, "medium": 91, "low": 88}[issue['complexity']]
-    print(f"    Escribiendo tests con pytest + pytest-asyncio...")
+    print("\n  [Nodo 4: Unit Test Agent]")
+    cov = {"high": 94, "medium": 91, "low": 88}[issue["complexity"]]
+    print("    Escribiendo tests con pytest + pytest-asyncio...")
     print(f"    → Tests generados: {cov // 10 + 2} test cases")
     print(f"    → Cobertura estimada: {cov}%")
-    print(f"    → Mock de LLM providers: sí (sin llamadas reales)")
+    print("    → Mock de LLM providers: sí (sin llamadas reales)")
 
-    print(f"\n  [Nodo 4b: Parallel Unit Tester] (módulos en paralelo)")
-    n_modules = {"high": 4, "medium": 3, "low": 2}[issue['complexity']]
+    print("\n  [Nodo 4b: Parallel Unit Tester] (módulos en paralelo)")
+    n_modules = {"high": 4, "medium": 3, "low": 2}[issue["complexity"]]
     print(f"    module_dispatcher → {n_modules} workers en paralelo")
     for i in range(1, n_modules + 1):
         print(f"      Worker {i}: tests del módulo_{i} → PASS ✓")
     print(f"    dev_test_aggregator → {n_modules}/{n_modules} módulos OK")
 
-    print(f"\n  [Test Gate]")
-    print(f"    → Todos los tests pasan ✓ → avanza a QA")
+    print("\n  [Test Gate]")
+    print("    → Todos los tests pasan ✓ → avanza a QA")
 
-    print(f"\n  [Nodo 5: QA Agent]")
-    print(f"    Tests de integración y edge cases...")
-    print(f"    → Tests de integración: PASS ✓")
-    print(f"    → Edge cases probados: inputs vacíos, timeouts, errores de red")
-    print(f"    → Regresión con suite completa: PASS ✓")
+    print("\n  [Nodo 5: QA Agent]")
+    print("    Tests de integración y edge cases...")
+    print("    → Tests de integración: PASS ✓")
+    print("    → Edge cases probados: inputs vacíos, timeouts, errores de red")
+    print("    → Regresión con suite completa: PASS ✓")
 
-    print(f"\n  [Nodo 6: Reviewer Agent]")
-    review_score = {"high": 0.88, "medium": 0.85, "low": 0.92}[issue['complexity']]
-    print(f"    Code review con checklist de calidad...")
+    print("\n  [Nodo 6: Reviewer Agent]")
+    review_score = {"high": 0.88, "medium": 0.85, "low": 0.92}[issue["complexity"]]
+    print("    Code review con checklist de calidad...")
     print(f"    → Puntuación de calidad: {review_score:.2f}/1.0")
     passed = review_score >= 0.8
     print(f"    → Review gate (>= 0.8): {'PASS ✓' if passed else 'FAIL ✗ → vuelve a Developer'}")
 
-    print(f"\n  [Review Gate → HITL Approval Seed]")
-    print(f"    Artefacto guardado en metadata['dev_pipeline']['code_artifact']")
+    print("\n  [Review Gate → HITL Approval Seed]")
+    print("    Artefacto guardado en metadata['dev_pipeline']['code_artifact']")
     print(f"    Risk level: {'HIGH' if issue['priority'] == 'high' else 'MEDIUM'}")
 
-    print(f"\n  [HITL Gate] (hitl_enabled=False → bypass automático)")
-    print(f"    → Aprobación automática → END ✓")
+    print("\n  [HITL Gate] (hitl_enabled=False → bypass automático)")
+    print("    → Aprobación automática → END ✓")
 
     print(f"\n  Pipeline completado para issue #{issue['id']}")
 
@@ -281,8 +286,6 @@ async def main() -> None:
         ("[HITL Gate]     ", "approve → END | reject → developer | bypass si hitl=False"),
     ]
     for node, desc in nodes:
-        is_gate = "[" in node
-        prefix = "  ├──" if not is_gate else "  │  "
         print(f"  {node}: {desc}")
 
     print(f"\n[Issues a desarrollar: {len(GITHUB_ISSUES)}]")
@@ -294,7 +297,9 @@ async def main() -> None:
     for issue in GITHUB_ISSUES:
         print(f"\n{'═' * 70}")
         print(f"  Feature: {issue['title']}")
-        print(f"  Issue: #{issue['id']} | Prioridad: {issue['priority']} | Complejidad: {issue['complexity']}")
+        print(
+            f"  Issue: #{issue['id']} | Prioridad: {issue['priority']} | Complejidad: {issue['complexity']}"
+        )
         print(f"  Estimación: {issue['estimated_hours']}h")
         print(f"{'─' * 70}")
 
@@ -304,22 +309,26 @@ async def main() -> None:
                 messages = final_state.get("messages", [])
                 pipeline_meta = final_state.get("metadata", {}).get("dev_pipeline", {})
 
-                print(f"\n  [Resultado real del pipeline]")
+                print("\n  [Resultado real del pipeline]")
                 if pipeline_meta:
                     print(f"    Iteraciones de desarrollo : {pipeline_meta.get('iteration', 1)}")
-                    print(f"    Score de revisión        : {pipeline_meta.get('review_result', {}).get('score', 'N/A')}")
-                    print(f"    Artefacto generado       : {bool(pipeline_meta.get('code_artifact'))}")
+                    print(
+                        f"    Score de revisión        : {pipeline_meta.get('review_result', {}).get('score', 'N/A')}"
+                    )
+                    print(
+                        f"    Artefacto generado       : {bool(pipeline_meta.get('code_artifact'))}"
+                    )
 
                 if messages:
                     last_msg = str(messages[-1].content)
-                    print(f"\n  Output final:")
+                    print("\n  Output final:")
                     print(f"  {last_msg[:400]}")
 
             except Exception as exc:
                 print(f"  [Modo simulado — razón: {type(exc).__name__}]")
                 simulate_dev_pipeline(issue)
         else:
-            print(f"  [Modo simulado — subgraph no disponible]")
+            print("  [Modo simulado — subgraph no disponible]")
             simulate_dev_pipeline(issue)
 
     # Resumen y comparativa con desarrollo manual
@@ -341,16 +350,16 @@ async def main() -> None:
     for phase, manual, pipeline in phases:
         print(f"  {phase}: {manual:>10} → {pipeline}")
 
-    print(f"\n  Quality Gates garantizan:")
-    print(f"    ✓ Tests siempre pasan antes de QA")
-    print(f"    ✓ Code review score >= 0.8 antes de aprobar")
-    print(f"    ✓ Aprobación humana opcional (HITL) para cambios críticos")
-    print(f"    ✓ Máximo 3 iteraciones por gate (anti-bucle infinito)")
+    print("\n  Quality Gates garantizan:")
+    print("    ✓ Tests siempre pasan antes de QA")
+    print("    ✓ Code review score >= 0.8 antes de aprobar")
+    print("    ✓ Aprobación humana opcional (HITL) para cambios críticos")
+    print("    ✓ Máximo 3 iteraciones por gate (anti-bucle infinito)")
 
-    print(f"\n[Configuración HITL]")
-    print(f"  hitl_enabled=True  → pausa y espera aprobación humana")
-    print(f"  hitl_enabled=False → bypass automático (CI/CD mode)")
-    print(f"  risk_level HIGH/MEDIUM/LOW → visible en el payload del interrupt")
+    print("\n[Configuración HITL]")
+    print("  hitl_enabled=True  → pausa y espera aprobación humana")
+    print("  hitl_enabled=False → bypass automático (CI/CD mode)")
+    print("  risk_level HIGH/MEDIUM/LOW → visible en el payload del interrupt")
 
 
 if __name__ == "__main__":

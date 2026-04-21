@@ -898,8 +898,7 @@ class Settings(BaseSettings):
         ge=1,
         le=10,
         description=(
-            "Per-principle cap on revision attempts before marking "
-            "``max_revisions_reached=True``."
+            "Per-principle cap on revision attempts before marking ``max_revisions_reached=True``."
         ),
     )
     constitutional_principles: list[str] = Field(
@@ -910,7 +909,7 @@ class Settings(BaseSettings):
             "(``P001 no_harmful_content``, ``P002 factual_accuracy``, "
             "``P003 no_pii_exposure``). Custom deployments may override with "
             "their own list via env var as a JSON array: "
-            "``LIGHTAGENT_CONSTITUTIONAL_PRINCIPLES='[\"P001\",\"custom-P999\"]'``."
+            '``LIGHTAGENT_CONSTITUTIONAL_PRINCIPLES=\'["P001","custom-P999"]\'``.'
         ),
     )
 

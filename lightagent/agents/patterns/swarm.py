@@ -114,14 +114,11 @@ async def swarm_handoff(
         ValueError: For self-handoff or a target outside ``valid_targets``.
     """
     if current_agent == target_agent:
-        raise ValueError(
-            f"self-handoff not allowed ({current_agent!r} → {target_agent!r})"
-        )
+        raise ValueError(f"self-handoff not allowed ({current_agent!r} → {target_agent!r})")
     targets = valid_targets if valid_targets is not None else VALID_HANDOFF_TARGETS
     if target_agent not in targets:
         raise ValueError(
-            f"{target_agent!r} is not a valid handoff target "
-            f"(allowed: {sorted(targets)})"
+            f"{target_agent!r} is not a valid handoff target (allowed: {sorted(targets)})"
         )
 
     otel = OTelManager()

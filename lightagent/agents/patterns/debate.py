@@ -179,9 +179,7 @@ async def debate_round(
             resolved_roles.append(f"analyst_{len(resolved_roles)}")
     else:
         if len(roles) != n_agents:
-            raise ValueError(
-                f"len(roles)={len(roles)} does not match n_agents={n_agents}"
-            )
+            raise ValueError(f"len(roles)={len(roles)} does not match n_agents={n_agents}")
         resolved_roles = list(roles)
 
     otel = OTelManager()
@@ -272,9 +270,7 @@ async def _generate_position(
     prior_positions: list[DebatePosition],
 ) -> str:
     system = (
-        _POSITION_PROMPT.format(role=role)
-        if round_idx == 1
-        else _REPLY_PROMPT.format(role=role)
+        _POSITION_PROMPT.format(role=role) if round_idx == 1 else _REPLY_PROMPT.format(role=role)
     )
     user_parts: list[str] = [f"Query: {query}"]
     if prior_positions:
@@ -303,9 +299,7 @@ async def _synthesise(
         return counts.most_common(1)[0][0]
 
     # moderator or weighted: call the LLM moderator.
-    positions_text = "\n\n".join(
-        f"[{p.role}] {p.content}" for p in positions
-    )
+    positions_text = "\n\n".join(f"[{p.role}] {p.content}" for p in positions)
     user = f"Query: {query}\n\nFinal positions:\n{positions_text}"
     builder = SecurePromptBuilder()
     messages = builder.build(system=_MODERATOR_PROMPT, user=user)

@@ -28,9 +28,7 @@ async def _default_suggester(_code: str, _issues: list[CodeIssue]) -> list[str]:
 
 
 def make_suggester_node(
-    suggester_fn: (
-        Callable[[str, list[CodeIssue]], Awaitable[list[str]]] | None
-    ) = None,
+    suggester_fn: (Callable[[str, list[CodeIssue]], Awaitable[list[str]]] | None) = None,
 ) -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:
     """Return an async LangGraph node that derives remediation suggestions."""
     fn = suggester_fn or _default_suggester

@@ -36,6 +36,7 @@ import tempfile
 from pathlib import Path
 
 from lightagent.rag.hierarchical import HierarchicalRAGEngine, HierarchicalSearchResult
+from lightagent.rag.vector_store import ChromaVectorStore
 
 # ── Dataset: extractos de contratos CUAD ─────────────────────────────────────
 # Cláusulas reales de contratos comerciales anotadas en CUAD.
@@ -218,24 +219,28 @@ def print_hierarchical_result(question: dict, result: HierarchicalSearchResult) 
     print(f"  Contrato relevante: {question['relevant_contract']}")
     print(f"  Cláusula: {question['clause_type']}")
 
-    print(f"\n  Chunks recuperados (hijo → padre):")
+    print("\n  Chunks recuperados (hijo → padre):")
     for i, chunk in enumerate(result.chunks[:3]):
-        print(f"\n  [{i+1}] Score: {chunk.relevance_score:.3f}")
-        print(f"  Contenido HIJO (granular, ~100 chars):")
+        print(f"\n  [{i + 1}] Score: {chunk.relevance_score:.3f}")
+        print("  Contenido HIJO (granular, ~100 chars):")
         child_content = chunk.content[:150]
         print(f"    '{child_content}...'")
 
         # El chunk padre está en los metadatos
-        parent_content = chunk.metadata.get("parent_content", "") if hasattr(chunk, 'metadata') else ""
+        parent_content = (
+            chunk.metadata.get("parent_content", "") if hasattr(chunk, "metadata") else ""
+        )
         if parent_content:
-            print(f"  Contenido PADRE (contexto completo, ~500 chars):")
+            print("  Contenido PADRE (contexto completo, ~500 chars):")
             print(f"    '{parent_content[:200]}...'")
 
     # Verificar si el keyword esperado está en los resultados
     all_text = " ".join(c.content.lower() for c in result.chunks[:3])
     expected_kw = question["expected_keyword"].lower()
     found = expected_kw in all_text
-    print(f"\n  Keyword esperado ('{question['expected_keyword']}'): {'✓ encontrado' if found else '✗ no encontrado'}")
+    print(
+        f"\n  Keyword esperado ('{question['expected_keyword']}'): {'✓ encontrado' if found else '✗ no encontrado'}"
+    )
     print("─" * 70)
 
 
@@ -256,7 +261,7 @@ async def main() -> None:
     # Inicialización
     print("\n[Indexando contratos CUAD]")
     engine = await setup_hierarchical_rag()
-    print(f"  ✓ Motor Hierarchical RAG listo")
+    print("  ✓ Motor Hierarchical RAG listo")
 
     # Ejecutar preguntas
     print(f"\n[Ejecutando {len(CUAD_QUESTIONS)} preguntas sobre cláusulas contractuales]")
@@ -272,13 +277,16 @@ async def main() -> None:
 
     # Resumen
     accuracy = correct / len(CUAD_QUESTIONS)
-    print(f"\n[Resumen]")
+    print("\n[Resumen]")
     print(f"  Keywords encontrados: {correct}/{len(CUAD_QUESTIONS)} ({accuracy:.0%})")
 
     print("\n[Ventajas del chunking jerárquico para documentos legales]")
     advantages = [
         ("Precisión", "Los chunks pequeños hacen match exacto con términos legales específicos"),
-        ("Contexto", "El párrafo padre proporciona el contexto necesario para interpretar la cláusula"),
+        (
+            "Contexto",
+            "El párrafo padre proporciona el contexto necesario para interpretar la cláusula",
+        ),
         ("Sin truncamiento", "No se pierde contexto crítico al generar la respuesta"),
         ("Escalabilidad", "Funciona para contratos de 100+ páginas sin degradación"),
     ]
@@ -286,9 +294,11 @@ async def main() -> None:
         print(f"  • {name:15s}: {desc}")
 
     print("\n[Comparativa de tamaños de chunk]")
-    print(f"  Chunk hijo : ~100 chars → alta precisión de búsqueda")
-    print(f"  Chunk padre: ~500 chars → contexto suficiente para generación")
-    print(f"  Documento  : {max(len(c['content']) for c in CUAD_CONTRACTS)} chars máx → sin límite de indexación")
+    print("  Chunk hijo : ~100 chars → alta precisión de búsqueda")
+    print("  Chunk padre: ~500 chars → contexto suficiente para generación")
+    print(
+        f"  Documento  : {max(len(c['content']) for c in CUAD_CONTRACTS)} chars máx → sin límite de indexación"
+    )
 
 
 if __name__ == "__main__":

@@ -30,7 +30,6 @@ Uso:
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 from langchain_core.documents import Document
 
@@ -195,17 +194,18 @@ async def run_crag_query(
     Returns:
         CRAGResult con respuesta y fuentes.
     """
-    result = await pipeline.run(question["question"])
-    return result
+    return await pipeline.run(question["question"])
 
 
 def print_crag_result(question: dict, result: CRAGResult) -> None:
     """Imprime los resultados CRAG de forma estructurada."""
     print(f"\n[{question['id']}] {question['question']}")
 
-    print(f"\n  Fuentes recuperadas y calificadas:")
+    print("\n  Fuentes recuperadas y calificadas:")
     for chunk in result.sources:
-        score_bar = "█" * int(chunk.relevance_score * 10) + "░" * (10 - int(chunk.relevance_score * 10))
+        score_bar = "█" * int(chunk.relevance_score * 10) + "░" * (
+            10 - int(chunk.relevance_score * 10)
+        )
         print(
             f"    [{score_bar}] {chunk.relevance_score:.2f} — "
             f"{chunk.source} (chunk {chunk.chunk_id})"
@@ -217,7 +217,7 @@ def print_crag_result(question: dict, result: CRAGResult) -> None:
         relevant_count = len([c for c in result.sources if c.relevance_score >= 0.5])
         print(f"  ✓ {relevant_count} chunks relevantes (score >= 0.5)")
 
-    print(f"\n  Respuesta CRAG:")
+    print("\n  Respuesta CRAG:")
     print(f"  {result.answer[:400]}")
 
     # Verificar si la fuente esperada fue usada
@@ -241,8 +241,8 @@ async def main() -> None:
 
     # Crear pipeline CRAG
     pipeline = CRAGPipeline(vector_store=store)
-    print(f"  ✓ Pipeline CRAG inicializado")
-    print(f"  Umbral de relevancia: 0.5 (chunks con score < 0.5 se descartan)")
+    print("  ✓ Pipeline CRAG inicializado")
+    print("  Umbral de relevancia: 0.5 (chunks con score < 0.5 se descartan)")
 
     # Ejecutar queries
     print(f"\n[Queries sobre {len(SQUAD_QUESTIONS)} preguntas SQuAD]")
@@ -259,7 +259,9 @@ async def main() -> None:
         "¿Cuáles son los mejores restaurantes de sushi en Tokio con estrellas Michelin?"
     )
     print(f"  Fallback activado: {off_topic_result.used_web_fallback}")
-    print(f"  Fuente fallback: {off_topic_result.sources[0].source if off_topic_result.sources else 'N/A'}")
+    print(
+        f"  Fuente fallback: {off_topic_result.sources[0].source if off_topic_result.sources else 'N/A'}"
+    )
 
     # Resumen del pipeline CRAG
     print("\n[Flujo CRAG — 5 pasos]")

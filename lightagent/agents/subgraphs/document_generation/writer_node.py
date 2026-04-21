@@ -41,8 +41,7 @@ def make_writer_node(
             return {}
 
         sections_blob = "\n\n".join(
-            f"## {title}\n{research.get(title, '(no notes)')}"
-            for title in outline
+            f"## {title}\n{research.get(title, '(no notes)')}" for title in outline
         )
         user = f"Outline + notes:\n\n{sections_blob}"
         builder = SecurePromptBuilder()

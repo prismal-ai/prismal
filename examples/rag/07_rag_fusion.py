@@ -186,13 +186,14 @@ async def setup_rag_fusion(n_queries: int = 4) -> RAGFusionEngine:
     ]
 
     store.add_documents(docs)
-    print(f"  ✓ {len(docs)} documentos BEIR indexados ({len(set(d['corpus'] for d in BEIR_DOCUMENTS))} corpora)")
+    print(
+        f"  ✓ {len(docs)} documentos BEIR indexados ({len({d['corpus'] for d in BEIR_DOCUMENTS})} corpora)"
+    )
 
-    engine = RAGFusionEngine(
+    return RAGFusionEngine(
         vector_store=store,
         n_queries=n_queries,  # número de variaciones de query a generar
     )
-    return engine
 
 
 def print_fusion_result(query_info: dict, result: FusionResult) -> None:
@@ -204,12 +205,14 @@ def print_fusion_result(query_info: dict, result: FusionResult) -> None:
     for i, q in enumerate(result.queries, 1):
         print(f"    {i}. {q}")
 
-    print(f"\n  Per-query results:")
-    for i, (query, chunks) in enumerate(zip(result.queries, result.per_query_results)):
+    print("\n  Per-query results:")
+    for i, (_query, chunks) in enumerate(
+        zip(result.queries, result.per_query_results, strict=False)
+    ):
         top_sources = [c.source for c in chunks[:3]]
-        print(f"    Q{i+1}: top-3 → {top_sources}")
+        print(f"    Q{i + 1}: top-3 → {top_sources}")
 
-    print(f"\n  Ranking fusionado (RRF score):")
+    print("\n  Ranking fusionado (RRF score):")
     for chunk in result.chunks[:5]:
         expected_mark = "→ " if chunk.source == query_info["expected_source"] else "  "
         print(f"    {expected_mark}[{chunk.relevance_score:.4f}] {chunk.source}")
@@ -244,9 +247,12 @@ def demo_rrf_formula() -> None:
 
     for doc, r1, r2, r3 in scenarios:
         rrf = 0.0
-        if r1: rrf += 1 / (k + r1)
-        if r2: rrf += 1 / (k + r2)
-        if r3: rrf += 1 / (k + r3)
+        if r1:
+            rrf += 1 / (k + r1)
+        if r2:
+            rrf += 1 / (k + r2)
+        if r3:
+            rrf += 1 / (k + r3)
 
         r1_str = str(r1) if r1 else "—"
         r2_str = str(r2) if r2 else "—"
@@ -259,12 +265,13 @@ def demo_rrf_formula() -> None:
 
     # Demostrar la función reciprocal_rank_fusion directamente
     from lightagent.rag.crag import RetrievedChunk
+
     sample_lists = [
         [RetrievedChunk("s1", "0", 0.9, "text1"), RetrievedChunk("s2", "1", 0.8, "text2")],
         [RetrievedChunk("s2", "1", 0.7, "text2"), RetrievedChunk("s1", "0", 0.6, "text1")],
     ]
     fused = reciprocal_rank_fusion(sample_lists, k=60)
-    print(f"\n  reciprocal_rank_fusion() demo:")
+    print("\n  reciprocal_rank_fusion() demo:")
     for chunk in fused:
         print(f"    {chunk.source}: RRF={chunk.relevance_score:.6f}")
 
@@ -280,7 +287,7 @@ async def main() -> None:
     # Configurar motor
     print("\n[Inicialización RAG-Fusion]")
     engine = await setup_rag_fusion(n_queries=4)
-    print(f"  ✓ RAG-Fusion listo (generará 4 variaciones por query)")
+    print("  ✓ RAG-Fusion listo (generará 4 variaciones por query)")
 
     # Ejecutar queries BEIR
     print(f"\n[Ejecutando {len(BEIR_QUERIES)} queries BEIR]")
@@ -296,7 +303,7 @@ async def main() -> None:
 
     # Resumen
     recall_at_3 = correct_count / len(BEIR_QUERIES)
-    print(f"\n[Resumen]")
+    print("\n[Resumen]")
     print(f"  Recall@3: {correct_count}/{len(BEIR_QUERIES)} ({recall_at_3:.0%})")
 
     print("\n[Ventajas de RAG-Fusion sobre RAG estándar]")

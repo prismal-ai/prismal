@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import TYPE_CHECKING
 
 from lightagent.agents.subgraphs.code_review.types import CodeIssue
 
@@ -45,6 +44,7 @@ try:
         build_code_review_subgraph,
         register_code_review,
     )
+
     CODE_REVIEW_AVAILABLE = True
 except ImportError:
     CODE_REVIEW_AVAILABLE = False
@@ -266,14 +266,15 @@ def save_results(data, filepath):
 # ── Pesos de severidad para el score (igual que report_generator_node) ────────
 SEVERITY_WEIGHTS: dict[str, float] = {
     "critical": 0.40,
-    "high":     0.20,
-    "medium":   0.10,
-    "low":      0.05,
-    "info":     0.01,
+    "high": 0.20,
+    "medium": 0.10,
+    "low": 0.05,
+    "info": 0.01,
 }
 
 
 # ── Callables inyectables para el subgraph ────────────────────────────────────
+
 
 async def heuristic_linter(code: str, filename: str) -> list[CodeIssue]:
     """Linter heurístico: detecta problemas de estilo y estructura."""
@@ -289,40 +290,46 @@ async def heuristic_linter(code: str, filename: str) -> list[CodeIssue]:
             next_line = lines[i].strip() if i < len(lines) else ""
             if not next_line.startswith('"""') and not next_line.startswith("'''"):
                 func_name = stripped.split("(")[0].replace("def ", "")
-                issues.append(CodeIssue(
-                    severity="low",
-                    category="style",
-                    description=f"Función `{func_name}` sin docstring.",
-                    file=filename,
-                    line=i,
-                    suggestion="Añade un docstring con Args/Returns según Google style.",
-                ))
+                issues.append(
+                    CodeIssue(
+                        severity="low",
+                        category="style",
+                        description=f"Función `{func_name}` sin docstring.",
+                        file=filename,
+                        line=i,
+                        suggestion="Añade un docstring con Args/Returns según Google style.",
+                    )
+                )
 
         # Magic numbers (excluir 0 y 1)
         magic = re.findall(r"\b(\d{2,}(?:\.\d+)?)\b", stripped)
         if magic and not stripped.startswith("#") and not stripped.startswith('"""'):
             for num in magic:
                 if num not in ("10", "16", "32", "64", "128", "256"):
-                    issues.append(CodeIssue(
-                        severity="info",
-                        category="style",
-                        description=f"Magic number `{num}` detectado.",
-                        file=filename,
-                        line=i,
-                        suggestion=f"Extrae `{num}` a una constante con nombre descriptivo.",
-                    ))
+                    issues.append(
+                        CodeIssue(
+                            severity="info",
+                            category="style",
+                            description=f"Magic number `{num}` detectado.",
+                            file=filename,
+                            line=i,
+                            suggestion=f"Extrae `{num}` a una constante con nombre descriptivo.",
+                        )
+                    )
                     break  # un issue por línea es suficiente
 
         # Líneas demasiado largas (>99 chars)
         if len(line) > 99:
-            issues.append(CodeIssue(
-                severity="info",
-                category="style",
-                description=f"Línea {i} excede 99 caracteres ({len(line)} chars).",
-                file=filename,
-                line=i,
-                suggestion="Divide la expresión o usa paréntesis para continuar en la siguiente línea.",
-            ))
+            issues.append(
+                CodeIssue(
+                    severity="info",
+                    category="style",
+                    description=f"Línea {i} excede 99 caracteres ({len(line)} chars).",
+                    file=filename,
+                    line=i,
+                    suggestion="Divide la expresión o usa paréntesis para continuar en la siguiente línea.",
+                )
+            )
 
     return issues
 
@@ -336,42 +343,48 @@ async def heuristic_scanner(code: str, filename: str) -> list[CodeIssue]:
         # SQL injection: concatenación de strings en queries
         (
             r"""(execute|cursor\.execute)\s*\(\s*["'][^"']*["']\s*\+""",
-            "critical", "security",
+            "critical",
+            "security",
             "SQL injection: interpolación directa de variables en query.",
             "Usa consultas parametrizadas: cursor.execute(sql, (param,))",
         ),
         # Credenciales hardcodeadas
         (
             r"""(?i)(password|secret|api_key|token|credential)\s*=\s*["'][^"']{6,}["']""",
-            "critical", "security",
+            "critical",
+            "security",
             "Credencial hardcodeada en el código fuente.",
             "Usa variables de entorno: os.environ.get('SECRET_KEY') o python-dotenv.",
         ),
         # pickle.loads
         (
             r"""pickle\.loads?\s*\(""",
-            "high", "security",
+            "high",
+            "security",
             "Deserialización insegura con pickle: puede ejecutar código arbitrario.",
             "Usa json.loads() para datos no confiables o valida el origen con firmado HMAC.",
         ),
         # yaml.load sin Loader
         (
             r"""yaml\.load\s*\([^,)]+\)""",
-            "high", "security",
+            "high",
+            "security",
             "yaml.load() sin Loader puede ejecutar código arbitrario.",
             "Usa yaml.safe_load() para datos no confiables.",
         ),
         # subprocess con shell=True
         (
             r"""subprocess\.(run|call|Popen)\s*\([^)]*shell\s*=\s*True""",
-            "high", "security",
+            "high",
+            "security",
             "subprocess con shell=True: vulnerable a shell injection.",
             "Pasa los argumentos como lista: subprocess.run(['cmd', arg]) con shell=False.",
         ),
         # requests sin timeout
         (
             r"""requests\.(get|post|put|delete|patch)\s*\([^)]*\)(?!\s*\.|\s*,\s*timeout)""",
-            "medium", "security",
+            "medium",
+            "security",
             "Llamada HTTP sin timeout: puede bloquearse indefinidamente.",
             "Añade timeout=30: requests.get(url, timeout=30)",
         ),
@@ -380,14 +393,16 @@ async def heuristic_scanner(code: str, filename: str) -> list[CodeIssue]:
     for pattern, severity, category, description, suggestion in patterns:
         for i, line in enumerate(lines, start=1):
             if re.search(pattern, line):
-                issues.append(CodeIssue(
-                    severity=severity,   # type: ignore[arg-type]
-                    category=category,   # type: ignore[arg-type]
-                    description=description,
-                    file=filename,
-                    line=i,
-                    suggestion=suggestion,
-                ))
+                issues.append(
+                    CodeIssue(
+                        severity=severity,  # type: ignore[arg-type]
+                        category=category,  # type: ignore[arg-type]
+                        description=description,
+                        file=filename,
+                        line=i,
+                        suggestion=suggestion,
+                    )
+                )
 
     return issues
 
@@ -401,64 +416,78 @@ async def heuristic_reviewer(code: str, filename: str) -> list[CodeIssue]:
         stripped = line.strip()
 
         # División sin comprobación de cero
-        if re.search(r"/\s*len\s*\(", stripped) and not re.search(r"if.*len", "".join(lines[max(0, i-4):i])):
-            issues.append(CodeIssue(
-                severity="high",
-                category="logic",
-                description="División por len() sin comprobar que la colección no esté vacía.",
-                file=filename,
-                line=i,
-                suggestion="Añade: if not numbers: return 0.0  (o raise ValueError) antes de dividir.",
-            ))
+        if re.search(r"/\s*len\s*\(", stripped) and not re.search(
+            r"if.*len", "".join(lines[max(0, i - 4) : i])
+        ):
+            issues.append(
+                CodeIssue(
+                    severity="high",
+                    category="logic",
+                    description="División por len() sin comprobar que la colección no esté vacía.",
+                    file=filename,
+                    line=i,
+                    suggestion="Añade: if not numbers: return 0.0  (o raise ValueError) antes de dividir.",
+                )
+            )
 
         # Acceso a índice [0] sin comprobación
-        if re.search(r"\w+\[0\]", stripped) and not re.search(r"if\s+\w+|len\(", "".join(lines[max(0, i-4):i])):
-            issues.append(CodeIssue(
-                severity="medium",
-                category="logic",
-                description="Acceso a índice [0] sin comprobar que la colección no esté vacía.",
-                file=filename,
-                line=i,
-                suggestion="Usa: items[0] if items else None  o comprueba len(items) > 0 antes.",
-            ))
+        if re.search(r"\w+\[0\]", stripped) and not re.search(
+            r"if\s+\w+|len\(", "".join(lines[max(0, i - 4) : i])
+        ):
+            issues.append(
+                CodeIssue(
+                    severity="medium",
+                    category="logic",
+                    description="Acceso a índice [0] sin comprobar que la colección no esté vacía.",
+                    file=filename,
+                    line=i,
+                    suggestion="Usa: items[0] if items else None  o comprueba len(items) > 0 antes.",
+                )
+            )
 
         # Condición duplicada/inalcanzable en elif
         if stripped.startswith("elif "):
             cond = stripped[5:].split(":")[0].strip()
             # Busca la misma condición en elif anteriores de la misma función
-            prev_block = "\n".join(lines[max(0, i - 20):i - 1])
+            prev_block = "\n".join(lines[max(0, i - 20) : i - 1])
             if f"elif {cond}" in prev_block or f"if {cond}" in prev_block:
-                issues.append(CodeIssue(
-                    severity="medium",
-                    category="logic",
-                    description=f"Condición `elif {cond}` duplicada/inalcanzable.",
-                    file=filename,
-                    line=i,
-                    suggestion="Elimina la rama duplicada o corrige la condición.",
-                ))
+                issues.append(
+                    CodeIssue(
+                        severity="medium",
+                        category="logic",
+                        description=f"Condición `elif {cond}` duplicada/inalcanzable.",
+                        file=filename,
+                        line=i,
+                        suggestion="Elimina la rama duplicada o corrige la condición.",
+                    )
+                )
 
         # Loop for i in range(len(...)) — anti-pattern
         if re.search(r"for\s+\w+\s+in\s+range\s*\(\s*len\s*\(", stripped):
-            issues.append(CodeIssue(
-                severity="low",
-                category="performance",
-                description="Loop `for i in range(len(x))` es menos pythónico y eficiente.",
-                file=filename,
-                line=i,
-                suggestion="Usa `for item in items:` o `for i, item in enumerate(items):`",
-            ))
+            issues.append(
+                CodeIssue(
+                    severity="low",
+                    category="performance",
+                    description="Loop `for i in range(len(x))` es menos pythónico y eficiente.",
+                    file=filename,
+                    line=i,
+                    suggestion="Usa `for item in items:` o `for i, item in enumerate(items):`",
+                )
+            )
 
         # Ausencia de tests (archivo sin 'def test_' y sin import pytest/unittest)
     if "def test_" not in code and "import pytest" not in code and "import unittest" not in code:
         if any(line.strip().startswith("def ") for line in lines):
-            issues.append(CodeIssue(
-                severity="medium",
-                category="test",
-                description="No se detectaron funciones de test para este módulo.",
-                file=filename,
-                line=None,
-                suggestion="Crea un archivo test_{filename} con pytest y cubre los casos límite.",
-            ))
+            issues.append(
+                CodeIssue(
+                    severity="medium",
+                    category="test",
+                    description="No se detectaron funciones de test para este módulo.",
+                    file=filename,
+                    line=None,
+                    suggestion="Crea un archivo test_{filename} con pytest y cubre los casos límite.",
+                )
+            )
 
     return issues
 
@@ -477,6 +506,7 @@ async def heuristic_suggester(code: str, issues: list[CodeIssue]) -> list[str]:
 
 # ── Cálculo de score (simula report_generator) ────────────────────────────────
 
+
 def compute_score(issues: list[CodeIssue]) -> float:
     """Calcula el score de revisión (1.0 = sin problemas)."""
     penalty = sum(SEVERITY_WEIGHTS.get(issue.severity, 0.0) for issue in issues)
@@ -484,6 +514,7 @@ def compute_score(issues: list[CodeIssue]) -> float:
 
 
 # ── Ejecución de la revisión ──────────────────────────────────────────────────
+
 
 async def run_code_review(snippet: dict, approval_threshold: float = 0.8) -> dict:
     """Ejecuta la revisión completa de un snippet de código.
@@ -547,8 +578,9 @@ async def run_code_review(snippet: dict, approval_threshold: float = 0.8) -> dic
         }
 
     # Modo real con subgraph
-    from lightagent.agents.state import initial_state
     from langchain_core.messages import HumanMessage
+
+    from lightagent.agents.state import initial_state
 
     await register_code_review(approval_threshold=approval_threshold)
     subgraph_def = build_code_review_subgraph(
@@ -596,23 +628,23 @@ def print_issue_table(issues: list[CodeIssue]) -> None:
 
     severity_icons = {
         "critical": "🔴",
-        "high":     "🟠",
-        "medium":   "🟡",
-        "low":      "🔵",
-        "info":     "⚪",
+        "high": "🟠",
+        "medium": "🟡",
+        "low": "🔵",
+        "info": "⚪",
     }
     category_labels = {
-        "security":    "SEC",
-        "logic":       "LOG",
-        "style":       "STY",
+        "security": "SEC",
+        "logic": "LOG",
+        "style": "STY",
         "performance": "PERF",
-        "test":        "TEST",
+        "test": "TEST",
     }
 
     for issue in issues:
         icon = severity_icons.get(issue.severity, "  ")
-        cat  = category_labels.get(issue.category, issue.category[:4].upper())
-        loc  = f"L{issue.line:3d}" if issue.line else "    "
+        cat = category_labels.get(issue.category, issue.category[:4].upper())
+        loc = f"L{issue.line:3d}" if issue.line else "    "
         print(f"    {icon} [{issue.severity:8s}] [{cat:4s}] {loc}  {issue.description[:60]}")
 
 
@@ -636,9 +668,11 @@ async def main() -> None:
     for node, desc in nodes:
         print(f"  {node}: {desc}")
     print()
-    print(f"  Score = 1.0 - Σ weight[severity]")
-    print(f"  Pesos: critical={SEVERITY_WEIGHTS['critical']}, high={SEVERITY_WEIGHTS['high']}, "
-          f"medium={SEVERITY_WEIGHTS['medium']}, low={SEVERITY_WEIGHTS['low']}, info={SEVERITY_WEIGHTS['info']}")
+    print("  Score = 1.0 - Σ weight[severity]")
+    print(
+        f"  Pesos: critical={SEVERITY_WEIGHTS['critical']}, high={SEVERITY_WEIGHTS['high']}, "
+        f"medium={SEVERITY_WEIGHTS['medium']}, low={SEVERITY_WEIGHTS['low']}, info={SEVERITY_WEIGHTS['info']}"
+    )
     print(f"  approved = (score >= {APPROVAL_THRESHOLD})")
 
     # Ejecutar revisiones
@@ -691,14 +725,22 @@ async def main() -> None:
     # ── Comparativa de severidades ────────────────────────────────────────────
     print("\n[Impacto en score por severidad de issue]")
     print(f"  Un solo issue crítico resta {SEVERITY_WEIGHTS['critical']:.0%} del score")
-    print(f"  → Con 1 crítico:  score={1.0 - SEVERITY_WEIGHTS['critical']:.2f}  "
-          f"{'✓' if (1.0 - SEVERITY_WEIGHTS['critical']) >= APPROVAL_THRESHOLD else '✗'}")
-    print(f"  → Con 2 altos:    score={1.0 - 2*SEVERITY_WEIGHTS['high']:.2f}  "
-          f"{'✓' if (1.0 - 2*SEVERITY_WEIGHTS['high']) >= APPROVAL_THRESHOLD else '✗'}")
-    print(f"  → Con 4 medios:   score={1.0 - 4*SEVERITY_WEIGHTS['medium']:.2f}  "
-          f"{'✓' if (1.0 - 4*SEVERITY_WEIGHTS['medium']) >= APPROVAL_THRESHOLD else '✗'}")
-    print(f"  → Con 10 bajos:   score={1.0 - 10*SEVERITY_WEIGHTS['low']:.2f}  "
-          f"{'✓' if (1.0 - 10*SEVERITY_WEIGHTS['low']) >= APPROVAL_THRESHOLD else '✗'}")
+    print(
+        f"  → Con 1 crítico:  score={1.0 - SEVERITY_WEIGHTS['critical']:.2f}  "
+        f"{'✓' if (1.0 - SEVERITY_WEIGHTS['critical']) >= APPROVAL_THRESHOLD else '✗'}"
+    )
+    print(
+        f"  → Con 2 altos:    score={1.0 - 2 * SEVERITY_WEIGHTS['high']:.2f}  "
+        f"{'✓' if (1.0 - 2 * SEVERITY_WEIGHTS['high']) >= APPROVAL_THRESHOLD else '✗'}"
+    )
+    print(
+        f"  → Con 4 medios:   score={1.0 - 4 * SEVERITY_WEIGHTS['medium']:.2f}  "
+        f"{'✓' if (1.0 - 4 * SEVERITY_WEIGHTS['medium']) >= APPROVAL_THRESHOLD else '✗'}"
+    )
+    print(
+        f"  → Con 10 bajos:   score={1.0 - 10 * SEVERITY_WEIGHTS['low']:.2f}  "
+        f"{'✓' if (1.0 - 10 * SEVERITY_WEIGHTS['low']) >= APPROVAL_THRESHOLD else '✗'}"
+    )
 
     # ── Uso con callables personalizados ─────────────────────────────────────
     print("\n[Uso con callables inyectables]")
@@ -717,12 +759,14 @@ async def main() -> None:
     # ── Comparativa Code Review manual vs pipeline ────────────────────────────
     print("\n[Code Review manual vs subgraph automatizado]")
     comparison = [
-        ("Manual (1 revisor)",     "15-60 min", "Parcial",    "Alta",  "Alta",   "Ninguna"),
-        ("Linter estático",        "< 1 s",     "Estilo/PEP8","Baja",  "Media",  "Ninguna"),
-        ("Bandit / SAST",          "< 5 s",     "Seguridad",  "Baja",  "Alta",   "Ninguna"),
-        ("Code Review Subgraph",   "5-30 s",    "Completa",   "Alta",  "Alta",   "Trazabilidad"),
+        ("Manual (1 revisor)", "15-60 min", "Parcial", "Alta", "Alta", "Ninguna"),
+        ("Linter estático", "< 1 s", "Estilo/PEP8", "Baja", "Media", "Ninguna"),
+        ("Bandit / SAST", "< 5 s", "Seguridad", "Baja", "Alta", "Ninguna"),
+        ("Code Review Subgraph", "5-30 s", "Completa", "Alta", "Alta", "Trazabilidad"),
     ]
-    header = f"  {'Método':<26} {'Tiempo':<11} {'Cobertura':<13} {'Recall':<8} {'Précis.':<8} {'Extra'}"
+    header = (
+        f"  {'Método':<26} {'Tiempo':<11} {'Cobertura':<13} {'Recall':<8} {'Précis.':<8} {'Extra'}"
+    )
     print(header)
     print("  " + "─" * 75)
     for method, time_, coverage, recall, prec, extra in comparison:

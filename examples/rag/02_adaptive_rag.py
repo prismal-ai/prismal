@@ -207,15 +207,13 @@ async def setup_adaptive_rag(collection_name: str = "adaptive_rag_example") -> A
     print(f"  ✓ Índice BM25 construido para {len(corpus)} documentos")
 
     # Motor Adaptive con todos los sub-motores disponibles
-    engine = AdaptiveRAGEngine(
+    return AdaptiveRAGEngine(
         crag_pipeline=crag,
         hyde_retriever=hyde,
         fusion_engine=fusion,
         hybrid_engine=hybrid,
         use_llm_classifier=False,  # clasificador regex (sin coste de LLM)
     )
-
-    return engine
 
 
 def print_adaptive_result(query_info: dict, result: AdaptiveResult) -> None:
@@ -227,8 +225,7 @@ def print_adaptive_result(query_info: dict, result: AdaptiveResult) -> None:
     print(f"  Dataset      : {query_info['dataset']}")
     print(f"  Tipo esperado: {query_info['query_type'].value}")
     print(
-        f"  Tipo detectado: {result.query_type.value}  {icon}"
-        f"  (confianza: {result.confidence:.2f})"
+        f"  Tipo detectado: {result.query_type.value}  {icon}  (confianza: {result.confidence:.2f})"
     )
     print(f"  Motor usado  : {result.strategy_used}")
     print(f"  Chunks obtenidos: {len(result.chunks)}")
@@ -246,7 +243,7 @@ async def main() -> None:
     # Configuración
     print("\n[Inicialización de sub-motores RAG]")
     engine = await setup_adaptive_rag()
-    print(f"  ✓ Motor Adaptive RAG listo con 4 sub-motores")
+    print("  ✓ Motor Adaptive RAG listo con 4 sub-motores")
 
     # Tabla de enrutamiento
     print("\n[Tabla de enrutamiento (clasificador regex)]")
@@ -280,9 +277,11 @@ async def main() -> None:
     # Resumen estadístico
     print("\n[Resumen estadístico]")
     accuracy = correct_classifications / len(ADAPTIVE_QUERIES)
-    print(f"  Clasificación correcta : {correct_classifications}/{len(ADAPTIVE_QUERIES)} ({accuracy:.0%})")
+    print(
+        f"  Clasificación correcta : {correct_classifications}/{len(ADAPTIVE_QUERIES)} ({accuracy:.0%})"
+    )
 
-    print(f"\n  Distribución de motores usados:")
+    print("\n  Distribución de motores usados:")
     for engine_name, count in sorted(engine_usage.items(), key=lambda x: -x[1]):
         bar = "█" * count
         print(f"    {engine_name:15s}: {bar} ({count})")

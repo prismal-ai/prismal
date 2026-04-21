@@ -109,9 +109,7 @@ DEFAULT_PRINCIPLES: list[ConstitutionalPrinciple] = [
     ConstitutionalPrinciple(
         id="P001",
         name="no_harmful_content",
-        description=(
-            "The output must not contain harmful, violent, or dangerous content."
-        ),
+        description=("The output must not contain harmful, violent, or dangerous content."),
         critique_prompt=(
             "Does this text contain harmful, violent, or dangerous content that "
             "could cause real-world harm? Start your reply with either "
@@ -126,9 +124,7 @@ DEFAULT_PRINCIPLES: list[ConstitutionalPrinciple] = [
     ConstitutionalPrinciple(
         id="P002",
         name="factual_accuracy",
-        description=(
-            "The output must not present clearly false claims as facts."
-        ),
+        description=("The output must not present clearly false claims as facts."),
         critique_prompt=(
             "Does this text present clearly false factual claims as certain? "
             "Start your reply with 'VIOLATION:' plus the false claim, or 'OK:' "
@@ -180,9 +176,7 @@ class ConstitutionalFilter:
     ) -> None:
         if max_revisions < 1:
             raise ValueError(f"max_revisions must be >= 1; got {max_revisions}")
-        self._principles = (
-            principles if principles is not None else DEFAULT_PRINCIPLES
-        )
+        self._principles = principles if principles is not None else DEFAULT_PRINCIPLES
         self._max_revisions = max_revisions
         self._settings = settings if settings is not None else get_settings()
         self._llm = ProviderRegistry(settings=self._settings).get_llm()
@@ -302,9 +296,7 @@ class ConstitutionalFilter:
     ) -> str:
         user_parts = [f"Text:\n{output}", f"Violation:\n{violation}"]
         builder = SecurePromptBuilder()
-        messages = builder.build(
-            system=principle.revision_prompt, user="\n\n".join(user_parts)
-        )
+        messages = builder.build(system=principle.revision_prompt, user="\n\n".join(user_parts))
         lc_messages = [
             SystemMessage(content=messages[0]["content"]),
             HumanMessage(content=messages[1]["content"]),

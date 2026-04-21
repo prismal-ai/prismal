@@ -28,15 +28,11 @@ logger = get_logger("lightagent.subgraphs.data_etl.validator")
 
 def make_validator_node(
     required_columns: list[str] | None = None,
-    validator_fn: (
-        Callable[[pl.DataFrame, dict[str, Any]], tuple[bool, list[str]]] | None
-    ) = None,
+    validator_fn: (Callable[[pl.DataFrame, dict[str, Any]], tuple[bool, list[str]]] | None) = None,
 ) -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:
     """Return an async LangGraph node that validates the extracted DataFrame."""
 
-    def _default_validator(
-        df: pl.DataFrame, _source: dict[str, Any]
-    ) -> tuple[bool, list[str]]:
+    def _default_validator(df: pl.DataFrame, _source: dict[str, Any]) -> tuple[bool, list[str]]:
         errors: list[str] = []
         if df.height == 0:
             errors.append("dataset is empty")
@@ -85,9 +81,7 @@ def make_etl_branching_gate() -> Callable[[dict[str, Any]], str]:
     """Conditional edge: route to transformer on pass, auditor on fail."""
 
     def gate(state: dict[str, Any]) -> str:
-        validation = (
-            (state.get("metadata") or {}).get("data_etl", {}).get("validation")
-        )
+        validation = (state.get("metadata") or {}).get("data_etl", {}).get("validation")
         if validation is None:
             return "auditor"
         return "transformer" if validation.get("passed") else "auditor"

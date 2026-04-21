@@ -47,18 +47,10 @@ _DESCRIPTION = (
 
 
 def build_code_review_subgraph(
-    linter_fn: (
-        Callable[[str, str], Awaitable[list[CodeIssue]]] | None
-    ) = None,
-    scanner_fn: (
-        Callable[[str, str], Awaitable[list[CodeIssue]]] | None
-    ) = None,
-    reviewer_fn: (
-        Callable[[str, str], Awaitable[list[CodeIssue]]] | None
-    ) = None,
-    suggester_fn: (
-        Callable[[str, list[CodeIssue]], Awaitable[list[str]]] | None
-    ) = None,
+    linter_fn: (Callable[[str, str], Awaitable[list[CodeIssue]]] | None) = None,
+    scanner_fn: (Callable[[str, str], Awaitable[list[CodeIssue]]] | None) = None,
+    reviewer_fn: (Callable[[str, str], Awaitable[list[CodeIssue]]] | None) = None,
+    suggester_fn: (Callable[[str, list[CodeIssue]], Awaitable[list[str]]] | None) = None,
     approval_threshold: float = 0.8,
     settings: Settings | None = None,
 ) -> SubgraphDefinition:

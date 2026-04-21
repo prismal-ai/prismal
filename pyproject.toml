@@ -282,6 +282,10 @@ max-complexity = 40
   "E402", "E501", "SIM117", "F841", "TC", "PT", "PTH",
   "RUF", "RET504", "B017", "B904",
 ]
+"examples/**/*.py" = [
+  "S311", "ANN", "ARG", "N806", "E501", "E741",
+  "RUF001", "RUF002", "RUF003", "SIM102", "F401",
+]
 "lightagent/skills/available/**/*.py" = ["S603", "S607"]
 "lightagent/skills/custom/**/*.py" = ["S603", "S607"]
 
@@ -389,3 +393,8 @@ exclude_dirs = ["tests", "lightagent/skills/custom"]
 skips = ["B101", "B104", "B608"]
 severity_level = "medium"
 confidence_level = "medium"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+]

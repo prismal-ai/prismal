@@ -97,9 +97,7 @@ class MixtureOfAgents:
         if not proposer_models:
             raise ValueError("proposer_models must be non-empty")
         if n_aggregator_layers < 1:
-            raise ValueError(
-                f"n_aggregator_layers must be >= 1; got {n_aggregator_layers}"
-            )
+            raise ValueError(f"n_aggregator_layers must be >= 1; got {n_aggregator_layers}")
         self._proposer_models = list(proposer_models)
         self._aggregator_model = aggregator_model or proposer_models[0]
         self._n_aggregator_layers = n_aggregator_layers
@@ -112,14 +110,10 @@ class MixtureOfAgents:
         with otel.start_span("moa.generate") as span:
             span.set_attribute("lightagent.moa.query_len", len(query))
             span.set_attribute("lightagent.moa.n_proposers", len(self._proposer_models))
-            span.set_attribute(
-                "lightagent.moa.n_aggregator_layers", self._n_aggregator_layers
-            )
+            span.set_attribute("lightagent.moa.n_aggregator_layers", self._n_aggregator_layers)
 
             registry = ProviderRegistry(settings=self._settings)
-            proposer_outputs, providers_used = await self._run_proposers(
-                registry, query
-            )
+            proposer_outputs, providers_used = await self._run_proposers(registry, query)
             if not proposer_outputs:
                 raise MoAError("All proposer models failed to produce an output")
 
@@ -171,9 +165,7 @@ class MixtureOfAgents:
         providers: list[str] = []
         for model, result in zip(self._proposer_models, results, strict=True):
             if isinstance(result, BaseException):
-                logger.warning(
-                    "moa_proposer_failed", model=model, error=str(result)
-                )
+                logger.warning("moa_proposer_failed", model=model, error=str(result))
                 continue
             outputs.append(result)
             providers.append(model)
@@ -190,12 +182,8 @@ class MixtureOfAgents:
         )
         return str(response.content).strip()
 
-    async def _aggregate(
-        self, llm: Any, query: str, proposals: list[str]
-    ) -> str:
-        proposals_text = "\n\n".join(
-            f"[Expert {i + 1}] {p}" for i, p in enumerate(proposals)
-        )
+    async def _aggregate(self, llm: Any, query: str, proposals: list[str]) -> str:
+        proposals_text = "\n\n".join(f"[Expert {i + 1}] {p}" for i, p in enumerate(proposals))
         user = f"Query: {query}\n\nExpert responses:\n{proposals_text}"
         builder = SecurePromptBuilder()
         messages = builder.build(system=_AGGREGATOR_PROMPT, user=user)

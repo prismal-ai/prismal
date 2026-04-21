@@ -174,12 +174,8 @@ async def test_consensus_synthesises_final_answer_and_agreement_score() -> None:
     state = _state()
     state["metadata"]["debate_consensus"] = {
         "positions": [
-            DebatePosition(
-                agent_id="a0", role="proponent", content="we should ship now", round=1
-            ),
-            DebatePosition(
-                agent_id="a1", role="opponent", content="we should wait", round=1
-            ),
+            DebatePosition(agent_id="a0", role="proponent", content="we should ship now", round=1),
+            DebatePosition(agent_id="a1", role="opponent", content="we should wait", round=1),
             DebatePosition(
                 agent_id="a2", role="moderator", content="ship with feature flag", round=1
             ),

@@ -167,9 +167,7 @@ def test_init_stores_config() -> None:
     settings = _make_settings()
     with patch(PROVIDER_REGISTRY_PATH) as mock_registry_cls:
         mock_registry_cls.return_value.get_llm.return_value = MagicMock()
-        engine = RAGFusionEngine(
-            vector_store=store, n_queries=5, rrf_k=30, settings=settings
-        )
+        engine = RAGFusionEngine(vector_store=store, n_queries=5, rrf_k=30, settings=settings)
     assert engine._store is store  # noqa: SLF001
     assert engine._n_queries == 5  # noqa: SLF001
     assert engine._rrf_k == 30  # noqa: SLF001
@@ -273,9 +271,7 @@ async def test_search_returns_fused_chunks() -> None:
         [(docA, 0.9), (docB, 0.8)],
     ]
     llm = MagicMock()
-    llm.ainvoke = AsyncMock(
-        return_value=_make_llm_response("1. v1\n2. v2\n3. v3")
-    )
+    llm.ainvoke = AsyncMock(return_value=_make_llm_response("1. v1\n2. v2\n3. v3"))
     with patch(PROVIDER_REGISTRY_PATH) as mock_registry_cls:
         mock_registry_cls.return_value.get_llm.return_value = llm
         engine = RAGFusionEngine(vector_store=store, n_queries=4, settings=_make_settings())

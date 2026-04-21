@@ -39,8 +39,6 @@ from __future__ import annotations
 
 import asyncio
 import io
-import tempfile
-from pathlib import Path
 from typing import Any
 
 import polars as pl
@@ -51,6 +49,7 @@ try:
         build_data_etl_subgraph,
         register_data_etl,
     )
+
     DATA_ETL_AVAILABLE = True
 except ImportError:
     DATA_ETL_AVAILABLE = False
@@ -116,38 +115,51 @@ REQUIRED_COLUMNS = ["PassengerId", "Survived", "Pclass", "Sex", "Age", "Fare"]
 
 TRANSFORMS = [
     # 1. Seleccionar columnas relevantes
-    {"op": "select", "columns": ["PassengerId", "Survived", "Pclass", "Sex", "Age",
-                                  "SibSp", "Parch", "Fare", "Embarked"]},
+    {
+        "op": "select",
+        "columns": [
+            "PassengerId",
+            "Survived",
+            "Pclass",
+            "Sex",
+            "Age",
+            "SibSp",
+            "Parch",
+            "Fare",
+            "Embarked",
+        ],
+    },
     # 2. Filtrar registros con tarifa válida (> 0)
     {"op": "filter", "column": "Fare", "operator": ">", "value": 0.0},
     # 3. Renombrar columnas a snake_case
-    {"op": "rename", "mapping": {
-        "PassengerId": "passenger_id",
-        "Survived":    "survived",
-        "Pclass":      "pclass",
-        "Sex":         "sex",
-        "Age":         "age",
-        "SibSp":       "sibsp",
-        "Parch":       "parch",
-        "Fare":        "fare",
-        "Embarked":    "embarked",
-    }},
+    {
+        "op": "rename",
+        "mapping": {
+            "PassengerId": "passenger_id",
+            "Survived": "survived",
+            "Pclass": "pclass",
+            "Sex": "sex",
+            "Age": "age",
+            "SibSp": "sibsp",
+            "Parch": "parch",
+            "Fare": "fare",
+            "Embarked": "embarked",
+        },
+    },
 ]
 
 
 # ── Callables inyectables ─────────────────────────────────────────────────────
 
+
 async def titanic_extractor(source: dict[str, Any]) -> pl.DataFrame:
     """Extractor que carga el dataset Titanic desde memoria (sin I/O)."""
     # En producción: source["path"] sería un CSV/Parquet real
     # Aquí usamos los datos incrustados para no requerir archivos externos
-    df = pl.read_csv(io.StringIO(TITANIC_CSV))
-    return df
+    return pl.read_csv(io.StringIO(TITANIC_CSV))
 
 
-def titanic_validator(
-    df: pl.DataFrame, source: dict[str, Any]
-) -> tuple[bool, list[str]]:
+def titanic_validator(df: pl.DataFrame, source: dict[str, Any]) -> tuple[bool, list[str]]:
     """Validator con análisis EDA: esquema, nulos, rangos."""
     errors: list[str] = []
 
@@ -205,6 +217,7 @@ async def titanic_transformer(
 
     # ── Paso 1: Aplicar transforms declarativos (select / filter / rename) ──
     from lightagent.agents.subgraphs.data_etl.transformer_node import _default_transformer
+
     current, base_log = _default_transformer(current, transforms)
     log.extend(base_log)
 
@@ -216,7 +229,9 @@ async def titanic_transformer(
             .agg(pl.col("age").median().alias("age_median"))
             .sort("pclass")
         )
-        median_map = dict(zip(medians["pclass"].to_list(), medians["age_median"].to_list()))
+        median_map = dict(
+            zip(medians["pclass"].to_list(), medians["age_median"].to_list(), strict=False)
+        )
         # Imputar nulos con la mediana de su clase
         current = current.with_columns(
             pl.when(pl.col("age").is_null())
@@ -224,7 +239,7 @@ async def titanic_transformer(
             .otherwise(pl.col("age"))
             .alias("age")
         )
-        nulls_filled = sum(1 for m in median_map.values() if m is not None)
+        sum(1 for m in median_map.values() if m is not None)
         log.append(f"impute_age_by_class: medianas={median_map}")
 
     # ── Paso 3 (Feature Engineering): codificar sexo como binario ────────────
@@ -237,17 +252,18 @@ async def titanic_transformer(
 
     # ── Paso 4 (Feature Engineering): tamaño de familia ──────────────────────
     if "sibsp" in current.columns and "parch" in current.columns:
-        current = current.with_columns(
-            (pl.col("sibsp") + pl.col("parch") + 1).alias("family_size")
-        )
+        current = current.with_columns((pl.col("sibsp") + pl.col("parch") + 1).alias("family_size"))
         log.append("feature_family_size = sibsp + parch + 1")
 
     # ── Paso 5 (Feature Engineering): grupo de edad ───────────────────────────
     if "age" in current.columns:
         current = current.with_columns(
-            pl.when(pl.col("age") < 13).then(pl.lit("child"))
-            .when(pl.col("age") < 18).then(pl.lit("teen"))
-            .when(pl.col("age") < 60).then(pl.lit("adult"))
+            pl.when(pl.col("age") < 13)
+            .then(pl.lit("child"))
+            .when(pl.col("age") < 18)
+            .then(pl.lit("teen"))
+            .when(pl.col("age") < 60)
+            .then(pl.lit("adult"))
             .otherwise(pl.lit("senior"))
             .alias("age_group")
         )
@@ -256,8 +272,10 @@ async def titanic_transformer(
     # ── Paso 6 (EDA): normalizar tarifa (log1p) ───────────────────────────────
     if "fare" in current.columns:
         import math
+
         current = current.with_columns(
-            pl.col("fare").map_elements(lambda x: math.log1p(x), return_dtype=pl.Float64)
+            pl.col("fare")
+            .map_elements(lambda x: math.log1p(x), return_dtype=pl.Float64)
             .alias("fare_log1p")
         )
         log.append("transform_fare: log1p(fare) → fare_log1p")
@@ -265,9 +283,7 @@ async def titanic_transformer(
     # ── Paso 7: imputar embarked con moda ────────────────────────────────────
     if "embarked" in current.columns:
         mode_val = current["embarked"].drop_nulls().mode()[0]
-        current = current.with_columns(
-            pl.col("embarked").fill_null(mode_val)
-        )
+        current = current.with_columns(pl.col("embarked").fill_null(mode_val))
         log.append(f"impute_embarked: mode='{mode_val}'")
 
     return current, log
@@ -281,6 +297,7 @@ async def memory_loader(df: pl.DataFrame, destination: dict[str, Any]) -> int:
 
 # ── EDA Helper: estadísticas del DataFrame ───────────────────────────────────
 
+
 def print_eda_summary(df: pl.DataFrame, title: str) -> None:
     """Imprime un resumen EDA del DataFrame."""
     print(f"\n  [{title}]")
@@ -290,22 +307,26 @@ def print_eda_summary(df: pl.DataFrame, title: str) -> None:
     # Nulos por columna
     null_info = [(c, df[c].null_count()) for c in df.columns if df[c].null_count() > 0]
     if null_info:
-        print(f"    Nulos   :")
+        print("    Nulos   :")
         for col, cnt in null_info:
             pct = cnt / df.height * 100
             print(f"      {col}: {cnt} ({pct:.1f}%)")
     else:
-        print(f"    Nulos   : ninguno ✓")
+        print("    Nulos   : ninguno ✓")
 
     # Estadísticas de columnas numéricas
-    num_cols = [c for c in df.columns if df[c].dtype in (pl.Float32, pl.Float64, pl.Int32, pl.Int64)]
+    num_cols = [
+        c for c in df.columns if df[c].dtype in (pl.Float32, pl.Float64, pl.Int32, pl.Int64)
+    ]
     if num_cols:
-        print(f"    Estadísticas numéricas:")
+        print("    Estadísticas numéricas:")
         for col in num_cols[:5]:  # máximo 5 columnas
             series = df[col].drop_nulls()
             if series.len() > 0:
-                print(f"      {col:15s}: min={series.min():.2f}  "
-                      f"median={series.median():.2f}  max={series.max():.2f}")
+                print(
+                    f"      {col:15s}: min={series.min():.2f}  "
+                    f"median={series.median():.2f}  max={series.max():.2f}"
+                )
 
 
 def print_survival_eda(df: pl.DataFrame) -> None:
@@ -326,7 +347,7 @@ def print_survival_eda(df: pl.DataFrame) -> None:
             .agg(pl.col("survived").mean().alias("survival_rate"))
             .sort("pclass")
         )
-        print(f"    Por clase de pasaje:")
+        print("    Por clase de pasaje:")
         for row in by_class.iter_rows(named=True):
             bar = "█" * int(row["survival_rate"] * 10)
             print(f"      Clase {row['pclass']}: {row['survival_rate']:.1%}  {bar}")
@@ -338,7 +359,7 @@ def print_survival_eda(df: pl.DataFrame) -> None:
             .agg(pl.col("survived").mean().alias("survival_rate"))
             .sort("sex_bin")
         )
-        print(f"    Por sexo (0=male, 1=female):")
+        print("    Por sexo (0=male, 1=female):")
         for row in by_sex.iter_rows(named=True):
             sex_label = "female" if row["sex_bin"] == 1 else "male  "
             bar = "█" * int(row["survival_rate"] * 10)
@@ -351,7 +372,7 @@ def print_survival_eda(df: pl.DataFrame) -> None:
             .agg(pl.col("survived").mean().alias("survival_rate"))
             .sort("survival_rate", descending=True)
         )
-        print(f"    Por grupo de edad:")
+        print("    Por grupo de edad:")
         for row in by_age.iter_rows(named=True):
             bar = "█" * int(row["survival_rate"] * 10)
             print(f"      {row['age_group']:8s}: {row['survival_rate']:.1%}  {bar}")
@@ -366,14 +387,17 @@ def print_survival_eda(df: pl.DataFrame) -> None:
             )
             .sort("family_size")
         )
-        print(f"    Por tamaño de familia (family_size):")
+        print("    Por tamaño de familia (family_size):")
         for row in by_family.iter_rows(named=True):
             bar = "█" * int(row["survival_rate"] * 10)
-            print(f"      size={row['family_size']:2d}  n={row['count']:3d}  "
-                  f"survival={row['survival_rate']:.1%}  {bar}")
+            print(
+                f"      size={row['family_size']:2d}  n={row['count']:3d}  "
+                f"survival={row['survival_rate']:.1%}  {bar}"
+            )
 
 
 # ── Ejecución del pipeline ────────────────────────────────────────────────────
+
 
 async def run_etl_pipeline() -> None:
     """Ejecuta el subgraph Data ETL sobre el dataset Titanic."""
@@ -395,9 +419,9 @@ async def run_etl_pipeline() -> None:
         print("\n  ── Nodo 2: validator (EDA + validación de esquema) ──")
         passed, errors = titanic_validator(df_raw, source)
         if passed:
-            print(f"    ✓ Validación aprobada — sin errores críticos")
+            print("    ✓ Validación aprobada — sin errores críticos")
         else:
-            print(f"    ✗ Validación fallida:")
+            print("    ✗ Validación fallida:")
             for e in errors:
                 print(f"      - {e}")
 
@@ -426,22 +450,29 @@ async def run_etl_pipeline() -> None:
         # Nodo 5: auditor
         print("\n  ── Nodo 5: auditor ──")
         null_before = sum(df_raw[c].null_count() for c in df_raw.columns)
-        null_after  = sum(df_transformed[c].null_count() for c in df_transformed.columns)
-        print(f"    Filas   : {df_raw.height} → {df_transformed.height} "
-              f"(Δ {df_transformed.height - df_raw.height:+d})")
-        print(f"    Columnas: {df_raw.width} → {df_transformed.width} "
-              f"(+{df_transformed.width - df_raw.width} features nuevas)")
-        print(f"    Nulos   : {null_before} → {null_after} "
-              f"({'✓ reducidos' if null_after < null_before else '= sin cambio'})")
-        print(f"    ✓ Pipeline completado exitosamente")
+        null_after = sum(df_transformed[c].null_count() for c in df_transformed.columns)
+        print(
+            f"    Filas   : {df_raw.height} → {df_transformed.height} "
+            f"(Δ {df_transformed.height - df_raw.height:+d})"
+        )
+        print(
+            f"    Columnas: {df_raw.width} → {df_transformed.width} "
+            f"(+{df_transformed.width - df_raw.width} features nuevas)"
+        )
+        print(
+            f"    Nulos   : {null_before} → {null_after} "
+            f"({'✓ reducidos' if null_after < null_before else '= sin cambio'})"
+        )
+        print("    ✓ Pipeline completado exitosamente")
 
         # EDA post-pipeline: análisis de supervivencia
         print_survival_eda(df_transformed)
         return
 
     # Modo real con subgraph LangGraph
-    from lightagent.agents.state import initial_state
     from langchain_core.messages import HumanMessage
+
+    from lightagent.agents.state import initial_state
 
     await register_data_etl()
     subgraph = build_data_etl_subgraph(
@@ -456,8 +487,8 @@ async def run_etl_pipeline() -> None:
     state["messages"] = [HumanMessage(content="Ejecuta el pipeline ETL sobre el dataset Titanic.")]
     state["metadata"] = {
         "data_etl": {
-            "source":      {"type": "inline", "name": "titanic"},
-            "transforms":  TRANSFORMS,
+            "source": {"type": "inline", "name": "titanic"},
+            "transforms": TRANSFORMS,
             "destination": {"type": "memory"},
         }
     }
@@ -479,6 +510,7 @@ async def run_etl_pipeline() -> None:
 
 # ── Demo de path de error: dataset con esquema incorrecto ─────────────────────
 
+
 async def demo_validation_failure() -> None:
     """Demuestra el gate de error cuando el dataset no pasa validación."""
     print("\n[Demo: path de error — dataset incorrecto]")
@@ -492,10 +524,10 @@ async def demo_validation_failure() -> None:
     print(f"  Dataset: {df_bad.height} filas, columnas={df_bad.columns}")
     print(f"  Resultado validación: {'✓ PASS' if passed else '✗ FAIL'}")
     if errors:
-        print(f"  Errores detectados:")
+        print("  Errores detectados:")
         for e in errors:
             print(f"    - {e}")
-    print(f"  → Gate redirige a auditor (error path) — transformer se omite")
+    print("  → Gate redirige a auditor (error path) — transformer se omite")
 
 
 async def main() -> None:
@@ -514,7 +546,6 @@ async def main() -> None:
         ("auditor    ", "Informe de calidad: shape, nulos, log de transforms"),
     ]
     for node, desc in steps:
-        prefix = "  ╔══ GATE" if "GATE" in node else "  ──────"
         print(f"  {node}: {desc}")
 
     # Pipeline principal: Titanic EDA

@@ -205,9 +205,7 @@ async def test_parallel_tasks_run_concurrently() -> None:
     async def joiner(goal, completed_tasks):
         return "joined"
 
-    compiler = _compiler(
-        plan_fn=plan_fn, tool_executor=slow_executor, joiner=joiner
-    )
+    compiler = _compiler(plan_fn=plan_fn, tool_executor=slow_executor, joiner=joiner)
 
     start = time.monotonic()
     result = await compiler.compile_and_run(goal="g", state={})
@@ -240,9 +238,7 @@ async def test_args_interpolate_prior_task_outputs() -> None:
     async def joiner(goal, completed_tasks):
         return "x"
 
-    compiler = _compiler(
-        plan_fn=plan_fn, tool_executor=tool_executor, joiner=joiner
-    )
+    compiler = _compiler(plan_fn=plan_fn, tool_executor=tool_executor, joiner=joiner)
     await compiler.compile_and_run(goal="g", state={})
 
     # By the time T2 ran, "$T1.output" must have been substituted.

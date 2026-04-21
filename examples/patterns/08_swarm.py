@@ -35,7 +35,6 @@ from typing import Any
 
 from lightagent.agents.patterns.swarm import (
     VALID_HANDOFF_TARGETS,
-    HandoffRecord,
     swarm_handoff,
 )
 
@@ -106,6 +105,7 @@ SUPPORT_TICKETS = [
 
 # ── Lógica de enrutamiento de agentes ────────────────────────────────────────
 
+
 def classify_intent(text: str) -> str:
     """Clasificador simple de intención basado en keywords.
 
@@ -122,16 +122,17 @@ def classify_intent(text: str) -> str:
 
     if any(kw in text_lower for kw in ["bug", "error", "exception", "500", "crash", "traceback"]):
         return "technical_bug"
-    elif any(kw in text_lower for kw in ["sql", "pandas", "dataframe", "análisis", "analizar", "informe"]):
+    if any(
+        kw in text_lower for kw in ["sql", "pandas", "dataframe", "análisis", "analizar", "informe"]
+    ):
         return "data_analysis"
-    elif any(kw in text_lower for kw in ["pedido", "entrega", "paquete", "envío", "tracking"]):
+    if any(kw in text_lower for kw in ["pedido", "entrega", "paquete", "envío", "tracking"]):
         return "order_support"
-    elif any(kw in text_lower for kw in ["planificar", "sprint", "priorizar", "roadmap", "features"]):
+    if any(kw in text_lower for kw in ["planificar", "sprint", "priorizar", "roadmap", "features"]):
         return "planning"
-    elif any(kw in text_lower for kw in ["código", "implementar", "función", "api", "endpoint"]):
+    if any(kw in text_lower for kw in ["código", "implementar", "función", "api", "endpoint"]):
         return "coding"
-    else:
-        return "general"
+    return "general"
 
 
 def decide_handoff(current_agent: str, intent: str, state: dict) -> tuple[str, str] | None:
@@ -207,7 +208,7 @@ async def process_ticket(ticket: dict) -> dict[str, Any]:
     print(f"\n[{ticket['id']}] Canal: {ticket['channel']}")
     print(f"  Intención detectada: {intent}")
     print(f"  Texto: {ticket['text'][:80]}...")
-    print(f"\n  Enrutamiento:")
+    print("\n  Enrutamiento:")
 
     hop = 0
     while hop < max_hops:
@@ -262,14 +263,11 @@ async def main() -> None:
     for ticket, state in all_states:
         history = state.get("metadata", {}).get("handoff_history", [])
         intent = classify_intent(ticket["text"])
-        print(
-            f"  {ticket['id']:<8} {ticket['channel']:<20} "
-            f"{intent:<25} {len(history):>6}"
-        )
+        print(f"  {ticket['id']:<8} {ticket['channel']:<20} {intent:<25} {len(history):>6}")
 
     # Análisis del audit trail
     print("\n[Audit Trail — Handoff History del último ticket]")
-    last_ticket, last_state = all_states[-1]
+    _last_ticket, last_state = all_states[-1]
     history = last_state.get("metadata", {}).get("handoff_history", [])
     for i, record in enumerate(history, 1):
         print(f"  {i}. {record['from_agent']} → {record['to_agent']}")

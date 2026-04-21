@@ -44,6 +44,7 @@ try:
         build_customer_service_subgraph,
         register_customer_service,
     )
+
     CUSTOMER_SERVICE_AVAILABLE = True
 except ImportError:
     CUSTOMER_SERVICE_AVAILABLE = False
@@ -96,7 +97,7 @@ SUPPORT_QUERIES = [
     {
         "id": "CS-006",
         "query": "Esto es inaceptable. Llevo 3 semanas esperando mi reembolso y nadie "
-                 "me responde. Voy a dejar una reseña negativa en todos lados.",
+        "me responde. Voy a dejar una reseña negativa en todos lados.",
         "category": "complaint",
         "expected_route": "ticket_creator",
         "context": "Cliente muy frustrado, caso urgente de escalación.",
@@ -105,7 +106,7 @@ SUPPORT_QUERIES = [
     {
         "id": "CS-007",
         "query": "Me cobraron dos veces el mismo pedido. Necesito que me devuelvan "
-                 "el dinero urgentemente. Esto es un fraude.",
+        "el dinero urgentemente. Esto es un fraude.",
         "category": "complaint",
         "expected_route": "ticket_creator",
         "context": "Doble cargo en cuenta bancaria, requiere intervención humana.",
@@ -115,8 +116,8 @@ SUPPORT_QUERIES = [
     {
         "id": "CS-008",
         "query": "Quiero saber si pueden hacer una excepción a la política de "
-                 "devoluciones para mi caso particular, ya que el regalo era para "
-                 "mi madre enferma y no pudo usarlo.",
+        "devoluciones para mi caso particular, ya que el regalo era para "
+        "mi madre enferma y no pudo usarlo.",
         "category": "other",
         "expected_route": "ticket_creator",
         "context": "Solicitud de excepción — requiere decisión humana.",
@@ -183,6 +184,7 @@ FAQ_KB = [
 
 # ── Simulador del pipeline ────────────────────────────────────────────────────
 
+
 def classify_intent(query: str) -> tuple[str, float]:
     """Simula el nodo classifier (LLM en modo real).
 
@@ -192,12 +194,38 @@ def classify_intent(query: str) -> tuple[str, float]:
     query_lower = query.lower()
 
     # Señales de queja
-    complaint_signals = ["inaceptable", "fraude", "urgente", "nunca", "reseña negativa",
-                         "tres semanas", "cobrado dos veces", "devuelvan", "escándalo"]
-    faq_signals = ["política", "horario", "rastrear", "seguimiento", "cómo puedo",
-                   "how do i", "what are", "business hours", "password", "reset"]
-    technical_signals = ["no enciende", "no funciona", "error", "fallo", "bloqueado",
-                         "locked out", "doesn't work"]
+    complaint_signals = [
+        "inaceptable",
+        "fraude",
+        "urgente",
+        "nunca",
+        "reseña negativa",
+        "tres semanas",
+        "cobrado dos veces",
+        "devuelvan",
+        "escándalo",
+    ]
+    faq_signals = [
+        "política",
+        "horario",
+        "rastrear",
+        "seguimiento",
+        "cómo puedo",
+        "how do i",
+        "what are",
+        "business hours",
+        "password",
+        "reset",
+    ]
+    technical_signals = [
+        "no enciende",
+        "no funciona",
+        "error",
+        "fallo",
+        "bloqueado",
+        "locked out",
+        "doesn't work",
+    ]
 
     complaint_score = sum(1 for s in complaint_signals if s in query_lower)
     faq_score = sum(1 for s in faq_signals if s in query_lower)
@@ -205,14 +233,13 @@ def classify_intent(query: str) -> tuple[str, float]:
 
     if complaint_score >= 2:
         return "complaint", 0.30  # baja confianza → escalará
-    elif complaint_score == 1:
+    if complaint_score == 1:
         return "complaint", 0.45  # aún baja → escalará
-    elif technical_score >= 1:
+    if technical_score >= 1:
         return "technical", 0.75
-    elif faq_score >= 1:
+    if faq_score >= 1:
         return "faq", 0.85
-    else:
-        return "other", 0.40  # ambiguo → escalará
+    return "other", 0.40  # ambiguo → escalará
 
 
 def faq_retrieval(query: str, top_k: int = 1) -> tuple[str | None, float]:
@@ -250,14 +277,15 @@ def generate_ticket_id(user_id: str) -> str:
 def generate_response(query: str, faq_answer: str | None, category: str) -> str:
     """Simula el nodo response_generator."""
     if faq_answer:
-        return f"Hola, gracias por contactarnos. {faq_answer} ¿Hay algo más en lo que pueda ayudarte?"
-    else:
-        templates = {
-            "faq": "Hola, gracias por tu consulta. He revisado tu caso y te puedo confirmar que nuestro equipo te atenderá en las próximas horas.",
-            "technical": "Hola, lamentamos los inconvenientes. Para resolver tu problema técnico, por favor sigue estos pasos: 1) Reinicia el dispositivo. 2) Si persiste, escríbenos a soporte@empresa.com con una foto.",
-            "other": "Hola, hemos recibido tu consulta. Un agente especializado revisará tu caso y te contactará en un plazo de 24 horas.",
-        }
-        return templates.get(category, "Gracias por contactarnos. Un agente te atenderá pronto.")
+        return (
+            f"Hola, gracias por contactarnos. {faq_answer} ¿Hay algo más en lo que pueda ayudarte?"
+        )
+    templates = {
+        "faq": "Hola, gracias por tu consulta. He revisado tu caso y te puedo confirmar que nuestro equipo te atenderá en las próximas horas.",
+        "technical": "Hola, lamentamos los inconvenientes. Para resolver tu problema técnico, por favor sigue estos pasos: 1) Reinicia el dispositivo. 2) Si persiste, escríbenos a soporte@empresa.com con una foto.",
+        "other": "Hola, hemos recibido tu consulta. Un agente especializado revisará tu caso y te contactará en un plazo de 24 horas.",
+    }
+    return templates.get(category, "Gracias por contactarnos. Un agente te atenderá pronto.")
 
 
 async def run_customer_service(query_data: dict, escalation_threshold: float = 0.6) -> dict:
@@ -272,12 +300,12 @@ async def run_customer_service(query_data: dict, escalation_threshold: float = 0
 
         # Nodo 1: classifier
         category, cls_confidence = classify_intent(query)
-        print(f"\n  ── Nodo 1: classifier ──")
+        print("\n  ── Nodo 1: classifier ──")
         print(f"    Categoría  : {category}")
         print(f"    Confianza  : {cls_confidence:.2f}")
 
         # Nodo 2: faq_retrieval
-        print(f"\n  ── Nodo 2: faq_retrieval ──")
+        print("\n  ── Nodo 2: faq_retrieval ──")
         faq_answer, faq_confidence = faq_retrieval(query)
         overall_confidence = (cls_confidence + faq_confidence) / 2
         print(f"    FAQ encontrado  : {'Sí' if faq_answer else 'No'}")
@@ -286,7 +314,7 @@ async def run_customer_service(query_data: dict, escalation_threshold: float = 0
         print(f"    Umbral escalación: {escalation_threshold}")
 
         # Gate: escalation
-        print(f"\n  ── Gate: escalation_gate ──")
+        print("\n  ── Gate: escalation_gate ──")
         should_escalate = overall_confidence < escalation_threshold or category == "complaint"
         route = "ticket_creator" if should_escalate else "response_generator"
         print(f"    ¿Escalar? {'Sí' if should_escalate else 'No'}  →  {route}")
@@ -300,11 +328,11 @@ async def run_customer_service(query_data: dict, escalation_threshold: float = 0
 
         if should_escalate:
             # Nodo 5: ticket_creator
-            print(f"\n  ── Nodo 5: ticket_creator ──")
+            print("\n  ── Nodo 5: ticket_creator ──")
             ticket_id = generate_ticket_id(query_data["user_id"])
             print(f"    Ticket creado : {ticket_id}")
             print(f"    Prioridad     : {'Alta' if category == 'complaint' else 'Normal'}")
-            print(f"    Asignado a    : soporte_humano")
+            print("    Asignado a    : soporte_humano")
             result["ticket_id"] = ticket_id
             result["response"] = (
                 f"Hemos registrado tu caso con número de ticket {ticket_id}. "
@@ -313,7 +341,7 @@ async def run_customer_service(query_data: dict, escalation_threshold: float = 0
             )
         else:
             # Nodo 4: response_generator
-            print(f"\n  ── Nodo 4: response_generator ──")
+            print("\n  ── Nodo 4: response_generator ──")
             response = generate_response(query, faq_answer, category)
             print(f"    Respuesta generada ({len(response)} chars)")
             result["response"] = response
@@ -328,8 +356,9 @@ async def run_customer_service(query_data: dict, escalation_threshold: float = 0
         return result
 
     # Modo real con subgraph LangGraph
-    from lightagent.agents.state import initial_state
     from langchain_core.messages import HumanMessage
+
+    from lightagent.agents.state import initial_state
 
     await register_customer_service(escalation_threshold=escalation_threshold)
     subgraph = build_customer_service_subgraph(
@@ -389,17 +418,22 @@ async def main() -> None:
     print("\n[Resumen estadístico]")
 
     routed_to_response = sum(1 for r in results if r["route"] == "response_generator")
-    routed_to_ticket   = sum(1 for r in results if r["route"] == "ticket_creator")
-    correct_routes     = sum(
-        1 for r, q in zip(results, SUPPORT_QUERIES)
+    routed_to_ticket = sum(1 for r in results if r["route"] == "ticket_creator")
+    correct_routes = sum(
+        1
+        for r, q in zip(results, SUPPORT_QUERIES, strict=False)
         if r["route"] == q["expected_route"]
     )
 
     print(f"  Queries procesadas    : {len(results)}")
-    print(f"  → response_generator  : {routed_to_response} ({routed_to_response/len(results):.0%})")
-    print(f"  → ticket_creator      : {routed_to_ticket} ({routed_to_ticket/len(results):.0%})")
-    print(f"  Rutas correctas       : {correct_routes}/{len(results)} "
-          f"({correct_routes/len(results):.0%} routing accuracy)")
+    print(
+        f"  → response_generator  : {routed_to_response} ({routed_to_response / len(results):.0%})"
+    )
+    print(f"  → ticket_creator      : {routed_to_ticket} ({routed_to_ticket / len(results):.0%})")
+    print(
+        f"  Rutas correctas       : {correct_routes}/{len(results)} "
+        f"({correct_routes / len(results):.0%} routing accuracy)"
+    )
     tickets = [r.get("ticket_id") for r in results if r.get("ticket_id")]
     if tickets:
         print(f"  Tickets creados       : {tickets}")
@@ -416,8 +450,11 @@ async def main() -> None:
     ]
     for thresh, desc in thresholds:
         # Simular conteos con el threshold dado
-        sim_auto = sum(1 for q in SUPPORT_QUERIES
-                       if classify_intent(q["query"])[1] >= thresh and q["category"] != "complaint")
+        sim_auto = sum(
+            1
+            for q in SUPPORT_QUERIES
+            if classify_intent(q["query"])[1] >= thresh and q["category"] != "complaint"
+        )
         sim_ticket = len(SUPPORT_QUERIES) - sim_auto
         marker = "← recomendado" if thresh == 0.6 else ""
         print(f"  {thresh:<12.1f} {sim_auto:<14d} {sim_ticket:<12d} {desc} {marker}")

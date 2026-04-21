@@ -41,9 +41,7 @@ async def _default_loader(df: pl.DataFrame, destination: dict[str, Any]) -> int:
 
 
 def make_loader_node(
-    loader_fn: (
-        Callable[[pl.DataFrame, dict[str, Any]], Awaitable[int] | int] | None
-    ) = None,
+    loader_fn: (Callable[[pl.DataFrame, dict[str, Any]], Awaitable[int] | int] | None) = None,
 ) -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:
     """Return an async LangGraph node that writes the DataFrame out."""
     fn = loader_fn or _default_loader

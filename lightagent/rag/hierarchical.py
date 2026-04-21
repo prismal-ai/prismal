@@ -172,9 +172,7 @@ class HierarchicalRAGEngine:
             for parent_text in parent_texts:
                 total_parents += 1
                 parent_id = uuid.uuid4().hex
-                child_texts = _chunk_text(
-                    parent_text, self._child_size, self._child_overlap
-                )
+                child_texts = _chunk_text(parent_text, self._child_size, self._child_overlap)
                 for child_text in child_texts:
                     child_id = uuid.uuid4().hex
                     child_docs.append(
@@ -244,9 +242,7 @@ class HierarchicalRAGEngine:
                     parent_source[parent_id] = metadata.get("source", "unknown")
                     parent_children[parent_id] = [chunk_id]
                 else:
-                    parent_best_score[parent_id] = max(
-                        parent_best_score[parent_id], score
-                    )
+                    parent_best_score[parent_id] = max(parent_best_score[parent_id], score)
                     parent_children[parent_id].append(chunk_id)
 
             ordered_parent_ids = sorted(

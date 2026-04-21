@@ -204,7 +204,7 @@ def print_self_rag_result(question: dict, result: SelfRAGResult) -> None:
     else:
         print("  → Respuesta generada sin recuperación (LLM usa conocimiento previo)")
 
-    print(f"\n  Respuesta final:")
+    print("\n  Respuesta final:")
     print(f"  {result.answer[:300]}")
     print("─" * 70)
 
@@ -247,9 +247,11 @@ async def main() -> None:
     # Resumen
     print("\n[Resumen estadístico]")
     retrieve_accuracy = retrieve_correct / len(PUBMED_QUESTIONS)
-    print(f"  Decisiones de recuperación correctas: {retrieve_correct}/{len(PUBMED_QUESTIONS)} ({retrieve_accuracy:.0%})")
+    print(
+        f"  Decisiones de recuperación correctas: {retrieve_correct}/{len(PUBMED_QUESTIONS)} ({retrieve_accuracy:.0%})"
+    )
 
-    print(f"\n  Distribución de SUPPORT tokens:")
+    print("\n  Distribución de SUPPORT tokens:")
     for token, count in support_distribution.items():
         print(f"    {token}: {count} queries")
 

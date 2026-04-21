@@ -328,6 +328,7 @@ class MemoryRedactionError(MemoryError):
 # re-exported here so callers can ``from lightagent.core.exceptions import
 # DebateError`` without needing to know which module owns each pattern.
 
+
 class ToTError(LightAgentError):
     """Tree-of-Thoughts search error (SPEC-PAT-001).
 
@@ -379,6 +380,7 @@ class SwarmError(LightAgentError):
 
 # ── Subgraph pipelines (Fase C) ──────────────────────────────────────────────
 
+
 class CustomerServiceError(LightAgentError):
     """Customer-service subgraph error (SPEC-SUBGRAPH-001)."""
 
@@ -425,8 +427,8 @@ __all__ = [
     "MCPToolError",
     "MemoryError",
     "MemoryRedactionError",
-    "ModelNotFoundError",
     "MoAError",
+    "ModelNotFoundError",
     "MultiVectorError",
     "PermissionDeniedError",
     "ProviderError",

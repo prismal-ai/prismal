@@ -35,7 +35,7 @@ import asyncio
 
 from langchain_core.documents import Document
 
-from lightagent.rag.crag import CRAGPipeline, RetrievedChunk
+from lightagent.rag.crag import CRAGPipeline
 from lightagent.rag.hyde import HyDEResult, HyDERetriever
 from lightagent.rag.vector_store import ChromaVectorStore
 
@@ -208,14 +208,14 @@ def print_comparison(query_info: dict, hyde_result: HyDEResult, crag_chunks: lis
     print(f"  Propósito: {query_info['description']}")
 
     # Documento hipotético generado
-    print(f"\n  📝 Documento hipotético generado por HyDE:")
+    print("\n  📝 Documento hipotético generado por HyDE:")
     print(f"     {hyde_result.hypothesis[:200]}...")
 
     # Comparativa de chunks recuperados
     hyde_sources = [c.source for c in hyde_result.chunks[:3]]
     crag_sources = [c.source for c in crag_chunks[:3]]
 
-    print(f"\n  Chunks recuperados:")
+    print("\n  Chunks recuperados:")
     print(f"    HyDE (hipotético): {hyde_sources}")
     print(f"    CRAG (query directa): {crag_sources}")
 
@@ -230,11 +230,11 @@ def print_comparison(query_info: dict, hyde_result: HyDEResult, crag_chunks: lis
 
         # Para queries abstractas, HyDE debería ganar
         if query_info["type"] == "abstract" and hyde_found and not crag_found:
-            print(f"    → HyDE supera a CRAG en query abstracta ✓")
+            print("    → HyDE supera a CRAG en query abstracta ✓")
         elif query_info["type"] == "concrete" and crag_found:
-            print(f"    → CRAG funciona bien para query concreta ✓")
+            print("    → CRAG funciona bien para query concreta ✓")
 
-    print(f"\n  Top-2 chunks HyDE:")
+    print("\n  Top-2 chunks HyDE:")
     for chunk in hyde_result.chunks[:2]:
         print(f"    [{chunk.relevance_score:.2f}] {chunk.source}: {chunk.content[:80]}...")
     print("─" * 70)
@@ -295,8 +295,12 @@ async def main() -> None:
 
     # Resumen
     print("\n[Resumen de la comparativa]")
-    print(f"  Queries abstractas (HyDE esperado ganar): {sum(1 for q in MSMARCO_QUERIES if q['type'] == 'abstract')}")
-    print(f"  Queries concretas (CRAG esperado ganar) : {sum(1 for q in MSMARCO_QUERIES if q['type'] == 'concrete')}")
+    print(
+        f"  Queries abstractas (HyDE esperado ganar): {sum(1 for q in MSMARCO_QUERIES if q['type'] == 'abstract')}"
+    )
+    print(
+        f"  Queries concretas (CRAG esperado ganar) : {sum(1 for q in MSMARCO_QUERIES if q['type'] == 'concrete')}"
+    )
 
     print("\n[¿Cuándo usar HyDE?]")
     recommendations = [
@@ -315,7 +319,7 @@ async def main() -> None:
     sample_result = await hyde_retriever.retrieve(
         "¿Por qué el self-attention supera al cross-attention en muchos casos?", k=2
     )
-    print(f"  Query   : '¿Por qué el self-attention supera al cross-attention?'")
+    print("  Query   : '¿Por qué el self-attention supera al cross-attention?'")
     print(f"  Hipótesis: {sample_result.hypothesis[:250]}...")
     print(f"  Embedding dim: {len(sample_result.hypothesis_embedding)} tokens hipotéticos")
 

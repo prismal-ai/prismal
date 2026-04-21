@@ -82,7 +82,7 @@ def print_result(topic: dict, result: DebateResult) -> None:
     print(f"  Categoría : {topic['category']}")
     print(f"  Pregunta  : {topic['query'][:80]}...")
     print(f"  Agentes   : {topic['n_agents']} | Rondas: {topic['n_rounds']}")
-    print(f"  Estrategia: moderador")
+    print("  Estrategia: moderador")
     print_separator()
 
     # Mostrar posiciones por ronda
@@ -94,7 +94,7 @@ def print_result(topic: dict, result: DebateResult) -> None:
                 print(f"    [{pos.role}] {pos.content[:120]}...")
 
     # Consenso final
-    print(f"\n  [CONSENSO FINAL]")
+    print("\n  [CONSENSO FINAL]")
     print(f"  {result.consensus}")
 
     # Métricas
@@ -117,7 +117,7 @@ def print_result(topic: dict, result: DebateResult) -> None:
 
 async def run_debate(topic: dict) -> DebateResult:
     """Ejecuta un debate para un tema dado."""
-    result = await debate_round(
+    return await debate_round(
         query=topic["query"],
         state={},  # estado opaco — reservado para extensiones futuras
         n_agents=topic["n_agents"],
@@ -125,7 +125,6 @@ async def run_debate(topic: dict) -> DebateResult:
         roles=topic["roles"],
         synthesis_strategy="moderator",
     )
-    return result
 
 
 async def main() -> None:

@@ -45,9 +45,7 @@ def make_consensus_node(
 
         messages = state.get("messages") or []
         query = str(messages[-1].content) if messages else ""
-        positions_text = "\n\n".join(
-            f"[{p.role}] {p.content}" for p in positions
-        )
+        positions_text = "\n\n".join(f"[{p.role}] {p.content}" for p in positions)
         user = f"Query: {query}\n\nFinal positions:\n{positions_text}"
         builder = SecurePromptBuilder()
         prompted = builder.build(system=_PROMPT, user=user)

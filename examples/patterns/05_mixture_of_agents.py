@@ -111,11 +111,10 @@ async def run_moa(sample: dict, models: list[str], aggregator: str) -> MoAResult
         n_aggregator_layers=1,  # una capa de agregación
     )
 
-    result = await moa.generate(
+    return await moa.generate(
         query=format_question(sample),
         state={"messages": [], "metadata": {"category": sample["category"]}},
     )
-    return result
 
 
 async def main() -> None:
@@ -134,7 +133,7 @@ async def main() -> None:
 
     print(f"\n  Propositores: {len(proposer_models)} modelos paralelos")
     print(f"  Agregador   : {aggregator_model}")
-    print(f"  Capas MoA   : 1")
+    print("  Capas MoA   : 1")
     print()
 
     correct_count = 0
@@ -146,10 +145,10 @@ async def main() -> None:
 
         result = await run_moa(sample, proposer_models, aggregator_model)
 
-        print(f"\n  Respuesta MoA:")
+        print("\n  Respuesta MoA:")
         print(f"  {result.final_answer[:300]}")
 
-        print(f"\n  Métricas MoA:")
+        print("\n  Métricas MoA:")
         print(f"    Propositores exitosos : {len(result.layer_outputs[0])}/{len(proposer_models)}")
         print(f"    Capas completadas     : {len(result.layer_outputs)}")
         print(f"    Proveedores usados    : {result.providers_used}")

@@ -37,6 +37,7 @@ import asyncio
 # Importar primitivas del patrón debate
 try:
     from lightagent.agents.patterns.debate import DebatePosition, pairwise_jaccard
+
     DEBATE_PRIMITIVES_AVAILABLE = True
 except ImportError:
     DEBATE_PRIMITIVES_AVAILABLE = False
@@ -47,6 +48,7 @@ try:
         build_debate_consensus_subgraph,
         register_debate_consensus,
     )
+
     DEBATE_CONSENSUS_AVAILABLE = True
 except ImportError:
     DEBATE_CONSENSUS_AVAILABLE = False
@@ -56,7 +58,7 @@ DEBATE_TOPICS = [
     {
         "id": "DEB-001",
         "thesis": "Los gobiernos deberían regular estrictamente el desarrollo de IA mediante "
-                  "licencias obligatorias y auditorías independientes antes del despliegue.",
+        "licencias obligatorias y auditorías independientes antes del despliegue.",
         "domain": "AI Regulation",
         "context": (
             "Referencia: EU AI Act (2024), propuestas de GPAI governance, debates en el "
@@ -67,7 +69,7 @@ DEBATE_TOPICS = [
     {
         "id": "DEB-002",
         "thesis": "Los modelos de lenguaje de gran escala deberían ser completamente "
-                  "open-source, con pesos y datos de entrenamiento públicos.",
+        "open-source, con pesos y datos de entrenamiento públicos.",
         "domain": "Open Source AI",
         "context": (
             "Meta Llama vs OpenAI GPT-4. Debate entre Yann LeCun y Sam Altman sobre "
@@ -78,7 +80,7 @@ DEBATE_TOPICS = [
     {
         "id": "DEB-003",
         "thesis": "El uso de IA en decisiones de contratación laboral debería estar "
-                  "prohibido hasta que se demuestren sesgos algorítmicos < 5%.",
+        "prohibido hasta que se demuestren sesgos algorítmicos < 5%.",
         "domain": "Algorithmic Hiring",
         "context": (
             "Amazon desactivó su sistema de IA para contratación en 2018 por sesgos de género. "
@@ -89,7 +91,7 @@ DEBATE_TOPICS = [
     {
         "id": "DEB-004",
         "thesis": "El entrenamiento de modelos de IA generativa con obras protegidas por "
-                  "copyright debería requerir licencia y compensación a los autores originales.",
+        "copyright debería requerir licencia y compensación a los autores originales.",
         "domain": "AI Copyright",
         "context": (
             "Casos: Getty Images vs Stability AI, New York Times vs OpenAI (2023). "
@@ -249,13 +251,12 @@ def simulate_consensus(topic: dict, moderation: dict) -> str:
     else:
         stance = "polarizado, sin consenso claro — debate continúa abierto"
 
-    consensus_text = (
+    return (
         f"Tras analizar ambas posiciones, la síntesis indica que el debate está {stance}. "
         f"Existen {len(agreement_pts)} puntos de convergencia y {len(tension_pts)} tensiones no resueltas. "
         f"El score de acuerdo Jaccard ({jaccard:.3f}) refleja "
         f"{'considerable solapamiento conceptual' if jaccard > 0.1 else 'posiciones fundamentalmente divergentes'}."
     )
-    return consensus_text
 
 
 async def run_debate(topic: dict) -> dict:
@@ -270,27 +271,23 @@ async def run_debate(topic: dict) -> dict:
         print("  [Modo demo — subgraph simulado]")
 
         # Nodo 1: proponent
-        print(f"\n  ── Nodo 1: proponent ──")
+        print("\n  ── Nodo 1: proponent ──")
         print(f"    Argumentos A FAVOR ({len(args['proponent'])}):")
         for arg in args["proponent"][:3]:
             print(f"      + {arg[:70]}")
 
         # Nodo 2: opponent
-        print(f"\n  ── Nodo 2: opponent ──")
+        print("\n  ── Nodo 2: opponent ──")
         print(f"    Argumentos EN CONTRA ({len(args['opponent'])}):")
         for arg in args["opponent"][:3]:
             print(f"      - {arg[:70]}")
 
         # Nodo 3: moderator
-        print(f"\n  ── Nodo 3: moderator ──")
+        print("\n  ── Nodo 3: moderator ──")
         moderation = simulate_moderator(args)
         jaccard = moderation["jaccard_agreement"]
         print(f"    Jaccard agreement score: {jaccard:.4f}")
-        agreement_level = (
-            "ALTO" if jaccard > 0.15 else
-            "MEDIO" if jaccard > 0.08 else
-            "BAJO"
-        )
+        agreement_level = "ALTO" if jaccard > 0.15 else "MEDIO" if jaccard > 0.08 else "BAJO"
         bar = "█" * int(jaccard * 100)
         print(f"    Nivel de acuerdo      : {agreement_level}  {bar}")
         print(f"    Puntos en común ({len(moderation['agreement_points'])}):")
@@ -301,16 +298,19 @@ async def run_debate(topic: dict) -> dict:
             print(f"      ⚡ {pt[:70]}")
 
         # Nodo 4: consensus
-        print(f"\n  ── Nodo 4: consensus ──")
+        print("\n  ── Nodo 4: consensus ──")
         consensus_text = simulate_consensus(topic, moderation)
         print(f"    {consensus_text}")
 
         # Verificar expectativa de acuerdo
         expected = topic["expected_agreement"]
         actual_level = agreement_level.lower()
-        match = "✓" if actual_level == expected or (
-            expected == "medium" and actual_level in ("medio", "medium")
-        ) else "~"
+        match = (
+            "✓"
+            if actual_level == expected
+            or (expected == "medium" and actual_level in ("medio", "medium"))
+            else "~"
+        )
         print(f"\n  Acuerdo esperado: {expected} | Obtenido: {agreement_level.lower()} {match}")
 
         return {
@@ -324,17 +324,22 @@ async def run_debate(topic: dict) -> dict:
         }
 
     # Modo real con subgraph LangGraph
-    from lightagent.agents.state import initial_state
     from langchain_core.messages import HumanMessage
+
+    from lightagent.agents.state import initial_state
 
     await register_debate_consensus()
     subgraph = build_debate_consensus_subgraph()
 
     state = initial_state()
-    state["messages"] = [HumanMessage(content=(
-        f"Debate sobre la siguiente tesis:\n{topic['thesis']}\n\n"
-        f"Contexto: {topic['context']}"
-    ))]
+    state["messages"] = [
+        HumanMessage(
+            content=(
+                f"Debate sobre la siguiente tesis:\n{topic['thesis']}\n\n"
+                f"Contexto: {topic['context']}"
+            )
+        )
+    ]
     state["metadata"] = {
         "debate_consensus": {
             "thesis": topic["thesis"],
@@ -385,11 +390,15 @@ async def main() -> None:
 
     # ── Estadísticas globales ─────────────────────────────────────────────────
     print("\n[Resumen estadístico — todos los debates]")
-    print(f"\n  {'ID':<10} {'Dominio':<25} {'Jaccard':>8} {'Acuerdo':>8} {'Común':>6} {'Tensión':>8}")
+    print(
+        f"\n  {'ID':<10} {'Dominio':<25} {'Jaccard':>8} {'Acuerdo':>8} {'Común':>6} {'Tensión':>8}"
+    )
     print("  " + "─" * 68)
     for r in results:
-        print(f"  {r['id']:<10} {r['domain']:<25} {r['jaccard']:>8.4f} "
-              f"{r['agreement_level']:>8} {r['agreement_points']:>6} {r['tension_points']:>8}")
+        print(
+            f"  {r['id']:<10} {r['domain']:<25} {r['jaccard']:>8.4f} "
+            f"{r['agreement_level']:>8} {r['agreement_points']:>6} {r['tension_points']:>8}"
+        )
 
     avg_jaccard = sum(r["jaccard"] for r in results) / len(results)
     print(f"\n  Jaccard promedio: {avg_jaccard:.4f}")
@@ -399,8 +408,14 @@ async def main() -> None:
     # ── Comparativa: Debate Pattern vs Debate Consensus Subgraph ─────────────
     print("\n[Debate Pattern vs Debate Consensus Subgraph]")
     comparison = [
-        ("debate.py (pattern)",       "N agentes", "M rondas", "Jaccard + síntesis", "Flexible"),
-        ("debate_consensus (subgraph)", "2 roles fijos", "1 ronda", "Jaccard + consenso", "Structured"),
+        ("debate.py (pattern)", "N agentes", "M rondas", "Jaccard + síntesis", "Flexible"),
+        (
+            "debate_consensus (subgraph)",
+            "2 roles fijos",
+            "1 ronda",
+            "Jaccard + consenso",
+            "Structured",
+        ),
     ]
     header = f"  {'Componente':<28} {'Agentes':<12} {'Rondas':<8} {'Score':<22} {'Uso'}"
     print(header)

@@ -217,15 +217,17 @@ def print_multivector_result(
     print(f"  Tipo de match esperado: {query_info['match_type']}")
     print(f"  Descripción: {query_info['description']}")
 
-    print(f"\n  Top-3 resultados:")
+    print("\n  Top-3 resultados:")
     for i, chunk in enumerate(result.chunks[:3], 1):
         expected = expected_prefix in chunk.source
         mark = "→" if expected else " "
-        print(f"    {mark}[{i}] [{chunk.relevance_score:.3f}] {chunk.source}: {chunk.content[:80]}...")
+        print(
+            f"    {mark}[{i}] [{chunk.relevance_score:.3f}] {chunk.source}: {chunk.content[:80]}..."
+        )
 
     # Mostrar qué representaciones hicieron match
     if result.matched_representations:
-        print(f"\n  Representaciones que hicieron match:")
+        print("\n  Representaciones que hicieron match:")
         for doc_id, representations in list(result.matched_representations.items())[:3]:
             print(f"    {doc_id}: {representations}")
 
@@ -274,27 +276,28 @@ async def main() -> None:
         expected_prefix = query_info["expected_source_prefix"]
         if any(expected_prefix in c.source for c in result.chunks[:3]):
             correct_count += 1
-            match_type_stats[query_info["match_type"]] = \
+            match_type_stats[query_info["match_type"]] = (
                 match_type_stats.get(query_info["match_type"], 0) + 1
+            )
 
     # Resumen
     recall = correct_count / len(MULTIVECTOR_QUERIES)
-    print(f"\n[Resumen estadístico]")
+    print("\n[Resumen estadístico]")
     print(f"  Recall@3: {correct_count}/{len(MULTIVECTOR_QUERIES)} ({recall:.0%})")
 
     # Comparativa de representaciones
-    print(f"\n[Distribución de tipos de match]")
+    print("\n[Distribución de tipos de match]")
     print("  En qué representaciones son más útiles:")
     for rep_type, desc in [
-        ("chunk",    "keywords técnicos exactos del paper"),
-        ("summary",  "conceptos y temas generales"),
+        ("chunk", "keywords técnicos exactos del paper"),
+        ("summary", "conceptos y temas generales"),
         ("question", "preguntas directas sobre el contenido"),
     ]:
         count = match_type_stats.get(rep_type, 0)
         print(f"    {rep_type:10s}: {count} queries ← {desc}")
 
     # Comparativa Multi-Vector vs Chunk-only
-    print(f"\n[Multi-Vector vs RAG estándar (solo chunks)]")
+    print("\n[Multi-Vector vs RAG estándar (solo chunks)]")
     comparison = [
         ("Multi-Vector", "Alta", "Alta", "3×"),
         ("RAG estándar", "Media", "Media", "1×"),
@@ -304,7 +307,7 @@ async def main() -> None:
     for method, recall_q, precision, cost in comparison:
         print(f"  {method:<15} {recall_q:<8} {precision:<10} {cost:>18}")
 
-    print(f"\n[Cuándo usar Multi-Vector RAG]")
+    print("\n[Cuándo usar Multi-Vector RAG]")
     print("  ✓ Documentos técnicos con vocabulario especializado")
     print("  ✓ Usuarios que preguntan con diferentes estilos/idiomas")
     print("  ✓ Corpus de papers científicos o documentación compleja")

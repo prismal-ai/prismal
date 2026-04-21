@@ -31,7 +31,6 @@ Uso:
 from __future__ import annotations
 
 import asyncio
-import re
 from typing import Any
 
 from lightagent.agents.patterns.lats import LATSAgent, LATSResult
@@ -115,23 +114,22 @@ async def action_generator(state: dict[str, Any], tools: list[dict]) -> list[str
             f"search_web(query='{goal} precio mejor opción')",
             f"search_web(query='comparativa {goal} 2024')",
         ]
-    elif steps == 1 and not info:
+    if steps == 1 and not info:
         return [
             "extract_info(source='primer resultado')",
             "extract_info(source='segundo resultado')",
             "open_url(url='resultado más relevante')",
         ]
-    elif steps == 2:
+    if steps == 2:
         return [
             "compare_options(results='todos los resultados')",
             "summarize(content='información recopilada')",
             "make_selection(criterion='mejor valor')",
         ]
-    else:
-        return [
-            "confirm_action(selection='opción elegida')",
-            "summarize(content='resultado final con precio/reserva/comparativa')",
-        ]
+    return [
+        "confirm_action(selection='opción elegida')",
+        "summarize(content='resultado final con precio/reserva/comparativa')",
+    ]
 
 
 async def transition_fn(state: dict[str, Any], action: str) -> dict[str, Any]:
@@ -193,7 +191,7 @@ async def reward_fn(state: dict[str, Any]) -> float:
     """
     info = state.get("info_gathered", [])
     steps = state.get("steps_taken", 0)
-    goal = state.get("goal", "")
+    state.get("goal", "")
 
     score = 0.0
 
@@ -234,18 +232,17 @@ async def run_lats_task(task: dict) -> LATSResult:
         reward_fn=reward_fn,
         action_generator=action_generator,
         transition_fn=transition_fn,
-        max_simulations=30,       # simulaciones MCTS
+        max_simulations=30,  # simulaciones MCTS
         exploration_constant=1.41,  # √2 (Auer et al. 2002)
-        max_depth=5,               # profundidad máxima del árbol
-        timeout_seconds=30.0,      # timeout de seguridad
-        terminal_reward=0.95,      # umbral de terminación anticipada
+        max_depth=5,  # profundidad máxima del árbol
+        timeout_seconds=30.0,  # timeout de seguridad
+        terminal_reward=0.95,  # umbral de terminación anticipada
     )
 
-    result = await agent.search(
+    return await agent.search(
         initial_state=task["initial_state"],
         goal=task["goal"],
     )
-    return result
 
 
 async def main() -> None:
