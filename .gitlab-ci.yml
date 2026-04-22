@@ -8,7 +8,10 @@
 #
 # Optimizaciones aplicadas (2026-04-22):
 #   1. Imagen base ghcr.io/astral-sh/uv:python3.13-bookworm-slim (uv pre-instalado).
-#   2. before_script reducido a `uv sync --extra dev --frozen` — sin apt ni curl.
+#   2. before_script: `apt-get install build-essential` (requerido para compilar
+#      extensiones C/C++ de sdists — e.g. annoy via nemoguardrails — ya que no
+#      hay wheels para cp313) + `uv sync --extra dev --frozen`. Sin `curl | sh`
+#      para instalar uv (ya viene en la imagen).
 #   3. Cache policy: pull-only global; pull-push sólo en lint:ruff (primer job).
 #   4. DAG con needs: — security arranca tras lint, tests tras complexity.
 #   5. complexity:radon con allow_failure (gate informativo, no bloqueante).
@@ -86,6 +89,10 @@ cache:
 # ------------------------------------------------------------
 .python-base:
   before_script:
+    # build-essential provee g++ y headers necesarios para compilar sdists
+    # de extensión C/C++ (e.g. `annoy` via `nemoguardrails` — no hay wheel
+    # oficial para CPython 3.13, por lo que uv debe compilar desde fuente).
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends build-essential
     # uv ya está en PATH en la imagen base; sólo sincronizamos el venv.
     # --frozen garantiza reproducibilidad exacta del lockfile.
     - uv sync --extra dev --frozen
