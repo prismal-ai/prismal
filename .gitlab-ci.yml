@@ -267,6 +267,16 @@ security:semgrep:
     # Semgrep usa Python 3.12 interno; no conflicta con el venv del proyecto
     SEMGREP_SEND_METRICS: "off"
   script:
+    # La imagen returntocorp/semgrep corre `adjust_for_docker()` al arrancar:
+    # detecta el entorno Docker y exige el código montado en `/src`.  GitLab
+    # CI en cambio clona en $CI_PROJECT_DIR (p.ej. /builds/<group>/<proj>),
+    # dejando /src como un directorio vacío — lo que hace fallar semgrep con
+    # «Detected Docker environment without a code volume».
+    # Workaround: symlinkar /src -> $CI_PROJECT_DIR antes de escanear. El
+    # artefacto semgrep.sarif se escribe vía el symlink y queda en
+    # $CI_PROJECT_DIR/semgrep.sarif, que es lo que GitLab sube como artifact.
+    - rmdir /src 2>/dev/null || true
+    - ln -s "$CI_PROJECT_DIR" /src
     - semgrep --version
     - semgrep scan
         --config=p/python
