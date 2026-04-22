@@ -1,0 +1,471 @@
+# .gitlab-ci.yml
+# lightagent-agents — Pipeline CI/CD optimizado
+# ============================================================
+# Reglas por rama:
+#   • develop → lint + typecheck + complejidad + seguridad + tests completos
+#   • main    → seguridad + build del paquete + publish a PyPI (manual)
+#   • MR      → mismos jobs que la rama destino (para validar antes de merge)
+#
+# Optimizaciones aplicadas (2026-04-22):
+#   1. Imagen base ghcr.io/astral-sh/uv:python3.13-bookworm-slim (uv pre-instalado).
+#   2. before_script: `apt-get install build-essential` (requerido para compilar
+#      extensiones C/C++ de sdists — e.g. annoy via nemoguardrails — ya que no
+#      hay wheels para cp313) + `uv sync --extra dev --frozen`. Sin `curl | sh`
+#      para instalar uv (ya viene en la imagen).
+#   3. Cache policy: pull-only global; pull-push sólo en lint:ruff (primer job).
+#   4. DAG con needs: — security arranca tras lint, tests tras complexity.
+#   5. complexity:radon con allow_failure (gate informativo, no bloqueante).
+#   6. trivy: segundo pass con --skip-db-update para evitar re-descarga de BD.
+#   7. flake8/flake8-cognitive-complexity movidos a dev deps — no instalación dinámica.
+#
+# CVEs/GHSAs ignorados alineados con `.trivyignore` y
+# `.pre-commit-config.yaml` -> hook `pip-audit`.
+# ============================================================
+
+default:
+  # Imagen oficial de Astral con uv + Python 3.13 pre-instalados.
+  # Elimina el apt-get + curl | sh de cada job (~2–4 min por job ahorrados).
+  image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+  interruptible: true
+
+stages:
+  - lint
+  - typecheck
+  - complexity
+  - security
+  - test
+  - build
+  - publish
+
+variables:
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
+  UV_LINK_MODE: copy
+  UV_PYTHON: "3.13"
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+  # Paquetes pineados con CVE conocidos pero sin upgrade path seguro.
+  # Mantener sincronizado con `.trivyignore` y `.pre-commit-config.yaml`.
+  PIP_AUDIT_IGNORES: >-
+    --ignore-vuln=GHSA-r7w7-9xr2-qq2r
+    --ignore-vuln=GHSA-fv5p-p927-qmxr
+    --ignore-vuln=GHSA-rr7j-v2q5-chgv
+    --ignore-vuln=CVE-2025-66416
+    --ignore-vuln=CVE-2026-25990
+    --ignore-vuln=CVE-2026-40192
+    --ignore-vuln=GHSA-jj6c-8h6c-hppx
+    --ignore-vuln=GHSA-4pxv-j86v-mhcw
+    --ignore-vuln=GHSA-7gw9-cf7v-778f
+    --ignore-vuln=GHSA-x284-j5p8-9c5p
+    --ignore-vuln=CVE-2025-62379
+    --ignore-vuln=GHSA-wj6h-64fc-37mp
+
+# ------------------------------------------------------------
+# Workflow: pipelines en MRs a develop/main, en pushes directos
+# a esas ramas (post-merge) y en tags.
+# ------------------------------------------------------------
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG
+
+# ------------------------------------------------------------
+# Caché global — política pull (sólo lectura en la mayoría de jobs).
+# lint:ruff sobreescribe con pull-push para actualizar el caché
+# cuando cambia uv.lock o pyproject.toml.
+# ------------------------------------------------------------
+cache:
+  key:
+    files:
+      - uv.lock
+      - pyproject.toml
+  paths:
+    - .cache/uv
+    - .venv
+  policy: pull
+
+# ------------------------------------------------------------
+# Plantillas (anchors YAML)
+# ------------------------------------------------------------
+.python-base:
+  before_script:
+    # build-essential provee g++ y headers necesarios para compilar sdists
+    # de extensión C/C++ (e.g. `annoy` via `nemoguardrails` — no hay wheel
+    # oficial para CPython 3.13, por lo que uv debe compilar desde fuente).
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends build-essential
+    # uv ya está en PATH en la imagen base; sólo sincronizamos el venv.
+    # --frozen garantiza reproducibilidad exacta del lockfile.
+    - uv sync --extra dev --frozen
+
+.rules-develop:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+
+.rules-main:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+    - if: '$CI_COMMIT_TAG'
+
+.rules-security:
+  # Seguridad corre en ambas ramas (develop y main) y en MRs
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_TAG'
+
+# ============================================================
+# 1. LINT (solo develop)
+# ============================================================
+lint:ruff:
+  extends:
+    - .python-base
+    - .rules-develop
+  stage: lint
+  # Único job que actualiza el caché cuando cambia el lockfile.
+  cache:
+    key:
+      files:
+        - uv.lock
+        - pyproject.toml
+    paths:
+      - .cache/uv
+      - .venv
+    policy: pull-push
+  script:
+    - uv run ruff check .
+    - uv run ruff format --check .
+
+# ============================================================
+# 2. TYPE CHECKING (solo develop)
+# ============================================================
+typecheck:mypy:
+  extends:
+    - .python-base
+    - .rules-develop
+  stage: typecheck
+  needs: [lint:ruff]
+  script:
+    - uv run mypy lightagent
+
+typecheck:ty:
+  extends:
+    - .python-base
+    - .rules-develop
+  stage: typecheck
+  needs: [lint:ruff]
+  allow_failure: true  # ty todavía en alpha — informativo
+  script:
+    - uv run ty check --output-format=concise lightagent/
+
+# ============================================================
+# 3. COMPLEJIDAD (solo develop)
+# ============================================================
+complexity:radon:
+  extends:
+    - .python-base
+    - .rules-develop
+  stage: complexity
+  needs: [typecheck:mypy]
+  # allow_failure: gate informativo — no bloquea security ni test.
+  # Las funciones con rango E/F deben refactorizarse pero no detienen el pipeline.
+  allow_failure: true
+  script:
+    # Reporte full (informativo)
+    - uv run radon cc lightagent/ -s -a
+    # Falla si aparece alguna función de rango E/F (CC >= 21)
+    - uv run radon cc lightagent/ -n E -s --total-average | tee radon-ef.txt
+    - '! grep -E "^\s+[MFC] " radon-ef.txt'
+  artifacts:
+    when: always
+    paths:
+      - radon-ef.txt
+    expire_in: 1 week
+
+complexity:lizard:
+  extends:
+    - .python-base
+    - .rules-develop
+  stage: complexity
+  needs: [typecheck:mypy]
+  script:
+    # Umbrales alineados con pre-commit: CCN=40, args=15, length=350
+    - uv run lizard lightagent/ --CCN 40 --arguments 15 --length 350 -w
+
+complexity:cognitive:
+  extends:
+    - .python-base
+    - .rules-develop
+  stage: complexity
+  needs: [typecheck:mypy]
+  script:
+    # flake8 y flake8-cognitive-complexity están en dev deps (pyproject.toml)
+    # — no se requiere instalación dinámica en CI.
+    - uv run flake8 --select=CCR001 --max-cognitive-complexity=100 lightagent/
+
+# ============================================================
+# 4. SEGURIDAD (develop + main)
+# Arranca inmediatamente después de lint gracias al DAG (needs: optional).
+# En main, donde lint:ruff no existe, arranca sin dependencias.
+# ============================================================
+security:bandit:
+  extends:
+    - .python-base
+    - .rules-security
+  stage: security
+  needs:
+    - job: lint:ruff
+      optional: true  # no existe en main → arranca libre
+  script:
+    - uv run bandit -r lightagent -c pyproject.toml --severity-level=medium -f txt
+
+security:gitleaks:
+  extends: .rules-security
+  stage: security
+  needs:
+    - job: lint:ruff
+      optional: true
+  image:
+    name: zricethezav/gitleaks:latest
+    entrypoint: [""]
+  script:
+    - gitleaks detect --source . --config .gitleaks.toml --no-git --redact --verbose
+
+security:pip-audit:
+  extends:
+    - .python-base
+    - .rules-security
+  stage: security
+  needs:
+    - job: lint:ruff
+      optional: true
+  script:
+    - uv run pip-audit $PIP_AUDIT_IGNORES --skip-editable
+  artifacts:
+    when: always
+    reports:
+      # GitLab no renderiza pip-audit nativamente; guardamos JSON como artefacto
+      dependency_scanning: pip-audit-report.json
+    paths:
+      - pip-audit-report.json
+    expire_in: 1 week
+  after_script:
+    - uv run pip-audit $PIP_AUDIT_IGNORES --skip-editable --format=json > pip-audit-report.json || true
+
+security:semgrep:
+  extends: .rules-security
+  stage: security
+  needs:
+    - job: lint:ruff
+      optional: true
+  image:
+    name: returntocorp/semgrep:latest
+    entrypoint: [""]
+  variables:
+    # Semgrep usa Python 3.12 interno; no conflicta con el venv del proyecto
+    SEMGREP_SEND_METRICS: "off"
+  script:
+    # La imagen returntocorp/semgrep corre `adjust_for_docker()` al arrancar:
+    # detecta el entorno Docker y exige el código montado en `/src`.  GitLab
+    # CI en cambio clona en $CI_PROJECT_DIR (p.ej. /builds/<group>/<proj>),
+    # dejando /src como un directorio vacío — lo que hace fallar semgrep con
+    # «Detected Docker environment without a code volume».
+    # Workaround: symlinkar /src -> $CI_PROJECT_DIR antes de escanear. El
+    # artefacto semgrep.sarif se escribe vía el symlink y queda en
+    # $CI_PROJECT_DIR/semgrep.sarif, que es lo que GitLab sube como artifact.
+    - rmdir /src 2>/dev/null || true
+    - ln -s "$CI_PROJECT_DIR" /src
+    - semgrep --version
+    - semgrep scan
+        --config=p/python
+        --config=p/secrets
+        --config=p/owasp-top-ten
+        --error
+        --exclude=tests
+        --exclude=examples
+        --exclude=.venv
+        --exclude=dist
+        --exclude=docs
+        --sarif --output=semgrep.sarif
+        --metrics=off
+  artifacts:
+    when: always
+    paths:
+      - semgrep.sarif
+    expire_in: 1 week
+
+security:trivy:fs:
+  extends: .rules-security
+  stage: security
+  needs:
+    - job: lint:ruff
+      optional: true
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: ".cache/trivy"
+  cache:
+    key: trivy-db
+    paths:
+      - .cache/trivy
+    policy: pull-push
+  script:
+    - trivy --version
+    # Primer pass: salida en tabla legible + exit-code de seguridad
+    - trivy fs
+        --scanners vuln,misconfig,secret
+        --severity HIGH,CRITICAL
+        --ignorefile .trivyignore
+        --exit-code 1
+        --format table
+        .
+    # Segundo pass: JSON para artefacto. --skip-db-update reutiliza la BD
+    # ya descargada en el paso anterior — no vuelve a descargarla.
+    - trivy fs
+        --scanners vuln,misconfig,secret
+        --ignorefile .trivyignore
+        --format json
+        --output trivy-fs.json
+        --skip-db-update
+        . || true
+  artifacts:
+    when: always
+    paths:
+      - trivy-fs.json
+    expire_in: 1 week
+
+# ============================================================
+# 5. TESTS (solo develop)
+# Arranca en cuanto los tres jobs de complexity terminan,
+# sin esperar a que security finalice (DAG paralelo).
+# ============================================================
+test:unit:
+  extends:
+    - .python-base
+    - .rules-develop
+  stage: test
+  needs:
+    - complexity:lizard
+    - complexity:cognitive
+    - job: complexity:radon
+      artifacts: false  # radon tiene allow_failure; no bloqueante
+  script:
+    - uv run pytest tests/unit
+        -m "not live_api"
+        --cov=lightagent
+        --cov-branch
+        --cov-report=term-missing
+        --cov-report=xml:coverage.xml
+        --cov-report=html:htmlcov
+        --junitxml=report-unit.xml
+        -n auto
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    when: always
+    reports:
+      junit: report-unit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - htmlcov/
+      - coverage.xml
+    expire_in: 1 week
+
+test:security:
+  extends:
+    - .python-base
+    - .rules-develop
+  stage: test
+  needs:
+    - complexity:lizard
+    - complexity:cognitive
+    - job: complexity:radon
+      artifacts: false
+  script:
+    - uv run pytest tests/security -m security --junitxml=report-security.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report-security.xml
+    expire_in: 1 week
+
+test:integration:
+  extends:
+    - .python-base
+    - .rules-develop
+  stage: test
+  needs:
+    - complexity:lizard
+    - complexity:cognitive
+    - job: complexity:radon
+      artifacts: false
+  allow_failure: true  # servicios externos opcionales (sandbox, DBs)
+  script:
+    - uv run pytest tests/integration -m "integration and not live_api" --junitxml=report-integration.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report-integration.xml
+    expire_in: 1 week
+
+# ============================================================
+# 6. BUILD (solo main y tags)
+# ============================================================
+build:package:
+  extends:
+    - .python-base
+    - .rules-main
+  stage: build
+  script:
+    - uv run python -m build
+    - uv run twine check dist/*
+    - ls -la dist/
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 month
+
+# ============================================================
+# 7. PUBLISH a PyPI (solo main y tags, automático tras CI)
+# ============================================================
+# Requiere configurar en GitLab CI/CD variables (protected + masked):
+#   • TWINE_USERNAME   = __token__
+#   • TWINE_PASSWORD   = pypi-XXXXXXXXXXXX   (API token)
+#
+# Disparo automático: al caer un commit en `main` (post-merge del MR
+# aprobado) o al empujar un tag. El job corre sólo si todos los jobs
+# de seguridad y el build pasaron — `--skip-existing` evita fallos si
+# la versión ya fue publicada (no-op idempotente).
+publish:pypi:
+  extends: .python-base
+  stage: publish
+  needs:
+    - job: build:package
+      artifacts: true
+    - job: security:bandit
+    - job: security:pip-audit
+    - job: security:semgrep
+    - job: security:trivy:fs
+    - job: security:gitleaks
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: on_success
+    - if: '$CI_COMMIT_TAG'
+      when: on_success
+  script:
+    - |
+      if [ -z "${TWINE_USERNAME:-}" ] || [ -z "${TWINE_PASSWORD:-}" ]; then
+        echo "ERROR: TWINE_USERNAME y TWINE_PASSWORD deben configurarse en CI/CD variables"
+        exit 1
+      fi
+    - uv run twine check dist/*
+    - uv run twine upload --non-interactive --skip-existing dist/*
+  environment:
+    name: pypi
+    url: https://pypi.org/project/lightagent-agents/

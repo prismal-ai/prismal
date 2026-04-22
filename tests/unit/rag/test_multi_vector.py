@@ -70,9 +70,7 @@ def test_init_stores_config() -> None:
     store = MagicMock()
     with patch(PROVIDER_REGISTRY_PATH) as reg:
         reg.return_value.get_llm.return_value = MagicMock()
-        engine = MultiVectorRAGEngine(
-            vector_store=store, n_questions=5, settings=MagicMock()
-        )
+        engine = MultiVectorRAGEngine(vector_store=store, n_questions=5, settings=MagicMock())
     assert engine._store is store  # noqa: SLF001
     assert engine._n_questions == 5  # noqa: SLF001
 
@@ -130,9 +128,7 @@ async def test_index_document_writes_summary_chunk_and_questions() -> None:
     ):
         mock_factory_cls.return_value.load.return_value = [doc]
         reg.return_value.get_llm.return_value = llm
-        engine = MultiVectorRAGEngine(
-            vector_store=store, n_questions=3, settings=MagicMock()
-        )
+        engine = MultiVectorRAGEngine(vector_store=store, n_questions=3, settings=MagicMock())
         n_docs, n_vectors = await engine.index_document(Path("file.txt"))
 
     called_docs = store.add_documents.call_args[0][0]
@@ -167,9 +163,7 @@ async def test_index_document_continues_when_llm_partially_fails() -> None:
     ):
         mock_factory_cls.return_value.load.return_value = [doc]
         reg.return_value.get_llm.return_value = llm
-        engine = MultiVectorRAGEngine(
-            vector_store=store, n_questions=2, settings=MagicMock()
-        )
+        engine = MultiVectorRAGEngine(vector_store=store, n_questions=2, settings=MagicMock())
         n_docs, n_vectors = await engine.index_document(Path("file.txt"))
 
     # chunk + 2 questions = 3 vectors (summary was dropped)

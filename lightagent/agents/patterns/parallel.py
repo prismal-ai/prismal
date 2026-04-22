@@ -40,7 +40,7 @@ The dispatcher honours two safety controls:
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from langgraph.types import Send
 
@@ -160,7 +160,7 @@ def make_parallel_dispatcher(
         return sends
 
     dispatcher.__name__ = f"parallel_dispatcher_{worker_node}"
-    return dispatcher
+    return cast("DispatcherFn", dispatcher)
 
 
 __all__ = ["DispatcherFn", "make_parallel_dispatcher"]

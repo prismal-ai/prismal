@@ -68,8 +68,7 @@ def make_transformer_node(
     transformer_fn: (
         Callable[
             [pl.DataFrame, list[dict[str, Any]]],
-            Awaitable[tuple[pl.DataFrame, list[str]]]
-            | tuple[pl.DataFrame, list[str]],
+            Awaitable[tuple[pl.DataFrame, list[str]]] | tuple[pl.DataFrame, list[str]],
         ]
         | None
     ) = None,

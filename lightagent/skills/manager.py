@@ -559,7 +559,7 @@ class SkillsManager:
     def _scan_dir(
         self,
         directory: Path,
-        status: Literal["available", "custom"],
+        status: Literal["available", "custom", "external"],
         skip_names: set[str],
     ) -> list[SkillInfo]:
         """Scan a directory and build SkillInfo for each subdirectory.

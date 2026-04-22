@@ -36,30 +36,20 @@ if TYPE_CHECKING:
 logger = get_logger("lightagent.subgraphs.data_etl.builder")
 
 _NAME = "data_etl"
-_DESCRIPTION = (
-    "Data ETL pipeline: "
-    "extractor → validator → transformer → loader → auditor"
-)
+_DESCRIPTION = "Data ETL pipeline: extractor → validator → transformer → loader → auditor"
 
 
 def build_data_etl_subgraph(
-    extractor_fn: (
-        Callable[[dict[str, Any]], Awaitable[pl.DataFrame]] | None
-    ) = None,
-    validator_fn: (
-        Callable[[pl.DataFrame, dict[str, Any]], tuple[bool, list[str]]] | None
-    ) = None,
+    extractor_fn: (Callable[[dict[str, Any]], Awaitable[pl.DataFrame]] | None) = None,
+    validator_fn: (Callable[[pl.DataFrame, dict[str, Any]], tuple[bool, list[str]]] | None) = None,
     transformer_fn: (
         Callable[
             [pl.DataFrame, list[dict[str, Any]]],
-            Awaitable[tuple[pl.DataFrame, list[str]]]
-            | tuple[pl.DataFrame, list[str]],
+            Awaitable[tuple[pl.DataFrame, list[str]]] | tuple[pl.DataFrame, list[str]],
         ]
         | None
     ) = None,
-    loader_fn: (
-        Callable[[pl.DataFrame, dict[str, Any]], Awaitable[int] | int] | None
-    ) = None,
+    loader_fn: (Callable[[pl.DataFrame, dict[str, Any]], Awaitable[int] | int] | None) = None,
     required_columns: list[str] | None = None,
     settings: Settings | None = None,
 ) -> SubgraphDefinition:
@@ -82,9 +72,7 @@ def build_data_etl_subgraph(
     del settings  # reserved
 
     extractor = make_extractor_node(extractor_fn=extractor_fn)
-    validator = make_validator_node(
-        required_columns=required_columns, validator_fn=validator_fn
-    )
+    validator = make_validator_node(required_columns=required_columns, validator_fn=validator_fn)
     branching_gate = make_etl_branching_gate()
     transformer = make_transformer_node(transformer_fn=transformer_fn)
     loader = make_loader_node(loader_fn=loader_fn)

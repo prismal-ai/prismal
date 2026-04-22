@@ -230,12 +230,11 @@ class SelfRAGPipeline:
         Unparseable or failing responses default to ``(UNSUPPORTED, 1)`` —
         pessimistic so downstream consumers can filter low-quality outputs.
         """
-        context_blob = "\n\n".join(
-            f"[{i + 1}] {c.content}" for i, c in enumerate(sources)
-        ) or "(no context — answer from general knowledge)"
-        user_blob = (
-            f"QUERY:\n{query}\n\nANSWER:\n{answer}\n\nCONTEXT:\n{context_blob}"
+        context_blob = (
+            "\n\n".join(f"[{i + 1}] {c.content}" for i, c in enumerate(sources))
+            or "(no context — answer from general knowledge)"
         )
+        user_blob = f"QUERY:\n{query}\n\nANSWER:\n{answer}\n\nCONTEXT:\n{context_blob}"
         builder = SecurePromptBuilder()
         messages = builder.build(system=_ASSESS_PROMPT, user=user_blob)
         lc_messages = [

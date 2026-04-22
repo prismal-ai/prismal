@@ -300,7 +300,7 @@ def apply_sampling(
         if method == "smote":
             try:
                 import pandas as pd
-                from imblearn.over_sampling import SMOTE  # type: ignore[import-untyped]
+                from imblearn.over_sampling import SMOTE
 
                 feats = [c for c in df.columns if c != target_column]
                 x_arr = df.select(feats).to_numpy()
@@ -384,8 +384,8 @@ def automl_train(
         x_train = df.select(feats).to_pandas()
         y = df[target_column].to_pandas()
         try:  # pragma: no cover
-            import joblib  # type: ignore[import-untyped]
-            from flaml import AutoML  # type: ignore[import-not-found]
+            import joblib
+            from flaml import AutoML
 
             automl = AutoML()
             automl.fit(
@@ -693,7 +693,7 @@ def explain_model(
 
             mpl.use("Agg")
             import matplotlib.pyplot as plt
-            import shap  # type: ignore[import-not-found]
+            import shap
 
             explainer = shap.Explainer(mdl, x_df)
             shap_values = explainer(x_df)
@@ -785,10 +785,8 @@ def export_model(
     if format == "onnx":
         try:  # pragma: no cover
             import joblib
-            from skl2onnx import convert_sklearn  # type: ignore[import-not-found]
-            from skl2onnx.common.data_types import (  # type: ignore[import-not-found]
-                FloatTensorType,
-            )
+            from skl2onnx import convert_sklearn
+            from skl2onnx.common.data_types import FloatTensorType
 
             mdl = joblib.load(model_path)
             n_features = getattr(mdl, "n_features_in_", 10)

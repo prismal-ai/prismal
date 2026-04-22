@@ -208,9 +208,7 @@ async def test_security_scanner_swallows_callable_errors() -> None:
 
 @pytest.mark.asyncio
 async def test_suggester_produces_one_suggestion_per_issue() -> None:
-    async def fake_suggester(
-        code: str, issues: list[CodeIssue]
-    ) -> list[str]:
+    async def fake_suggester(code: str, issues: list[CodeIssue]) -> list[str]:
         return [f"fix-{i.description}" for i in issues]
 
     node = make_suggester_node(suggester_fn=fake_suggester)
@@ -226,9 +224,7 @@ async def test_suggester_produces_one_suggestion_per_issue() -> None:
 
 @pytest.mark.asyncio
 async def test_suggester_noop_when_no_issues() -> None:
-    async def fake_suggester(
-        code: str, issues: list[CodeIssue]
-    ) -> list[str]:
+    async def fake_suggester(code: str, issues: list[CodeIssue]) -> list[str]:
         return ["unused"]
 
     node = make_suggester_node(suggester_fn=fake_suggester)
@@ -289,9 +285,7 @@ async def test_report_score_clamped_to_zero() -> None:
     """Many critical issues can't push the score below 0.0."""
     node = make_report_generator_node()
     state = _state()
-    state["metadata"]["code_review"]["issues"] = [
-        _issue(severity="critical") for _ in range(20)
-    ]
+    state["metadata"]["code_review"]["issues"] = [_issue(severity="critical") for _ in range(20)]
     update = await node(state)
     assert update["metadata"]["code_review"]["report"].score == 0.0
 
@@ -300,9 +294,7 @@ async def test_report_score_clamped_to_zero() -> None:
 async def test_report_generator_appends_ai_message_with_summary() -> None:
     node = make_report_generator_node()
     state = _state()
-    state["metadata"]["code_review"]["issues"] = [
-        _issue(severity="high", description="watch out")
-    ]
+    state["metadata"]["code_review"]["issues"] = [_issue(severity="high", description="watch out")]
     update = await node(state)
     assert "messages" in update
     assert isinstance(update["messages"][0], AIMessage)

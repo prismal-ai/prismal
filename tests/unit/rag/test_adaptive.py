@@ -24,9 +24,7 @@ def _chunk(source: str = "f.txt", cid: str = "0", content: str = "c") -> Retriev
 
 def _mock_crag(chunks: list[RetrievedChunk]) -> MagicMock:
     c = MagicMock()
-    c.run = AsyncMock(
-        return_value=CRAGResult(answer="a", sources=chunks, used_web_fallback=False)
-    )
+    c.run = AsyncMock(return_value=CRAGResult(answer="a", sources=chunks, used_web_fallback=False))
     return c
 
 
@@ -197,9 +195,7 @@ async def test_search_factual_simple_uses_crag_by_default() -> None:
 async def test_force_strategy_overrides_classification() -> None:
     hyde = _mock_hyde([_chunk()])
     crag = _mock_crag([])
-    engine = AdaptiveRAGEngine(
-        crag_engine=crag, hyde_retriever=hyde, settings=MagicMock()
-    )
+    engine = AdaptiveRAGEngine(crag_engine=crag, hyde_retriever=hyde, settings=MagicMock())
     # Classifier would say FACTUAL_SIMPLE → CRAG; force hyde.
     await engine.search("When was LangGraph released?", k=3, force_strategy="hyde")
     hyde.search.assert_awaited_once()

@@ -33,11 +33,11 @@ from __future__ import annotations
 
 import asyncio
 
+from lightagent.agents.state import initial_state
 from lightagent.agents.subgraphs.ml_pipeline.builder import (
     build_ml_pipeline_subgraph,
     register_ml_pipeline,
 )
-from lightagent.agents.state import initial_state
 
 # ── Dataset: descripción del problema y datos ─────────────────────────────────
 # En un entorno real, el agente accede a archivos CSV/Parquet reales.
@@ -109,15 +109,18 @@ async def main() -> None:
 
     # Mensaje inicial con instrucciones
     from langchain_core.messages import HumanMessage
+
     state["messages"] = [
-        HumanMessage(content=(
-            f"Ejecuta un pipeline completo de Machine Learning para el dataset: "
-            f"{ML_TASK['dataset_name']}.\n\n"
-            f"Descripción: {ML_TASK['description']}\n\n"
-            f"Tarea: {ML_TASK['task_type']}\n"
-            f"Métrica objetivo: {ML_TASK['evaluation_metric']} >= {ML_TASK['target_score']}\n"
-            f"Algoritmos a probar: {', '.join(ML_TASK['algorithms_to_try'])}"
-        ))
+        HumanMessage(
+            content=(
+                f"Ejecuta un pipeline completo de Machine Learning para el dataset: "
+                f"{ML_TASK['dataset_name']}.\n\n"
+                f"Descripción: {ML_TASK['description']}\n\n"
+                f"Tarea: {ML_TASK['task_type']}\n"
+                f"Métrica objetivo: {ML_TASK['evaluation_metric']} >= {ML_TASK['target_score']}\n"
+                f"Algoritmos a probar: {', '.join(ML_TASK['algorithms_to_try'])}"
+            )
+        )
     ]
 
     print(f"\n[Ejecutando pipeline para: {ML_TASK['dataset_name']}]")
@@ -129,7 +132,7 @@ async def main() -> None:
     try:
         final_state = await subgraph.ainvoke(state, config=config)
 
-        print(f"\n[Resultados del pipeline]")
+        print("\n[Resultados del pipeline]")
 
         # Extraer métricas del metadata
         pipeline_meta = final_state.get("metadata", {}).get("ml_pipeline", {})
@@ -143,7 +146,7 @@ async def main() -> None:
         # Último mensaje del agente
         messages = final_state.get("messages", [])
         if messages:
-            print(f"\n  Último mensaje del pipeline:")
+            print("\n  Último mensaje del pipeline:")
             print(f"  {str(messages[-1].content)[:300]}")
 
     except Exception as exc:

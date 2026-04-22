@@ -211,6 +211,7 @@ async def test_search_respects_max_simulations_cap() -> None:
 @pytest.mark.asyncio
 async def test_search_respects_max_depth() -> None:
     """Tree never exceeds max_depth, so path length is bounded."""
+
     async def gen(state: Any, tools: Any) -> list[str]:
         return ["go"]
 
@@ -234,6 +235,7 @@ async def test_search_respects_max_depth() -> None:
 @pytest.mark.asyncio
 async def test_search_times_out_when_budget_elapses() -> None:
     """timeout_seconds caps wall-clock; loop exits before max_simulations."""
+
     async def slow_reward(state: Any) -> float:
         await asyncio.sleep(0.05)
         return 0.1
@@ -261,6 +263,7 @@ async def test_search_times_out_when_budget_elapses() -> None:
 @pytest.mark.asyncio
 async def test_search_raises_when_no_simulation_produces_reward() -> None:
     """If ALL simulations return 0 and no children are produced, raise LATSError."""
+
     async def no_actions(state: Any, tools: Any) -> list[str]:
         return []
 
@@ -285,6 +288,7 @@ async def test_search_raises_when_no_simulation_produces_reward() -> None:
 @pytest.mark.asyncio
 async def test_search_ultimately_favours_higher_reward_path() -> None:
     """Given enough simulations, MCTS converges to the better branch."""
+
     async def gen(state: Any, tools: Any) -> list[str]:
         if state.get("depth", 0) >= 1:
             return []

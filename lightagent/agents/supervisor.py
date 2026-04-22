@@ -40,6 +40,10 @@ from lightagent.monitoring.otel import OTelManager
 from lightagent.providers.registry import ProviderRegistry
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from langchain_core.messages import BaseMessage
+
     from lightagent.agents.state import AgentState
 
 logger = get_logger("lightagent.agents.supervisor")
@@ -403,6 +407,188 @@ async def _extract_and_store_memory(state: AgentState) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _loop_break_decision(
+    state: AgentState,
+    trimmed: Sequence[BaseMessage],
+    session_id: str,
+) -> dict[str, object] | None:
+    """Return an END routing dict when a specialist already answered.
+
+    The supervisor must never route to a specialist twice in a row for
+    the same user turn. When the last message in the trimmed window is
+    an ``AIMessage`` whose ``current_agent`` is not the supervisor, we
+    shortcut to END without calling the LLM.
+    """
+    if not trimmed:
+        return None
+    last_msg = trimmed[-1]
+    if getattr(last_msg, "type", "") != "ai":
+        return None
+    last_agent = state.get("current_agent", "")
+    if last_agent == "supervisor":
+        return None
+    logger.debug("supervisor_loop_break", last_agent=last_agent, session_id=session_id)
+    return {"current_agent": "supervisor", "next_agent": None, "messages": []}
+
+
+def _intent_short_circuit(
+    trimmed: Sequence[BaseMessage],
+    session_id: str,
+) -> tuple[str, dict[str, object]] | None:
+    """Deterministic regex-based intent match (SPEC-046 AC-046-5).
+
+    Returns the matched agent name plus a full supervisor return dict
+    when the last human message matches a known intent, or ``None`` when
+    the LLM should decide. The matched name is exposed so the caller can
+    tag the OTel span with the routing source.
+    """
+    last_human_text = ""
+    for msg in reversed(trimmed):
+        if getattr(msg, "type", "") == "human":
+            last_human_text = str(getattr(msg, "content", ""))
+            break
+    matched_intent = match_intent(last_human_text)
+    if matched_intent is None or matched_intent not in _VALID_ROUTES:
+        return None
+    logger.info(
+        "supervisor_intent_short_circuit",
+        intent="cron_management",
+        next_agent=matched_intent,
+        session_id=session_id,
+    )
+    return matched_intent, {
+        "current_agent": "supervisor",
+        "next_agent": matched_intent,
+        "messages": [],
+    }
+
+
+def _match_route(raw: str, session_id: str) -> str:
+    """Normalise the LLM routing response to a valid route name.
+
+    Returns one of the members in :data:`_VALID_ROUTES` — defaults to
+    ``"END"`` with a warning log when the response is unrecognised.
+    """
+    normalised = raw.strip("\"' \t\n").upper()
+    for valid in _VALID_ROUTES:
+        if valid.upper() == normalised:
+            return valid
+    logger.warning(
+        "supervisor_invalid_routing",
+        raw_response=raw,
+        defaulting_to="END",
+        session_id=session_id,
+    )
+    return "END"
+
+
+def _apply_routing_overrides(
+    next_agent: str | None,
+    state: AgentState,
+    session_id: str,
+) -> str | None:
+    """Apply feature-flag downgrades and parallel-dispatch upgrades.
+
+    - Phase 38: ``codeact`` → ``coder`` when CodeAct is disabled.
+    - Phase 41: ``cua`` → ``researcher`` when CUA is disabled.
+    - Phase 34: ``researcher`` → ``parallel_researcher`` when the planner
+      has enqueued more than one task and parallel mode is enabled.
+    """
+    settings = get_settings()
+    if next_agent == "codeact" and not settings.codeact_enabled:
+        logger.info("supervisor_codeact_downgrade_to_coder", session_id=session_id)
+        return "coder"
+    if next_agent == "cua" and not settings.cua_enabled:
+        logger.info("supervisor_cua_downgrade_to_researcher", session_id=session_id)
+        return "researcher"
+    if (
+        next_agent == "researcher"
+        and len(state.get("pending_tasks", [])) > 1
+        and settings.parallel_enabled
+    ):
+        logger.info(
+            "supervisor_routing_upgraded_to_parallel",
+            pending_count=len(state.get("pending_tasks", [])),
+            session_id=session_id,
+        )
+        return "parallel_researcher"
+    return next_agent
+
+
+def _extract_answer_content(answer_resp: object, session_id: str) -> str:
+    """Collapse an LLM answer response to plain text.
+
+    When the LLM called ``remember_preference`` we invoke the tool and
+    join all tool results; otherwise we return the raw response content.
+    Synthetic function-call JSON wrappers emitted by open models are
+    unwrapped so the user never sees the raw wrapper.
+    """
+    from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
+
+    tool_calls = getattr(answer_resp, "tool_calls", None) or []
+    tool_results: list[str] = []
+    for tc in tool_calls:
+        if tc.get("name") == "remember_preference":
+            from lightagent.agents.tools import remember_preference
+
+            result = remember_preference.invoke(tc.get("args", {}))
+            tool_results.append(str(result))
+            logger.info(
+                "supervisor.remember_preference_called",
+                args=tc.get("args", {}),
+                result=result,
+                session_id=session_id,
+            )
+
+    content = "\n".join(tool_results) if tool_results else str(getattr(answer_resp, "content", ""))
+    unwrapped = _unwrap_synthetic_tool_call(content)
+    return unwrapped if unwrapped is not None else content
+
+
+async def _build_direct_answer(
+    llm: object,
+    state: AgentState,
+    trimmed: Sequence[BaseMessage],
+    session_id: str,
+) -> list[AIMessage]:
+    """Generate the supervisor's direct answer when routing to END.
+
+    Returns an empty list when the END branch should not answer directly
+    (no messages, or the last message isn't a human turn). The system
+    prompt is built from SOUL/CAPACITIES/USER/PREFERENCES markdown files
+    via :class:`ProfileManager`, falling back to ``_ANSWER_SYSTEM_PROMPT``.
+    """
+    messages = state.get("messages")
+    if not messages:
+        return []
+    last = messages[-1]
+    if getattr(last, "type", "") != "human":
+        return []
+
+    from lightagent.agents.tools import SUPERVISOR_DIRECT_TOOLS
+
+    answer_system = ProfileManager().load_system_prompt() or _ANSWER_SYSTEM_PROMPT
+    llm_with_tools = llm.bind_tools(SUPERVISOR_DIRECT_TOOLS)  # type: ignore[attr-defined]
+    answer_resp = await llm_with_tools.ainvoke([SystemMessage(content=answer_system), *trimmed])
+    return [AIMessage(content=_extract_answer_content(answer_resp, session_id))]
+
+
+def _spawn_memory_extraction(state: AgentState) -> None:
+    """Fire-and-forget SPEC-039 AC-039-3 memory extraction at session end.
+
+    No-op when extraction is disabled or no event loop is running; all
+    errors are swallowed so they never impact the user-facing response.
+    """
+    if not get_settings().memory_extraction_enabled:
+        return
+    try:
+        task = asyncio.create_task(_extract_and_store_memory(state))
+        _memory_extraction_tasks.add(task)
+        task.add_done_callback(_memory_extraction_tasks.discard)
+    except RuntimeError as exc:
+        logger.debug("memory_extraction_task_skipped", error=str(exc))
+
+
 async def supervisor_node(state: AgentState) -> dict[str, object]:
     """
     Execute the supervisor node logic and decide the next routing target.
@@ -439,69 +625,26 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
             "lightagent.message_count": len(state["messages"]),
         },
     ) as span:
-        llm = ProviderRegistry().get_llm_with_fallback()
-
-        # Trim the conversation history to the most recent messages before
-        # sending to the LLM.  Long sessions (message_count > 20) can easily
-        # exceed provider rate limits (e.g. Anthropic's 30k tokens/min cap)
-        # because every supervisor call re-sends the entire history.
-        # Keeping the last _HISTORY_WINDOW messages is sufficient for routing
-        # decisions — the full history is still stored in the LangGraph state.
+        # Trim history before anything else — long sessions otherwise
+        # exceed provider rate limits since every supervisor call re-sends
+        # the entire history. The last _HISTORY_WINDOW messages are enough
+        # for routing; the full history remains in LangGraph state.
         trimmed = state["messages"][-_HISTORY_WINDOW:]
 
-        # Loop-breaker: if the last message is an AIMessage from a specialist
-        # agent (i.e. not the user and not generated by the supervisor itself),
-        # route directly to END without calling the LLM.  This guarantees that
-        # a single specialist response always terminates the routing cycle,
-        # regardless of what the LLM might decide.
-        if trimmed:
-            last_msg = trimmed[-1]
-            last_is_ai = getattr(last_msg, "type", "") == "ai"
-            last_agent = state.get("current_agent", "")
-            if last_is_ai and last_agent != "supervisor":
-                logger.debug(
-                    "supervisor_loop_break",
-                    last_agent=last_agent,
-                    session_id=session_id,
-                )
-                span.set_attribute("lightagent.routing_decision", "END")
-                return {
-                    "current_agent": "supervisor",
-                    "next_agent": None,
-                    "messages": [],
-                }
+        loop_break = _loop_break_decision(state, trimmed, session_id)
+        if loop_break is not None:
+            span.set_attribute("lightagent.routing_decision", "END")
+            return loop_break
 
-        # SPEC-046 AC-046-5: deterministic short-circuit for unambiguous
-        # intents (currently only ``cron_manager``).  Runs AFTER the loop
-        # breaker and BEFORE building the LLM routing prompt so we never
-        # waste tokens — and never mis-route — on requests that a pure
-        # regex matcher can recognise with high confidence.
-        last_human_text = ""
-        for msg in reversed(trimmed):
-            if getattr(msg, "type", "") == "human":
-                last_human_text = str(getattr(msg, "content", ""))
-                break
-        matched_intent = match_intent(last_human_text)
-        if matched_intent is not None and matched_intent in _VALID_ROUTES:
-            logger.info(
-                "supervisor_intent_short_circuit",
-                intent="cron_management",
-                next_agent=matched_intent,
-                session_id=session_id,
-            )
+        short_circuit = _intent_short_circuit(trimmed, session_id)
+        if short_circuit is not None:
+            matched_intent, result = short_circuit
             span.set_attribute("lightagent.routing_decision", matched_intent)
             span.set_attribute("lightagent.routing_source", "intent_router")
-            return {
-                "current_agent": "supervisor",
-                "next_agent": matched_intent,
-                "messages": [],
-            }
+            return result
 
-        # SPEC-039 AC-039-4: recall up to ``memory_recall_limit`` durable
-        # preferences for the current user and append them to the system
-        # prompt. Degrades gracefully to an empty suffix on any failure.
+        llm = ProviderRegistry().get_llm_with_fallback()
         memory_context = await _recall_memory_context(state)
-
         routing_messages = [
             SystemMessage(content=_SYSTEM_PROMPT + memory_context),
             *trimmed,
@@ -512,75 +655,14 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
                 )
             ),
         ]
-
         response = await llm.ainvoke(routing_messages)
-
         raw: str = str(response.content).strip()
-        # Normalise: strip surrounding quotes/whitespace and match case-insensitively
-        normalised = raw.strip("\"' \t\n").upper()
 
-        # Find exact match against valid routes (case-insensitive)
-        matched: str | None = None
-        for valid in _VALID_ROUTES:
-            if valid.upper() == normalised:
-                matched = valid
-                break
-
-        if matched is None:
-            logger.warning(
-                "supervisor_invalid_routing",
-                raw_response=raw,
-                defaulting_to="END",
-                session_id=session_id,
-            )
-            matched = "END"
-
+        matched = _match_route(raw, session_id)
         next_agent: str | None = None if matched == "END" else matched
+        next_agent = _apply_routing_overrides(next_agent, state, session_id)
 
-        # Phase 38: respect the CodeAct feature flag — if the LLM picked
-        # ``codeact`` while the toggle is off, downgrade to the classic
-        # ``coder`` agent so the user still gets a response.
-        if next_agent == "codeact" and not get_settings().codeact_enabled:
-            logger.info(
-                "supervisor_codeact_downgrade_to_coder",
-                session_id=session_id,
-            )
-            next_agent = "coder"
-            matched = "coder"
-
-        # Phase 41: respect the CUA feature flag — if the LLM picked
-        # ``cua`` while the toggle is off, downgrade to the
-        # ``researcher`` agent which is the closest text-based
-        # fallback. The CUA node itself also returns a graceful
-        # disabled message, but downgrading at the routing layer
-        # avoids an extra round-trip through the graph.
-        if next_agent == "cua" and not get_settings().cua_enabled:
-            logger.info(
-                "supervisor_cua_downgrade_to_researcher",
-                session_id=session_id,
-            )
-            next_agent = "researcher"
-            matched = "researcher"
-
-        # Phase 34: heuristic upgrade — when the LLM picked ``researcher`` and
-        # the planner has already enqueued more than one independent task in
-        # ``pending_tasks``, switch to the parallel research dispatcher so the
-        # tasks fan out concurrently instead of running serially.
-        if (
-            next_agent == "researcher"
-            and len(state.get("pending_tasks", [])) > 1
-            and get_settings().parallel_enabled
-        ):
-            logger.info(
-                "supervisor_routing_upgraded_to_parallel",
-                pending_count=len(state.get("pending_tasks", [])),
-                session_id=session_id,
-            )
-            next_agent = "parallel_researcher"
-            matched = "parallel_researcher"
-
-        span.set_attribute("lightagent.routing_decision", matched)
-
+        span.set_attribute("lightagent.routing_decision", next_agent if next_agent else "END")
         logger.info(
             "supervisor_routing_decision",
             next_agent=next_agent,
@@ -588,81 +670,10 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
             session_id=session_id,
         )
 
-        # When routing to END and the last message is from the user, generate a
-        # direct answer.  Sub-agents produce their own AIMessages, so we only
-        # need this for the supervisor-answers-directly path.
         response_messages: list[AIMessage] = []
-        if next_agent is None and state.get("messages"):
-            last = state["messages"][-1]
-            if getattr(last, "type", "") == "human":
-                # Build the answer system prompt by combining:
-                #   SOUL.md (persona) + CAPACITIES.md (permanent capabilities)
-                #   + USER.md (user context) + PREFERENCES.md (learned prefs).
-                # load_system_prompt() handles the concatenation and falls back
-                # to an empty string when none of the files exist.
-                profile = ProfileManager()
-                answer_system = profile.load_system_prompt() or _ANSWER_SYSTEM_PROMPT
-
-                # Bind remember_preference so the LLM can call it when the user
-                # makes an explicit "remember that…" request.
-                from lightagent.agents.tools import SUPERVISOR_DIRECT_TOOLS
-
-                llm_with_tools = llm.bind_tools(SUPERVISOR_DIRECT_TOOLS)
-                answer_resp = await llm_with_tools.ainvoke(
-                    [SystemMessage(content=answer_system), *trimmed]
-                )
-
-                # If the LLM decided to call remember_preference, invoke it
-                # and replace the response with a human-readable confirmation.
-                tool_calls = getattr(answer_resp, "tool_calls", None) or []
-                if tool_calls:
-                    tool_results: list[str] = []
-                    for tc in tool_calls:
-                        if tc.get("name") == "remember_preference":
-                            from lightagent.agents.tools import remember_preference
-
-                            result = remember_preference.invoke(tc.get("args", {}))
-                            tool_results.append(str(result))
-                            logger.info(
-                                "supervisor.remember_preference_called",
-                                args=tc.get("args", {}),
-                                result=result,
-                                session_id=session_id,
-                            )
-                    if tool_results:
-                        answer_content = "\n".join(tool_results)
-                    else:
-                        answer_content = str(answer_resp.content)
-                else:
-                    answer_content = str(answer_resp.content)
-
-                # Unwrap synthetic function-call JSON (Ollama / open models)
-                # so the supervisor direct-answer path never leaks the raw
-                # wrapper through to the user.
-                from lightagent.agents.tool_registry import (
-                    _unwrap_synthetic_tool_call,
-                )
-
-                unwrapped = _unwrap_synthetic_tool_call(answer_content)
-                if unwrapped is not None:
-                    answer_content = unwrapped
-
-                response_messages = [AIMessage(content=answer_content)]
-
-        # SPEC-039 AC-039-3: when the session is ending (next_agent is
-        # None) fire memory extraction as a background task so the user
-        # response is returned immediately. ``create_task`` swallows its
-        # own exceptions via ``_extract_and_store_memory`` which wraps
-        # the entire body in try/except.
-        if next_agent is None and get_settings().memory_extraction_enabled:
-            try:
-                task = asyncio.create_task(_extract_and_store_memory(state))
-                _memory_extraction_tasks.add(task)
-                task.add_done_callback(_memory_extraction_tasks.discard)
-            except RuntimeError as exc:
-                # No running loop (unlikely inside an async node) —
-                # best-effort skip so the graph still returns cleanly.
-                logger.debug("memory_extraction_task_skipped", error=str(exc))
+        if next_agent is None:
+            response_messages = await _build_direct_answer(llm, state, trimmed, session_id)
+            _spawn_memory_extraction(state)
 
         return {
             "current_agent": "supervisor",

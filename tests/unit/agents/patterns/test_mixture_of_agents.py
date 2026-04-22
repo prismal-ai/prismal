@@ -39,9 +39,7 @@ def _per_model_registry(
     responses_by_model: dict[str, list[str]],
 ) -> MagicMock:
     """Build a ProviderRegistry mock whose get_llm(model) returns distinct LLMs."""
-    llms = {
-        m: _scripted_llm(*responses_by_model[m]) for m in responses_by_model
-    }
+    llms = {m: _scripted_llm(*responses_by_model[m]) for m in responses_by_model}
     registry = MagicMock()
 
     def get_llm(model: str | None = None) -> MagicMock:
@@ -91,9 +89,7 @@ def test_init_rejects_empty_proposer_models() -> None:
 
 def test_init_rejects_nonpositive_aggregator_layers() -> None:
     with pytest.raises(ValueError):
-        MixtureOfAgents(
-            proposer_models=["a"], n_aggregator_layers=0, settings=MagicMock()
-        )
+        MixtureOfAgents(proposer_models=["a"], n_aggregator_layers=0, settings=MagicMock())
 
 
 # ── generate() happy path ────────────────────────────────────────────────────

@@ -193,18 +193,14 @@ async def test_validator_no_dataframe_returns_empty() -> None:
 def test_etl_branching_gate_routes_passed_to_transformer() -> None:
     gate = make_etl_branching_gate()
     state = _state()
-    state["metadata"]["data_etl"] = {
-        "validation": {"passed": True, "errors": []}
-    }
+    state["metadata"]["data_etl"] = {"validation": {"passed": True, "errors": []}}
     assert gate(state) == "transformer"
 
 
 def test_etl_branching_gate_routes_failed_to_auditor() -> None:
     gate = make_etl_branching_gate()
     state = _state()
-    state["metadata"]["data_etl"] = {
-        "validation": {"passed": False, "errors": ["e"]}
-    }
+    state["metadata"]["data_etl"] = {"validation": {"passed": False, "errors": ["e"]}}
     assert gate(state) == "auditor"
 
 

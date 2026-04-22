@@ -124,9 +124,7 @@ async def test_decide_retrieval_parses_retrieve_token() -> None:
     llm = _mock_llm_with_scripted_responses("RETRIEVE")
     with patch(PROVIDER_REGISTRY_PATH) as reg:
         reg.return_value.get_llm.return_value = llm
-        p = SelfRAGPipeline(
-            vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock()
-        )
+        p = SelfRAGPipeline(vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock())
         decision, fallback = await p._decide_retrieval("q")  # noqa: SLF001
     assert decision is RetrievalDecision.RETRIEVE
     assert fallback is False
@@ -138,9 +136,7 @@ async def test_decide_retrieval_parses_no_retrieve_token() -> None:
     llm = _mock_llm_with_scripted_responses("NO_RETRIEVE")
     with patch(PROVIDER_REGISTRY_PATH) as reg:
         reg.return_value.get_llm.return_value = llm
-        p = SelfRAGPipeline(
-            vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock()
-        )
+        p = SelfRAGPipeline(vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock())
         decision, fallback = await p._decide_retrieval("q")  # noqa: SLF001
     assert decision is RetrievalDecision.NO_RETRIEVE
     assert fallback is False
@@ -153,9 +149,7 @@ async def test_decide_retrieval_is_permissive_about_surrounding_text() -> None:
     llm = _mock_llm_with_scripted_responses("My decision: RETRIEVE — need external facts.")
     with patch(PROVIDER_REGISTRY_PATH) as reg:
         reg.return_value.get_llm.return_value = llm
-        p = SelfRAGPipeline(
-            vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock()
-        )
+        p = SelfRAGPipeline(vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock())
         decision, _ = await p._decide_retrieval("q")  # noqa: SLF001
     assert decision is RetrievalDecision.RETRIEVE
 
@@ -170,9 +164,7 @@ async def test_decide_retrieval_falls_back_to_retrieve_when_unparseable() -> Non
     llm = _mock_llm_with_scripted_responses("Sure, I can help with that.")
     with patch(PROVIDER_REGISTRY_PATH) as reg:
         reg.return_value.get_llm.return_value = llm
-        p = SelfRAGPipeline(
-            vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock()
-        )
+        p = SelfRAGPipeline(vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock())
         decision, fallback = await p._decide_retrieval("q")  # noqa: SLF001
     assert decision is RetrievalDecision.RETRIEVE
     assert fallback is True
@@ -185,9 +177,7 @@ async def test_decide_retrieval_falls_back_when_llm_raises() -> None:
     llm.ainvoke = AsyncMock(side_effect=RuntimeError("boom"))
     with patch(PROVIDER_REGISTRY_PATH) as reg:
         reg.return_value.get_llm.return_value = llm
-        p = SelfRAGPipeline(
-            vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock()
-        )
+        p = SelfRAGPipeline(vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock())
         decision, fallback = await p._decide_retrieval("q")  # noqa: SLF001
     assert decision is RetrievalDecision.RETRIEVE
     assert fallback is True
@@ -202,9 +192,7 @@ async def test_assess_support_parses_supported_with_utility() -> None:
     llm = _mock_llm_with_scripted_responses("SUPPORTED Utility:5")
     with patch(PROVIDER_REGISTRY_PATH) as reg:
         reg.return_value.get_llm.return_value = llm
-        p = SelfRAGPipeline(
-            vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock()
-        )
+        p = SelfRAGPipeline(vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock())
         support, utility = await p._assess_support("q", "ans", [])  # noqa: SLF001
     assert support is SupportedDecision.SUPPORTED
     assert utility == 5
@@ -216,9 +204,7 @@ async def test_assess_support_parses_partial() -> None:
     llm = _mock_llm_with_scripted_responses("PARTIALLY_SUPPORTED Utility:3")
     with patch(PROVIDER_REGISTRY_PATH) as reg:
         reg.return_value.get_llm.return_value = llm
-        p = SelfRAGPipeline(
-            vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock()
-        )
+        p = SelfRAGPipeline(vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock())
         support, utility = await p._assess_support("q", "ans", [])  # noqa: SLF001
     assert support is SupportedDecision.PARTIALLY_SUPPORTED
     assert utility == 3
@@ -230,9 +216,7 @@ async def test_assess_support_unparseable_defaults_to_unsupported_utility_1() ->
     llm = _mock_llm_with_scripted_responses("I'm not sure")
     with patch(PROVIDER_REGISTRY_PATH) as reg:
         reg.return_value.get_llm.return_value = llm
-        p = SelfRAGPipeline(
-            vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock()
-        )
+        p = SelfRAGPipeline(vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock())
         support, utility = await p._assess_support("q", "ans", [])  # noqa: SLF001
     assert support is SupportedDecision.UNSUPPORTED
     assert utility == 1
@@ -244,9 +228,7 @@ async def test_assess_support_clamps_utility_to_1_5_range() -> None:
     llm = _mock_llm_with_scripted_responses("SUPPORTED Utility:99")
     with patch(PROVIDER_REGISTRY_PATH) as reg:
         reg.return_value.get_llm.return_value = llm
-        p = SelfRAGPipeline(
-            vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock()
-        )
+        p = SelfRAGPipeline(vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock())
         _, utility = await p._assess_support("q", "ans", [])  # noqa: SLF001
     assert 1 <= utility <= 5
 
@@ -322,8 +304,6 @@ async def test_run_raises_selfrag_error_when_generation_fails_on_no_retrieve() -
     )
     with patch(PROVIDER_REGISTRY_PATH) as reg:
         reg.return_value.get_llm.return_value = llm
-        p = SelfRAGPipeline(
-            vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock()
-        )
+        p = SelfRAGPipeline(vector_store=store, crag_pipeline=MagicMock(), settings=MagicMock())
         with pytest.raises(SelfRAGError):
             await p.run("q")

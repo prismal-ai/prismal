@@ -53,9 +53,7 @@ def make_faq_retrieval_node(
             chunks = []
 
         if chunks:
-            confidence = max(
-                float(getattr(c, "relevance_score", 0.0)) for c in chunks
-            )
+            confidence = max(float(getattr(c, "relevance_score", 0.0)) for c in chunks)
         else:
             confidence = 0.0
 

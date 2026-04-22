@@ -304,7 +304,7 @@ class DateTimeService:
         """
         settings = get_settings()
         try:
-            import ntplib  # type: ignore[import-not-found]  # optional dep, no stubs
+            import ntplib
 
             client = ntplib.NTPClient()
             response = client.request(settings.ntp_server, version=3)

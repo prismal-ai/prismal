@@ -130,9 +130,7 @@ async def generate_article(
         )
         user = f"Instrucción: {instruction}"
 
-    response = await llm.ainvoke(
-        [SystemMessage(content=system), HumanMessage(content=user)]
-    )
+    response = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=user)])
     return str(response.content).strip()
 
 
@@ -172,9 +170,7 @@ async def critique_article(
         "[feedback detallado]"
     )
 
-    response = await llm.ainvoke(
-        [SystemMessage(content=system), HumanMessage(content=user)]
-    )
+    response = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=user)])
 
     raw = str(response.content).strip()
     lines = raw.split("\n", 1)
@@ -186,6 +182,7 @@ async def critique_article(
     except ValueError:
         # Fallback: buscar el primer número flotante
         import re
+
         numbers = re.findall(r"\b0\.\d+\b|\b1\.0\b", raw)
         score = float(numbers[0]) if numbers else 0.5
 

@@ -96,9 +96,7 @@ class HybridSearchEngine:
             ValueError: If ``len(corpus) != len(doc_ids)``.
         """
         if len(corpus) != len(doc_ids):
-            raise ValueError(
-                f"corpus and doc_ids length mismatch: {len(corpus)} vs {len(doc_ids)}"
-            )
+            raise ValueError(f"corpus and doc_ids length mismatch: {len(corpus)} vs {len(doc_ids)}")
         tokenized = [_tokenize(text) for text in corpus]
         self._bm25 = BM25Okapi(tokenized) if tokenized else None
         self._corpus = list(corpus)
@@ -141,9 +139,7 @@ class HybridSearchEngine:
                 otel.increment_counter("rag_queries")
                 return semantic_chunks[:k]
 
-            sem_scores_by_key = {
-                (c.source, c.chunk_id): c.relevance_score for c in semantic_chunks
-            }
+            sem_scores_by_key = {(c.source, c.chunk_id): c.relevance_score for c in semantic_chunks}
             chunk_by_key: dict[tuple[str, str], RetrievedChunk] = {
                 (c.source, c.chunk_id): c for c in semantic_chunks
             }
@@ -214,8 +210,7 @@ class HybridSearchEngine:
             return {}
         raw_scores = self._bm25.get_scores(tokens)
         return {
-            doc_id: float(score)
-            for doc_id, score in zip(self._doc_ids, raw_scores, strict=True)
+            doc_id: float(score) for doc_id, score in zip(self._doc_ids, raw_scores, strict=True)
         }
 
     def _doc_id_to_key(self, doc_id: str) -> tuple[str, str]:

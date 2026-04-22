@@ -33,7 +33,6 @@ Uso:
 from __future__ import annotations
 
 import asyncio
-from datetime import date
 
 from langchain_core.messages import HumanMessage
 
@@ -45,6 +44,7 @@ try:
         build_financial_subgraph,
         register_financial_analyst,
     )
+
     FINANCIAL_SUBGRAPH_AVAILABLE = True
 except ImportError:
     FINANCIAL_SUBGRAPH_AVAILABLE = False
@@ -163,16 +163,18 @@ async def run_financial_analysis(request: dict) -> None:
         print("\n  [Nodo 1: market_data_collector]")
         print(f"    Precio: ${market_data.get('current_price')}")
         print(f"    Cap: {market_data.get('market_cap')}")
-        print(f"    ✓ Data Gate: confidence alta → procede")
+        print("    ✓ Data Gate: confidence alta → procede")
 
         print("\n  [Nodo 2: technical_analyst]")
-        print(f"    RSI(14): {market_data.get('rsi_14')} ({'sobrecomprado' if market_data.get('rsi_14', 0) > 70 else 'neutral'})")
+        print(
+            f"    RSI(14): {market_data.get('rsi_14')} ({'sobrecomprado' if market_data.get('rsi_14', 0) > 70 else 'neutral'})"
+        )
         print(f"    MACD: {market_data.get('macd_signal')}")
-        sups = market_data.get('support_levels', [])
-        resis = market_data.get('resistance_levels', [])
+        sups = market_data.get("support_levels", [])
+        resis = market_data.get("resistance_levels", [])
         print(f"    Soportes: {sups[:2]}")
         print(f"    Resistencias: {resis[:2]}")
-        print(f"    ✓ Technical Gate: señales claras → procede a fundamental")
+        print("    ✓ Technical Gate: señales claras → procede a fundamental")
 
         print("\n  [Nodo 3: fundamental_analyst]")
         print(f"    P/E Ratio: {market_data.get('pe_ratio')} (sector avg: ~30)")
@@ -181,15 +183,17 @@ async def run_financial_analysis(request: dict) -> None:
         print(f"    Gross Margin: {market_data.get('gross_margin')}%")
 
         print("\n  [Nodo 4: risk_sentiment_analyst]")
-        beta = market_data.get('beta', 1.0)
+        beta = market_data.get("beta", 1.0)
         risk_level = "ALTO" if beta > 1.5 else "MEDIO" if beta > 1.0 else "BAJO"
         print(f"    Beta: {beta} → Riesgo relativo al mercado: {risk_level}")
-        print(f"    Precio/52w Max: {(market_data.get('current_price',0)/market_data.get('52w_high',1)*100):.1f}%")
+        print(
+            f"    Precio/52w Max: {(market_data.get('current_price', 0) / market_data.get('52w_high', 1) * 100):.1f}%"
+        )
 
         print("\n  [Nodo 5: report_generator]")
-        consensus = market_data.get('analyst_consensus', 'HOLD')
-        target_med = market_data.get('price_targets', {}).get('median', 0)
-        current = market_data.get('current_price', 0)
+        consensus = market_data.get("analyst_consensus", "HOLD")
+        target_med = market_data.get("price_targets", {}).get("median", 0)
+        current = market_data.get("current_price", 0)
         upside = ((target_med - current) / current * 100) if current > 0 else 0
         print(f"    Recomendación: {consensus}")
         print(f"    Precio objetivo (mediana): ${target_med}")
@@ -214,7 +218,7 @@ async def run_financial_analysis(request: dict) -> None:
 
     messages = final_state.get("messages", [])
     if messages:
-        print(f"\n  Informe generado:")
+        print("\n  Informe generado:")
         print(f"  {str(messages[-1].content)[:500]}")
 
 
@@ -236,7 +240,6 @@ async def main() -> None:
         ("report_generator      ", "síntesis + recomendación BUY/HOLD/SELL"),
     ]
     for node, desc in nodes_and_gates:
-        prefix = "  [Gate]" if "Gate" in node else "  ──────"
         print(f"  {node}: {desc}")
 
     # Ejecutar análisis para cada ticker

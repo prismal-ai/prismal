@@ -51,9 +51,7 @@ def make_role_node(
             user_parts.append(f"Prior positions:\n{prior_text}")
 
         builder = SecurePromptBuilder()
-        prompted = builder.build(
-            system=system_prompt, user="\n\n".join(user_parts)
-        )
+        prompted = builder.build(system=system_prompt, user="\n\n".join(user_parts))
         try:
             response = await llm.ainvoke(
                 [

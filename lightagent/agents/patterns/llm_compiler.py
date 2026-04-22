@@ -21,11 +21,14 @@ Example::
     async def plan_fn(goal, state, previous_results):
         return await llm_planner(goal, previous_results)
 
+
     async def tool_executor(task, prior_outputs):
         return await run_tool(task.tool, task.args)
 
+
     async def joiner(goal, completed):
         return await llm_joiner(goal, completed)
+
 
     compiler = LLMCompiler(
         tools=my_tools,
@@ -211,9 +214,7 @@ class LLMCompiler:
         for task in plan.tasks:
             for dep in task.depends_on:
                 if dep not in id_set:
-                    raise CompilerError(
-                        f"Task {task.id!r} depends on unknown task {dep!r}"
-                    )
+                    raise CompilerError(f"Task {task.id!r} depends on unknown task {dep!r}")
 
         # Kahn's algorithm
         in_degree = {t.id: len(t.depends_on) for t in plan.tasks}
@@ -232,9 +233,7 @@ class LLMCompiler:
                     queue.append(s)
         if processed != len(plan.tasks):
             remaining = [tid for tid, deg in in_degree.items() if deg > 0]
-            raise CompilerError(
-                f"Plan contains a cycle involving tasks: {sorted(remaining)}"
-            )
+            raise CompilerError(f"Plan contains a cycle involving tasks: {sorted(remaining)}")
         return True
 
     def compute_execution_waves(self, tasks: Sequence[TaskNode]) -> list[list[str]]:
@@ -283,9 +282,7 @@ class LLMCompiler:
 
                 if failed == 0:
                     final = await self._joiner(goal, plan.tasks)
-                    span.set_attribute(
-                        "lightagent.compiler.replanning_count", replanning_count
-                    )
+                    span.set_attribute("lightagent.compiler.replanning_count", replanning_count)
                     span.set_attribute("lightagent.compiler.tasks_succeeded", succeeded)
                     logger.info(
                         "llm_compiler_done",
@@ -316,9 +313,7 @@ class LLMCompiler:
                     tasks_failed=failed,
                 )
 
-    async def _run_plan(
-        self, plan: CompilerPlan
-    ) -> tuple[dict[str, Any], int, int]:
+    async def _run_plan(self, plan: CompilerPlan) -> tuple[dict[str, Any], int, int]:
         """Run all waves; return ``(outputs_by_id, succeeded, failed)``."""
         outputs: dict[str, Any] = {}
         by_id = {t.id: t for t in plan.tasks}
@@ -346,9 +341,7 @@ class LLMCompiler:
                     succeeded += 1
         return outputs, succeeded, failed
 
-    async def _run_one_task(
-        self, task: TaskNode, prior_outputs: dict[str, Any]
-    ) -> Any:
+    async def _run_one_task(self, task: TaskNode, prior_outputs: dict[str, Any]) -> Any:
         task.status = "running"
         interpolated = _interpolate_args(task.args, prior_outputs)
         # We don't mutate the original args dict; expose the interpolated one
@@ -365,9 +358,7 @@ class LLMCompiler:
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
-def _interpolate_args(
-    args: dict[str, Any], prior_outputs: dict[str, Any]
-) -> dict[str, Any]:
+def _interpolate_args(args: dict[str, Any], prior_outputs: dict[str, Any]) -> dict[str, Any]:
     """Replace ``$Tid.output`` placeholders in *args* with real outputs.
 
     Pure function: returns a new dict; leaves *args* untouched. Placeholders
@@ -383,6 +374,7 @@ def _interpolate_args(
                 if ref_id in prior_outputs:
                     resolved[key] = prior_outputs[ref_id]
                     continue
+
             # Inline substitution when placeholder appears as a substring.
             def _sub(m: re.Match[str]) -> str:
                 ref_id = m.group(1)

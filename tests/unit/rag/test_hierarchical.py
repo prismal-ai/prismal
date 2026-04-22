@@ -260,10 +260,7 @@ def test_search_handles_children_without_parent_metadata_gracefully() -> None:
 
 def test_search_returns_at_most_k_parents() -> None:
     """k limits number of parent groups, not child hits."""
-    docs = [
-        _child_result(f"c{i}", "file.txt", f"c{i}", f"p{i}", f"PARENT-P{i}")
-        for i in range(10)
-    ]
+    docs = [_child_result(f"c{i}", "file.txt", f"c{i}", f"p{i}", f"PARENT-P{i}") for i in range(10)]
     store = MagicMock()
     store.similarity_search.return_value = [(d, 0.9 - i * 0.01) for i, d in enumerate(docs)]
     engine = HierarchicalRAGEngine(

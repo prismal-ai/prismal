@@ -41,10 +41,12 @@ def make_response_generator_node(
 
         cs = (state.get("metadata") or {}).get("customer_service") or {}
         retrieved = cs.get("retrieved") or []
-        context_blob = "\n\n".join(
-            f"[{i + 1}] {getattr(c, 'content', str(c))}"
-            for i, c in enumerate(retrieved)
-        ) or "(no knowledge-base context available)"
+        context_blob = (
+            "\n\n".join(
+                f"[{i + 1}] {getattr(c, 'content', str(c))}" for i, c in enumerate(retrieved)
+            )
+            or "(no knowledge-base context available)"
+        )
         user = f"Query: {query}\n\nKnowledge base:\n{context_blob}"
 
         builder = SecurePromptBuilder()
@@ -59,8 +61,7 @@ def make_response_generator_node(
         except Exception as exc:
             logger.warning("customer_service_response_error", error=str(exc))
             answer = (
-                "I'm sorry — I couldn't produce an answer right now. "
-                "Please try again in a moment."
+                "I'm sorry — I couldn't produce an answer right now. Please try again in a moment."
             )
         else:
             answer = str(response.content).strip()

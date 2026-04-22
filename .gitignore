@@ -69,3 +69,7 @@ env.example
 !env.example
 lightagent_agents_presentation.pptx
 lightagent_infografias.html
+LightAgent_Patrones_Arquitecturas_IA.pptx
+LightAgent_Patrones_Arquitecturas_IA.pdf
+dist/
+packaging/

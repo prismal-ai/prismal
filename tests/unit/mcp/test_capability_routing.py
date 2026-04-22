@@ -181,9 +181,7 @@ def test_get_tools_for_agent_forwards_capabilities_to_manager() -> None:
             FakeMgr,
         ),
     ):
-        tool_registry.get_tools_for_agent(
-            "researcher", required_capabilities=["research", "rag"]
-        )
+        tool_registry.get_tools_for_agent("researcher", required_capabilities=["research", "rag"])
 
     assert captured["caps"] == ["research", "rag"]
 
@@ -246,9 +244,7 @@ def test_get_recommended_capabilities_new_nodes_return_lists() -> None:
         "code_execution",
         "file_management",
     ]
-    assert "customer_service" in (
-        get_recommended_capabilities("customer_service") or []
-    )
+    assert "customer_service" in (get_recommended_capabilities("customer_service") or [])
 
 
 def test_get_tools_for_agent_code_review_excludes_customer_service_tools() -> None:

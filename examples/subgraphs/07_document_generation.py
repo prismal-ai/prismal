@@ -37,6 +37,7 @@ try:
         build_document_generation_subgraph,
         register_document_generation,
     )
+
     DOC_GEN_AVAILABLE = True
 except ImportError:
     DOC_GEN_AVAILABLE = False
@@ -49,8 +50,16 @@ DOCUMENT_REQUESTS = [
         "topic": "REST API design best practices",
         "audience": "developers intermediate",
         "format": "markdown",
-        "sections": ["Introducción", "Recursos y URIs", "Métodos HTTP", "Códigos de estado",
-                     "Versionado", "Autenticación", "Paginación", "Mejores prácticas"],
+        "sections": [
+            "Introducción",
+            "Recursos y URIs",
+            "Métodos HTTP",
+            "Códigos de estado",
+            "Versionado",
+            "Autenticación",
+            "Paginación",
+            "Mejores prácticas",
+        ],
         "target_length": "1500 words",
         "context": (
             "Guía práctica para desarrolladores backend que quieren diseñar APIs REST "
@@ -63,8 +72,15 @@ DOCUMENT_REQUESTS = [
         "topic": "Machine Learning Explainability (SHAP, LIME, feature importance)",
         "audience": "data scientists intermediate",
         "format": "markdown",
-        "sections": ["¿Por qué XAI?", "SHAP Values", "LIME", "Importancia de features",
-                     "Casos de uso", "Limitaciones", "Herramientas"],
+        "sections": [
+            "¿Por qué XAI?",
+            "SHAP Values",
+            "LIME",
+            "Importancia de features",
+            "Casos de uso",
+            "Limitaciones",
+            "Herramientas",
+        ],
         "target_length": "1200 words",
         "context": (
             "Documento para data scientists que entrenan modelos en producción y "
@@ -77,8 +93,14 @@ DOCUMENT_REQUESTS = [
         "topic": "Zero-trust network security model",
         "audience": "security engineers advanced",
         "format": "markdown",
-        "sections": ["Core Principles", "Identity Verification", "Least Privilege",
-                     "Microsegmentation", "Continuous Monitoring", "Implementation Roadmap"],
+        "sections": [
+            "Core Principles",
+            "Identity Verification",
+            "Least Privilege",
+            "Microsegmentation",
+            "Continuous Monitoring",
+            "Implementation Roadmap",
+        ],
         "target_length": "2000 words",
         "context": (
             "Technical reference for security engineers migrating from perimeter-based "
@@ -165,14 +187,15 @@ RESEARCH_KNOWLEDGE = {
 
 # ── Simulador del pipeline ────────────────────────────────────────────────────
 
+
 def simulate_planner(request: dict) -> dict:
     """Simula el nodo planner: genera el plan del documento."""
     return {
         "title": request["title"],
         "audience": request["audience"],
         "sections": request["sections"],
-        "estimated_words_per_section": int(
-            request["target_length"].split()[0]) // len(request["sections"]),
+        "estimated_words_per_section": int(request["target_length"].split()[0])
+        // len(request["sections"]),
         "format": request["format"],
         "tone": "technical" if "advanced" in request["audience"] else "approachable-technical",
     }
@@ -258,7 +281,7 @@ def simulate_formatter(document: str, format_type: str) -> str:
         # Ya está en Markdown, añadir metadatos YAML frontmatter
         frontmatter = "---\nformat: markdown\ngenerator: lightagent-document-generation\n---\n\n"
         return frontmatter + document
-    elif format_type == "html":
+    if format_type == "html":
         # Conversión básica a HTML
         html = "<html><body>\n"
         for line in document.splitlines():
@@ -272,10 +295,10 @@ def simulate_formatter(document: str, format_type: str) -> str:
                 html += f"<p>{line}</p>\n"
         html += "</body></html>"
         return html
-    else:  # plain
-        import re
-        plain = re.sub(r"[#*`_]", "", document)
-        return plain
+    # plain
+    import re
+
+    return re.sub(r"[#*`_]", "", document)
 
 
 async def run_document_generation(request: dict) -> dict:
@@ -288,14 +311,14 @@ async def run_document_generation(request: dict) -> dict:
         print("  [Modo demo — subgraph simulado]")
 
         # Nodo 1: planner
-        print(f"\n  ── Nodo 1: planner ──")
+        print("\n  ── Nodo 1: planner ──")
         plan = simulate_planner(request)
         print(f"    Secciones planificadas: {len(plan['sections'])}")
         print(f"    ~{plan['estimated_words_per_section']} palabras/sección")
         print(f"    Tono: {plan['tone']}")
 
         # Nodo 2: researcher
-        print(f"\n  ── Nodo 2: researcher ──")
+        print("\n  ── Nodo 2: researcher ──")
         research = simulate_researcher(request, plan)
         print(f"    Conceptos clave encontrados: {len(research.get('key_concepts', []))}")
         print(f"    Ejemplos recopilados        : {len(research.get('examples', []))}")
@@ -303,25 +326,25 @@ async def run_document_generation(request: dict) -> dict:
             print(f"    Fuentes referenciadas       : {research['references']}")
 
         # Nodo 3: writer
-        print(f"\n  ── Nodo 3: writer ──")
+        print("\n  ── Nodo 3: writer ──")
         draft = simulate_writer(request, plan, research)
         word_count = len(draft.split())
         print(f"    Borrador generado: {word_count} palabras, {len(draft)} chars")
         print(f"    Secciones H2     : {draft.count(chr(10) + '## ')}")
 
         # Nodo 4: editor
-        print(f"\n  ── Nodo 4: editor ──")
+        print("\n  ── Nodo 4: editor ──")
         final_doc, edits = simulate_editor(draft, request)
         if edits:
             print(f"    Revisiones aplicadas ({len(edits)}):")
             for edit in edits:
                 print(f"      • {edit}")
         else:
-            print(f"    ✓ Sin revisiones necesarias")
+            print("    ✓ Sin revisiones necesarias")
         print(f"    Palabras finales: {len(final_doc.split())}")
 
         # Nodo 5: formatter
-        print(f"\n  ── Nodo 5: formatter ──")
+        print("\n  ── Nodo 5: formatter ──")
         formatted_doc = simulate_formatter(final_doc, request["format"])
         print(f"    Formato aplicado  : {request['format']}")
         print(f"    Documento final   : {len(formatted_doc)} chars")
@@ -329,7 +352,7 @@ async def run_document_generation(request: dict) -> dict:
         # Preview del documento
         lines = formatted_doc.splitlines()
         preview_lines = [l for l in lines[:12] if l.strip()][:6]
-        print(f"\n  Preview (primeras líneas):")
+        print("\n  Preview (primeras líneas):")
         for line in preview_lines:
             print(f"    {line[:75]}")
 
@@ -344,25 +367,30 @@ async def run_document_generation(request: dict) -> dict:
         }
 
     # Modo real con subgraph LangGraph
-    from lightagent.agents.state import initial_state
     from langchain_core.messages import HumanMessage
+
+    from lightagent.agents.state import initial_state
 
     await register_document_generation(format=request["format"])
     subgraph = build_document_generation_subgraph(format=request["format"])
 
     state = initial_state()
-    state["messages"] = [HumanMessage(content=(
-        f"Genera un documento técnico sobre: {request['topic']}\n"
-        f"Título: {request['title']}\n"
-        f"Audiencia: {request['audience']}\n"
-        f"Secciones: {', '.join(request['sections'])}\n"
-        f"Longitud objetivo: {request['target_length']}\n"
-        f"Contexto: {request['context']}"
-    ))]
+    state["messages"] = [
+        HumanMessage(
+            content=(
+                f"Genera un documento técnico sobre: {request['topic']}\n"
+                f"Título: {request['title']}\n"
+                f"Audiencia: {request['audience']}\n"
+                f"Secciones: {', '.join(request['sections'])}\n"
+                f"Longitud objetivo: {request['target_length']}\n"
+                f"Contexto: {request['context']}"
+            )
+        )
+    ]
     state["metadata"] = {
         "document_generation": {
-            "title":    request["title"],
-            "topic":    request["topic"],
+            "title": request["title"],
+            "topic": request["topic"],
             "audience": request["audience"],
             "sections": request["sections"],
         }
@@ -412,8 +440,10 @@ async def main() -> None:
     print(f"  {'ID':<10} {'Título':<35} {'Palabras':>8} {'Edits':>6} {'Formato'}")
     print("  " + "─" * 68)
     for r in results:
-        print(f"  {r['id']:<10} {r['title'][:34]:<35} {r['word_count']:>8} "
-              f"{r['edits_applied']:>6} {r['format']}")
+        print(
+            f"  {r['id']:<10} {r['title'][:34]:<35} {r['word_count']:>8} "
+            f"{r['edits_applied']:>6} {r['format']}"
+        )
 
     total_words = sum(r["word_count"] for r in results)
     print(f"\n  Total de palabras generadas: {total_words:,}")
@@ -423,8 +453,8 @@ async def main() -> None:
     print("\n[Formatos de salida disponibles]")
     formats_info = [
         ("markdown", "Texto con sintaxis Markdown — ideal para wikis, GitHub, Confluence"),
-        ("plain",    "Texto plano sin markup — útil para email, TTS, legacy systems"),
-        ("html",     "HTML renderizable — para portales web o emails enriquecidos"),
+        ("plain", "Texto plano sin markup — útil para email, TTS, legacy systems"),
+        ("html", "HTML renderizable — para portales web o emails enriquecidos"),
     ]
     for fmt, desc in formats_info:
         print(f"  {fmt:10s}: {desc}")

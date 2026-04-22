@@ -101,7 +101,7 @@ class MetaLearner:
         try:
             from langfuse import Langfuse
 
-            client = Langfuse(
+            client: Any = Langfuse(
                 public_key=settings.langfuse_public_key.get_secret_value(),
                 secret_key=settings.langfuse_secret_key.get_secret_value(),
                 host=settings.langfuse_host,

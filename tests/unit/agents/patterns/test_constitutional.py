@@ -219,9 +219,7 @@ async def test_apply_respects_max_revisions_cap() -> None:
     llm.ainvoke = AsyncMock(side_effect=lambda *a, **kw: _response("VIOLATION: still bad"))
     with patch(PROVIDER_REGISTRY_PATH) as reg:
         reg.return_value.get_llm.return_value = llm
-        f = ConstitutionalFilter(
-            principles=[principle], max_revisions=2, settings=MagicMock()
-        )
+        f = ConstitutionalFilter(principles=[principle], max_revisions=2, settings=MagicMock())
         result = await f.apply("bad")
 
     assert result.max_revisions_reached is True

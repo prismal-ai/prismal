@@ -66,9 +66,7 @@ async def test_adaptive_rag_then_constitutional_filter() -> None:
     # The LLM always returns "OK" → no violation → no revision.
     filter_llm = MagicMock()
     filter_llm.ainvoke = AsyncMock(return_value=_response("OK: clean"))
-    with patch(
-        "lightagent.agents.patterns.constitutional.ProviderRegistry"
-    ) as reg:
+    with patch("lightagent.agents.patterns.constitutional.ProviderRegistry") as reg:
         reg.return_value.get_llm.return_value = filter_llm
         filt = ConstitutionalFilter(
             principles=[principle],
@@ -121,9 +119,7 @@ async def test_adaptive_rag_plus_constitutional_revision_flow() -> None:
             _response("OK: now clean"),
         ]
     )
-    with patch(
-        "lightagent.agents.patterns.constitutional.ProviderRegistry"
-    ) as reg:
+    with patch("lightagent.agents.patterns.constitutional.ProviderRegistry") as reg:
         reg.return_value.get_llm.return_value = filter_llm
         filt = ConstitutionalFilter(principles=[principle], settings=MagicMock())
         const_result = await filt.apply(result.chunks[0].content)

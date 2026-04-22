@@ -13,8 +13,8 @@ Example::
     store = ChromaVectorStore()
     retriever = HyDERetriever(vector_store=store)
     result = await retriever.search("Why does LangGraph use StateGraph?", k=5)
-    print(result.hypothesis)   # the generated hypothetical answer
-    print(result.chunks)       # retrieved chunks
+    print(result.hypothesis)  # the generated hypothetical answer
+    print(result.chunks)  # retrieved chunks
 """
 
 from __future__ import annotations
@@ -115,9 +115,7 @@ class HyDERetriever:
             span.set_attribute("lightagent.hypothesis_len", len(hypothesis))
 
             hypothesis_embedding = await self._embed_hypothesis(hypothesis)
-            span.set_attribute(
-                "lightagent.hypothesis_embedding_dims", len(hypothesis_embedding)
-            )
+            span.set_attribute("lightagent.hypothesis_embedding_dims", len(hypothesis_embedding))
 
             raw_results = self._store.similarity_search(hypothesis, k=k)
             chunks: list[RetrievedChunk] = []

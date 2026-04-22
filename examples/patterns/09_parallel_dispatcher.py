@@ -30,7 +30,7 @@ import asyncio
 import time
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from lightagent.agents.patterns.parallel import make_parallel_dispatcher
 from lightagent.core.config import get_settings
@@ -179,11 +179,13 @@ async def run_parallel_verification(
     valid_results = []
     for i, result in enumerate(results):
         if isinstance(result, Exception):
-            valid_results.append({
-                "claim_id": claims[i]["id"],
-                "error": str(result),
-                "correct": False,
-            })
+            valid_results.append(
+                {
+                    "claim_id": claims[i]["id"],
+                    "error": str(result),
+                    "correct": False,
+                }
+            )
         else:
             valid_results.append(result)
 
@@ -199,11 +201,11 @@ def demo_langgraph_dispatcher() -> None:
 
     # En un grafo LangGraph real, el dispatcher se crearía así:
     dispatcher = make_parallel_dispatcher(
-        tasks_field="research_tasks",   # campo del estado con las tareas
-        worker_node="claim_verifier",   # nodo worker del grafo
-        max_workers=6,                  # cap de workers concurrentes
-        on_empty="__end__",             # routing cuando no hay tareas
-        task_key="_task",               # key para inyectar la tarea al worker
+        tasks_field="research_tasks",  # campo del estado con las tareas
+        worker_node="claim_verifier",  # nodo worker del grafo
+        max_workers=6,  # cap de workers concurrentes
+        on_empty="__end__",  # routing cuando no hay tareas
+        task_key="_task",  # key para inyectar la tarea al worker
     )
 
     print("  Dispatcher creado con configuración:")
@@ -266,19 +268,16 @@ async def main() -> None:
     t_parallel = time.perf_counter() - t0
 
     # Resultados
-    print(f"\n  Resultados de verificación:")
+    print("\n  Resultados de verificación:")
     print(f"  {'ID':<8} {'Label esperado':<20} {'Predicción':<20} {'OK?':>4}")
     print("  " + "─" * 55)
     for r in results_parallel:
         if "error" in r:
-            print(f"  {r['claim_id']:<8} {'ERROR':<20} {str(r.get('error',''))[:18]:<20} {'✗':>4}")
+            print(f"  {r['claim_id']:<8} {'ERROR':<20} {str(r.get('error', ''))[:18]:<20} {'✗':>4}")
         else:
             ok = "✓" if r["correct"] else "✗"
             print(
-                f"  {r['claim_id']:<8} "
-                f"{r['expected_label']:<20} "
-                f"{r['predicted_label']:<20} "
-                f"{ok:>4}"
+                f"  {r['claim_id']:<8} {r['expected_label']:<20} {r['predicted_label']:<20} {ok:>4}"
             )
 
     # Métricas

@@ -35,10 +35,7 @@ if TYPE_CHECKING:
 logger = get_logger("lightagent.subgraphs.debate_consensus.builder")
 
 _NAME = "debate_consensus"
-_DESCRIPTION = (
-    "Debate/consensus pipeline: "
-    "proponent → opponent → moderator → consensus"
-)
+_DESCRIPTION = "Debate/consensus pipeline: proponent → opponent → moderator → consensus"
 
 
 def build_debate_consensus_subgraph(

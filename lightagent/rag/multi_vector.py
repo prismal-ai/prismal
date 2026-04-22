@@ -208,9 +208,7 @@ class MultiVectorRAGEngine:
                 if doc_id not in best_by_doc or score > best_by_doc[doc_id][0]:
                     best_by_doc[doc_id] = (score, doc)
 
-            ordered_ids = sorted(
-                best_by_doc, key=lambda did: best_by_doc[did][0], reverse=True
-            )[:k]
+            ordered_ids = sorted(best_by_doc, key=lambda did: best_by_doc[did][0], reverse=True)[:k]
 
             chunks = [
                 RetrievedChunk(

@@ -195,7 +195,8 @@ async def test_subsequent_rounds_see_previous_positions() -> None:
     # Check calls 3 and 4 have round-1 content.
     round2_calls = llm.ainvoke.call_args_list[2:4]
     combined = " ".join(
-        str(call.args[0][1].content) for call in round2_calls  # HumanMessage
+        str(call.args[0][1].content)
+        for call in round2_calls  # HumanMessage
     )
     assert "R1-A" in combined or "R1-B" in combined
 

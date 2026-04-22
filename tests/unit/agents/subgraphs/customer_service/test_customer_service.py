@@ -207,9 +207,7 @@ async def test_response_generator_composes_answer_with_context() -> None:
     state["metadata"]["customer_service"] = {
         "category": "faq",
         "confidence": 0.9,
-        "retrieved": [
-            MagicMock(content="Returns accepted within 30 days.", source="policy.md")
-        ],
+        "retrieved": [MagicMock(content="Returns accepted within 30 days.", source="policy.md")],
     }
     update = await node(state)
 

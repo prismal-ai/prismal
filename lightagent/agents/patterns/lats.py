@@ -34,11 +34,14 @@ Example::
     async def gen(state, tools):
         return await llm_generate_actions(state, tools)
 
+
     async def step(state, action):
         return await env.apply(action)
 
+
     async def score(state):
         return 1.0 if env.is_done(state) else 0.0
+
 
     agent = LATSAgent(
         tools=my_tools,
@@ -103,9 +106,7 @@ class LATSNode:
         exploit = self.reward / self.visits
         if self.parent is None or self.parent.visits <= 0:
             return exploit
-        explore = exploration_constant * math.sqrt(
-            math.log(self.parent.visits) / self.visits
-        )
+        explore = exploration_constant * math.sqrt(math.log(self.parent.visits) / self.visits)
         return exploit + explore
 
 
@@ -176,9 +177,7 @@ class LATSAgent:
         if max_depth < 1:
             raise ValueError(f"max_depth must be >= 1; got {max_depth}")
         if exploration_constant < 0.0:
-            raise ValueError(
-                f"exploration_constant must be >= 0; got {exploration_constant}"
-            )
+            raise ValueError(f"exploration_constant must be >= 0; got {exploration_constant}")
         self._tools = tools
         self._reward_fn = reward_fn
         self._action_generator = action_generator
@@ -212,9 +211,7 @@ class LATSAgent:
         with otel.start_span("lats.search") as span:
             span.set_attribute("lightagent.lats.max_simulations", self._max_simulations)
             span.set_attribute("lightagent.lats.max_depth", self._max_depth)
-            span.set_attribute(
-                "lightagent.lats.exploration_constant", self._exploration_constant
-            )
+            span.set_attribute("lightagent.lats.exploration_constant", self._exploration_constant)
 
             root = LATSNode(state=initial_state, action=None)
             deadline = (
@@ -235,14 +232,10 @@ class LATSAgent:
 
             best_path_nodes = self._best_path(root)
             if not best_path_nodes:
-                raise LATSError(
-                    "No children were expanded — action_generator returned empty"
-                )
+                raise LATSError("No children were expanded — action_generator returned empty")
 
             best_leaf = best_path_nodes[-1]
-            best_avg_reward = (
-                best_leaf.reward / best_leaf.visits if best_leaf.visits else 0.0
-            )
+            best_avg_reward = best_leaf.reward / best_leaf.visits if best_leaf.visits else 0.0
             tree_depth = self._tree_depth(root)
 
             logger.info(
@@ -277,11 +270,7 @@ class LATSAgent:
 
         # 2. Expand (if non-terminal, visited at least once, and within depth).
         depth = self._node_depth(node)
-        if (
-            not node.is_terminal
-            and node.visits > 0
-            and depth < self._max_depth
-        ):
+        if not node.is_terminal and node.visits > 0 and depth < self._max_depth:
             await self._expand(node)
             if node.children:
                 # Descend to the first fresh child for simulation.

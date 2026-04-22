@@ -145,18 +145,18 @@ def print_result(text_sample: dict, result: ConstitutionalResult) -> None:
     print(f"  Texto original ({len(text_sample['text'])} chars):")
     print(f"    {text_sample['text'][:150]}...")
 
-    print(f"\n  Resultado:")
+    print("\n  Resultado:")
     print(f"    Todos los principios satisfechos: {result.all_principles_satisfied}")
     print(f"    Max. revisiones alcanzadas     : {result.max_revisions_reached}")
     print(f"    Revisiones aplicadas           : {len(result.revisions)}")
 
     if result.revisions:
-        print(f"\n  Revisiones aplicadas:")
+        print("\n  Revisiones aplicadas:")
         for rev in result.revisions:
             print(f"    [{rev.principle_id}] Violación: {rev.violation_detected[:80]}...")
             print(f"    → Texto revisado: {rev.revised[:120]}...")
     else:
-        print(f"  ✓ Sin revisiones necesarias")
+        print("  ✓ Sin revisiones necesarias")
 
     print(f"\n  Output final ({len(result.final_output)} chars):")
     print(f"    {result.final_output[:200]}...")
@@ -181,11 +181,10 @@ async def run_constitutional_filter(
         max_revisions=3,  # máximo 3 revisiones por principio
     )
 
-    result = await filt.apply(
+    return await filt.apply(
         output=text_sample["text"],
         context=text_sample["context"],
     )
-    return result
 
 
 async def main() -> None:
@@ -234,13 +233,14 @@ async def main() -> None:
 
     # Agrupar por principio
     from collections import Counter
+
     violations_by_principle: Counter = Counter()
     for _, r in all_results:
         for rev in r.revisions:
             violations_by_principle[rev.principle_id] += 1
 
     if violations_by_principle:
-        print(f"\n  Violaciones por principio:")
+        print("\n  Violaciones por principio:")
         for pid, count in violations_by_principle.most_common():
             print(f"    {pid}: {count} violaciones")
 

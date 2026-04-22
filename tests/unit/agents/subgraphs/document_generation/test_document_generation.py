@@ -63,9 +63,7 @@ def test_document_generation_error_inherits_from_lightagent_error() -> None:
 
 @pytest.mark.asyncio
 async def test_planner_node_parses_numbered_outline() -> None:
-    llm = _llm_returning(
-        "1. Introduction\n2. Core concepts\n3. Example\n4. Conclusion"
-    )
+    llm = _llm_returning("1. Introduction\n2. Core concepts\n3. Example\n4. Conclusion")
     node = make_planner_node(llm=llm)
     update = await node(_state("Intro to LangGraph"))
     outline = update["metadata"]["document_generation"]["outline"]
@@ -100,9 +98,7 @@ async def test_researcher_node_gathers_notes_per_section() -> None:
     llm = _llm_returning("notes for section 1", "notes for section 2", "notes for 3")
     node = make_researcher_node(llm=llm, rag_engine=None)
     state = _state("topic")
-    state["metadata"]["document_generation"] = {
-        "outline": ["S1", "S2", "S3"]
-    }
+    state["metadata"]["document_generation"] = {"outline": ["S1", "S2", "S3"]}
     update = await node(state)
     research = update["metadata"]["document_generation"]["research"]
     assert set(research.keys()) == {"S1", "S2", "S3"}
@@ -230,9 +226,7 @@ async def test_formatter_falls_back_to_draft_when_no_edited() -> None:
 async def test_formatter_plain_strips_markdown_headings() -> None:
     node = make_formatter_node(format="plain")
     state = _state()
-    state["metadata"]["document_generation"] = {
-        "edited": "# Title\n\nBody text."
-    }
+    state["metadata"]["document_generation"] = {"edited": "# Title\n\nBody text."}
     update = await node(state)
     final = update["metadata"]["document_generation"]["final"]
     assert "# " not in final

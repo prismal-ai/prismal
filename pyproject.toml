@@ -212,6 +212,8 @@ dev = [
   "bandit[toml]>=1.8.0",
   "radon>=6.0.1",
   "lizard>=1.17.0",
+  "flake8>=7.2.0",
+  "flake8-cognitive-complexity>=0.1.0",
   "pip-audit>=2.7.0",
   "types-pyyaml>=6.0.12.20240917",
   "types-toml>=0.10.8.20240310",
@@ -282,6 +284,10 @@ max-complexity = 40
   "E402", "E501", "SIM117", "F841", "TC", "PT", "PTH",
   "RUF", "RET504", "B017", "B904",
 ]
+"examples/**/*.py" = [
+  "S311", "ANN", "ARG", "N806", "E501", "E741",
+  "RUF001", "RUF002", "RUF003", "SIM102", "F401",
+]
 "lightagent/skills/available/**/*.py" = ["S603", "S607"]
 "lightagent/skills/custom/**/*.py" = ["S603", "S607"]
 
@@ -312,11 +318,20 @@ namespace_packages = true
 explicit_package_bases = true
 
 [[tool.mypy.overrides]]
+# Módulos sin stubs o que son extras opcionales (protegidos con try/except
+# o TYPE_CHECKING en el código). Mantener sincronizado con `ty.toml`.
 module = [
   "litellm.*", "chromadb.*", "prefect.*", "watchdog.*",
   "nemoguardrails.*", "mcp.*", "structlog.*", "docx2txt.*",
-  "unstructured.*", "circuitbreaker.*", "alembic", "alembic.*",
+  "unstructured.*", "alembic", "alembic.*",
   "apscheduler.*", "croniter.*", "rank_bm25.*",
+  # Extras opcionales — resuelven import-not-found cuando el extra no está
+  # instalado en el entorno de CI o del desarrollador.
+  "yfinance", "ccxt", "pandas_ta", "pandas", "matplotlib", "matplotlib.*",
+  "shap", "imblearn.*", "flaml", "skl2onnx", "skl2onnx.*",
+  "motor", "motor.*", "aiosmtplib", "ntplib",
+  "langgraph.checkpoint.postgres.*", "langgraph.store.postgres.*",
+  "psutil", "jose", "joblib",
 ]
 ignore_missing_imports = true
 
@@ -389,3 +404,8 @@ exclude_dirs = ["tests", "lightagent/skills/custom"]
 skips = ["B101", "B104", "B608"]
 severity_level = "medium"
 confidence_level = "medium"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+]

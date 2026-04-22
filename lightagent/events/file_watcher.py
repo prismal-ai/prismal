@@ -31,11 +31,15 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 from lightagent.core.logging import get_logger
+
+if TYPE_CHECKING:
+    from watchdog.observers.api import BaseObserver
 
 logger = get_logger("lightagent.events.file_watcher")
 
@@ -140,9 +144,9 @@ class FileWatcher:
         watcher.start()
     """
 
-    def __init__(self, observer: Observer | None = None) -> None:
+    def __init__(self, observer: BaseObserver | None = None) -> None:
         """Initialise FileWatcher with an optional custom observer."""
-        self._observer: Observer = observer or Observer()
+        self._observer: BaseObserver = observer or Observer()
         self._watches: list[_WatchEntry] = []
 
     def register(

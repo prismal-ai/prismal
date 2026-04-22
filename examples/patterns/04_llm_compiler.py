@@ -281,18 +281,17 @@ async def run_compiler(sample: dict) -> CompilerResult:
         CompilerResult con el plan ejecutado y la respuesta final.
     """
     compiler = LLMCompiler(
-        tools=[{"name": t} for t in _MOCK_TOOL_RESULTS.keys()],
+        tools=[{"name": t} for t in _MOCK_TOOL_RESULTS],
         plan_fn=plan_fn,
         tool_executor=tool_executor,
         joiner=joiner,
         max_replanning=2,
     )
 
-    result = await compiler.compile_and_run(
+    return await compiler.compile_and_run(
         goal=sample["question"],
         state={"messages": [], "metadata": {}},
     )
-    return result
 
 
 async def main() -> None:
@@ -319,13 +318,13 @@ async def main() -> None:
             print(f"    Onda {i}: {wave}  ← ejecutadas simultáneamente")
 
         # Resultados
-        print(f"\n  Estado de tareas:")
+        print("\n  Estado de tareas:")
         for t in result.plan.tasks:
             status_icon = "✓" if t.status == "completed" else "✗"
             print(f"    {status_icon} {t.id} [{t.status}]")
 
         print(f"\n  Re-planificaciones: {result.replanning_count}")
-        print(f"\n  Respuesta final:")
+        print("\n  Respuesta final:")
         print(f"  {result.final_answer[:300]}")
         print("-" * 70)
 
@@ -344,6 +343,7 @@ async def main() -> None:
         TaskNode(id="D", description="task D", tool="aggregate", args={}, depends_on=["B", "C"]),
     ]
     from lightagent.agents.patterns.llm_compiler import CompilerPlan
+
     plan = CompilerPlan(tasks=valid_plan_tasks, goal="test", is_valid=False, execution_waves=[])
     is_valid = compiler.validate_dag(plan)
     waves = compiler.compute_execution_waves(valid_plan_tasks)
