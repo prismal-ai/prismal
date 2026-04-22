@@ -12,9 +12,10 @@
 
 default:
   image: python:3.13-slim
-  tags:
-    - docker
   interruptible: true
+  # Nota: sin `tags:` los jobs se asignan a cualquier runner disponible
+  # (p.ej. los shared runners de GitLab.com). Si este proyecto usa runners
+  # autogestionados con un tag específico, añadir aquí `tags: [<tag>]`.
 
 stages:
   - lint
