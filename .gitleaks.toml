@@ -31,6 +31,9 @@ paths = [
   # Tests y fixtures
   '''tests?/.*''',
   '''fixtures?/.*''',
+  # Ejemplos / demos — contienen credenciales falsas intencionales
+  # usadas como entrada de los subgraphs de code-review y security scan.
+  '''examples?/.*''',
   # Documentacion
   '''docs?/.*''',
   '''README.*''',
