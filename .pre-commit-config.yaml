@@ -251,6 +251,7 @@ repos:
           - --ignore-vuln=GHSA-7gw9-cf7v-778f
           - --ignore-vuln=GHSA-x284-j5p8-9c5p
           - --ignore-vuln=CVE-2025-62379
+          - --ignore-vuln=GHSA-wj6h-64fc-37mp
           - --skip-editable
         pass_filenames: false
         files: ^(pyproject\.toml|uv\.lock)$

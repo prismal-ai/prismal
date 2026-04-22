@@ -35,6 +35,14 @@ GHSA-x284-j5p8-9c5p
 # --- reflex 0.7.14 -> CVE-2025-62379 (sin fix upstream aun) --
 CVE-2025-62379
 
+# --- ecdsa 0.19.2 -> CVE-2024-23342 (Minerva timing attack) --
+# Transitiva (python-jose -> ecdsa). El mantenedor de python-ecdsa
+# declaro publicamente que NO habra fix (GHSA-wj6h-64fc-37mp): la
+# mitigacion completa requiere criptografia en C. Recomienda migrar
+# a `cryptography`. Ya usamos python-jose[cryptography] pero python-jose
+# arrastra `ecdsa` como dep regular. TODO: evaluar migracion a PyJWT.
+CVE-2024-23342
+
 # ============================================================
 # TODO: TRIAGE — detectados por Trivy (mas reciente que pip-audit DB).
 # Pendientes de revisar via `lightagent doctor security-check` (Phase 30).
