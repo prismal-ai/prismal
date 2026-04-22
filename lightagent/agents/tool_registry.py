@@ -30,6 +30,8 @@ from typing import TYPE_CHECKING
 from lightagent.core.logging import get_logger
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from langchain_core.tools import BaseTool
 
 logger = get_logger("lightagent.agents.tool_registry")
@@ -593,7 +595,7 @@ async def _invoke_llm_with_backoff(
 async def react_loop(
     llm: object,
     tools: list[BaseTool],
-    messages: list[object],
+    messages: Sequence[object],
     *,
     agent_name: str = "agent",
     max_iterations: int = _MAX_REACT_ITERATIONS,

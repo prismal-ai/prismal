@@ -1,0 +1,126 @@
+# ty configuration — pareja informativa del typecheck autoritativo (mypy).
+# ty 0.0.x es alpha: suprimimos reglas con falsos positivos conocidos
+# contra patrones ya validados por mypy (strict) y el sistema en runtime.
+#
+# Referencias cruzadas:
+#   - typecheck:mypy   -> fuente de verdad (gating)
+#   - typecheck:ty     -> informativo (allow_failure: true en .gitlab-ci.yml)
+
+[environment]
+python-version = "3.13"
+
+[rules]
+# Extras opcionales (yfinance, ccxt, motor, aiosmtplib, ntplib, matplotlib,
+# shap, flaml, imblearn, skl2onnx, langgraph.checkpoint.postgres.*, …): se
+# importan bajo try/except o TYPE_CHECKING. mypy ya los filtra con
+# ignore_missing_imports; replicamos el comportamiento en ty.
+unresolved-import = "ignore"
+
+# LangGraph declara `StateT@StateGraph` con bound `TypedDictLikeV1 | DataclassLike`
+# (Protocol interno). ty 0.0.31 no reconoce nuestros TypedDict (`AgentState`)
+# como compatibles con ese bound — false positive; mypy sí lo valida.
+invalid-type-arguments = "ignore"
+
+# ------------------------------------------------------------
+# Overrides por archivo: suprimen sólo las reglas afectadas por
+# limitaciones específicas de ty en módulos concretos.
+# ------------------------------------------------------------
+
+[[overrides]]
+# Constructores de StateGraph(AgentState) y add_conditional_edges con dict[str, …]
+# — derivado del mismo bound Protocol que arriba.
+include = [
+  "lightagent/agents/factory.py",
+  "lightagent/agents/graph.py",
+  "lightagent/agents/subgraphs/factory.py",
+]
+[overrides.rules]
+invalid-argument-type = "ignore"
+
+[[overrides]]
+# pandas/numpy: ty no estrecha correctamente `int | float | Decimal | …` a
+# `SupportsFloat/SupportsIndex` al pasar a `float()` / `int()` / Series ctor.
+# Reglas polars Expr similares para aritmética sobre columnas.
+include = [
+  "lightagent/agents/subgraphs/ml_pipeline/tools_ml.py",
+  "lightagent/data/polars_utils.py",
+]
+[overrides.rules]
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
+unsupported-operator = "ignore"
+
+[[overrides]]
+# datetime_server._is_wildcard/_is_single_int: firmas que reciben tramos de
+# cron ya parseados (`list[int | Literal["*", "l"]]`). Compatibles con
+# `list[int | str]` en runtime — ty no tolera la varianza de List.
+include = ["lightagent/mcp/servers/datetime_server.py"]
+[overrides.rules]
+invalid-argument-type = "ignore"
+
+[[overrides]]
+# ``subprocess.run(cmd, …)`` con `cmd: list[str]` construido a partir de
+# LiteralString + paths — ty eleva el tipo a `list[LiteralString]` y no lo
+# ensancha a `list[str]` al cruzar el límite de función.
+include = ["lightagent/sandbox/isolation.py"]
+[overrides.rules]
+invalid-argument-type = "ignore"
+
+[[overrides]]
+# Mocks de módulos opcionales (httpx / motor / langfuse / pg connection):
+# shims `None` o `object` con gating en runtime; ty los ve como incompatibles.
+include = [
+  "lightagent/rag/federated.py",
+  "lightagent/agents/network_supervisor.py",
+  "lightagent/memory/mongodb_store.py",
+  "lightagent/agents/meta_learner.py",
+  "lightagent/core/database.py",
+  "lightagent/monitoring/otel.py",
+  "lightagent/agents/tool_registry.py",
+  "lightagent/security/nemo_rails.py",
+  "lightagent/scheduler/prefect_flows.py",
+  "lightagent/scheduler/executor.py",
+  "lightagent/sandbox/installer.py",
+]
+[overrides.rules]
+invalid-assignment = "ignore"
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
+no-matching-overload = "ignore"
+call-non-callable = "ignore"
+invalid-return-type = "ignore"
+not-subscriptable = "ignore"
+
+[[overrides]]
+# watchdog Observer es una variable con tipo (`cast(..., BaseObserver)`),
+# lo cual ty aún no acepta en anotaciones de parámetros.
+include = ["lightagent/events/file_watcher.py"]
+[overrides.rules]
+invalid-type-form = "ignore"
+
+[[overrides]]
+# Meta-programación sobre SubgraphRegistry: tipos genéricos devueltos por
+# métodos descriptor que ty no sabe subscriptar en runtime.
+include = ["lightagent/agents/subgraphs/registry.py"]
+[overrides.rules]
+invalid-type-form = "ignore"
+
+[[overrides]]
+# Narrowing de `dict.get()` sobre payloads heterogéneos (nemoguardrails,
+# skill_creator gates, supervisor literal routing, subgraphs/gates narrowing).
+include = [
+  "lightagent/agents/skill_creator.py",
+  "lightagent/agents/tools.py",
+  "lightagent/agents/supervisor.py",
+  "lightagent/agents/subgraphs/gates.py",
+  "lightagent/sandbox/tools.py",
+  "lightagent/skills/base.py",
+  "lightagent/skills/manager.py",
+  "lightagent/agents/patterns/parallel.py",
+]
+[overrides.rules]
+invalid-argument-type = "ignore"
+invalid-assignment = "ignore"
+invalid-return-type = "ignore"
+no-matching-overload = "ignore"
+unresolved-attribute = "ignore"
