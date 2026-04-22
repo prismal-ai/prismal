@@ -18,7 +18,7 @@ Architecture:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import yaml
 from langchain_core.messages import AIMessage, HumanMessage
@@ -28,6 +28,9 @@ from lightagent.agents.graph import get_compiled_graph
 from lightagent.agents.state import create_initial_state
 from lightagent.core.logging import get_logger
 from lightagent.monitoring.otel import OTelManager
+
+if TYPE_CHECKING:
+    from langchain_core.runnables import RunnableConfig
 
 logger = get_logger("lightagent.agents.network_supervisor")
 
@@ -108,7 +111,7 @@ def _make_a2a_jwt(node_url: str) -> str:
             "iat": datetime.now(UTC),
             "exp": datetime.now(UTC) + timedelta(minutes=5),
         }
-        return jwt.encode(payload, secret, algorithm="HS256")
+        return cast("str", jwt.encode(payload, secret, algorithm="HS256"))
     except ImportError:
         logger.warning("jose_not_installed_a2a_jwt_empty")
         return ""
@@ -236,8 +239,9 @@ class NetworkSupervisorAgent:
         graph = get_compiled_graph()
         state = create_initial_state(session_id=session_id or "network-local")
         state["messages"] = [HumanMessage(content=task)]
-        config = {"configurable": {"thread_id": session_id or "network-local"}}
-        return await graph.ainvoke(state, config)  # type: ignore[return-value]
+        config: RunnableConfig = {"configurable": {"thread_id": session_id or "network-local"}}
+        result = await graph.ainvoke(state, config)
+        return cast("dict[str, Any]", result)
 
 
 __all__ = ["NetworkNode", "NetworkSupervisorAgent", "_load_nodes"]

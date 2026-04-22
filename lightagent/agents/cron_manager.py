@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import BaseMessage, SystemMessage
 
 from lightagent.agents.tool_registry import get_tools_for_agent, react_loop
 from lightagent.core.logging import get_logger
@@ -153,7 +153,7 @@ async def cron_manager_node(state: AgentState) -> dict[str, object]:
     active_tools = get_tools_for_agent("cron_manager")
     llm_with_tools = llm.bind_tools(active_tools)
 
-    system = [SystemMessage(content=_SYSTEM_PROMPT)]
+    system: list[BaseMessage] = [SystemMessage(content=_SYSTEM_PROMPT)]
     messages = list(state["messages"])
 
     response = await react_loop(

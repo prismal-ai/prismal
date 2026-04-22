@@ -140,9 +140,7 @@ class LongTermMemoryStore:
 
         if backend == "postgresql":
             try:
-                from langgraph.store.postgres.aio import (  # type: ignore[import-not-found]
-                    AsyncPostgresStore,
-                )
+                from langgraph.store.postgres.aio import AsyncPostgresStore
             except ImportError as e:  # pragma: no cover — exercised via mocked tests
                 raise ImportError(
                     "PostgreSQL long-term memory backend requires the "

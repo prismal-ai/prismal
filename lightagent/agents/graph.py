@@ -33,6 +33,8 @@ from langgraph.constants import END
 from langgraph.graph import StateGraph
 
 if TYPE_CHECKING:
+    from collections.abc import Hashable
+
     from langgraph.graph.state import CompiledStateGraph
 
 from lightagent.agents.codeact_agent import codeact_node
@@ -162,9 +164,7 @@ async def build_checkpointer(db_url: str | None = None) -> Any:
 
     if url.startswith(("postgresql://", "postgresql+asyncpg://", "postgres://")):
         try:
-            from langgraph.checkpoint.postgres.aio import (  # type: ignore[import-not-found]
-                AsyncPostgresSaver,
-            )
+            from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
         except ImportError as e:  # pragma: no cover — exercised via mocked tests
             raise ImportError(
                 "PostgreSQL checkpointer backend requires the optional "
@@ -309,7 +309,7 @@ def build_supervisor_graph(
     builder.set_entry_point("supervisor")
 
     # Conditional edges: supervisor → sub-agent or END
-    conditional_edges: dict[str, str | object] = {
+    conditional_edges: dict[Hashable, str] = {
         "researcher": "researcher",
         "coder": "coder",
         "codeact": "codeact",

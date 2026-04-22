@@ -14,9 +14,15 @@ import sys
 from pathlib import Path
 
 
-def find_spec_files(specs_dir: str) -> dict:
+def find_spec_files(specs_dir: str) -> dict[str, list[Path]]:
     """Find spec files organized by type."""
-    specs = {"prd": [], "api": [], "technical": [], "data-model": [], "plans": []}
+    specs: dict[str, list[Path]] = {
+        "prd": [],
+        "api": [],
+        "technical": [],
+        "data-model": [],
+        "plans": [],
+    }
     base = Path(specs_dir)
 
     if not base.exists():

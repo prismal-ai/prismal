@@ -220,7 +220,7 @@ async def researcher_node(state: AgentState) -> dict[str, object]:
     active_tools = get_tools_for_agent("researcher")
     llm_with_tools = llm.bind_tools(active_tools)
 
-    system = [SystemMessage(content=_SYSTEM_PROMPT)]
+    system: list[BaseMessage] = [SystemMessage(content=_SYSTEM_PROMPT)]
     # Trim to the most recent messages before applying the last-human invariant.
     # Prevents large conversation histories from exhausting the token-per-minute
     # budget when combined with the system prompt and tool results.

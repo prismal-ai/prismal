@@ -94,7 +94,7 @@ class MongoDBMemoryStore:
             retention_days if retention_days is not None else settings.memory_retention_days
         )
         self._initialized = False
-        self._collection: AsyncIOMotorCollection  # type: ignore[type-arg]
+        self._collection: AsyncIOMotorCollection
 
         if vector_store is not None:
             self._vector_store = vector_store
@@ -244,6 +244,8 @@ class MongoDBMemoryStore:
 
         for doc, _score in chroma_results:
             entry_id = doc.metadata.get("entry_id")
+            if not isinstance(entry_id, str):
+                continue
             doc_session = doc.metadata.get("session_id", "")
 
             if session_id is not None and doc_session != session_id:

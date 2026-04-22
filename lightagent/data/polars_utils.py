@@ -52,19 +52,20 @@ def _apply_filter(df: pl.DataFrame, column: str, op: FilterOp, value: object) ->
         raise LightAgentError(f"Column '{column}' not found. Available: {df.columns}")
 
     col_expr = pl.col(column)
+    mask: pl.Expr
     match op:
         case "==":
-            mask = col_expr == value
+            mask = col_expr.eq(value)
         case "!=":
-            mask = col_expr != value
+            mask = col_expr.ne(value)
         case ">":
-            mask = col_expr > value
+            mask = col_expr.gt(value)
         case ">=":
-            mask = col_expr >= value
+            mask = col_expr.ge(value)
         case "<":
-            mask = col_expr < value
+            mask = col_expr.lt(value)
         case "<=":
-            mask = col_expr <= value
+            mask = col_expr.le(value)
         case _:  # pragma: no cover
             raise LightAgentError(f"Unsupported filter operator: '{op}'")
 

@@ -13,12 +13,15 @@ import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import httpx
 
 from lightagent.core.logging import get_logger
 from lightagent.sandbox.manager import SandboxManager
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = get_logger("lightagent.sandbox.installer")
 
@@ -69,7 +72,7 @@ class SandboxInstaller:
             Resumen de la instalación o mensaje de error.
         """
         mgr = manager.lower().strip()
-        dispatch = {
+        dispatch: dict[str, Callable[[str, str | None], str]] = {
             "pip": self._pip_install,
             "npm": self._npm_install,
             "go": self._go_get,
@@ -262,7 +265,7 @@ class SandboxInstaller:
         url: str,
         dest: Path,
         strip_components: int,
-        fmt: str,
+        fmt: Literal["gz", "xz"],
     ) -> str:
         """Descarga un tarball y lo extrae en *dest*.
 
@@ -288,7 +291,7 @@ class SandboxInstaller:
             return f"Error descargando {url}: {exc}"
 
         try:
-            mode = f"r:{fmt}"
+            mode: Literal["r:gz", "r:xz"] = "r:gz" if fmt == "gz" else "r:xz"
             with tarfile.open(tmp_path, mode) as tar:
                 members = tar.getmembers()
                 for member in members:

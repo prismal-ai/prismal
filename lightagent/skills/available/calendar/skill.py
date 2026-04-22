@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
@@ -63,7 +64,7 @@ def _read_events(calendar_dir: Path, days_ahead: int) -> list[dict[str, str]]:
         List of event dicts sorted by start time.
     """
     try:
-        from icalendar import Calendar  # type: ignore[import-untyped]  # local import
+        from icalendar import Calendar
     except ImportError:
         return []
 
@@ -79,7 +80,8 @@ def _read_events(calendar_dir: Path, days_ahead: int) -> list[dict[str, str]]:
     for ics_file in calendar_dir.glob("*.ics"):
         try:
             cal = Calendar.from_ical(ics_file.read_bytes())
-            for component in cal.walk():
+            for raw_component in cal.walk():
+                component: Any = raw_component
                 if component.name != "VEVENT":
                     continue
                 dtstart = _parse_dt(

@@ -316,11 +316,20 @@ namespace_packages = true
 explicit_package_bases = true
 
 [[tool.mypy.overrides]]
+# Módulos sin stubs o que son extras opcionales (protegidos con try/except
+# o TYPE_CHECKING en el código). Mantener sincronizado con `ty.toml`.
 module = [
   "litellm.*", "chromadb.*", "prefect.*", "watchdog.*",
   "nemoguardrails.*", "mcp.*", "structlog.*", "docx2txt.*",
-  "unstructured.*", "circuitbreaker.*", "alembic", "alembic.*",
+  "unstructured.*", "alembic", "alembic.*",
   "apscheduler.*", "croniter.*", "rank_bm25.*",
+  # Extras opcionales — resuelven import-not-found cuando el extra no está
+  # instalado en el entorno de CI o del desarrollador.
+  "yfinance", "ccxt", "pandas_ta", "pandas", "matplotlib", "matplotlib.*",
+  "shap", "imblearn.*", "flaml", "skl2onnx", "skl2onnx.*",
+  "motor", "motor.*", "aiosmtplib", "ntplib",
+  "langgraph.checkpoint.postgres.*", "langgraph.store.postgres.*",
+  "psutil", "jose", "joblib",
 ]
 ignore_missing_imports = true
 

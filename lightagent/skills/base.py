@@ -121,6 +121,17 @@ class BaseSkill(ABC):
 # ---------------------------------------------------------------------------
 
 
+def _as_str_list(value: object) -> list[str]:
+    """Coerce a frontmatter value to ``list[str]``.
+
+    YAML values arrive as ``object`` from :func:`parse_skill_md`; this narrows
+    them to a typed list, returning ``[]`` for anything that is not a list.
+    """
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return []
+
+
 def _find_skill_md(skill_dir: Path) -> Path | None:
     """Return the ``skill.md`` file inside *skill_dir*, case-insensitively.
 
@@ -244,9 +255,9 @@ def generate_skill_py(skill_dir: Path) -> None:
     description: str = str(meta.get("description", "Markdown-based skill"))
     version: str = str(meta.get("version", "1.0.0"))
     author: str = str(meta.get("author", "unknown"))
-    tags: list[str] = list(meta.get("tags", []))  # type: ignore[arg-type]
+    tags: list[str] = _as_str_list(meta.get("tags", []))
     safe: bool = bool(meta.get("safe_to_auto_activate", False))
-    perms: list[str] = list(meta.get("requires_permissions", []))  # type: ignore[arg-type]
+    perms: list[str] = _as_str_list(meta.get("requires_permissions", []))
 
     class_name = _py_class_name(name)
     # No get_tools() override — MarkdownSkill.get_tools() auto-discovers scripts,
@@ -456,9 +467,9 @@ class MarkdownSkill(BaseSkill):
             description=str(meta.get("description", "Markdown-based skill")),
             version=str(meta.get("version", "1.0.0")),
             author=str(meta.get("author", "unknown")),
-            tags=list(meta.get("tags", [])),  # type: ignore[arg-type]
+            tags=_as_str_list(meta.get("tags", [])),
             safe_to_auto_activate=bool(meta.get("safe_to_auto_activate", False)),
-            requires_permissions=list(meta.get("requires_permissions", [])),  # type: ignore[arg-type]
+            requires_permissions=_as_str_list(meta.get("requires_permissions", [])),
         )
 
     def get_tools(self) -> list[BaseTool]:

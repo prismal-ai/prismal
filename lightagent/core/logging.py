@@ -17,7 +17,7 @@ Example::
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -43,7 +43,7 @@ class _LoguruBridge:
         """Emit a log message via Loguru."""
         _loguru.opt(depth=3).info(message)
 
-    def __getattr__(self, name: str) -> Callable[..., None]:  # type: ignore[override]
+    def __getattr__(self, name: str) -> Callable[..., None]:
         """Emit a level-specific message via Loguru."""
 
         def _emit(message: str, *_args: object, **_kw: object) -> None:
@@ -173,4 +173,4 @@ def get_logger(name: str = "lightagent") -> structlog.stdlib.BoundLogger:
     cfg = structlog.get_config()
     if not cfg.get("processors"):
         setup_logging()
-    return structlog.get_logger(name).bind()
+    return cast("structlog.stdlib.BoundLogger", structlog.get_logger(name).bind())
