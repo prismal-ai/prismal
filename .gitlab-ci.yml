@@ -3,8 +3,12 @@
 # ============================================================
 # Reglas por rama:
 #   • develop → lint + typecheck + complejidad + seguridad + tests completos
-#   • main    → seguridad + build del paquete + publish a PyPI (manual)
+#   • main    → build del paquete + publish a PyPI (manual)
 #   • MR      → mismos jobs que la rama destino (para validar antes de merge)
+#
+# Nota: la seguridad (bandit, gitleaks, pip-audit, semgrep, trivy) corre
+# exclusivamente en develop y en MRs hacia develop — no en main ni en tags.
+# El código que llega a main ya fue auditado al mergearse el MR→develop→main.
 #
 # Optimizaciones aplicadas (2026-04-22):
 #   1. Imagen base ghcr.io/astral-sh/uv:python3.13-bookworm-slim (uv pre-instalado).
@@ -110,12 +114,11 @@ cache:
     - if: '$CI_COMMIT_TAG'
 
 .rules-security:
-  # Seguridad corre en ambas ramas (develop y main) y en MRs
+  # Seguridad corre SÓLO en develop y en MRs hacia develop.
+  # Main está restringido a build + publish a PyPI (sin re-auditoría).
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
 
 # ============================================================
 # 1. LINT (solo develop)
@@ -207,9 +210,11 @@ complexity:cognitive:
     - uv run flake8 --select=CCR001 --max-cognitive-complexity=100 lightagent/
 
 # ============================================================
-# 4. SEGURIDAD (develop + main)
-# Arranca inmediatamente después de lint gracias al DAG (needs: optional).
-# En main, donde lint:ruff no existe, arranca sin dependencias.
+# 4. SEGURIDAD (sólo develop y MRs hacia develop)
+# Arranca inmediatamente después de lint gracias al DAG. lint:ruff
+# siempre existe en este contexto, por eso las dependencias no son
+# opcionales — pero las mantenemos con `optional: true` como salvaguarda
+# si en el futuro se amplía `.rules-security`.
 # ============================================================
 security:bandit:
   extends:
@@ -218,7 +223,7 @@ security:bandit:
   stage: security
   needs:
     - job: lint:ruff
-      optional: true  # no existe en main → arranca libre
+      optional: true
   script:
     - uv run bandit -r lightagent -c pyproject.toml --severity-level=medium -f txt
 
@@ -439,20 +444,16 @@ build:package:
 #   • TWINE_PASSWORD   = pypi-XXXXXXXXXXXX   (API token)
 #
 # Disparo automático: al caer un commit en `main` (post-merge del MR
-# aprobado) o al empujar un tag. El job corre sólo si todos los jobs
-# de seguridad y el build pasaron — `--skip-existing` evita fallos si
-# la versión ya fue publicada (no-op idempotente).
+# aprobado) o al empujar un tag. El job corre sólo si `build:package`
+# pasó — `--skip-existing` evita fallos si la versión ya fue publicada
+# (no-op idempotente). La auditoría de seguridad ya ocurrió en el MR
+# hacia develop, por lo que no se repite aquí.
 publish:pypi:
   extends: .python-base
   stage: publish
   needs:
     - job: build:package
       artifacts: true
-    - job: security:bandit
-    - job: security:pip-audit
-    - job: security:semgrep
-    - job: security:trivy:fs
-    - job: security:gitleaks
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: on_success
