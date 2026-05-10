@@ -41,7 +41,7 @@ def test_get_tools_for_agent_caps_at_max_total(
     fake_mcp = _make_tools("mcp", 60)
     fake_skill = _make_tools("skill", 90)
 
-    monkeypatch.setattr(tool_registry, "get_mcp_tools", lambda: fake_mcp)
+    monkeypatch.setattr(tool_registry, "get_mcp_tools", lambda **_: fake_mcp)
     monkeypatch.setattr(tool_registry, "get_skill_tools", lambda: fake_skill)
 
     tools = tool_registry.get_tools_for_agent("researcher")
@@ -61,7 +61,7 @@ def test_get_tools_for_agent_no_cap_when_under_limit(
     fake_mcp = _make_tools("mcp", 10)
     fake_skill = _make_tools("skill", 5)
 
-    monkeypatch.setattr(tool_registry, "get_mcp_tools", lambda: fake_mcp)
+    monkeypatch.setattr(tool_registry, "get_mcp_tools", lambda **_: fake_mcp)
     monkeypatch.setattr(tool_registry, "get_skill_tools", lambda: fake_skill)
 
     tools = tool_registry.get_tools_for_agent("researcher")

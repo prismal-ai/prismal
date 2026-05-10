@@ -240,8 +240,18 @@ def test_to_records_empty_dataframe() -> None:
 # ---------------------------------------------------------------------------
 # save_chart
 # ---------------------------------------------------------------------------
+# matplotlib lives in the optional `analytics` extra (not installed by `dev`).
+# Skip the chart suite when it's missing so the rest of the polars tests stay
+# usable without bloating the default dev environment.
+import importlib.util as _importlib_util
+
+_needs_matplotlib = pytest.mark.skipif(
+    _importlib_util.find_spec("matplotlib") is None,
+    reason="matplotlib not installed (analytics extra)",
+)
 
 
+@_needs_matplotlib
 def test_save_chart_bar(tmp_path: Path, sales_df: pl.DataFrame) -> None:
     """save_chart with kind='bar' creates a PNG file."""
     out = tmp_path / "chart.png"
@@ -250,6 +260,7 @@ def test_save_chart_bar(tmp_path: Path, sales_df: pl.DataFrame) -> None:
     assert result.suffix == ".png"
 
 
+@_needs_matplotlib
 def test_save_chart_line(tmp_path: Path, sales_df: pl.DataFrame) -> None:
     """save_chart with kind='line' creates a file."""
     out = tmp_path / "line.png"
@@ -257,6 +268,7 @@ def test_save_chart_line(tmp_path: Path, sales_df: pl.DataFrame) -> None:
     assert result.exists()
 
 
+@_needs_matplotlib
 def test_save_chart_scatter(tmp_path: Path, sales_df: pl.DataFrame) -> None:
     """save_chart with kind='scatter' creates a file."""
     out = tmp_path / "scatter.png"
@@ -264,6 +276,7 @@ def test_save_chart_scatter(tmp_path: Path, sales_df: pl.DataFrame) -> None:
     assert result.exists()
 
 
+@_needs_matplotlib
 def test_save_chart_hist(tmp_path: Path, sales_df: pl.DataFrame) -> None:
     """save_chart with kind='hist' creates a histogram."""
     out = tmp_path / "hist.png"
@@ -271,6 +284,7 @@ def test_save_chart_hist(tmp_path: Path, sales_df: pl.DataFrame) -> None:
     assert result.exists()
 
 
+@_needs_matplotlib
 def test_save_chart_creates_parent_dir(tmp_path: Path, sales_df: pl.DataFrame) -> None:
     """save_chart creates parent directories automatically."""
     out = tmp_path / "nested" / "deep" / "chart.png"
@@ -278,12 +292,14 @@ def test_save_chart_creates_parent_dir(tmp_path: Path, sales_df: pl.DataFrame) -
     assert result.exists()
 
 
+@_needs_matplotlib
 def test_save_chart_missing_column(tmp_path: Path, sales_df: pl.DataFrame) -> None:
     """save_chart raises LightAgentError when a column is missing."""
     with pytest.raises(LightAgentError, match="Column 'bad'"):
         save_chart(sales_df, "bad", "sales", tmp_path / "c.png")
 
 
+@_needs_matplotlib
 def test_save_chart_returns_resolved_path(tmp_path: Path, sales_df: pl.DataFrame) -> None:
     """save_chart returns an absolute resolved Path."""
     out = tmp_path / "chart.png"

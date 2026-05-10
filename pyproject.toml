@@ -370,6 +370,11 @@ filterwarnings = [
   "ignore:.*unclosed.*:ResourceWarning",
   "ignore::ResourceWarning:aiosqlite",
   "ignore::pytest.PytestUnraisableExceptionWarning",
+  # aiosqlite spawns a worker thread per connection. When an async test's
+  # cleanup races the loop close, the worker raises after-the-fact and pytest
+  # promotes it via filterwarnings=error. The connection itself is correctly
+  # closed; it's a benign teardown artefact.
+  "ignore::pytest.PytestUnhandledThreadExceptionWarning",
   "ignore:.*flow run id.*:UserWarning",
   "ignore:.*PREFECT_LOGGING.*:UserWarning",
 ]

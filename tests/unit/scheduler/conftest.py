@@ -10,12 +10,34 @@ of APScheduler internals.
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from unittest.mock import MagicMock
 
+
+def _package_installed(name: str) -> bool:
+    """True if ``name`` is importable in the current environment.
+
+    Plain ``name in sys.modules`` is wrong here: a package only enters
+    sys.modules once something imports it, so at conftest-load time prefect
+    and apscheduler are *installed* but absent from sys.modules. The old
+    guard fell into the stub branch and tests received MagicMocks.
+
+    ``find_spec`` is the right check — but it can raise
+    ``ValueError: <name>.__spec__ is not set`` when another conftest in the
+    same xdist worker has already stubbed the module. In that case, fall
+    back to sys.modules: anything present (real or stub) means "don't
+    re-stub".
+    """
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ValueError):
+        return name in sys.modules
+
+
 # ── APScheduler stub ──────────────────────────────────────────────────────────
-# Only inject if not already available (venv case has real package).
-if "apscheduler" not in sys.modules:
+# Only inject when the real package is not installed.
+if not _package_installed("apscheduler"):
     _aps = MagicMock()
     sys.modules["apscheduler"] = _aps
     sys.modules["apscheduler.schedulers"] = MagicMock()
@@ -28,7 +50,7 @@ if "apscheduler" not in sys.modules:
     sys.modules["apscheduler.jobstores.base"].JobLookupError = Exception
 
 # ── Prefect stub ──────────────────────────────────────────────────────────────
-if "prefect" not in sys.modules:
+if not _package_installed("prefect"):
     sys.modules["prefect"] = MagicMock()
     sys.modules["prefect.deployments"] = MagicMock()
 

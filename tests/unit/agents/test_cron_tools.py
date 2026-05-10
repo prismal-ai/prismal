@@ -100,6 +100,7 @@ class TestCronAdd:
             "tz-job",
             "0 9 * * *",
             "Do something",
+            max_retries=2,
             output_channel=None,
             output_target=None,
             timezone="America/Caracas",
