@@ -56,6 +56,12 @@ CVE-2026-35030  # CRITICAL — OIDC userinfo cache key auth bypass
 CVE-2026-35029  # HIGH — RCE via unrestricted proxy config
 GHSA-69x8-hrgq-fjj8  # HIGH — password hash exposure / pass-the-hash
 
+# --- litellm 1.83.0 -> fix 1.83.7 (no aplicado) --------------
+# Subir a 1.83.7 downgradearia aiohttp/python-dotenv y abriria 11 CVEs nuevas.
+# Net negative — staying on 1.83.0. Mismos ignores en pip-audit.
+CVE-2026-42208
+CVE-2026-42271
+
 # --- pyasn1 0.6.2 -> fix 0.6.3 (DoS via recursion) -----------
 # Transitiva (cryptography / python-jose). Patch upgrade.
 CVE-2026-30922

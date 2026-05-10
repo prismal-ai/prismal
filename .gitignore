@@ -73,3 +73,5 @@ LightAgent_Patrones_Arquitecturas_IA.pptx
 LightAgent_Patrones_Arquitecturas_IA.pdf
 dist/
 packaging/
+*.pptx
+*.ipynb

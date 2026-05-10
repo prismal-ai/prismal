@@ -62,6 +62,8 @@ variables:
     --ignore-vuln=GHSA-x284-j5p8-9c5p
     --ignore-vuln=CVE-2025-62379
     --ignore-vuln=GHSA-wj6h-64fc-37mp
+    --ignore-vuln=CVE-2026-42208
+    --ignore-vuln=CVE-2026-42271
 
 # ------------------------------------------------------------
 # Workflow: pipelines en MRs a develop/main, en pushes directos
@@ -466,7 +468,10 @@ publish:pypi:
         exit 1
       fi
     - uv run twine check dist/*
-    - uv run twine upload --non-interactive --skip-existing dist/*
+    # --verbose: surface PyPI's full HTTP response on failure (e.g. metadata
+    # rejections like the PEP 639 License-Expression vs License classifier
+    # conflict, which otherwise return an opaque "400 Bad Request").
+    - uv run twine upload --verbose --non-interactive --skip-existing dist/*
   environment:
     name: pypi
     url: https://pypi.org/project/lightagent-agents/

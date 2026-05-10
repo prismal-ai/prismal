@@ -11,7 +11,8 @@ version = "2.0.0"
 description = "LightAgent AI Agent Framework — LangGraph multi-agent orchestration, security, RAG, MCP, and observability"
 readme = "README.md"
 requires-python = ">=3.13"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Ernesto Crespo", email = "ecrespo@gmail.com" }]
 maintainers = [{ name = "Ernesto Crespo", email = "ecrespo@gmail.com" }]
 keywords = [
@@ -29,7 +30,8 @@ keywords = [
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
+  # License classifier removed: incompatible with PEP 639 `License-Expression`
+  # in Metadata 2.4. PyPI rejects uploads that mix both with HTTP 400.
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
