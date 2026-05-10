@@ -59,6 +59,7 @@ GHSA-69x8-hrgq-fjj8  # HIGH — password hash exposure / pass-the-hash
 # --- litellm 1.83.0 -> fix 1.83.7 (no aplicado) --------------
 # Subir a 1.83.7 downgradearia aiohttp/python-dotenv y abriria 11 CVEs nuevas.
 # Net negative — staying on 1.83.0. Mismos ignores en pip-audit.
+CVE-2026-42203
 CVE-2026-42208
 CVE-2026-42271
 

@@ -252,11 +252,13 @@ repos:
           - --ignore-vuln=GHSA-x284-j5p8-9c5p
           - --ignore-vuln=CVE-2025-62379
           - --ignore-vuln=GHSA-wj6h-64fc-37mp
-          # litellm 1.83.7 fixes GHSA-xqmj-j6mv-4862 + CVE-2026-42208 + CVE-2026-42271
-          # but pins click/jsonschema/openai/pydantic/python-dotenv to older versions,
-          # downgrading aiohttp/python-dotenv and opening 11 new CVEs. Net negative —
-          # staying on 1.83.0 until a clean fix.
+          # litellm 1.83.7 fixes GHSA-xqmj-j6mv-4862 + CVE-2026-42203 +
+          # CVE-2026-42208 + CVE-2026-42271 but pins click/jsonschema/openai/
+          # pydantic/python-dotenv to older versions, downgrading aiohttp/
+          # python-dotenv and opening 11 new CVEs. Net negative — staying on
+          # 1.83.0 until a clean fix.
           - --ignore-vuln=GHSA-xqmj-j6mv-4862
+          - --ignore-vuln=CVE-2026-42203
           - --ignore-vuln=CVE-2026-42208
           - --ignore-vuln=CVE-2026-42271
           # pip 26.0.1 is the latest release; CVE-2026-3219 has no fix version yet.

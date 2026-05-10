@@ -62,6 +62,7 @@ variables:
     --ignore-vuln=GHSA-x284-j5p8-9c5p
     --ignore-vuln=CVE-2025-62379
     --ignore-vuln=GHSA-wj6h-64fc-37mp
+    --ignore-vuln=CVE-2026-42203
     --ignore-vuln=CVE-2026-42208
     --ignore-vuln=CVE-2026-42271
 
@@ -323,23 +324,27 @@ security:trivy:fs:
     policy: pull-push
   script:
     - trivy --version
-    # Primer pass: salida en tabla legible + exit-code de seguridad
+    # Primer pass: JSON para artefacto. Siempre se ejecuta (sin --exit-code)
+    # y descarga la BD que reutiliza el segundo pass. El `|| true` defiende
+    # contra fallos accidentales para que el artefacto SIEMPRE quede subido,
+    # incluso si el gate posterior bloquea el job.
+    - trivy fs
+        --scanners vuln,misconfig,secret
+        --ignorefile .trivyignore
+        --format json
+        --output trivy-fs.json
+        .
+        || true
+    # Segundo pass: tabla legible + gate (--exit-code 1). Reutiliza la BD
+    # del paso anterior con --skip-db-update.
     - trivy fs
         --scanners vuln,misconfig,secret
         --severity HIGH,CRITICAL
         --ignorefile .trivyignore
         --exit-code 1
         --format table
-        .
-    # Segundo pass: JSON para artefacto. --skip-db-update reutiliza la BD
-    # ya descargada en el paso anterior — no vuelve a descargarla.
-    - trivy fs
-        --scanners vuln,misconfig,secret
-        --ignorefile .trivyignore
-        --format json
-        --output trivy-fs.json
         --skip-db-update
-        . || true
+        .
   artifacts:
     when: always
     paths:
