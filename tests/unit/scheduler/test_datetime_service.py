@@ -49,16 +49,20 @@ def test_resolve_timezone_explicit_iana() -> None:
     assert tz == ZoneInfo("America/Caracas")
 
 
-def test_resolve_timezone_invalid_falls_back_utc(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
+def test_resolve_timezone_invalid_falls_back_utc() -> None:
     """resolve_timezone('Bad/Zone') logs WARNING and returns UTC."""
+    # Use structlog.testing.capture_logs() — it intercepts records before any
+    # processor/sink runs, so it's robust to whichever logger factory the
+    # project happens to have configured (default ConsoleRenderer → stdout vs
+    # loguru-backed → stderr). capsys/capfd are flaky here under xdist:
+    # pytest's own capture drains the buffer before the fixture reads it.
+    from structlog.testing import capture_logs
+
     dts = DateTimeService.get()
-    tz = dts.resolve_timezone("Bad/Zone")
+    with capture_logs() as cap_logs:
+        tz = dts.resolve_timezone("Bad/Zone")
     assert tz == _UTC
-    # structlog pretty-prints to stdout in the test environment
-    captured = capsys.readouterr()
-    assert "Bad/Zone" in captured.out or "Bad/Zone" in captured.err
+    assert any("Bad/Zone" in str(log) for log in cap_logs)
 
 
 # ── resolve_timezone — chain walk ─────────────────────────────────────────────
@@ -147,7 +151,11 @@ def test_get_scheduler_tz_returns_cron_tz() -> None:
             ntp_enabled=False,
         )
         dts = DateTimeService()
-    assert dts.get_scheduler_tz() == ZoneInfo("America/Caracas")
+        # Must call inside the patch context: get_scheduler_tz() reads
+        # settings at call time (via resolve_timezone). Outside the with
+        # block the mock is gone and the test depends on the host OS tz.
+        tz = dts.get_scheduler_tz()
+    assert tz == ZoneInfo("America/Caracas")
 
 
 # ── now() ─────────────────────────────────────────────────────────────────────
@@ -336,32 +344,36 @@ def test_ntp_unreachable_falls_back(caplog: pytest.LogCaptureFixture) -> None:
     assert any("unreachable" in r.message.lower() for r in caplog.records)
 
 
-def test_ntp_large_offset_logs_warning(capsys: pytest.CaptureFixture[str]) -> None:
+def test_ntp_large_offset_logs_warning() -> None:
     """Large NTP offset (> threshold) logs a WARNING."""
+    from structlog.testing import capture_logs
+
     mock_response = MagicMock()
     mock_response.offset = 30.0  # 30 s > default threshold of 5 s
 
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
-        mock_cfg.return_value = MagicMock(
-            ntp_enabled=True,
-            ntp_server="pool.ntp.org",
-            ntp_sync_interval_seconds=3600,
-            ntp_warn_threshold_seconds=5,
-            cron_timezone="",
-            timezone="",
-        )
-        with patch.dict("sys.modules", {"ntplib": MagicMock()}):
-            import sys
+    with capture_logs() as cap_logs:
+        with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+            mock_cfg.return_value = MagicMock(
+                ntp_enabled=True,
+                ntp_server="pool.ntp.org",
+                ntp_sync_interval_seconds=3600,
+                ntp_warn_threshold_seconds=5,
+                cron_timezone="",
+                timezone="",
+            )
+            with patch.dict("sys.modules", {"ntplib": MagicMock()}):
+                import sys
 
-            mock_ntplib = sys.modules["ntplib"]
-            mock_ntplib.NTPClient.return_value.request.return_value = mock_response
+                mock_ntplib = sys.modules["ntplib"]
+                mock_ntplib.NTPClient.return_value.request.return_value = mock_response
 
-            dts = DateTimeService()
+                dts = DateTimeService()
 
     assert dts._ntp_offset == timedelta(seconds=30.0)
-    # structlog uses pretty-print to stdout in test environment
-    captured = capsys.readouterr()
-    assert "offset" in captured.out.lower() or "threshold" in captured.out.lower()
+    # See test_resolve_timezone_invalid_falls_back_utc for why we capture via
+    # structlog directly instead of capsys/capfd.
+    combined = " ".join(str(log) for log in cap_logs).lower()
+    assert "offset" in combined or "threshold" in combined
 
 
 def test_ntp_resync_after_interval() -> None:

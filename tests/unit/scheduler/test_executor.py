@@ -723,7 +723,14 @@ def test_register_job_passes_timezone_to_cron_trigger(mock_manager: MagicMock) -
     job = CronJob(name="tz-job", schedule="0 9 * * *", task="t", timezone="America/Caracas")
     ex = CronExecutor(manager=mock_manager)
 
-    with patch("lightagent.scheduler.executor.CronTrigger") as mock_trigger_cls:
+    # Must patch the scheduler's add_job too: with real apscheduler installed
+    # it validates the trigger type and rejects the MagicMock returned by the
+    # patched CronTrigger. (The bug was hidden previously because the
+    # scheduler conftest was stubbing apscheduler wholesale.)
+    with (
+        patch("lightagent.scheduler.executor.CronTrigger") as mock_trigger_cls,
+        patch.object(ex._scheduler, "add_job"),
+    ):
         mock_trigger_cls.from_crontab.return_value = MagicMock()
         ex._register_job(job)
         mock_trigger_cls.from_crontab.assert_called_once()
