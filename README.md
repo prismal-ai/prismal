@@ -278,6 +278,40 @@ See [CHANGELOG.md](./CHANGELOG.md) for release history.
 
 ---
 
+## Releasing (maintainers)
+
+Run only after the full suite, linters and type/security checks are green.
+
+```bash
+# 0) Verify on the release branch
+cd prismal && git switch main
+
+# 1) Quality gates (must all pass)
+uv pip install -e ".[dev,all]"
+uv run pytest -m "not live_api"
+uv run ruff check . && uv run mypy prismal && uv run bandit -r prismal -c pyproject.toml
+
+# 2) Build + validate the prismal distribution
+rm -rf dist/ && python -m build && twine check dist/*
+twine upload --repository testpypi dist/*          # validate on TestPyPI first
+
+# 3) Push history and publish prismal
+git push origin main
+twine upload dist/*                                 # publish to PyPI
+git tag prismal/v3.0.0 && git push --tags           # tag format: prismal/vMAJOR.MINOR.PATCH
+
+# 4) Publish the deprecated compatibility bridge (lightagent-agents -> prismal)
+cd compat/lightagent-agents
+rm -rf dist/ && python -m build && twine check dist/*
+twine upload dist/*                                 # publishes lightagent-agents 2.9.0
+```
+
+Post-release follow-ups: configure DNS/site for `prismal.dev`, coordinate the
+sibling `lightagent` app package (the namespace rename breaks the shared PEP 420
+namespace), and regenerate the branded binary assets (PDF/PPTX/HTML).
+
+---
+
 ## License
 
 MIT © Ernesto Crespo
