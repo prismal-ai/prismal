@@ -1,0 +1,40 @@
+# ============================================================
+# Deprecated compatibility distribution: lightagent-agents
+# ------------------------------------------------------------
+# This package has been renamed to `prismal`. This 2.9.0 release is a thin
+# bridge: it depends on `prismal` and ships a `lightagent` import shim that
+# redirects `lightagent.* -> prismal.*`, so existing `pip install
+# lightagent-agents` / `from lightagent. ...` users keep working while they
+# migrate. It is built/published from this subfolder, separately from the
+# main `prismal` distribution at the repo root.
+# ============================================================
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lightagent-agents"
+version = "2.9.0"
+description = "Deprecated — renamed to 'prismal'. Compatibility shim that installs prismal and redirects 'lightagent.*' imports."
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+authors = [{ name = "Ernesto Crespo", email = "ecrespo@gmail.com" }]
+maintainers = [{ name = "Ernesto Crespo", email = "ecrespo@gmail.com" }]
+keywords = ["prismal", "lightagent", "deprecated", "compatibility", "shim"]
+classifiers = [
+  "Development Status :: 7 - Inactive",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = ["prismal>=3.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/prismal-ai/prismal"
+Repository = "https://github.com/prismal-ai/prismal"
+
+# Ship only the 'lightagent' redirector shim; prismal itself is pulled in as a
+# dependency.
+[tool.hatch.build.targets.wheel]
+packages = ["lightagent"]

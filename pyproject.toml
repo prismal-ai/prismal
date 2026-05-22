@@ -256,6 +256,7 @@ exclude = [
   "/docs",
   "/tests",
   "/data/",
+  "/compat",
   ".env",
   ".env.*",
 ]
