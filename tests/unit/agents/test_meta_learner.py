@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.agents.meta_learner."""
+"""Unit tests for prismal.agents.meta_learner."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ async def test_fetch_traces_returns_empty_when_langfuse_disabled() -> None:
     mock_settings = MagicMock()
     mock_settings.langfuse_enabled = False
 
-    with patch("lightagent.core.config.get_settings", return_value=mock_settings):
+    with patch("prismal.core.config.get_settings", return_value=mock_settings):
         learner = MetaLearner()
         traces = await learner.fetch_traces(days=7)
 
@@ -126,7 +126,7 @@ async def test_fetch_traces_returns_traces_when_langfuse_enabled(
     learner = MetaLearner(proposals_dir=tmp_path)
 
     with (
-        patch("lightagent.core.config.get_settings", return_value=mock_settings),
+        patch("prismal.core.config.get_settings", return_value=mock_settings),
         patch.dict("sys.modules", {"langfuse": MagicMock(Langfuse=mock_langfuse_cls)}),
     ):
         traces = await learner.fetch_traces(days=7)
@@ -150,7 +150,7 @@ async def test_fetch_traces_returns_empty_on_exception(tmp_path: Path) -> None:
     learner = MetaLearner(proposals_dir=tmp_path)
 
     with (
-        patch("lightagent.core.config.get_settings", return_value=mock_settings),
+        patch("prismal.core.config.get_settings", return_value=mock_settings),
         patch.dict("sys.modules", {"langfuse": MagicMock(Langfuse=mock_langfuse_cls)}),
     ):
         traces = await learner.fetch_traces(days=7)
@@ -185,7 +185,7 @@ async def test_score_traces_returns_scores_for_valid_traces(tmp_path: Path) -> N
     mock_registry = MagicMock()
     mock_registry.get_llm.return_value = mock_llm
 
-    with patch("lightagent.agents.meta_learner.ProviderRegistry", return_value=mock_registry):
+    with patch("prismal.agents.meta_learner.ProviderRegistry", return_value=mock_registry):
         scores = await learner.score_traces(traces)
 
     assert len(scores) == 1
@@ -206,7 +206,7 @@ async def test_score_traces_handles_llm_error_gracefully(tmp_path: Path) -> None
     mock_registry = MagicMock()
     mock_registry.get_llm.return_value = mock_llm
 
-    with patch("lightagent.agents.meta_learner.ProviderRegistry", return_value=mock_registry):
+    with patch("prismal.agents.meta_learner.ProviderRegistry", return_value=mock_registry):
         scores = await learner.score_traces(traces)
 
     # Error handling skips the trace — returns empty list
@@ -227,7 +227,7 @@ async def test_score_traces_handles_invalid_json(tmp_path: Path) -> None:
     mock_registry = MagicMock()
     mock_registry.get_llm.return_value = mock_llm
 
-    with patch("lightagent.agents.meta_learner.ProviderRegistry", return_value=mock_registry):
+    with patch("prismal.agents.meta_learner.ProviderRegistry", return_value=mock_registry):
         scores = await learner.score_traces(traces)
 
     assert scores == []
@@ -269,7 +269,7 @@ async def test_generate_proposals_returns_llm_output(tmp_path: Path) -> None:
     mock_registry = MagicMock()
     mock_registry.get_llm.return_value = mock_llm
 
-    with patch("lightagent.agents.meta_learner.ProviderRegistry", return_value=mock_registry):
+    with patch("prismal.agents.meta_learner.ProviderRegistry", return_value=mock_registry):
         result = await learner.generate_proposals(low_scores)
 
     assert "Proposals" in result
@@ -296,7 +296,7 @@ async def test_generate_proposals_returns_empty_on_llm_error(tmp_path: Path) -> 
     mock_registry = MagicMock()
     mock_registry.get_llm.return_value = mock_llm
 
-    with patch("lightagent.agents.meta_learner.ProviderRegistry", return_value=mock_registry):
+    with patch("prismal.agents.meta_learner.ProviderRegistry", return_value=mock_registry):
         result = await learner.generate_proposals(low_scores)
 
     assert result == ""

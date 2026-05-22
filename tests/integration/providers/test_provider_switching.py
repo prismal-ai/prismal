@@ -6,7 +6,7 @@ corresponding environment variables are set.
 
 Run manually::
 
-    LIGHTAGENT_ANTHROPIC_API_KEY=sk-ant-... \\
+    PRISMAL_ANTHROPIC_API_KEY=sk-ant-... \\
         uv run pytest tests/integration/providers/ -v
 """
 
@@ -26,8 +26,8 @@ def _has_env(var: str) -> bool:
 
 
 @pytest.mark.skipif(
-    not _has_env("LIGHTAGENT_ANTHROPIC_API_KEY"),
-    reason="LIGHTAGENT_ANTHROPIC_API_KEY not set",
+    not _has_env("PRISMAL_ANTHROPIC_API_KEY"),
+    reason="PRISMAL_ANTHROPIC_API_KEY not set",
 )
 def test_anthropic_live_call() -> None:
     """Live call to Anthropic Claude must return a non-empty response."""
@@ -39,8 +39,8 @@ def test_anthropic_live_call() -> None:
 
 
 @pytest.mark.skipif(
-    not _has_env("LIGHTAGENT_OPENAI_API_KEY"),
-    reason="LIGHTAGENT_OPENAI_API_KEY not set",
+    not _has_env("PRISMAL_OPENAI_API_KEY"),
+    reason="PRISMAL_OPENAI_API_KEY not set",
 )
 def test_openai_live_call() -> None:
     """Live call to OpenAI GPT must return a non-empty response."""

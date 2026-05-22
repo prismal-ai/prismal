@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
     from prismal.agents.subgraphs.code_review.types import CodeIssue
 
-logger = get_logger("lightagent.subgraphs.code_review.report")
+logger = get_logger("prismal.subgraphs.code_review.report")
 
 _SEVERITY_WEIGHT: dict[str, float] = {
     "critical": 0.40,

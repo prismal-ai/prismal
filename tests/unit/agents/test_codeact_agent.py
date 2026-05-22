@@ -1,4 +1,4 @@
-"""Tests for :mod:`lightagent.agents.codeact_agent` — SPEC-040 AC-040-5.
+"""Tests for :mod:`prismal.agents.codeact_agent` — SPEC-040 AC-040-5.
 
 The CodeAct loop has four moving parts (LLM, import validator, shell
 gate, sandbox) and the only safe way to exercise the auto-correction
@@ -121,19 +121,19 @@ def _patch_codeact(
     def _cm() -> Any:
         with (
             patch(
-                "lightagent.agents.codeact_agent.get_settings",
+                "prismal.agents.codeact_agent.get_settings",
                 return_value=settings_mock,
             ),
             patch(
-                "lightagent.agents.codeact_agent.ProviderRegistry",
+                "prismal.agents.codeact_agent.ProviderRegistry",
                 new=provider_mock,
             ),
             patch(
-                "lightagent.agents.codeact_agent.ActionInterceptor.check_shell",
+                "prismal.agents.codeact_agent.ActionInterceptor.check_shell",
                 new=check_shell_mock,
             ),
             patch(
-                "lightagent.agents.codeact_agent._run_code_in_sandbox",
+                "prismal.agents.codeact_agent._run_code_in_sandbox",
                 new=sandbox_mock,
             ),
         ):
@@ -212,11 +212,11 @@ class TestValidateImports:
         assert "socket" in reason
         assert "allowlist" in reason.lower()
 
-    def test_blocks_lightagent_imports(self) -> None:
+    def test_blocks_prismal_imports(self) -> None:
         """CodeAct must never reach into project internals."""
         ok, reason = _validate_imports("from prismal.memory import x")
         assert not ok
-        assert "lightagent" in reason
+        assert "prismal" in reason
 
     def test_blocks_dynamic_import_call(self) -> None:
         # SPEC-044 AC-044-1: ``__import__`` is now in the name-call
@@ -597,14 +597,14 @@ class TestGetImportAllowlist:
     def test_default_excludes_dangerous_stdlib_modules(self) -> None:
         """SPEC-044 AC-044-5: ``os``, ``sys``, ``subprocess`` must NOT be
         in the default allowlist. Operators who need them must override
-        via ``LIGHTAGENT_CODEACT_IMPORT_ALLOWLIST`` and accept the risk.
+        via ``PRISMAL_CODEACT_IMPORT_ALLOWLIST`` and accept the risk.
         """
         allowlist = _get_import_allowlist()
         for pkg in ("os", "sys", "subprocess"):
             assert pkg not in allowlist, f"'{pkg}' should NOT be in the default CodeAct allowlist"
 
     def test_custom_allowlist_from_settings(self) -> None:
-        with patch("lightagent.agents.codeact_agent.get_settings") as mock_settings:
+        with patch("prismal.agents.codeact_agent.get_settings") as mock_settings:
             mock_settings.return_value.codeact_import_allowlist = "alpha, beta ,gamma"
             allowlist = _get_import_allowlist()
         assert allowlist == frozenset({"alpha", "beta", "gamma"})
@@ -834,19 +834,19 @@ class TestCodeactNodeShellGate:
         settings_mock.codeact_import_allowlist = "pathlib,json"
         with (
             patch(
-                "lightagent.agents.codeact_agent.get_settings",
+                "prismal.agents.codeact_agent.get_settings",
                 return_value=settings_mock,
             ),
             patch(
-                "lightagent.agents.codeact_agent.ProviderRegistry",
+                "prismal.agents.codeact_agent.ProviderRegistry",
                 new=provider_mock,
             ),
             patch(
-                "lightagent.agents.codeact_agent.ActionInterceptor.check_shell",
+                "prismal.agents.codeact_agent.ActionInterceptor.check_shell",
                 side_effect=_shell_side_effect,
             ),
             patch(
-                "lightagent.agents.codeact_agent._run_code_in_sandbox",
+                "prismal.agents.codeact_agent._run_code_in_sandbox",
                 new=AsyncMock(side_effect=_sandbox_side_effect),
             ),
         ):
@@ -860,7 +860,7 @@ class TestCodeactNodeShellGate:
         with _patch_codeact(llm, shell_enabled=False) as mocks:
             out = await codeact_node(_make_state())
 
-        assert "LIGHTAGENT_SHELL_ENABLED" in out["messages"][0].content
+        assert "PRISMAL_SHELL_ENABLED" in out["messages"][0].content
         mocks["sandbox"].assert_not_awaited()
 
 
@@ -877,8 +877,8 @@ class TestCodeactDisabled:
         llm = MagicMock()
         llm.ainvoke = AsyncMock()
         with (
-            patch("lightagent.agents.codeact_agent.get_settings") as mock_settings,
-            patch("lightagent.agents.codeact_agent.ProviderRegistry") as pr,
+            patch("prismal.agents.codeact_agent.get_settings") as mock_settings,
+            patch("prismal.agents.codeact_agent.ProviderRegistry") as pr,
         ):
             mock_settings.return_value.codeact_enabled = False
             pr.return_value.get_llm_with_fallback.return_value = llm

@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
     import polars as pl
 
-logger = get_logger("lightagent.subgraphs.data_etl.loader")
+logger = get_logger("prismal.subgraphs.data_etl.loader")
 
 
 async def _default_loader(df: pl.DataFrame, destination: dict[str, Any]) -> int:

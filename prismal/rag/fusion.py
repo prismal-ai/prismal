@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from prismal.core.config import Settings
     from prismal.rag.vector_store import ChromaVectorStore
 
-logger = get_logger("lightagent.rag.fusion")
+logger = get_logger("prismal.rag.fusion")
 
 _VARIANT_PROMPT = (
     "You generate alternative phrasings of a search query to improve retrieval "
@@ -107,8 +107,8 @@ class RAGFusionEngine:
         n_queries: Total number of query phrasings, counting the original
             (default 4 — so 3 LLM-generated variants).
         rrf_k: RRF smoothing constant (default 60).
-        settings: LightAgent settings. ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+        settings: Prismal settings. ``None`` resolves via
+            :func:`~prismal.core.config.get_settings`.
     """
 
     def __init__(
@@ -139,9 +139,9 @@ class RAGFusionEngine:
         """
         otel = OTelManager()
         with otel.start_span("fusion.search") as span:
-            span.set_attribute("lightagent.query_len", len(query))
-            span.set_attribute("lightagent.n_queries", self._n_queries)
-            span.set_attribute("lightagent.k", k)
+            span.set_attribute("prismal.query_len", len(query))
+            span.set_attribute("prismal.n_queries", self._n_queries)
+            span.set_attribute("prismal.k", k)
 
             variants = await self._generate_query_variants(query)
             all_queries = [query, *variants][: self._n_queries]
@@ -150,7 +150,7 @@ class RAGFusionEngine:
             ranked_lists = [per_query_results[q] for q in all_queries]
             fused = reciprocal_rank_fusion(ranked_lists, k=self._rrf_k)
 
-            span.set_attribute("lightagent.fused_count", len(fused))
+            span.set_attribute("prismal.fused_count", len(fused))
             otel.increment_counter("rag_queries")
 
             logger.info(

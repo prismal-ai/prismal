@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.security.nemo_rails (SPEC-019 / T-200)."""
+"""Unit tests for prismal.security.nemo_rails (SPEC-019 / T-200)."""
 
 from __future__ import annotations
 
@@ -216,7 +216,7 @@ async def test_check_input_timeout_fails_open() -> None:
     layer._rails = mock_rails  # type: ignore[attr-defined]
     layer._config_path = Path("config/nemo_rails")  # type: ignore[attr-defined]
 
-    with patch("lightagent.security.nemo_rails._NEMO_TIMEOUT_SECONDS", 0.01):
+    with patch("prismal.security.nemo_rails._NEMO_TIMEOUT_SECONDS", 0.01):
         blocked, category = await layer.check_input("some text")
 
     assert blocked is False
@@ -238,7 +238,7 @@ async def test_check_output_timeout_fails_open() -> None:
     layer._rails = mock_rails  # type: ignore[attr-defined]
     layer._config_path = Path("config/nemo_rails")  # type: ignore[attr-defined]
 
-    with patch("lightagent.security.nemo_rails._NEMO_TIMEOUT_SECONDS", 0.01):
+    with patch("prismal.security.nemo_rails._NEMO_TIMEOUT_SECONDS", 0.01):
         blocked, category = await layer.check_output("some output")
 
     assert blocked is False
@@ -268,7 +268,7 @@ def test_get_nemo_layer_disabled() -> None:
     mock_settings = MagicMock()
     mock_settings.nemo_guardrails_enabled = False
 
-    with patch("lightagent.core.config.get_settings", return_value=mock_settings):
+    with patch("prismal.core.config.get_settings", return_value=mock_settings):
         result = get_nemo_layer()
 
     assert result is None
@@ -280,7 +280,7 @@ def test_get_nemo_layer_enabled_missing_config(tmp_path: Path) -> None:
     mock_settings.nemo_guardrails_enabled = True
 
     missing = tmp_path / "no_nemo"
-    with patch("lightagent.core.config.get_settings", return_value=mock_settings):
+    with patch("prismal.core.config.get_settings", return_value=mock_settings):
         layer = get_nemo_layer(missing)
 
     assert layer is not None

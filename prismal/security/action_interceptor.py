@@ -20,7 +20,7 @@ from prismal.core.logging import get_logger
 from prismal.security.audit import AuditLogger
 from prismal.security.permissions import PermissionManager, PermissionType
 
-logger = get_logger("lightagent.security.action_interceptor")
+logger = get_logger("prismal.security.action_interceptor")
 
 # Maps tool names to required PermissionType. Extend when new tools are added.
 _TOOL_PERMISSION_MAP: dict[str, PermissionType] = {
@@ -141,7 +141,7 @@ class ActionInterceptor(BaseCallbackHandler):
     def check_shell(cmd: list[str]) -> bool:
         """Return True if shell execution is permitted by current settings.
 
-        Checks ``settings.shell_enabled`` (``LIGHTAGENT_SHELL_ENABLED`` env var).
+        Checks ``settings.shell_enabled`` (``PRISMAL_SHELL_ENABLED`` env var).
         Always call this before spawning any subprocess from application code.
 
         Args:

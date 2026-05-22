@@ -1,6 +1,6 @@
 """NetworkSupervisorAgent — distributed multi-agent routing (T-211 / SPEC-021).
 
-Routes tasks to remote LightAgent nodes by capability tag.  Falls back
+Routes tasks to remote Prismal nodes by capability tag.  Falls back
 gracefully to local execution when no suitable node is available or when
 the remote call fails.
 
@@ -32,7 +32,7 @@ from prismal.monitoring.otel import OTelManager
 if TYPE_CHECKING:
     from langchain_core.runnables import RunnableConfig
 
-logger = get_logger("lightagent.agents.network_supervisor")
+logger = get_logger("prismal.agents.network_supervisor")
 
 _DEFAULT_CONFIG = Path("config/network_nodes.yaml")
 
@@ -43,7 +43,7 @@ except ImportError:
 
 
 class NetworkNode(BaseModel):
-    """A remote LightAgent node in the distributed network.
+    """A remote Prismal node in the distributed network.
 
     Attributes:
         name: Human-readable node label.
@@ -105,7 +105,7 @@ def _make_a2a_jwt(node_url: str) -> str:
         from jose import jwt
 
         payload = {
-            "sub": "lightagent-node",
+            "sub": "prismal-node",
             "aud": node_url,
             "type": "a2a",
             "iat": datetime.now(UTC),
@@ -118,7 +118,7 @@ def _make_a2a_jwt(node_url: str) -> str:
 
 
 class NetworkSupervisorAgent:
-    """Routes tasks to remote LightAgent nodes by capability.
+    """Routes tasks to remote Prismal nodes by capability.
 
     Args:
         nodes: List of remote nodes.  If None, loaded from YAML on init.
@@ -172,13 +172,13 @@ class NetworkSupervisorAgent:
         """
         otel = OTelManager()
         with otel.start_span("network_supervisor.delegate") as span:
-            span.set_attribute("lightagent.capability", capability)
+            span.set_attribute("prismal.capability", capability)
 
             node = self._find_node(capability)
             if node is not None and httpx is not None:
                 try:
                     result = await self._call_remote(node, task, session_id)
-                    span.set_attribute("lightagent.routed_to", node.name)
+                    span.set_attribute("prismal.routed_to", node.name)
                     logger.info(
                         "network_delegate_remote",
                         node=node.name,
@@ -192,7 +192,7 @@ class NetworkSupervisorAgent:
                         error=str(exc),
                     )
 
-            span.set_attribute("lightagent.routed_to", "local")
+            span.set_attribute("prismal.routed_to", "local")
             logger.info("network_delegate_local", capability=capability)
             return await self._run_local(task, session_id)
 

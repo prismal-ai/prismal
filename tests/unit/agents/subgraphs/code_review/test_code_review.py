@@ -34,7 +34,7 @@ from prismal.agents.subgraphs.code_review import (
 from prismal.agents.subgraphs.code_review.builder import (
     build_code_review_subgraph,
 )
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -80,8 +80,8 @@ def test_code_review_report_is_instantiable() -> None:
     assert r.approved is True
 
 
-def test_code_review_error_inherits_from_lightagent_error() -> None:
-    assert issubclass(CodeReviewError, LightAgentError)
+def test_code_review_error_inherits_from_prismal_error() -> None:
+    assert issubclass(CodeReviewError, PrismalError)
 
 
 # ── linter_node ──────────────────────────────────────────────────────────────

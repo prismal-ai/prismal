@@ -27,7 +27,7 @@ from prismal.agents.supervisor import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-_PATCH_TARGET = "lightagent.agents.supervisor.ProviderRegistry"
+_PATCH_TARGET = "prismal.agents.supervisor.ProviderRegistry"
 
 
 def _make_state(text: str) -> AgentState:

@@ -8,7 +8,7 @@ inference code (``predict.py``), and writes a model card.
 All outputs are saved to ``{ml_workspace_root}/{model_name}/``.
 Never log raw model files or full dataset contents to traces.
 
-Stores a :class:`~lightagent.agents.subgraphs.ml_pipeline.artifacts.ModelPackage`
+Stores a :class:`~prismal.agents.subgraphs.ml_pipeline.artifacts.ModelPackage`
 under ``state["metadata"]["ml_pipeline"]["model_package"]``.
 """
 
@@ -28,7 +28,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.ml_pipeline.model_exporter")
+logger = structlog.get_logger("prismal.subgraphs.ml_pipeline.model_exporter")
 otel = OTelManager()
 
 _SYSTEM = """You are a Model Exporter for the ml_pipeline subgraph.
@@ -89,7 +89,7 @@ The `ModelPackage` is acceptable when ALL of the following hold:
 
 ## Background
 - Artifact schema:
-  `lightagent/agents/subgraphs/ml_pipeline/artifacts.py::ModelPackage`.
+  `prismal/agents/subgraphs/ml_pipeline/artifacts.py::ModelPackage`.
 - All outputs MUST save under
   `data/workspace/ml_models/{dataset_name}/`.
 - Never log raw model bytes or dataset rows to traces.
@@ -144,8 +144,8 @@ async def model_exporter_node(state: AgentState) -> dict[str, Any]:
         ``metadata["ml_pipeline"]["model_package"]``.
     """
     with otel.start_span("ml_pipeline.model_exporter") as span:
-        span.set_attribute("lightagent.subgraph", "ml_pipeline")
-        span.set_attribute("lightagent.agent", "model_exporter")
+        span.set_attribute("prismal.subgraph", "ml_pipeline")
+        span.set_attribute("prismal.agent", "model_exporter")
 
         settings = get_settings()
         ml: dict[str, Any] = dict(state.get("metadata", {}).get("ml_pipeline", {}))
@@ -179,7 +179,7 @@ async def model_exporter_node(state: AgentState) -> dict[str, Any]:
                 model_path=f"{base}/model.joblib",
                 format="joblib",
                 inference_code_path=f"{base}/predict.py",
-                model_card=f"# {dataset_name} Model\nExported by LightAgent.",
+                model_card=f"# {dataset_name} Model\nExported by Prismal.",
                 dependencies=[],
             )
 
@@ -192,7 +192,7 @@ async def model_exporter_node(state: AgentState) -> dict[str, Any]:
             export_format=package.format,
             model_path=package.model_path,
         )
-        span.set_attribute("lightagent.ml.export_format", package.format)
+        span.set_attribute("prismal.ml.export_format", package.format)
 
         return {
             "current_agent": "model_exporter",

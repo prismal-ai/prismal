@@ -23,7 +23,7 @@ def test_otel_manager_is_singleton() -> None:
 def test_start_span_returns_noop_when_disabled() -> None:
     """start_span returns a _NoOpSpan context manager when OTEL disabled."""
     _reset_singleton()
-    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
+    with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -48,7 +48,7 @@ def test_noop_span_methods() -> None:
 def test_increment_counter_noop_when_disabled() -> None:
     """increment_counter is safe no-op when OTEL disabled."""
     _reset_singleton()
-    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
+    with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -61,7 +61,7 @@ def test_increment_counter_noop_when_disabled() -> None:
 def test_record_histogram_noop_when_disabled() -> None:
     """record_histogram is safe no-op when OTEL disabled."""
     _reset_singleton()
-    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
+    with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -74,7 +74,7 @@ def test_record_histogram_noop_when_disabled() -> None:
 def test_start_span_with_attributes_noop() -> None:
     """start_span accepts attributes when disabled."""
     _reset_singleton()
-    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
+    with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -240,7 +240,7 @@ def test_start_span_records_exception_and_reraises() -> None:
 def test_shutdown_noop_when_disabled() -> None:
     """shutdown() returns immediately when not enabled."""
     _reset_singleton()
-    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
+    with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -313,7 +313,7 @@ def test_probe_endpoint_returns_true_when_reachable() -> None:
     mock_sock.__exit__ = MagicMock(return_value=False)
 
     with patch(
-        "lightagent.monitoring.otel.socket.create_connection",
+        "prismal.monitoring.otel.socket.create_connection",
         return_value=mock_sock,
     ):
         assert mgr._probe_endpoint("http://localhost:4318") is True
@@ -329,7 +329,7 @@ def test_probe_endpoint_returns_false_when_refused() -> None:
     mgr.enabled = False  # type: ignore[attr-defined]
 
     with patch(
-        "lightagent.monitoring.otel.socket.create_connection",
+        "prismal.monitoring.otel.socket.create_connection",
         side_effect=OSError(111, "Connection refused"),
     ):
         assert mgr._probe_endpoint("http://localhost:4318") is False
@@ -341,9 +341,9 @@ def test_setup_disables_otel_when_endpoint_unreachable() -> None:
 
     _reset_singleton()
     with (
-        patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings,
+        patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings,
         patch(
-            "lightagent.monitoring.otel.socket.create_connection",
+            "prismal.monitoring.otel.socket.create_connection",
             side_effect=OSError(111, "Connection refused"),
         ),
     ):
@@ -351,7 +351,7 @@ def test_setup_disables_otel_when_endpoint_unreachable() -> None:
         s.otel_enabled = True
         s.otel_exporter = "otlp"
         s.otel_endpoint = "http://localhost:4318"
-        s.otel_service_name = "lightagent"
+        s.otel_service_name = "prismal"
         s.otel_metrics_enabled = False
         mock_settings.return_value = s
         mgr = OTelManager()

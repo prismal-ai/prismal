@@ -7,7 +7,7 @@ reads a list of independent tasks from ``state`` and emits one ``Send`` per
 task targeting the same worker node.  LangGraph then executes the worker
 invocations concurrently and merges their partial state updates via the
 ``operator.add`` reducers declared on
-:class:`~lightagent.agents.state.AgentState` (see Phase 34 / T-309).
+:class:`~prismal.agents.state.AgentState` (see Phase 34 / T-309).
 
 Example::
 
@@ -50,7 +50,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.patterns.parallel")
+logger = get_logger("prismal.agents.patterns.parallel")
 
 DispatcherFn = Callable[["AgentState"], "list[Send] | str"]
 """Signature returned by :func:`make_parallel_dispatcher`.

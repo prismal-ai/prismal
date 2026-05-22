@@ -1,12 +1,12 @@
 """Skills system — discovery, activation, and tool aggregation.
 
-Public API for the three-tier LightAgent skills system:
+Public API for the three-tier Prismal skills system:
 
-* :class:`~lightagent.skills.base.BaseSkill` — abstract base for all skills
-* :class:`~lightagent.skills.base.SkillMetadata` — Pydantic model for skill metadata
-* :class:`~lightagent.skills.manager.SkillsManager` — orchestrates skill lifecycle
-* :class:`~lightagent.skills.manager.SkillInfo` — summary DTO returned by list_skills()
-* :data:`~lightagent.skills.manager.SkillStatus` — literal type for skill status
+* :class:`~prismal.skills.base.BaseSkill` — abstract base for all skills
+* :class:`~prismal.skills.base.SkillMetadata` — Pydantic model for skill metadata
+* :class:`~prismal.skills.manager.SkillsManager` — orchestrates skill lifecycle
+* :class:`~prismal.skills.manager.SkillInfo` — summary DTO returned by list_skills()
+* :data:`~prismal.skills.manager.SkillStatus` — literal type for skill status
 
 Quick start::
 

@@ -1,5 +1,5 @@
 """
-DateTimeService — single source of truth for all datetime operations in LightAgent.
+DateTimeService — single source of truth for all datetime operations in Prismal.
 
 Provides timezone resolution, NTP-corrected timestamps, cron next-run computation,
 and UTC conversion utilities. All components MUST use this service instead of
@@ -7,8 +7,8 @@ calling ``datetime.now()``, ``croniter``, or APScheduler triggers directly.
 
 Timezone resolution order (highest → lowest priority):
   1. Explicit ``tz_str`` argument passed to :meth:`resolve_timezone`
-  2. ``LIGHTAGENT_CRON_TIMEZONE`` environment variable
-  3. ``LIGHTAGENT_TIMEZONE`` environment variable
+  2. ``PRISMAL_CRON_TIMEZONE`` environment variable
+  3. ``PRISMAL_TIMEZONE`` environment variable
   4. OS local timezone via ``tzlocal.get_localzone()``
   5. UTC (final fallback)
 """
@@ -32,12 +32,12 @@ _UTC = ZoneInfo("UTC")
 
 
 class DateTimeService:
-    """Single source of truth for all datetime operations in LightAgent.
+    """Single source of truth for all datetime operations in Prismal.
 
     Timezone resolution order:
       1. Explicit tz_str argument
-      2. LIGHTAGENT_CRON_TIMEZONE (for cron operations)
-      3. LIGHTAGENT_TIMEZONE
+      2. PRISMAL_CRON_TIMEZONE (for cron operations)
+      3. PRISMAL_TIMEZONE
       4. tzlocal.get_localzone()
       5. UTC (fallback)
 
@@ -89,7 +89,7 @@ class DateTimeService:
         Invalid names log a WARNING and fall back to UTC.
 
         If *tz_str* is ``None`` or empty the resolution chain is walked:
-        ``LIGHTAGENT_CRON_TIMEZONE`` → ``LIGHTAGENT_TIMEZONE`` →
+        ``PRISMAL_CRON_TIMEZONE`` → ``PRISMAL_TIMEZONE`` →
         OS localzone → UTC.
 
         Args:
@@ -103,11 +103,11 @@ class DateTimeService:
 
         settings = get_settings()
 
-        # Step 2: LIGHTAGENT_CRON_TIMEZONE
+        # Step 2: PRISMAL_CRON_TIMEZONE
         if settings.cron_timezone:
             return self._parse_iana(settings.cron_timezone)
 
-        # Step 3: LIGHTAGENT_TIMEZONE
+        # Step 3: PRISMAL_TIMEZONE
         if settings.timezone:
             return self._parse_iana(settings.timezone)
 
@@ -129,7 +129,7 @@ class DateTimeService:
     def get_scheduler_tz(self) -> ZoneInfo:
         """Return the effective timezone for APScheduler initialisation.
 
-        Walks the resolution chain starting from ``LIGHTAGENT_CRON_TIMEZONE``.
+        Walks the resolution chain starting from ``PRISMAL_CRON_TIMEZONE``.
 
         Returns:
             A :class:`~zoneinfo.ZoneInfo` representing the scheduler timezone.

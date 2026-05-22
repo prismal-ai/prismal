@@ -1,11 +1,11 @@
-"""LightAgent custom exception hierarchy.
+"""Prismal custom exception hierarchy.
 
-All framework-specific errors inherit from ``LightAgentError``, allowing
-callers to catch the entire hierarchy with a single ``except LightAgentError``.
+All framework-specific errors inherit from ``PrismalError``, allowing
+callers to catch the entire hierarchy with a single ``except PrismalError``.
 
 Hierarchy::
 
-    LightAgentError
+    PrismalError
     ├── SecurityError
     │   ├── InjectionDetectedError
     │   ├── PermissionDeniedError
@@ -29,14 +29,14 @@ from __future__ import annotations
 # ── Base ─────────────────────────────────────────────────────────────────────
 
 
-class LightAgentError(Exception):
-    """Base class for all LightAgent-specific errors."""
+class PrismalError(Exception):
+    """Base class for all Prismal-specific errors."""
 
 
 # ── Security ──────────────────────────────────────────────────────────────────
 
 
-class SecurityError(LightAgentError):
+class SecurityError(PrismalError):
     """Raised when a security policy is violated."""
 
 
@@ -93,7 +93,7 @@ class CanaryLeakError(SecurityError):
 # ── Provider ──────────────────────────────────────────────────────────────────
 
 
-class ProviderError(LightAgentError):
+class ProviderError(PrismalError):
     """Raised when an LLM provider call fails."""
 
 
@@ -128,7 +128,7 @@ class ProviderTimeoutError(ProviderError):
 # ── Skill ─────────────────────────────────────────────────────────────────────
 
 
-class SkillError(LightAgentError):
+class SkillError(PrismalError):
     """Raised when a skill operation fails."""
 
 
@@ -168,7 +168,7 @@ class SkillValidationError(SkillError):
 # ── MCP ───────────────────────────────────────────────────────────────────────
 
 
-class MCPError(LightAgentError):
+class MCPError(PrismalError):
     """Raised when an MCP operation fails."""
 
 
@@ -210,7 +210,7 @@ class MCPToolError(MCPError):
 # ── RAG ───────────────────────────────────────────────────────────────────────
 
 
-class RAGError(LightAgentError):
+class RAGError(PrismalError):
     """Raised when a RAG operation fails."""
 
 
@@ -273,7 +273,7 @@ class AdaptiveRAGError(RAGError):
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 
-class SchedulerError(LightAgentError):
+class SchedulerError(PrismalError):
     """Raised when a scheduler operation fails."""
 
 
@@ -306,7 +306,7 @@ class CronJobExistsError(SchedulerError):
 # ── Memory ────────────────────────────────────────────────────────────────────
 
 
-class MemoryError(LightAgentError):
+class MemoryError(PrismalError):
     """Raised when a memory operation fails."""
 
 
@@ -324,80 +324,80 @@ class MemoryRedactionError(MemoryError):
 
 
 # ── Agent patterns (Fase B / SPEC-PAT-001..007) ─────────────────────────────
-# Canonical definitions live in ``lightagent/agents/patterns/*.py``;
+# Canonical definitions live in ``prismal/agents/patterns/*.py``;
 # re-exported here so callers can ``from prismal.core.exceptions import
 # DebateError`` without needing to know which module owns each pattern.
 
 
-class ToTError(LightAgentError):
+class ToTError(PrismalError):
     """Tree-of-Thoughts search error (SPEC-PAT-001).
 
-    Canonical class in :mod:`lightagent.agents.patterns.tree_of_thoughts`.
+    Canonical class in :mod:`prismal.agents.patterns.tree_of_thoughts`.
     """
 
 
-class DebateError(LightAgentError):
+class DebateError(PrismalError):
     """Debate pattern error (SPEC-PAT-002).
 
-    Canonical class in :mod:`lightagent.agents.patterns.debate`.
+    Canonical class in :mod:`prismal.agents.patterns.debate`.
     """
 
 
-class ConstitutionalError(LightAgentError):
+class ConstitutionalError(PrismalError):
     """Constitutional-AI filter error (SPEC-PAT-003).
 
-    Canonical class in :mod:`lightagent.agents.patterns.constitutional`.
+    Canonical class in :mod:`prismal.agents.patterns.constitutional`.
     """
 
 
-class LATSError(LightAgentError):
+class LATSError(PrismalError):
     """Language-Agent-Tree-Search / MCTS error (SPEC-PAT-004).
 
-    Canonical class in :mod:`lightagent.agents.patterns.lats`.
+    Canonical class in :mod:`prismal.agents.patterns.lats`.
     """
 
 
-class CompilerError(LightAgentError):
+class CompilerError(PrismalError):
     """LLM-Compiler plan / execution error (SPEC-PAT-005).
 
-    Canonical class in :mod:`lightagent.agents.patterns.llm_compiler`.
+    Canonical class in :mod:`prismal.agents.patterns.llm_compiler`.
     """
 
 
-class MoAError(LightAgentError):
+class MoAError(PrismalError):
     """Mixture-of-Agents error (SPEC-PAT-006).
 
-    Canonical class in :mod:`lightagent.agents.patterns.mixture_of_agents`.
+    Canonical class in :mod:`prismal.agents.patterns.mixture_of_agents`.
     """
 
 
-class SwarmError(LightAgentError):
+class SwarmError(PrismalError):
     """Swarm handoff error (SPEC-PAT-007).
 
-    Canonical class in :mod:`lightagent.agents.patterns.swarm`.
+    Canonical class in :mod:`prismal.agents.patterns.swarm`.
     """
 
 
 # ── Subgraph pipelines (Fase C) ──────────────────────────────────────────────
 
 
-class CustomerServiceError(LightAgentError):
+class CustomerServiceError(PrismalError):
     """Customer-service subgraph error (SPEC-SUBGRAPH-001)."""
 
 
-class DocumentGenerationError(LightAgentError):
+class DocumentGenerationError(PrismalError):
     """Document-generation subgraph error (C2)."""
 
 
-class DataETLError(LightAgentError):
+class DataETLError(PrismalError):
     """Data-ETL subgraph error (C3)."""
 
 
-class CodeReviewError(LightAgentError):
+class CodeReviewError(PrismalError):
     """Code-review subgraph error (SPEC-SUBGRAPH-002)."""
 
 
-class DebateConsensusError(LightAgentError):
+class DebateConsensusError(PrismalError):
     """Debate/consensus subgraph error (C5)."""
 
 
@@ -421,7 +421,7 @@ __all__ = [
     "HybridSearchError",
     "InjectionDetectedError",
     "LATSError",
-    "LightAgentError",
+    "PrismalError",
     "MCPConnectionError",
     "MCPError",
     "MCPToolError",

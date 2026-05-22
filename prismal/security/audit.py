@@ -24,7 +24,7 @@ from pathlib import Path
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
 
-logger = get_logger("lightagent.security.audit")
+logger = get_logger("prismal.security.audit")
 
 _DEFAULT_LOG_PATH = Path("data/logs/audit.jsonl")
 _GENESIS_HASH = "0" * 64
@@ -124,9 +124,9 @@ class AuditLogger:
         )
         otel = OTelManager()
         with otel.start_span("security.audit.blocked") as span:
-            span.set_attribute("lightagent.session_id", session_id)
-            span.set_attribute("lightagent.text_length", len(text))
-            span.set_attribute("lightagent.reason_count", len(reasons))
+            span.set_attribute("prismal.session_id", session_id)
+            span.set_attribute("prismal.text_length", len(text))
+            span.set_attribute("prismal.reason_count", len(reasons))
             span.add_event(
                 "security.input_blocked",
                 attributes={

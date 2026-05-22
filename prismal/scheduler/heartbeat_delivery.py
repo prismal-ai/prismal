@@ -17,7 +17,7 @@ from __future__ import annotations
 import httpx
 import structlog
 
-logger = structlog.get_logger("lightagent.scheduler.heartbeat_delivery")
+logger = structlog.get_logger("prismal.scheduler.heartbeat_delivery")
 
 _TELEGRAM_API = "https://api.telegram.org"
 _SLACK_API = "https://slack.com/api/chat.postMessage"
@@ -178,7 +178,7 @@ class HeartbeatDelivery:
             import aiosmtplib
 
             message = MIMEText(text, "plain", "utf-8")
-            message["Subject"] = "LightAgent Heartbeat Report"
+            message["Subject"] = "Prismal Heartbeat Report"
             message["From"] = self._smtp_from
             message["To"] = recipient
             await aiosmtplib.send(

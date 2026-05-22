@@ -1,4 +1,4 @@
-"""Unit tests for tree_of_thoughts (lightagent.agents.patterns.tree_of_thoughts).
+"""Unit tests for tree_of_thoughts (prismal.agents.patterns.tree_of_thoughts).
 
 Tree of Thoughts explores a reasoning tree: each node generates N candidate
 next thoughts, each is scored, and the search keeps the top beam_size at
@@ -19,7 +19,7 @@ from prismal.agents.patterns.tree_of_thoughts import (
     make_tot_node,
     tree_of_thoughts,
 )
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -78,8 +78,8 @@ def test_tot_result_is_instantiable() -> None:
     assert r.total_thoughts_generated == 1
 
 
-def test_tot_error_inherits_from_lightagent_error() -> None:
-    assert issubclass(ToTError, LightAgentError)
+def test_tot_error_inherits_from_prismal_error() -> None:
+    assert issubclass(ToTError, PrismalError)
 
 
 # ── Input validation ─────────────────────────────────────────────────────────

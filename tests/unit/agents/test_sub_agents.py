@@ -54,7 +54,7 @@ async def test_researcher_node_returns_current_agent() -> None:
     state = create_initial_state(session_id="sess-researcher")
     state["messages"] = [HumanMessage(content="Find info about LangGraph")]
 
-    with patch("lightagent.agents.researcher.ProviderRegistry") as mock_reg:
+    with patch("prismal.agents.researcher.ProviderRegistry") as mock_reg:
         mock_reg.return_value.get_llm_with_fallback.return_value = _mock_llm()
         result = await researcher_node(state)
 
@@ -75,7 +75,7 @@ async def test_coder_node_returns_current_agent() -> None:
     state = create_initial_state(session_id="sess-coder")
     state["messages"] = [HumanMessage(content="Write a Python hello world script")]
 
-    with patch("lightagent.agents.coder.ProviderRegistry") as mock_reg:
+    with patch("prismal.agents.coder.ProviderRegistry") as mock_reg:
         mock_reg.return_value.get_llm_with_fallback.return_value = _mock_llm()
         result = await coder_node(state)
 
@@ -96,7 +96,7 @@ async def test_rag_agent_node_returns_current_agent() -> None:
     state = create_initial_state(session_id="sess-rag")
     state["messages"] = [HumanMessage(content="What does our onboarding doc say?")]
 
-    with patch("lightagent.agents.rag_agent.ProviderRegistry") as mock_reg:
+    with patch("prismal.agents.rag_agent.ProviderRegistry") as mock_reg:
         mock_reg.return_value.get_llm_with_fallback.return_value = _mock_llm()
         result = await rag_agent_node(state)
 
@@ -129,7 +129,7 @@ async def test_planner_node_returns_current_agent() -> None:
         "3. [agent: critic] Review the result\n"
     )
 
-    with patch("lightagent.agents.planner.ProviderRegistry") as mock_reg:
+    with patch("prismal.agents.planner.ProviderRegistry") as mock_reg:
         mock_llm = MagicMock()
         mock_llm.ainvoke = AsyncMock(return_value=AIMessage(content=planner_response))
         mock_llm.bind_tools.return_value = mock_llm  # bind_tools must return the same mock
@@ -155,7 +155,7 @@ async def test_critic_node_returns_current_agent() -> None:
     state = create_initial_state(session_id="sess-critic")
     state["messages"] = [HumanMessage(content="Review this answer")]
 
-    with patch("lightagent.agents.critic.ProviderRegistry") as mock_reg:
+    with patch("prismal.agents.critic.ProviderRegistry") as mock_reg:
         mock_reg.return_value.get_llm_with_fallback.return_value = _mock_llm()
         result = await critic_node(state)
 
@@ -172,7 +172,7 @@ async def test_critic_node_increments_iteration_count() -> None:
     state["messages"] = [HumanMessage(content="Review this")]
     # iteration_count starts at 0 from create_initial_state
 
-    with patch("lightagent.agents.critic.ProviderRegistry") as mock_reg:
+    with patch("prismal.agents.critic.ProviderRegistry") as mock_reg:
         mock_reg.return_value.get_llm_with_fallback.return_value = _mock_llm()
         result = await critic_node(state)
 
@@ -200,7 +200,7 @@ async def test_data_analyst_node_returns_current_agent() -> None:
     state = create_initial_state(session_id="sess-data-analyst")
     state["messages"] = [HumanMessage(content="Show me total sales by region")]
 
-    with patch("lightagent.agents.data_analyst.ProviderRegistry") as mock_reg:
+    with patch("prismal.agents.data_analyst.ProviderRegistry") as mock_reg:
         mock_reg.return_value.get_llm_with_fallback.return_value = _mock_llm()
         result = await data_analyst_node(state)
 
@@ -221,7 +221,7 @@ async def test_file_manager_node_returns_current_agent() -> None:
     state = create_initial_state(session_id="sess-file-manager")
     state["messages"] = [HumanMessage(content="Save this text to output.txt")]
 
-    with patch("lightagent.agents.file_manager.ProviderRegistry") as mock_reg:
+    with patch("prismal.agents.file_manager.ProviderRegistry") as mock_reg:
         mock_reg.return_value.get_llm_with_fallback.return_value = _mock_llm()
         result = await file_manager_node(state)
 

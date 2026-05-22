@@ -41,7 +41,7 @@ class TestCronAdd:
 
         job = _make_job(name="daily-brief", next_run=datetime(2099, 6, 15, 9, 0, 0))
 
-        with patch("lightagent.scheduler.cron_manager.CronManager.add", return_value=job):
+        with patch("prismal.scheduler.cron_manager.CronManager.add", return_value=job):
             result = cron_add.invoke(
                 {"name": "daily-brief", "schedule": "0 9 * * *", "task": "Send a brief"}
             )
@@ -54,7 +54,7 @@ class TestCronAdd:
         from prismal.agents.tools import cron_add
 
         with patch(
-            "lightagent.scheduler.cron_manager.CronManager.add",
+            "prismal.scheduler.cron_manager.CronManager.add",
             side_effect=ValueError("Cron job 'daily-brief' already exists"),
         ):
             result = cron_add.invoke(
@@ -71,7 +71,7 @@ class TestCronAdd:
         job = _make_job(name="no-time-job", next_run=None)
         job.next_run = None  # ensure None
 
-        with patch("lightagent.scheduler.cron_manager.CronManager.add", return_value=job):
+        with patch("prismal.scheduler.cron_manager.CronManager.add", return_value=job):
             result = cron_add.invoke(
                 {"name": "no-time-job", "schedule": "0 9 * * *", "task": "mystery"}
             )
@@ -85,7 +85,7 @@ class TestCronAdd:
         job = _make_job(name="tz-job")
 
         with patch(
-            "lightagent.scheduler.cron_manager.CronManager.add", return_value=job
+            "prismal.scheduler.cron_manager.CronManager.add", return_value=job
         ) as mock_add:
             cron_add.invoke(
                 {
@@ -112,7 +112,7 @@ class TestCronAdd:
 
         job = _make_job(name="tz-job")
 
-        with patch("lightagent.scheduler.cron_manager.CronManager.add", return_value=job):
+        with patch("prismal.scheduler.cron_manager.CronManager.add", return_value=job):
             result = cron_add.invoke(
                 {
                     "name": "tz-job",
@@ -131,7 +131,7 @@ class TestCronAdd:
         job = _make_job(name="no-tz-job")
 
         with patch(
-            "lightagent.scheduler.cron_manager.CronManager.add", return_value=job
+            "prismal.scheduler.cron_manager.CronManager.add", return_value=job
         ) as mock_add:
             cron_add.invoke(
                 {
@@ -158,7 +158,7 @@ class TestCronOnce:
 
         job = _make_job(name="once-job", schedule="once:2099-12-01T10:00:00")
 
-        with patch("lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job):
+        with patch("prismal.scheduler.cron_manager.CronManager.add_once", return_value=job):
             result = cron_once.invoke(
                 {
                     "name": "once-job",
@@ -191,7 +191,7 @@ class TestCronOnce:
         job = _make_job(name="tz-once", schedule="once:2099-12-01T10:00:00")
 
         with patch(
-            "lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job
+            "prismal.scheduler.cron_manager.CronManager.add_once", return_value=job
         ) as mock_add_once:
             cron_once.invoke(
                 {
@@ -210,7 +210,7 @@ class TestCronOnce:
 
         job = _make_job(name="tz-once", schedule="once:2099-12-01T10:00:00")
 
-        with patch("lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job):
+        with patch("prismal.scheduler.cron_manager.CronManager.add_once", return_value=job):
             result = cron_once.invoke(
                 {
                     "name": "tz-once",
@@ -229,7 +229,7 @@ class TestCronOnce:
         job = _make_job(name="no-tz-once", schedule="once:2099-12-01T10:00:00")
 
         with patch(
-            "lightagent.scheduler.cron_manager.CronManager.add_once", return_value=job
+            "prismal.scheduler.cron_manager.CronManager.add_once", return_value=job
         ) as mock_add_once:
             cron_once.invoke(
                 {
@@ -254,7 +254,7 @@ class TestCronList:
         """When no jobs exist the tool returns the empty-state message."""
         from prismal.agents.tools import cron_list
 
-        with patch("lightagent.scheduler.cron_manager.CronManager.list_jobs", return_value=[]):
+        with patch("prismal.scheduler.cron_manager.CronManager.list_jobs", return_value=[]):
             result = cron_list.invoke({})
 
         assert result == "No cron jobs scheduled."
@@ -268,7 +268,7 @@ class TestCronList:
             _make_job(name="job-beta", next_run=datetime(2099, 3, 15, 12, 0)),
         ]
 
-        with patch("lightagent.scheduler.cron_manager.CronManager.list_jobs", return_value=jobs):
+        with patch("prismal.scheduler.cron_manager.CronManager.list_jobs", return_value=jobs):
             result = cron_list.invoke({})
 
         assert "job-alpha" in result
@@ -280,7 +280,7 @@ class TestCronList:
         from prismal.agents.tools import cron_list
 
         with patch(
-            "lightagent.scheduler.cron_manager.CronManager.list_jobs",
+            "prismal.scheduler.cron_manager.CronManager.list_jobs",
             side_effect=RuntimeError("db gone"),
         ):
             result = cron_list.invoke({})
@@ -300,7 +300,7 @@ class TestCronPause:
         """Verify the result contains 'paused' on success."""
         from prismal.agents.tools import cron_pause
 
-        with patch("lightagent.scheduler.cron_manager.CronManager.pause") as mock_pause:
+        with patch("prismal.scheduler.cron_manager.CronManager.pause") as mock_pause:
             result = cron_pause.invoke({"name": "daily-brief"})
 
         mock_pause.assert_called_once_with("daily-brief")
@@ -312,7 +312,7 @@ class TestCronPause:
         from prismal.agents.tools import cron_pause
 
         with patch(
-            "lightagent.scheduler.cron_manager.CronManager.pause",
+            "prismal.scheduler.cron_manager.CronManager.pause",
             side_effect=KeyError("daily-brief"),
         ):
             result = cron_pause.invoke({"name": "daily-brief"})
@@ -333,7 +333,7 @@ class TestCronResume:
         """Verify the result contains 'resumed' on success."""
         from prismal.agents.tools import cron_resume
 
-        with patch("lightagent.scheduler.cron_manager.CronManager.resume") as mock_resume:
+        with patch("prismal.scheduler.cron_manager.CronManager.resume") as mock_resume:
             result = cron_resume.invoke({"name": "daily-brief"})
 
         mock_resume.assert_called_once_with("daily-brief")
@@ -345,7 +345,7 @@ class TestCronResume:
         from prismal.agents.tools import cron_resume
 
         with patch(
-            "lightagent.scheduler.cron_manager.CronManager.resume",
+            "prismal.scheduler.cron_manager.CronManager.resume",
             side_effect=KeyError("daily-brief"),
         ):
             result = cron_resume.invoke({"name": "daily-brief"})
@@ -366,7 +366,7 @@ class TestCronRemove:
         """Verify the result contains 'removed' on success."""
         from prismal.agents.tools import cron_remove
 
-        with patch("lightagent.scheduler.cron_manager.CronManager.remove") as mock_remove:
+        with patch("prismal.scheduler.cron_manager.CronManager.remove") as mock_remove:
             result = cron_remove.invoke({"name": "old-job"})
 
         mock_remove.assert_called_once_with("old-job")
@@ -378,7 +378,7 @@ class TestCronRemove:
         from prismal.agents.tools import cron_remove
 
         with patch(
-            "lightagent.scheduler.cron_manager.CronManager.remove",
+            "prismal.scheduler.cron_manager.CronManager.remove",
             side_effect=KeyError("old-job"),
         ):
             result = cron_remove.invoke({"name": "old-job"})
@@ -398,8 +398,8 @@ class TestCronToolsRegistry:
     def _get_tool_names(self, agent_name: str) -> list[str]:
         """Return tool names for an agent with MCP + skills mocked to empty."""
         with (
-            patch("lightagent.agents.tool_registry.get_mcp_tools", return_value=[]),
-            patch("lightagent.agents.tool_registry.get_skill_tools", return_value=[]),
+            patch("prismal.agents.tool_registry.get_mcp_tools", return_value=[]),
+            patch("prismal.agents.tool_registry.get_skill_tools", return_value=[]),
         ):
             from prismal.agents.tool_registry import get_tools_for_agent
 

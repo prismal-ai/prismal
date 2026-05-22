@@ -1,4 +1,4 @@
-"""Unit tests for HierarchicalRAGEngine (lightagent.rag.hierarchical).
+"""Unit tests for HierarchicalRAGEngine (prismal.rag.hierarchical).
 
 Parent-Child RAG indexes small child chunks for high retrieval precision,
 but returns the enclosing parent chunk for broader generation context.
@@ -25,7 +25,7 @@ from prismal.rag.hierarchical import (
     ParentChunk,
 )
 
-LOADER_PATH = "lightagent.rag.hierarchical.DocumentProcessorFactory"
+LOADER_PATH = "prismal.rag.hierarchical.DocumentProcessorFactory"
 
 
 def _make_document(content: str, source: str = "file.txt") -> MagicMock:

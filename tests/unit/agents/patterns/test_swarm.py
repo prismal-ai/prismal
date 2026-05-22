@@ -1,4 +1,4 @@
-"""Unit tests for swarm_handoff (lightagent.agents.patterns.swarm).
+"""Unit tests for swarm_handoff (prismal.agents.patterns.swarm).
 
 Swarm handoff: a decentralised pattern where any agent can pass control to
 any other agent in the allowlist. The handoff is recorded in the state's
@@ -18,7 +18,7 @@ from prismal.agents.patterns.swarm import (
     SwarmError,
     swarm_handoff,
 )
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
 
 def _state(**overrides: Any) -> dict[str, Any]:
@@ -56,8 +56,8 @@ def test_valid_handoff_targets_is_frozenset() -> None:
         assert expected in VALID_HANDOFF_TARGETS
 
 
-def test_swarm_error_inherits_from_lightagent_error() -> None:
-    assert issubclass(SwarmError, LightAgentError)
+def test_swarm_error_inherits_from_prismal_error() -> None:
+    assert issubclass(SwarmError, PrismalError)
 
 
 # ── Validation ───────────────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ async def test_handoff_context_snapshot_includes_session_id() -> None:
 @pytest.mark.asyncio
 async def test_handoff_emits_structured_audit_log() -> None:
     state = _state()
-    with patch("lightagent.agents.patterns.swarm.logger") as mock_logger:
+    with patch("prismal.agents.patterns.swarm.logger") as mock_logger:
         await swarm_handoff(
             current_agent="coder",
             target_agent="critic",

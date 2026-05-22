@@ -27,7 +27,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.researcher")
+logger = get_logger("prismal.agents.researcher")
 
 # Maximum tool-call iterations per researcher invocation.  Guards against
 # runaway loops when tool results never satisfy the LLM.

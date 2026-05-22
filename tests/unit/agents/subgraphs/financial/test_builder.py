@@ -25,11 +25,11 @@ async def test_register_financial_analyst_creates_registry_entry() -> None:
 
     with (
         patch(
-            "lightagent.agents.subgraphs.financial.builder.SubgraphFactory",
+            "prismal.agents.subgraphs.financial.builder.SubgraphFactory",
             return_value=mock_factory,
         ),
         patch(
-            "lightagent.agents.subgraphs.financial.builder.SubgraphRegistry.get_instance",
+            "prismal.agents.subgraphs.financial.builder.SubgraphRegistry.get_instance",
             return_value=mock_registry,
         ),
     ):
@@ -50,7 +50,7 @@ async def test_register_financial_analyst_idempotent() -> None:
     mock_registry.register = AsyncMock()
 
     with patch(
-        "lightagent.agents.subgraphs.financial.builder.SubgraphRegistry.get_instance",
+        "prismal.agents.subgraphs.financial.builder.SubgraphRegistry.get_instance",
         return_value=mock_registry,
     ):
         await register_financial_analyst()
@@ -70,7 +70,7 @@ async def test_get_compiled_financial_analyst_returns_graph() -> None:
     mock_factory.build = AsyncMock(return_value=mock_compiled)
 
     with patch(
-        "lightagent.agents.subgraphs.financial.builder.SubgraphFactory",
+        "prismal.agents.subgraphs.financial.builder.SubgraphFactory",
         return_value=mock_factory,
     ):
         result = await builder_mod.get_compiled_financial_analyst(checkpointer_path=":memory:")

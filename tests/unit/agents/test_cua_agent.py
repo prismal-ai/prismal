@@ -1,4 +1,4 @@
-"""Tests for :mod:`lightagent.agents.cua_agent` — SPEC-043 AC-043-6.
+"""Tests for :mod:`prismal.agents.cua_agent` — SPEC-043 AC-043-6.
 
 The CUA loop has four moving parts (vision LLM, Playwright screenshot
 adapter, risk classifier, HITL interrupt) and every one of them is
@@ -134,27 +134,27 @@ def _patch_runtime(
     def _cm() -> Any:
         patches: list[Any] = [
             patch(
-                "lightagent.agents.cua_agent.get_settings",
+                "prismal.agents.cua_agent.get_settings",
                 return_value=settings,
             ),
             patch(
-                "lightagent.agents.cua_agent.ProviderRegistry",
+                "prismal.agents.cua_agent.ProviderRegistry",
                 new=provider_mock,
             ),
             patch(
-                "lightagent.agents.cua_agent.take_screenshot",
+                "prismal.agents.cua_agent.take_screenshot",
                 new=AsyncMock(side_effect=_take_screenshot),
             ),
             patch(
-                "lightagent.agents.cua_agent.execute_browser_action",
+                "prismal.agents.cua_agent.execute_browser_action",
                 new=execute_mock,
             ),
-            patch("lightagent.agents.cua_agent.AuditLogger"),
+            patch("prismal.agents.cua_agent.AuditLogger"),
         ]
         if interrupt_return is not None:
             patches.append(
                 patch(
-                    "lightagent.agents.cua_agent.interrupt",
+                    "prismal.agents.cua_agent.interrupt",
                     return_value=interrupt_return,
                 )
             )
@@ -297,7 +297,7 @@ class TestParseAction:
 class TestCuaDisabled:
     async def test_cua_disabled_returns_disabled_message(self) -> None:
         with patch(
-            "lightagent.agents.cua_agent.get_settings",
+            "prismal.agents.cua_agent.get_settings",
             return_value=_settings_mock(enabled=False),
         ):
             out = await cua_node(_state())
@@ -306,7 +306,7 @@ class TestCuaDisabled:
 
     async def test_no_vision_model_returns_graceful_error(self) -> None:
         with patch(
-            "lightagent.agents.cua_agent.get_settings",
+            "prismal.agents.cua_agent.get_settings",
             return_value=_settings_mock(vision_model=""),
         ):
             out = await cua_node(_state())
@@ -323,11 +323,11 @@ class TestCuaDisabled:
         del provider.return_value.get_vision_llm
         with (
             patch(
-                "lightagent.agents.cua_agent.get_settings",
+                "prismal.agents.cua_agent.get_settings",
                 return_value=_settings_mock(),
             ),
             patch(
-                "lightagent.agents.cua_agent.ProviderRegistry",
+                "prismal.agents.cua_agent.ProviderRegistry",
                 new=provider,
             ),
         ):
@@ -343,11 +343,11 @@ class TestCuaDisabled:
         )
         with (
             patch(
-                "lightagent.agents.cua_agent.get_settings",
+                "prismal.agents.cua_agent.get_settings",
                 return_value=_settings_mock(),
             ),
             patch(
-                "lightagent.agents.cua_agent.ProviderRegistry",
+                "prismal.agents.cua_agent.ProviderRegistry",
                 new=provider,
             ),
         ):
@@ -564,22 +564,22 @@ class TestMaxActions:
         provider_mock.return_value.get_vision_llm = MagicMock(return_value=vlm)
         with (
             patch(
-                "lightagent.agents.cua_agent.get_settings",
+                "prismal.agents.cua_agent.get_settings",
                 return_value=settings,
             ),
             patch(
-                "lightagent.agents.cua_agent.ProviderRegistry",
+                "prismal.agents.cua_agent.ProviderRegistry",
                 new=provider_mock,
             ),
             patch(
-                "lightagent.agents.cua_agent.take_screenshot",
+                "prismal.agents.cua_agent.take_screenshot",
                 new=AsyncMock(side_effect=RuntimeError("browser down")),
             ),
             patch(
-                "lightagent.agents.cua_agent.execute_browser_action",
+                "prismal.agents.cua_agent.execute_browser_action",
                 new=AsyncMock(),
             ) as execute_mock,
-            patch("lightagent.agents.cua_agent.AuditLogger"),
+            patch("prismal.agents.cua_agent.AuditLogger"),
         ):
             out = await cua_node(_state())
 

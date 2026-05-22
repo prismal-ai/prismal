@@ -1,4 +1,4 @@
-"""Dynamic sub-agent orchestration package for LightAgent."""
+"""Dynamic sub-agent orchestration package for Prismal."""
 
 from prismal.agents.subgraphs.artifacts import (
     CodeArtifact,

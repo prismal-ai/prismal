@@ -11,7 +11,7 @@ Handles the full skill lifecycle:
   ``anthropics/skills``) via the GitHub API, wrap Claude Code YAML/MD skills as
   a ``BaseSkill`` Python class, and place it in ``skills/available/``.
 - **create**        — generate a brand-new skill from a natural-language
-  specification using the :mod:`~lightagent.agents.skill_creator` pipeline
+  specification using the :mod:`~prismal.agents.skill_creator` pipeline
   (ruff + mypy + bandit quality checks, human-review sentinel).
 
 Example conversation::
@@ -48,7 +48,7 @@ from prismal.skills.remote_installer import RemoteSkillInstaller
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.skill_manager")
+logger = get_logger("prismal.agents.skill_manager")
 
 # ---------------------------------------------------------------------------
 # System prompt (documentation + structural contract)
@@ -64,10 +64,10 @@ logger = get_logger("lightagent.agents.skill_manager")
 #   3. It is the fallback prompt used if the agent is ever wired into a
 #      ReAct loop for ambiguous requests the regex router cannot classify.
 
-_SYSTEM_PROMPT = """You are a skill lifecycle manager for LightAgent.
+_SYSTEM_PROMPT = """You are a skill lifecycle manager for Prismal.
 
 ## Purpose
-Manage the full lifecycle of LightAgent skills: list what is available and
+Manage the full lifecycle of Prismal skills: list what is available and
 what is active, activate/deactivate skills, install new skills from local
 paths or GitHub repositories, and generate brand-new skills from a natural-
 language spec via the `skill_creator` pipeline. You are the only agent
@@ -124,7 +124,7 @@ The operation is acceptable when ALL of the following hold:
 4. Format the response with the Output contract above.
 
 ## Background
-- Skills live in `lightagent/skills/`:
+- Skills live in `prismal/skills/`:
   - `available/` — installed but inactive.
   - `active/` — symlinks to active skills (auto-loaded at startup).
   - `custom/` — AI-generated skills pending human review.
@@ -150,7 +150,7 @@ User: "Instala el skill que está en /home/user/mis_skills/traductor"
 Response:
 ✅ Skill `traductor` instalado (carpeta) y activado.
    Origen:  /home/user/mis_skills/traductor
-   Destino: lightagent/skills/available/traductor/
+   Destino: prismal/skills/available/traductor/
 
 ### Example 3 — Negative (what NOT to do)
 BAD:
@@ -286,8 +286,8 @@ def _parse_remote_install_args(user_message: str) -> tuple[str, str]:
     else:
         m_slug = _RE_REPO_SLUG.search(user_message)
         candidate = m_slug.group(1).strip() if m_slug else ""
-        # Ignore internal paths like 'skills/available' or 'lightagent/skills'
-        if candidate and not candidate.startswith(("skills/", "lightagent/")):
+        # Ignore internal paths like 'skills/available' or 'prismal/skills'
+        if candidate and not candidate.startswith(("skills/", "prismal/")):
             repo = candidate
         else:
             repo = "anthropics/skills"
@@ -388,7 +388,7 @@ def _format_active_skills_only(manager: SkillsManager) -> str:
     without showing available or external inactive skills.
 
     Args:
-        manager: Initialised :class:`~lightagent.skills.manager.SkillsManager`.
+        manager: Initialised :class:`~prismal.skills.manager.SkillsManager`.
 
     Returns:
         Formatted string listing only active skills.
@@ -410,7 +410,7 @@ def _format_skills_list(manager: SkillsManager) -> str:
     """Render the full skill inventory as a markdown-friendly string.
 
     Args:
-        manager: Initialised :class:`~lightagent.skills.manager.SkillsManager`.
+        manager: Initialised :class:`~prismal.skills.manager.SkillsManager`.
 
     Returns:
         Formatted multiline string with skills grouped by status.
@@ -425,7 +425,7 @@ def _format_skills_list(manager: SkillsManager) -> str:
     custom = [s for s in skills if s.status == "custom"]
     errors = [s for s in skills if s.status == "error"]
 
-    lines: list[str] = ["**Skills en LightAgent:**\n"]
+    lines: list[str] = ["**Skills en Prismal:**\n"]
 
     if active:
         lines.append("✅ **Activos:**")
@@ -472,10 +472,10 @@ def _install_from_path(
     * **Python skill** — a directory containing ``skill.py``.
     * **Markdown skill package** — a directory containing ``skill.md``
       (+ optional ``scripts/`` and ``references/``).  A ``skill.py`` wrapper
-      is generated automatically via :func:`~lightagent.skills.base.generate_skill_py`.
+      is generated automatically via :func:`~prismal.skills.base.generate_skill_py`.
     * **Zip archive** — a ``.zip`` file whose contents follow either of the
       above layouts.  Delegated to
-      :meth:`~lightagent.skills.manager.SkillsManager.install_from_zip`.
+      :meth:`~prismal.skills.manager.SkillsManager.install_from_zip`.
 
     Args:
         source_path: Filesystem path supplied by the user (directory or .zip).
@@ -655,7 +655,7 @@ async def skill_manager_node(state: AgentState) -> dict[str, object]:
                     f"✅ Skill `{installed_name}` descargado desde "
                     f"`github.com/{repo}`.\n\n"
                     f"   Instalado en: "
-                    f"`lightagent/skills/available/{installed_name}/`\n\n"
+                    f"`prismal/skills/available/{installed_name}/`\n\n"
                     f"⚠️  El skill requiere revisión humana antes de activarse.\n"
                     f"   Cuando lo hayas revisado, dime:\n"
                     f'   **"activa el skill {installed_name}"**'
@@ -690,7 +690,7 @@ async def skill_manager_node(state: AgentState) -> dict[str, object]:
                 result = (
                     f"✅ Skill `{skill_name}` instalado ({pkg_type}) y activado.\n"
                     f"   Origen:  {source_path}\n"
-                    f"   Destino: lightagent/skills/available/{skill_name}/"
+                    f"   Destino: prismal/skills/available/{skill_name}/"
                 )
                 logger.info(
                     "skill_installed_from_path",

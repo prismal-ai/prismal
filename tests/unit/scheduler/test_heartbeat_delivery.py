@@ -17,7 +17,7 @@ async def test_send_telegram_calls_httpx() -> None:
     mock_resp = MagicMock()
     mock_resp.raise_for_status = MagicMock()
 
-    with patch("lightagent.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
+    with patch("prismal.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(return_value=mock_resp)
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -39,7 +39,7 @@ async def test_send_slack_calls_httpx() -> None:
     mock_resp = MagicMock()
     mock_resp.raise_for_status = MagicMock()
 
-    with patch("lightagent.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
+    with patch("prismal.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(return_value=mock_resp)
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -58,7 +58,7 @@ async def test_send_discord_posts_to_webhook() -> None:
     mock_resp = MagicMock()
     mock_resp.raise_for_status = MagicMock()
 
-    with patch("lightagent.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
+    with patch("prismal.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(return_value=mock_resp)
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -84,7 +84,7 @@ async def test_send_http_error_does_not_raise() -> None:
     """send() swallows HTTP errors (fail-open design)."""
     delivery = HeartbeatDelivery(telegram_token="tok")
 
-    with patch("lightagent.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
+    with patch("prismal.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(side_effect=Exception("network error"))
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -99,7 +99,7 @@ async def test_send_http_error_does_not_raise() -> None:
 async def test_send_telegram_skipped_when_no_token() -> None:
     """send() skips Telegram silently when no token is configured."""
     delivery = HeartbeatDelivery(telegram_token="")
-    with patch("lightagent.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
+    with patch("prismal.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
         await delivery.send("telegram", "12345", "hello")
     mock_cls.assert_not_called()
 
@@ -108,7 +108,7 @@ async def test_send_telegram_skipped_when_no_token() -> None:
 async def test_send_slack_skipped_when_no_token() -> None:
     """send() skips Slack silently when no token is configured."""
     delivery = HeartbeatDelivery(slack_token="")
-    with patch("lightagent.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
+    with patch("prismal.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
         await delivery.send("slack", "#ch", "hello")
     mock_cls.assert_not_called()
 
@@ -117,7 +117,7 @@ async def test_send_slack_skipped_when_no_token() -> None:
 async def test_send_email_skipped_when_no_smtp_config() -> None:
     """send() skips email delivery silently when smtp_host is not configured."""
     delivery = HeartbeatDelivery(smtp_host="", smtp_from="")
-    with patch("lightagent.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
+    with patch("prismal.scheduler.heartbeat_delivery.httpx.AsyncClient") as mock_cls:
         await delivery.send("email", "user@example.com", "hello")
     mock_cls.assert_not_called()
 

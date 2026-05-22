@@ -3,7 +3,7 @@
 Technical Analyst agent node for the financial_analyst subgraph.
 
 Computes RSI, MACD, Bollinger Bands, SMA/EMA, Stochastic, ADX. Stores a
-:class:`~lightagent.agents.subgraphs.financial.artifacts.TechnicalAnalysis`
+:class:`~prismal.agents.subgraphs.financial.artifacts.TechnicalAnalysis`
 under ``state["metadata"]["financial_analyst"]["technical_analysis"]``.
 """
 
@@ -22,7 +22,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.financial.technical_analyst")
+logger = structlog.get_logger("prismal.subgraphs.financial.technical_analyst")
 otel = OTelManager()
 
 # Phase 39 / SPEC-041 AC-041-1: the seven canonical indicator families
@@ -133,7 +133,7 @@ The `TechnicalAnalysis` is acceptable when ALL of the following hold:
 
 ## Background
 - Artifact schema:
-  `lightagent/agents/subgraphs/financial/artifacts.py::TechnicalAnalysis`.
+  `prismal/agents/subgraphs/financial/artifacts.py::TechnicalAnalysis`.
 - Lazy-import `pandas_ta`, `matplotlib`.
 - Pipeline is read-only analysis — never execute trades.
 
@@ -193,8 +193,8 @@ async def technical_analyst_node(state: AgentState) -> dict[str, Any]:
         ``metadata["financial_analyst"]["technical_analysis"]``.
     """
     with otel.start_span("financial_analyst.technical_analyst") as span:
-        span.set_attribute("lightagent.subgraph", "financial_analyst")
-        span.set_attribute("lightagent.agent", "technical_analyst")
+        span.set_attribute("prismal.subgraph", "financial_analyst")
+        span.set_attribute("prismal.agent", "technical_analyst")
 
         fin: dict[str, Any] = dict(state.get("metadata", {}).get("financial_analyst", {}))
         snapshot = fin.get("market_snapshot", {})
@@ -233,8 +233,8 @@ async def technical_analyst_node(state: AgentState) -> dict[str, Any]:
             signal_count=len(analysis.signals),
             data_confidence=confidence,
         )
-        span.set_attribute("lightagent.financial.symbol", analysis.symbol)
-        span.set_attribute("lightagent.financial.trend", analysis.trend)
+        span.set_attribute("prismal.financial.symbol", analysis.symbol)
+        span.set_attribute("prismal.financial.trend", analysis.trend)
 
         return {
             "current_agent": "technical_analyst",

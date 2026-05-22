@@ -23,9 +23,9 @@ def test_langfuse_manager_is_singleton() -> None:
 def test_langfuse_disabled_without_keys() -> None:
     """Manager is disabled when keys are not configured."""
     _reset_singleton()
-    with patch("lightagent.monitoring.langfuse_client.logger"):
+    with patch("prismal.monitoring.langfuse_client.logger"):
         with patch(
-            "lightagent.monitoring._settings_proxy.get_monitoring_settings"
+            "prismal.monitoring._settings_proxy.get_monitoring_settings"
         ) as mock_settings:
             from unittest.mock import MagicMock
 
@@ -42,7 +42,7 @@ def test_langfuse_disabled_without_keys() -> None:
 def test_create_trace_returns_noop_when_disabled() -> None:
     """create_trace returns a no-op object when Langfuse is disabled."""
     _reset_singleton()
-    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
+    with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -59,7 +59,7 @@ def test_create_trace_returns_noop_when_disabled() -> None:
 def test_get_callback_handler_returns_none_when_disabled() -> None:
     """get_callback_handler returns None when Langfuse is disabled."""
     _reset_singleton()
-    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
+    with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -75,7 +75,7 @@ def test_get_callback_handler_returns_none_when_disabled() -> None:
 def test_flush_and_shutdown_noop_when_disabled() -> None:
     """flush/shutdown are safe no-ops when disabled."""
     _reset_singleton()
-    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
+    with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         from unittest.mock import MagicMock
 
         s = MagicMock()
@@ -117,7 +117,7 @@ def test_langfuse_enabled_creates_client() -> None:
 
     with (
         patch.dict("sys.modules", {"langfuse": langfuse_stub}),
-        patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_s,
+        patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_s,
     ):
         s = MagicMock()
         s.langfuse_enabled = True
@@ -146,7 +146,7 @@ def test_langfuse_init_exception_disables() -> None:
 
     with (
         patch.dict("sys.modules", {"langfuse": langfuse_stub}),
-        patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_s,
+        patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_s,
     ):
         s = MagicMock()
         s.langfuse_enabled = True
@@ -279,7 +279,7 @@ def test_score_trace_noop_when_disabled() -> None:
     from unittest.mock import MagicMock, patch
 
     _reset_singleton()
-    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_s:
+    with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_s:
         s = MagicMock()
         s.langfuse_enabled = False
         s.langfuse_public_key.get_secret_value.return_value = ""

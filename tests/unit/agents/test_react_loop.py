@@ -1,4 +1,4 @@
-"""Unit tests for react_loop in lightagent.agents.tool_registry.
+"""Unit tests for react_loop in prismal.agents.tool_registry.
 
 Covers the normal path, iteration cap, per-tool failure budget, the
 all-tools-failed early-exit (permanent errors such as Tavily 400), and the

@@ -2,7 +2,7 @@
 
 ``langchain_litellm`` is only available inside the project venv.  When the
 test runner uses the system Python (e.g. Anaconda) the import chain
-``lightagent.agents.__init__`` → ``AgentFactory`` → ``providers.registry``
+``prismal.agents.__init__`` → ``AgentFactory`` → ``providers.registry``
 → ``langchain_litellm`` would otherwise abort collection.
 
 Injecting a lightweight stub into ``sys.modules`` before any test module is
@@ -22,11 +22,11 @@ import pytest
 #: :meth:`Settings._resolve_llm_provider` conflict warning (which
 #: ``filterwarnings=["error", ...]`` converts into a test failure).
 _ENV_ISOLATION_KEYS: tuple[str, ...] = (
-    "LIGHTAGENT_LLM_PROVIDER",
-    "LIGHTAGENT_DEFAULT_MODEL",
-    "LIGHTAGENT_MODEL",
-    "LIGHTAGENT_FALLBACK_MODEL",
-    "LIGHTAGENT_OLLAMA_BASE_URL",
+    "PRISMAL_LLM_PROVIDER",
+    "PRISMAL_DEFAULT_MODEL",
+    "PRISMAL_MODEL",
+    "PRISMAL_FALLBACK_MODEL",
+    "PRISMAL_OLLAMA_BASE_URL",
     "OLLAMA_API_BASE",
 )
 

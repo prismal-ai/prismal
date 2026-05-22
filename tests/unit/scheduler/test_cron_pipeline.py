@@ -23,7 +23,7 @@ from prismal.scheduler.executor import CronExecutor
 # Helpers
 # ---------------------------------------------------------------------------
 
-_GRAPH_PATCH = "lightagent.agents.graph.get_async_compiled_graph"
+_GRAPH_PATCH = "prismal.agents.graph.get_async_compiled_graph"
 
 
 def _make_compiled_graph_mock(*, fail: bool = False) -> AsyncMock:
@@ -151,7 +151,7 @@ async def test_start_registers_jobs_and_skips_paused(tmp_path: Path) -> None:
     mock_scheduler.running = False
 
     with patch(
-        "lightagent.scheduler.executor.AsyncIOScheduler",
+        "prismal.scheduler.executor.AsyncIOScheduler",
         return_value=mock_scheduler,
     ):
         executor._scheduler = mock_scheduler
@@ -173,7 +173,7 @@ async def test_start_with_real_manager_empty_db(tmp_path: Path) -> None:
     mock_scheduler.running = False
 
     with patch(
-        "lightagent.scheduler.executor.AsyncIOScheduler",
+        "prismal.scheduler.executor.AsyncIOScheduler",
         return_value=mock_scheduler,
     ):
         executor._scheduler = mock_scheduler
@@ -199,7 +199,7 @@ async def test_start_registers_all_active_jobs_from_real_manager(
     mock_scheduler.running = False
 
     with patch(
-        "lightagent.scheduler.executor.AsyncIOScheduler",
+        "prismal.scheduler.executor.AsyncIOScheduler",
         return_value=mock_scheduler,
     ):
         executor._scheduler = mock_scheduler

@@ -23,7 +23,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.planner")
+logger = get_logger("prismal.agents.planner")
 
 _SYSTEM_PROMPT = """You are a planning and software design specialist with deep \
 expertise in Spec-Driven Design (SDD).
@@ -33,7 +33,7 @@ Decompose complex multi-step user requests into ordered, executable plans for
 downstream specialist agents, OR produce formal software specification documents
 (PRD, API Spec, Tech Design, Data Model, Implementation Plan) when the user asks
 to plan, design, or document a feature before it is built. You are the single
-entry point for every "think before you code" workflow in LightAgent.
+entry point for every "think before you code" workflow in Prismal.
 
 ## Input
 - `state.messages`: full conversation history; the last HumanMessage contains

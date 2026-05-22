@@ -1,4 +1,4 @@
-"""Prefect flow definitions for LightAgent scheduled tasks.
+"""Prefect flow definitions for Prismal scheduled tasks.
 
 Defines reusable Prefect flows for document indexing, skill discovery,
 config hot-reload, and generic agent execution.  All flows include
@@ -24,7 +24,7 @@ from prefect import flow, task
 from prismal.core.logging import get_logger
 from prismal.skills.manager import SkillsManager
 
-logger = get_logger("lightagent.scheduler.prefect_flows")
+logger = get_logger("prismal.scheduler.prefect_flows")
 
 # ── Tasks (reusable building blocks) ─────────────────────────────────────────
 
@@ -64,7 +64,7 @@ def _discover_skills_task() -> list[str]:
 
 @task(retries=1, retry_delay_seconds=10, name="reload-config-task")
 def _reload_config_task() -> bool:
-    """Hot-reload LightAgent configuration from disk.
+    """Hot-reload Prismal configuration from disk.
 
     Returns:
         True if reload succeeded, False otherwise.
@@ -109,7 +109,7 @@ def skill_discovery_flow() -> list[str]:
 
 @flow(name="config-reload-flow", log_prints=True)
 def config_reload_flow() -> bool:
-    """Hot-reload LightAgent configuration from disk.
+    """Hot-reload Prismal configuration from disk.
 
     Returns:
         True if the reload succeeded.

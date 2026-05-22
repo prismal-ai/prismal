@@ -10,26 +10,26 @@ from prismal.monitoring.otel import OTelManager, _NoOpSpan
 
 
 def test_mcp_span_attributes() -> None:
-    """MCP spans support standard lightagent.mcp attributes."""
+    """MCP spans support standard prismal.mcp attributes."""
     OTelManager._instance = None
     OTelManager._initialized = False
-    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
+    with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         s = MagicMock()
         s.otel_enabled = False
         mock_settings.return_value = s
         otel = OTelManager()
     with otel.start_span("mcp.tool_call") as span:
         assert isinstance(span, _NoOpSpan)
-        span.set_attribute("lightagent.mcp.server_name", "filesystem")
-        span.set_attribute("lightagent.mcp.tool_name", "read_file")
-        span.set_attribute("lightagent.mcp.input_len", 42)
+        span.set_attribute("prismal.mcp.server_name", "filesystem")
+        span.set_attribute("prismal.mcp.tool_name", "read_file")
+        span.set_attribute("prismal.mcp.input_len", 42)
 
 
 def test_mcp_counter_increments() -> None:
     """mcp_tool_calls counter increments without error."""
     OTelManager._instance = None
     OTelManager._initialized = False
-    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
+    with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         s = MagicMock()
         s.otel_enabled = False
         mock_settings.return_value = s

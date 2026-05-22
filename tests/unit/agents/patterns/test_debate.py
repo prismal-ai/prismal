@@ -1,4 +1,4 @@
-"""Unit tests for debate_round (lightagent.agents.patterns.debate).
+"""Unit tests for debate_round (prismal.agents.patterns.debate).
 
 Debate pattern: N agents with distinct roles produce positions on the query,
 optionally refine them across rounds, then a synthesis step produces a
@@ -20,9 +20,9 @@ from prismal.agents.patterns.debate import (
     DebateResult,
     debate_round,
 )
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
-PROVIDER_REGISTRY_PATH = "lightagent.agents.patterns.debate.ProviderRegistry"
+PROVIDER_REGISTRY_PATH = "prismal.agents.patterns.debate.ProviderRegistry"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -69,8 +69,8 @@ def test_debate_result_is_instantiable() -> None:
     assert r.rounds_completed == 1
 
 
-def test_debate_error_inherits_from_lightagent_error() -> None:
-    assert issubclass(DebateError, LightAgentError)
+def test_debate_error_inherits_from_prismal_error() -> None:
+    assert issubclass(DebateError, PrismalError)
 
 
 # ── Input validation ─────────────────────────────────────────────────────────

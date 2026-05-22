@@ -4,11 +4,11 @@
 that makes direct httpx POSTs to the Telegram ``sendMessage`` and
 Slack ``chat.postMessage`` APIs when a cron job fails.
 
-It is injected into :class:`~lightagent.scheduler.executor.CronExecutor`
+It is injected into :class:`~prismal.scheduler.executor.CronExecutor`
 as an optional dependency so that tests can pass a no-op instance or a
 mock without touching real HTTP.
 
-Configuration is read from :class:`~lightagent.core.config.Settings` at
+Configuration is read from :class:`~prismal.core.config.Settings` at
 construction time when tokens/targets are not passed explicitly.
 """
 
@@ -17,7 +17,7 @@ from __future__ import annotations
 import httpx
 import structlog
 
-logger = structlog.get_logger("lightagent.scheduler.notifier")
+logger = structlog.get_logger("prismal.scheduler.notifier")
 
 _TELEGRAM_API = "https://api.telegram.org"
 _SLACK_API = "https://slack.com/api/chat.postMessage"

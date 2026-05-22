@@ -22,7 +22,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.rag_agent")
+logger = get_logger("prismal.agents.rag_agent")
 
 # Groundedness threshold matches AC-035-3 (0.8) and is intentionally lower
 # than the planner's default (0.85) because RAG answers tolerate some
@@ -166,22 +166,22 @@ requirements in the reflection loop.
 ## Examples
 
 ### Example 1 — Positive (grounded answer with citations)
-User: "¿Qué política de logging usa LightAgent para los módulos de seguridad?"
+User: "¿Qué política de logging usa Prismal para los módulos de seguridad?"
 
 Response:
-LightAgent usa `structlog` para todo el logging estructurado [1]. En los
+Prismal usa `structlog` para todo el logging estructurado [1]. En los
 módulos de seguridad, los eventos sensibles (fallos de guardrails, rate
 limits) se emiten a nivel WARNING o ERROR y nunca registran datos crudos de
 PII o claves API [2]. El nivel por defecto es INFO, configurable vía
-`LIGHTAGENT_LOG_LEVEL`.
+`PRISMAL_LOG_LEVEL`.
 
 Sources:
   [1] (KB) docs/observability/logging.md
-  [2] (KB) lightagent/security/README.md
+  [2] (KB) prismal/security/README.md
 
 ### Example 2 — Negative (what NOT to do)
 BAD answer:
-"LightAgent uses Python logging module to log security events in JSON format
+"Prismal uses Python logging module to log security events in JSON format
 to stdout."
 
 Problems:
@@ -197,7 +197,7 @@ Response:
 La base de conocimiento interna no contiene métricas de latencia de
 producción para `/chat`. Una búsqueda web no devolvió cifras específicas
 para este proyecto. Te sugiero consultar el dashboard Langfuse o ejecutar
-`lightagent doctor --metrics` para obtener datos actuales.
+`prismal doctor --metrics` para obtener datos actuales.
 
 Sources: (none)
 """

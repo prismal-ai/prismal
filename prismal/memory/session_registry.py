@@ -21,7 +21,7 @@ from pathlib import Path
 
 import structlog
 
-logger = structlog.get_logger("lightagent.memory.session_registry")
+logger = structlog.get_logger("prismal.memory.session_registry")
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _DEFAULT_PROFILE_DIR = _REPO_ROOT / "data" / "workspace" / "profile"

@@ -96,10 +96,10 @@ async def test_docker_env_allowlist_is_empty_by_default(monkeypatch) -> None:
     """``os.environ`` inside the sandbox has no host secrets leaked."""
     # Deliberately set a highly-recognisable host env var. It must NOT
     # appear inside the container because the allowlist is empty.
-    monkeypatch.setenv("LIGHTAGENT_HOST_SECRET_PROBE", "should-not-leak")
+    monkeypatch.setenv("PRISMAL_HOST_SECRET_PROBE", "should-not-leak")
     code = (
         "import os\n"
-        "print('PROBE_PRESENT' if 'LIGHTAGENT_HOST_SECRET_PROBE' in os.environ "
+        "print('PROBE_PRESENT' if 'PRISMAL_HOST_SECRET_PROBE' in os.environ "
         "else 'PROBE_ABSENT')\n"
     )
     result = await _run_via_docker(code)
@@ -113,7 +113,7 @@ async def test_docker_container_removed_after_exit() -> None:
     """After ``run()`` returns, ``docker ps -a`` does not list the container."""
     import secrets
 
-    marker = f"lightagent-test-{secrets.token_hex(4)}"
+    marker = f"prismal-test-{secrets.token_hex(4)}"
     code = f"print('{marker}')\n"
     result = await _run_via_docker(code)
     assert marker in result.stdout
@@ -130,7 +130,7 @@ async def test_docker_container_removed_after_exit() -> None:
         check=False,
     )
     assert ps.returncode == 0
-    assert "lightagent-codeact-" not in ps.stdout, (
+    assert "prismal-codeact-" not in ps.stdout, (
         "Ephemeral codeact container leaked after run() — check --rm flag "
         "and kill path. docker ps -a output:\n" + ps.stdout
     )

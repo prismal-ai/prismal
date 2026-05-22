@@ -1,7 +1,7 @@
 # ruff: noqa: E501  # Prompt constants contain long JSON example lines.
 """Product Owner agent node for the dev_pipeline subgraph.
 
-Generates a :class:`~lightagent.agents.subgraphs.artifacts.UserStory`
+Generates a :class:`~prismal.agents.subgraphs.artifacts.UserStory`
 from the user's feature request.  The story is stored under
 ``state["metadata"]["dev_pipeline"]["user_story"]``.
 """
@@ -23,7 +23,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.po_agent")
+logger = structlog.get_logger("prismal.subgraphs.dev_pipeline.po_agent")
 otel = OTelManager()
 
 # 5 of 6 INVEST criteria must pass — matches AC-035-5.
@@ -131,7 +131,7 @@ description MUST follow the `As a … I want … so that …` template.
 7. Emit JSON only — no backticks, no commentary, no trailing text.
 
 ## Background
-- Artifact schema: `lightagent/agents/subgraphs/artifacts.py::UserStory`.
+- Artifact schema: `prismal/agents/subgraphs/artifacts.py::UserStory`.
 - The JSON is parsed by `json.loads` then validated by
   `UserStory.model_validate`; any deviation from the schema causes a
   fallback story with title "Feature".
@@ -193,8 +193,8 @@ async def po_agent_node(state: AgentState) -> dict[str, Any]:
         score / iteration count under ``dev_pipeline``).
     """
     with otel.start_span("dev_pipeline.po_agent") as span:
-        span.set_attribute("lightagent.subgraph", "dev_pipeline")
-        span.set_attribute("lightagent.agent", "po_agent")
+        span.set_attribute("prismal.subgraph", "dev_pipeline")
+        span.set_attribute("prismal.agent", "po_agent")
 
         llm = ProviderRegistry().get_llm()
         critique_llm = ProviderRegistry().get_llm()

@@ -1,4 +1,4 @@
-"""Tests for :mod:`lightagent.memory.long_term_store`.
+"""Tests for :mod:`prismal.memory.long_term_store`.
 
 Covers SPEC-039 AC-039-1 (backend selection), AC-039-2 (mandatory PII
 sanitization before persistence), AC-039-4 (graceful degradation),
@@ -110,7 +110,7 @@ class TestBackendSelection:
 
     def test_memory_backend_default_from_settings(self) -> None:
         """When ``backend`` is ``None`` the constructor reads the setting."""
-        with patch("lightagent.memory.long_term_store.get_settings") as mock_settings:
+        with patch("prismal.memory.long_term_store.get_settings") as mock_settings:
             mock_settings.return_value.memory_backend = "memory"
             store = LongTermMemoryStore()
         assert store.backend_name == "memory"
@@ -155,7 +155,7 @@ class TestBackendSelection:
         sys.modules["langgraph.store.postgres"] = pkg
         sys.modules["langgraph.store.postgres.aio"] = aio_mod
         try:
-            with patch("lightagent.memory.long_term_store.get_settings") as mock_settings:
+            with patch("prismal.memory.long_term_store.get_settings") as mock_settings:
                 mock_settings.return_value.memory_backend = "postgresql"
                 mock_settings.return_value.db_url = "postgresql://user@host/db"
                 store = LongTermMemoryStore(backend="postgresql")
@@ -255,7 +255,7 @@ class TestStoreAndRecall:
         ``settings.memory_default_ttl_days`` is used.
         """
         ns = preferences_namespace("alice")
-        with patch("lightagent.memory.long_term_store.get_settings") as mock_settings:
+        with patch("prismal.memory.long_term_store.get_settings") as mock_settings:
             mock_settings.return_value.memory_default_ttl_days = 7
             await store.store_fact(
                 user_id="alice",

@@ -76,7 +76,7 @@ def test_list_session_ids_returns_empty_when_no_db() -> None:
     from prismal.agents.graph import list_session_ids
 
     with patch(
-        "lightagent.agents.graph._DEFAULT_CHECKPOINT_PATH",
+        "prismal.agents.graph._DEFAULT_CHECKPOINT_PATH",
         Path("/nonexistent/path/x.db"),
     ):
         result = list_session_ids()
@@ -100,7 +100,7 @@ def test_list_session_ids_reads_thread_ids(tmp_path: Path) -> None:
         conn.execute("INSERT INTO checkpoints VALUES ('sess-a', 'c3', NULL)")
         conn.commit()
 
-    with patch("lightagent.agents.graph._DEFAULT_CHECKPOINT_PATH", db_path):
+    with patch("prismal.agents.graph._DEFAULT_CHECKPOINT_PATH", db_path):
         result = list_session_ids()
 
     assert result == ["sess-a", "sess-b"]
@@ -116,7 +116,7 @@ def test_list_session_ids_handles_exception(tmp_path: Path) -> None:
     db_path = tmp_path / "bad.db"
     db_path.write_bytes(b"THIS IS NOT A VALID SQLITE DATABASE")
 
-    with patch("lightagent.agents.graph._DEFAULT_CHECKPOINT_PATH", db_path):
+    with patch("prismal.agents.graph._DEFAULT_CHECKPOINT_PATH", db_path):
         result = list_session_ids()
 
     assert result == []
@@ -130,7 +130,7 @@ def test_supervisor_router_wrapper_delegates(tmp_path: Path) -> None:
 
     mock_state = MagicMock()
     with patch(
-        "lightagent.agents.graph.supervisor_router", return_value="researcher"
+        "prismal.agents.graph.supervisor_router", return_value="researcher"
     ) as mock_router:
         result = _supervisor_router(mock_state)
 

@@ -2,7 +2,7 @@
 
 Assembles the 6-agent dev pipeline (PO -> Architect -> Developer -> UnitTest ->
 QA -> Reviewer) with approval gates and registers it with the
-:class:`~lightagent.agents.subgraphs.registry.SubgraphRegistry`.
+:class:`~prismal.agents.subgraphs.registry.SubgraphRegistry`.
 
 Usage::
 
@@ -46,7 +46,7 @@ from prismal.agents.subgraphs.gates import (
 from prismal.agents.subgraphs.registry import SubgraphDefinition, SubgraphRegistry
 from prismal.core.config import get_settings
 
-logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.builder")
+logger = structlog.get_logger("prismal.subgraphs.dev_pipeline.builder")
 
 _NAME = "dev_pipeline"
 _DESCRIPTION = (

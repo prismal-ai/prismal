@@ -18,7 +18,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.critic")
+logger = get_logger("prismal.agents.critic")
 
 _SYSTEM_PROMPT = """You are a critical reviewer responsible for evaluating outputs.
 

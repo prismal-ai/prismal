@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.agents.skill_creator (T-073)."""
+"""Unit tests for prismal.agents.skill_creator (T-073)."""
 
 from __future__ import annotations
 
@@ -113,8 +113,8 @@ async def test_create_skill_writes_files(tmp_path: Path) -> None:
     mock_llm = _make_mock_llm(_SAMPLE_SKILL_CODE)
 
     with (
-        patch("lightagent.agents.skill_creator.ProviderRegistry") as mock_registry,
-        patch("lightagent.agents.skill_creator._run_ruff", return_value=(True, "")),
+        patch("prismal.agents.skill_creator.ProviderRegistry") as mock_registry,
+        patch("prismal.agents.skill_creator._run_ruff", return_value=(True, "")),
     ):
         mock_registry.return_value.get_llm.return_value = mock_llm
         await create_skill("Convert units between metric and imperial", skills_root=tmp_path)
@@ -135,8 +135,8 @@ async def test_create_skill_strips_markdown_fences(tmp_path: Path) -> None:
     mock_llm = _make_mock_llm(fenced_code)
 
     with (
-        patch("lightagent.agents.skill_creator.ProviderRegistry") as mock_registry,
-        patch("lightagent.agents.skill_creator._run_ruff", return_value=(True, "")),
+        patch("prismal.agents.skill_creator.ProviderRegistry") as mock_registry,
+        patch("prismal.agents.skill_creator._run_ruff", return_value=(True, "")),
     ):
         mock_registry.return_value.get_llm.return_value = mock_llm
         await create_skill("unit converter", skills_root=tmp_path)
@@ -155,8 +155,8 @@ async def test_create_skill_returns_result_string(tmp_path: Path) -> None:
     mock_llm = _make_mock_llm(_SAMPLE_SKILL_CODE)
 
     with (
-        patch("lightagent.agents.skill_creator.ProviderRegistry") as mock_registry,
-        patch("lightagent.agents.skill_creator._run_ruff", return_value=(True, "")),
+        patch("prismal.agents.skill_creator.ProviderRegistry") as mock_registry,
+        patch("prismal.agents.skill_creator._run_ruff", return_value=(True, "")),
     ):
         mock_registry.return_value.get_llm.return_value = mock_llm
         result = await create_skill("unit converter", skills_root=tmp_path)
@@ -174,9 +174,9 @@ async def test_create_skill_ruff_failure_reported(tmp_path: Path) -> None:
     mock_llm = _make_mock_llm(_SAMPLE_SKILL_CODE)
 
     with (
-        patch("lightagent.agents.skill_creator.ProviderRegistry") as mock_registry,
+        patch("prismal.agents.skill_creator.ProviderRegistry") as mock_registry,
         patch(
-            "lightagent.agents.skill_creator._run_ruff",
+            "prismal.agents.skill_creator._run_ruff",
             return_value=(False, "E501 line too long"),
         ),
     ):
@@ -242,7 +242,7 @@ async def test_node_with_human_message(tmp_path: Path) -> None:
     }
 
     with patch(
-        "lightagent.agents.skill_creator.create_skill",
+        "prismal.agents.skill_creator.create_skill",
         new_callable=AsyncMock,
         return_value="Skill generated: unit_converter\nLocation: /tmp/x",
     ):

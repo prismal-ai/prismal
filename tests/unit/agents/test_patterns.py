@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.agents.patterns — AgentPattern enum."""
+"""Unit tests for prismal.agents.patterns — AgentPattern enum."""
 
 from __future__ import annotations
 

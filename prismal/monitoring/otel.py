@@ -51,7 +51,7 @@ class OTelManager:
 
         otel = OTelManager()
         with otel.start_span("rag.retrieve") as span:
-            span.set_attribute("lightagent.query_len", len(query))
+            span.set_attribute("prismal.query_len", len(query))
             docs = retriever.get(query)
     """
 
@@ -91,7 +91,7 @@ class OTelManager:
 
             exporter_name = getattr(s, "otel_exporter", "otlp")
             endpoint = getattr(s, "otel_endpoint", "http://localhost:4318")
-            service_name = getattr(s, "otel_service_name", "lightagent")
+            service_name = getattr(s, "otel_service_name", "prismal")
 
             from opentelemetry import metrics, trace
             from opentelemetry.sdk.metrics import MeterProvider
@@ -106,7 +106,7 @@ class OTelManager:
                 logger.warning(
                     "otel.endpoint_unreachable",
                     endpoint=endpoint,
-                    hint="Start an OTLP collector or set LIGHTAGENT_OTEL_ENABLED=false",
+                    hint="Start an OTLP collector or set PRISMAL_OTEL_ENABLED=false",
                 )
                 return
 
@@ -217,45 +217,45 @@ class OTelManager:
         return PeriodicExportingMetricReader(OTLPMetricExporter(endpoint=f"{endpoint}/v1/metrics"))
 
     def _register_standard_metrics(self) -> None:
-        """Register standard LightAgent OTEL metrics."""
+        """Register standard Prismal OTEL metrics."""
         if self._meter is None:
             return
         self._counters["llm_requests"] = self._meter.create_counter(
-            "lightagent.llm_requests_total",
+            "prismal.llm_requests_total",
             description="Total LLM API requests",
         )
         self._counters["llm_tokens"] = self._meter.create_counter(
-            "lightagent.llm_tokens_total",
+            "prismal.llm_tokens_total",
             description="Total LLM tokens consumed",
         )
         self._counters["agent_errors"] = self._meter.create_counter(
-            "lightagent.agent_errors_total",
+            "prismal.agent_errors_total",
             description="Total agent errors",
         )
         self._counters["security_blocks"] = self._meter.create_counter(
-            "lightagent.security_blocks_total",
+            "prismal.security_blocks_total",
             description="Total inputs blocked by security layer",
         )
         self._counters["rag_queries"] = self._meter.create_counter(
-            "lightagent.rag_queries_total",
+            "prismal.rag_queries_total",
             description="Total RAG queries processed",
         )
         self._counters["mcp_tool_calls"] = self._meter.create_counter(
-            "lightagent.mcp_tool_calls_total",
+            "prismal.mcp_tool_calls_total",
             description="Total MCP tool calls",
         )
         self._histograms["agent_latency"] = self._meter.create_histogram(
-            "lightagent.agent_latency_seconds",
+            "prismal.agent_latency_seconds",
             description="Agent execution latency in seconds",
             unit="s",
         )
         self._histograms["llm_latency"] = self._meter.create_histogram(
-            "lightagent.llm_latency_seconds",
+            "prismal.llm_latency_seconds",
             description="LLM call latency in seconds",
             unit="s",
         )
         self._histograms["rag_latency"] = self._meter.create_histogram(
-            "lightagent.rag_retrieval_latency_seconds",
+            "prismal.rag_retrieval_latency_seconds",
             description="RAG retrieval latency in seconds",
             unit="s",
         )

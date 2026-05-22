@@ -1,7 +1,7 @@
 """SandboxExecutor — ejecuta código y comandos dentro de la sandbox.
 
 Soporta Python, JavaScript, TypeScript, Go y Bash.  Cada ejecución usa
-el entorno construido por :class:`~lightagent.sandbox.manager.SandboxManager`
+el entorno construido por :class:`~prismal.sandbox.manager.SandboxManager`
 (PATH aislado, GOPATH, HOME sandbox, etc.) y tiene un timeout configurable.
 
 Los archivos temporales (snippets) se eliminan automáticamente tras la
@@ -25,7 +25,7 @@ from prismal.sandbox.manager import SandboxManager
 if TYPE_CHECKING:
     from pathlib import Path
 
-logger = get_logger("lightagent.sandbox.executor")
+logger = get_logger("prismal.sandbox.executor")
 
 __all__ = ["ExecutionResult", "SandboxExecutor"]
 
@@ -135,10 +135,10 @@ class SandboxExecutor:
         Phase 43 / SPEC-045 changed the dispatch model:
 
         * When the operator has activated process isolation (either
-          ``LIGHTAGENT_SANDBOX_ISOLATION_REQUIRED=true`` OR
-          ``LIGHTAGENT_SANDBOX_ISOLATION_BACKEND`` is set to a
+          ``PRISMAL_SANDBOX_ISOLATION_REQUIRED=true`` OR
+          ``PRISMAL_SANDBOX_ISOLATION_BACKEND`` is set to a
           non-empty value), this method delegates to the selected
-          :class:`~lightagent.sandbox.isolation.IsolationBackend`
+          :class:`~prismal.sandbox.isolation.IsolationBackend`
           via :func:`select_backend`. The backend launches the code
           inside a real isolation boundary (docker container,
           podman container, nsjail / bwrap / firejail namespace) so
@@ -149,7 +149,7 @@ class SandboxExecutor:
           executed, and removed). This is the dev-mode behaviour
           retained for backward compatibility while Phase 43 rolls
           out — the entire path will be deleted once
-          ``LIGHTAGENT_SANDBOX_ISOLATION_REQUIRED=true`` becomes the
+          ``PRISMAL_SANDBOX_ISOLATION_REQUIRED=true`` becomes the
           default.
 
         The shape of :class:`ExecutionResult` is identical in both

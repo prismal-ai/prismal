@@ -1,7 +1,7 @@
 """CodeAct agent — direct Python code generation with auto-correction.
 
 SPEC-040 / Phase 38, hardened by SPEC-044 / Phase 42. Unlike the
-classic :mod:`lightagent.agents.coder` node which uses a ReAct
+classic :mod:`prismal.agents.coder` node which uses a ReAct
 tool-calling loop (``sandbox_exec`` JSON tool calls processed by
 :func:`react_loop`), CodeAct asks the LLM to emit executable Python
 directly wrapped in ``<code>...</code>`` tags. A single block can
@@ -12,18 +12,18 @@ on multi-step coding tasks (arxiv:2402.01030).
 
    **The current runtime is NOT an isolated sandbox.**
 
-   :class:`~lightagent.sandbox.executor.SandboxExecutor` writes the
+   :class:`~prismal.sandbox.executor.SandboxExecutor` writes the
    code to a temporary ``.py`` file and spawns a plain host subprocess
-   with the LightAgent process's full privileges — no container, no
+   with the Prismal process's full privileges — no container, no
    ``chroot``, no seccomp, no network namespace, no cgroup limits.
    The ``sandbox`` name in this module is historical.
 
    Real process isolation is tracked under SPEC-045 (Phase 43,
-   ``lightagent/sandbox/isolation.py``). Until that lands, CodeAct
-   should be treated as *"run arbitrary Python as the LightAgent
+   ``prismal/sandbox/isolation.py``). Until that lands, CodeAct
+   should be treated as *"run arbitrary Python as the Prismal
    user"*: any prompt-injection path that reaches the CodeAct LLM can
    achieve host code execution. For that reason
-   ``LIGHTAGENT_CODEACT_ENABLED`` defaults to ``False`` after SPEC-044
+   ``PRISMAL_CODEACT_ENABLED`` defaults to ``False`` after SPEC-044
    and the supervisor downgrades any ``codeact`` routing decision to
    the classic ``coder`` node when the flag is off.
 
@@ -48,7 +48,7 @@ rules):
    None of this is a substitute for real process isolation — it is
    defense-in-depth layered on top of SPEC-045.
 3. :meth:`ActionInterceptor.check_shell` gates execution on
-   ``LIGHTAGENT_SHELL_ENABLED``. When the gate is closed we return a
+   ``PRISMAL_SHELL_ENABLED``. When the gate is closed we return a
    graceful ``AIMessage`` explaining how to enable it instead of
    silently failing.
 4. Code runs in the existing :class:`SandboxExecutor` (via
@@ -82,7 +82,7 @@ from prismal.security.action_interceptor import ActionInterceptor
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.codeact")
+logger = get_logger("prismal.agents.codeact")
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ where ``result`` is the final value you want to return to the user. When the
 task is fully solved, that print is your termination signal.
 
 ## Import Rules
-Only the packages listed in ``LIGHTAGENT_CODEACT_IMPORT_ALLOWLIST`` may be
+Only the packages listed in ``PRISMAL_CODEACT_IMPORT_ALLOWLIST`` may be
 imported. Attempting to import anything else will reject the block before it
 runs. Never try to ``import prismal`` or reach into project internals —
 the restricted runtime actively rejects imports of the project source tree.
@@ -160,8 +160,8 @@ block and you will need to emit a fixed version:
 
 
 _SHELL_DISABLED_REPLY: str = (
-    "CodeAct cannot run code because `LIGHTAGENT_SHELL_ENABLED=false`. "
-    "Set `LIGHTAGENT_SHELL_ENABLED=true` in your environment to enable "
+    "CodeAct cannot run code because `PRISMAL_SHELL_ENABLED=false`. "
+    "Set `PRISMAL_SHELL_ENABLED=true` in your environment to enable "
     "the restricted host runtime, or route this task to a non-execution "
     "agent. Note that SPEC-045 (Phase 43) will replace the current "
     "host-subprocess runtime with a real isolation backend — until "
@@ -306,7 +306,7 @@ def _validate_imports(code: str) -> tuple[bool, str]:
        of bypasses. Ordinary dict / list subscripts are unaffected.
     5. **Import allowlist**: ``ast.Import`` and ``ast.ImportFrom``
        nodes must reference top-level modules listed in
-       ``LIGHTAGENT_CODEACT_IMPORT_ALLOWLIST``.
+       ``PRISMAL_CODEACT_IMPORT_ALLOWLIST``.
     6. **Syntax**: ``ast.parse`` failures are wrapped as a rejection
        with the raw ``SyntaxError`` message for operator visibility.
 
@@ -321,7 +321,7 @@ def _validate_imports(code: str) -> tuple[bool, str]:
 
     This validator is defense-in-depth layered on top of the Phase 43
     process isolation (SPEC-045). When isolation is unavailable
-    CodeAct should be disabled (``LIGHTAGENT_CODEACT_ENABLED=false``);
+    CodeAct should be disabled (``PRISMAL_CODEACT_ENABLED=false``);
     the denylist is not a substitute for real sandboxing.
 
     Args:
@@ -431,14 +431,14 @@ def _extract_code_block(content: str) -> str | None:
 
 
 async def _run_code_in_sandbox(code: str) -> tuple[bool, str, str, int]:
-    """Run ``code`` in the LightAgent code runtime on a worker thread.
+    """Run ``code`` in the Prismal code runtime on a worker thread.
 
     .. warning::
 
        As of SPEC-044 (Phase 42), the "sandbox" name is historical.
-       :class:`~lightagent.sandbox.executor.SandboxExecutor` currently
+       :class:`~prismal.sandbox.executor.SandboxExecutor` currently
        runs the supplied code in a plain host subprocess with the
-       LightAgent process's full privileges — no container, no
+       Prismal process's full privileges — no container, no
        seccomp, no network namespace. Real isolation is tracked under
        SPEC-045 (Phase 43). The function name is kept for backward
        compatibility with the existing call sites; the underlying
@@ -512,7 +512,7 @@ async def codeact_node(state: AgentState) -> dict[str, Any]:
                 AIMessage(
                     content=(
                         "CodeAct is disabled "
-                        "(`LIGHTAGENT_CODEACT_ENABLED=false`). "
+                        "(`PRISMAL_CODEACT_ENABLED=false`). "
                         "The supervisor should route this task to "
                         "`coder` instead."
                     )

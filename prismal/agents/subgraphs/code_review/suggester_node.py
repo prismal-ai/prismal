@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from prismal.agents.subgraphs.code_review.types import CodeIssue
 
-logger = get_logger("lightagent.subgraphs.code_review.suggester")
+logger = get_logger("prismal.subgraphs.code_review.suggester")
 
 
 async def _default_suggester(_code: str, _issues: list[CodeIssue]) -> list[str]:

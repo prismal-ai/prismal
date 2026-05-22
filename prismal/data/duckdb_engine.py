@@ -14,7 +14,7 @@ from typing import Any
 
 import duckdb
 
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
 # SQL keywords that indicate destructive or schema-mutating operations.
 _BLOCKED_KEYWORDS: frozenset[str] = frozenset(
@@ -42,22 +42,22 @@ class SQLValidator:
     """Validates SQL strings to prevent destructive database operations.
 
     Only SELECT and WITH (CTEs) queries are permitted.
-    Any query containing DDL/DML keywords raises :exc:`LightAgentError`.
+    Any query containing DDL/DML keywords raises :exc:`PrismalError`.
     """
 
     def validate(self, sql: str) -> None:
-        """Raise LightAgentError if *sql* contains a blocked keyword.
+        """Raise PrismalError if *sql* contains a blocked keyword.
 
         Args:
             sql: SQL string to validate.
 
         Raises:
-            LightAgentError: When a destructive keyword is detected.
+            PrismalError: When a destructive keyword is detected.
         """
         match = _BLOCKED_RE.search(sql)
         if match:
             keyword = match.group(1).upper()
-            raise LightAgentError(
+            raise PrismalError(
                 f"SQL validation failed: '{keyword}' operations are not permitted. "
                 "Only SELECT queries are allowed."
             )
@@ -102,7 +102,7 @@ class DuckDBEngine:
             List of row dicts keyed by column name.
 
         Raises:
-            LightAgentError: If *sql* contains a blocked keyword.
+            PrismalError: If *sql* contains a blocked keyword.
         """
         self._validator.validate(sql)
         relation = self._conn.execute(sql)
@@ -130,7 +130,7 @@ class DuckDBEngine:
             List of row dicts.
 
         Raises:
-            LightAgentError: If *sql* contains a blocked keyword.
+            PrismalError: If *sql* contains a blocked keyword.
             FileNotFoundError: If the CSV file does not exist.
         """
         csv_path = Path(path)

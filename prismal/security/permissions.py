@@ -1,7 +1,7 @@
 """Permission manager — manages capability grants with TTL expiry.
 
 Persists permissions in SQLite using the shared AsyncEngine from
-lightagent.core.database. Supports time-limited (TTL) and permanent grants.
+prismal.core.database. Supports time-limited (TTL) and permanent grants.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
 
-logger = get_logger("lightagent.security.permissions")
+logger = get_logger("prismal.security.permissions")
 
 
 class PermissionType(enum.StrEnum):

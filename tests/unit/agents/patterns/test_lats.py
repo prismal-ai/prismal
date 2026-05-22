@@ -1,4 +1,4 @@
-"""Unit tests for LATSAgent (lightagent.agents.patterns.lats).
+"""Unit tests for LATSAgent (prismal.agents.patterns.lats).
 
 Language Agent Tree Search uses Monte Carlo Tree Search (MCTS) to explore
 the space of agent actions. Tests cover:
@@ -26,7 +26,7 @@ from prismal.agents.patterns.lats import (
     LATSNode,
     LATSResult,
 )
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -73,8 +73,8 @@ def test_lats_result_is_instantiable() -> None:
     assert r.total_simulations == 10
 
 
-def test_lats_error_inherits_from_lightagent_error() -> None:
-    assert issubclass(LATSError, LightAgentError)
+def test_lats_error_inherits_from_prismal_error() -> None:
+    assert issubclass(LATSError, PrismalError)
 
 
 # ── UCB1 math ────────────────────────────────────────────────────────────────

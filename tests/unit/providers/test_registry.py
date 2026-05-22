@@ -51,7 +51,7 @@ def settings() -> Settings:
 
     Passes ``_env_file=None`` so the developer's local ``.env`` can never
     leak into the test run — otherwise an environment with
-    ``LIGHTAGENT_LLM_PROVIDER=ollama`` would trip the provider resolver
+    ``PRISMAL_LLM_PROVIDER=ollama`` would trip the provider resolver
     validator when the test fixture pins a non-Ollama model.
     """
     return Settings(
@@ -72,7 +72,7 @@ def registry(settings: Settings) -> ProviderRegistry:
     return ProviderRegistry(settings=settings)
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_uses_default_model(mock_cls: MagicMock, registry: ProviderRegistry) -> None:
     """get_llm() with no args must use settings.default_model."""
     registry.get_llm()
@@ -80,35 +80,35 @@ def test_get_llm_uses_default_model(mock_cls: MagicMock, registry: ProviderRegis
     assert call_kwargs["model"] == "claude-sonnet-4-5"
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_uses_provided_model(mock_cls: MagicMock, registry: ProviderRegistry) -> None:
     """get_llm(model=...) must use the supplied model string."""
     registry.get_llm(model="gpt-4o")
     assert mock_cls.call_args.kwargs["model"] == "gpt-4o"
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_passes_streaming(mock_cls: MagicMock, registry: ProviderRegistry) -> None:
     """get_llm(streaming=True) must set streaming=True on ChatLiteLLM."""
     registry.get_llm(streaming=True)
     assert mock_cls.call_args.kwargs["streaming"] is True
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_uses_settings_temperature(mock_cls: MagicMock, registry: ProviderRegistry) -> None:
     """get_llm() with no temperature must use settings.temperature."""
     registry.get_llm()
     assert mock_cls.call_args.kwargs["temperature"] == 0.5
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_overrides_temperature(mock_cls: MagicMock, registry: ProviderRegistry) -> None:
     """get_llm(temperature=...) must override settings.temperature."""
     registry.get_llm(temperature=0.0)
     assert mock_cls.call_args.kwargs["temperature"] == 0.0
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_returns_base_chat_model(mock_cls: MagicMock, registry: ProviderRegistry) -> None:
     """get_llm() must return the ChatLiteLLM instance."""
     mock_instance = MagicMock(spec=BaseChatModel)
@@ -117,21 +117,21 @@ def test_get_llm_returns_base_chat_model(mock_cls: MagicMock, registry: Provider
     assert result is mock_instance
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_ollama_model(mock_cls: MagicMock, registry: ProviderRegistry) -> None:
     """get_llm(model='ollama/llama3') must route to Ollama via LiteLLM."""
     registry.get_llm(model="ollama/llama3")
     assert mock_cls.call_args.kwargs["model"] == "ollama/llama3"
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_gemini_model(mock_cls: MagicMock, registry: ProviderRegistry) -> None:
     """get_llm(model='gemini/gemini-1.5-pro') must route to Google Gemini."""
     registry.get_llm(model="gemini/gemini-1.5-pro")
     assert mock_cls.call_args.kwargs["model"] == "gemini/gemini-1.5-pro"
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_anthropic_model(mock_cls: MagicMock, registry: ProviderRegistry) -> None:
     """get_llm(model='claude-sonnet-4-5') must route to Anthropic via LiteLLM."""
     registry.get_llm(model="claude-sonnet-4-5")
@@ -255,7 +255,7 @@ def test_fallback_model_differs_from_default(registry: ProviderRegistry) -> None
     assert registry._settings.fallback_model != registry._settings.default_model
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_with_fallback_returns_runnable_with_fallbacks(
     mock_cls: MagicMock, registry: ProviderRegistry
 ) -> None:
@@ -267,7 +267,7 @@ def test_get_llm_with_fallback_returns_runnable_with_fallbacks(
     assert isinstance(result, RunnableWithFallbacks)
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_with_fallback_uses_fallback_model(
     mock_cls: MagicMock, registry: ProviderRegistry
 ) -> None:
@@ -283,7 +283,7 @@ def test_get_llm_with_fallback_uses_fallback_model(
     assert "gpt-4o-mini" in models_used
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_with_fallback_skips_wrapper_when_empty(
     mock_cls: MagicMock,
 ) -> None:
@@ -324,7 +324,7 @@ def test_provider_registry_exports_ollama_base_url(
     assert os.environ.get("OLLAMA_API_BASE") == "http://ollama.internal:11434"
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_uses_ollama_timeout_for_ollama_models(
     mock_cls: MagicMock,
 ) -> None:
@@ -344,7 +344,7 @@ def test_get_llm_uses_ollama_timeout_for_ollama_models(
     assert kwargs["model"] == "ollama_chat/llama3.1"
 
 
-@patch("lightagent.providers.registry.ChatLiteLLM")
+@patch("prismal.providers.registry.ChatLiteLLM")
 def test_get_llm_uses_cloud_timeout_for_non_ollama_models(
     mock_cls: MagicMock,
 ) -> None:

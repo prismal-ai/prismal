@@ -1,8 +1,8 @@
 # ruff: noqa: E501  # Prompt constants contain long JSON example lines.
 """Architect agent node for the dev_pipeline subgraph.
 
-Converts a :class:`~lightagent.agents.subgraphs.artifacts.UserStory` into a
-:class:`~lightagent.agents.subgraphs.artifacts.TechnicalSpec`.
+Converts a :class:`~prismal.agents.subgraphs.artifacts.UserStory` into a
+:class:`~prismal.agents.subgraphs.artifacts.TechnicalSpec`.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.architect")
+logger = structlog.get_logger("prismal.subgraphs.dev_pipeline.architect")
 otel = OTelManager()
 
 _SYSTEM = """You are a Software Architect for the dev_pipeline subgraph.
@@ -70,7 +70,7 @@ The `TechnicalSpec` is production-ready when ALL of the following hold:
 6. Emit JSON only — no backticks, no commentary.
 
 ## Background
-- Artifact schema: `lightagent/agents/subgraphs/artifacts.py::TechnicalSpec`.
+- Artifact schema: `prismal/agents/subgraphs/artifacts.py::TechnicalSpec`.
 - Parsed via `TechnicalSpec.model_validate`; on failure a fallback spec
   is created with the raw content in `architecture`.
 - Consumed by the Developer agent as the sole source of implementation
@@ -120,8 +120,8 @@ async def architect_agent_node(state: AgentState) -> dict[str, Any]:
         Partial state update with TechnicalSpec stored in metadata.
     """
     with otel.start_span("dev_pipeline.architect") as span:
-        span.set_attribute("lightagent.subgraph", "dev_pipeline")
-        span.set_attribute("lightagent.agent", "architect")
+        span.set_attribute("prismal.subgraph", "dev_pipeline")
+        span.set_attribute("prismal.agent", "architect")
 
         dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
         story_data = dp.get("user_story", {})

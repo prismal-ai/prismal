@@ -12,7 +12,7 @@ bubblewrap, or firejail) instead of a bare host subprocess.
    ``SandboxIsolationError`` exception. The actual ``run()``
    implementations are filled in by T-349 (docker / podman),
    T-350 (namespace backends), and wired into
-   :class:`~lightagent.sandbox.executor.SandboxExecutor` by T-351.
+   :class:`~prismal.sandbox.executor.SandboxExecutor` by T-351.
    Until then every concrete backend except :class:`NoneBackend`
    raises :class:`SandboxIsolationError` from ``run()``.
 
@@ -30,7 +30,7 @@ concrete backends):
    ``*_API_KEY`` / ``*_SECRET`` / ``*_TOKEN`` / ``*_PASSWORD`` at
    parse time)
 9. Audit entry per invocation via
-   :class:`~lightagent.security.audit.AuditLogger`
+   :class:`~prismal.security.audit.AuditLogger`
 
 Design notes:
 
@@ -65,7 +65,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from prismal.sandbox.executor import ExecutionResult
 
-logger = get_logger("lightagent.sandbox.isolation")
+logger = get_logger("prismal.sandbox.isolation")
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +83,7 @@ class SandboxIsolationError(RuntimeError):
     :func:`select_backend` raises this when:
 
     * The operator set an explicit
-      ``LIGHTAGENT_SANDBOX_ISOLATION_BACKEND`` value that is not
+      ``PRISMAL_SANDBOX_ISOLATION_BACKEND`` value that is not
       available on the host.
     * The selected backend is :class:`NoneBackend` AND
       ``settings.is_production=True`` (CLAUDE.md Phase 43 rule #2).
@@ -102,7 +102,7 @@ class IsolationBackend(ABC):
 
     Concrete subclasses implement exactly one contract: given a code
     string, a language identifier, and a timeout, produce an
-    :class:`~lightagent.sandbox.executor.ExecutionResult` while
+    :class:`~prismal.sandbox.executor.ExecutionResult` while
     enforcing the security properties documented in the module
     docstring. The :meth:`run` method is async because the concrete
     backends all spawn subprocesses via
@@ -112,7 +112,7 @@ class IsolationBackend(ABC):
 
     * :attr:`name` — stable identifier used in logs, audit entries,
       and the ``/api/health`` endpoint. Must match the
-      ``LIGHTAGENT_SANDBOX_ISOLATION_BACKEND`` value used to select
+      ``PRISMAL_SANDBOX_ISOLATION_BACKEND`` value used to select
       the backend explicitly.
     * :attr:`binary` — the executable probed by :meth:`is_available`.
       ``None`` for the :class:`NoneBackend` because it has no
@@ -178,7 +178,7 @@ class IsolationBackend(ABC):
 
         Returns:
             A fully-populated
-            :class:`~lightagent.sandbox.executor.ExecutionResult`.
+            :class:`~prismal.sandbox.executor.ExecutionResult`.
 
         Raises:
             SandboxIsolationError: If any mandatory restriction
@@ -195,7 +195,7 @@ class IsolationBackend(ABC):
 
 #: Case-insensitive substring patterns that disqualify an env-var key
 #: from the sandbox allowlist. If the operator sets
-#: ``LIGHTAGENT_SANDBOX_ENV_ALLOWLIST`` to a list that contains any
+#: ``PRISMAL_SANDBOX_ENV_ALLOWLIST`` to a list that contains any
 #: key matching one of these patterns, the helper drops it with a
 #: WARNING log — the rejection is non-overridable.
 _SENSITIVE_ENV_PATTERN: re.Pattern[str] = re.compile(
@@ -208,7 +208,7 @@ def _build_env_args(allowlist_str: str) -> list[str]:
     """Translate the env-var allowlist string into ``-e KEY=VALUE`` args.
 
     Parses a comma-separated list (the format of
-    ``LIGHTAGENT_SANDBOX_ENV_ALLOWLIST``), looks up each name in the
+    ``PRISMAL_SANDBOX_ENV_ALLOWLIST``), looks up each name in the
     current process environment, and emits
     ``["-e", "KEY=<value>", ...]`` ready to be spliced into the
     container argv. Missing keys are silently dropped (DEBUG log);
@@ -343,7 +343,7 @@ def _seccomp_profile_path() -> Path | None:
     default seccomp profile which is already a significant
     improvement over the pre-Phase-43 host subprocess path.
     """
-    # ``Path(__file__)`` is ``.../lightagent/sandbox/isolation.py``
+    # ``Path(__file__)`` is ``.../prismal/sandbox/isolation.py``
     # → four ``parent`` hops reach the repository root, where the
     # ``config/`` directory lives alongside ``pyproject.toml``.
     profile = Path(__file__).parent.parent.parent / "config" / "sandbox_seccomp.json"
@@ -398,7 +398,7 @@ class _ContainerBackend(IsolationBackend):
     rule #3 via explicit CLI flags:
 
     * ``--rm`` — container removed on exit (no stray containers).
-    * ``--name lightagent-codeact-<hex>`` — stable name so the
+    * ``--name prismal-codeact-<hex>`` — stable name so the
       timeout path can kill the container deterministically.
     * ``--user 65534:65534`` — ``nobody`` / ``nogroup`` UID, never
       root inside the container.
@@ -476,7 +476,7 @@ class _ContainerBackend(IsolationBackend):
 
         settings = get_settings()
         binary = self.binary or self.name
-        container_name = f"lightagent-codeact-{secrets.token_hex(6)}"
+        container_name = f"prismal-codeact-{secrets.token_hex(6)}"
 
         # Build the argv deterministically so tests can assert
         # flag ordering.
@@ -531,13 +531,13 @@ class _ContainerBackend(IsolationBackend):
         # CLAUDE.md Phase 31 rule #3 — shell gate applies even when
         # the subprocess is a container wrapper. Users who want to
         # disable all subprocess execution via
-        # LIGHTAGENT_SHELL_ENABLED=false get their wish here.
+        # PRISMAL_SHELL_ENABLED=false get their wish here.
         if not ActionInterceptor.check_shell(argv):
             blocked = ExecutionResult(
                 stdout="",
                 stderr=(
                     "Sandbox execution blocked by ActionInterceptor "
-                    "(LIGHTAGENT_SHELL_ENABLED=false)."
+                    "(PRISMAL_SHELL_ENABLED=false)."
                 ),
                 exit_code=126,
                 language=lang,
@@ -786,7 +786,7 @@ class _NamespaceBackend(IsolationBackend):
                 stdout="",
                 stderr=(
                     "Sandbox execution blocked by ActionInterceptor "
-                    "(LIGHTAGENT_SHELL_ENABLED=false)."
+                    "(PRISMAL_SHELL_ENABLED=false)."
                 ),
                 exit_code=126,
                 language=lang,
@@ -1137,7 +1137,7 @@ class NoneBackend(IsolationBackend):
       operators can alert on a degraded posture.
 
     ``run()`` delegates to the existing
-    :class:`~lightagent.sandbox.executor.SandboxExecutor` path on a
+    :class:`~prismal.sandbox.executor.SandboxExecutor` path on a
     worker thread. No additional restrictions are applied — the
     security posture is identical to calling
     :meth:`SandboxExecutor.run_code` directly.
@@ -1241,7 +1241,7 @@ BACKEND_PRIORITY: tuple[tuple[str, type[IsolationBackend]], ...] = (
 )
 
 #: Name → class mapping for explicit backend selection via
-#: ``LIGHTAGENT_SANDBOX_ISOLATION_BACKEND``. Mirrors
+#: ``PRISMAL_SANDBOX_ISOLATION_BACKEND``. Mirrors
 #: :data:`BACKEND_PRIORITY` but as a dict for O(1) lookup in
 #: :func:`select_backend` (T-351).
 BACKENDS_BY_NAME: dict[str, type[IsolationBackend]] = dict(BACKEND_PRIORITY)
@@ -1309,7 +1309,7 @@ def select_backend(override: str | None = None) -> IsolationBackend:
                 f"Requested isolation backend {target!r} is not "
                 f"available on this host (binary missing or daemon "
                 f"unreachable). Install the tool or pick a different "
-                f"value for LIGHTAGENT_SANDBOX_ISOLATION_BACKEND."
+                f"value for PRISMAL_SANDBOX_ISOLATION_BACKEND."
             )
     else:
         backend = _autoselect_backend()
@@ -1317,9 +1317,9 @@ def select_backend(override: str | None = None) -> IsolationBackend:
     if backend.name == "none" and settings.is_production:
         raise SandboxIsolationError(
             "The 'none' isolation backend is forbidden in production "
-            "(LIGHTAGENT_IS_PRODUCTION=true). Install one of "
+            "(PRISMAL_IS_PRODUCTION=true). Install one of "
             f"{', '.join(n for n, _ in BACKEND_PRIORITY if n != 'none')} "
-            "and set LIGHTAGENT_SANDBOX_ISOLATION_BACKEND, or roll "
+            "and set PRISMAL_SANDBOX_ISOLATION_BACKEND, or roll "
             "back the production marker."
         )
 

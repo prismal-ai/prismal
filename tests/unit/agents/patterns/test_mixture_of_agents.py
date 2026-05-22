@@ -1,4 +1,4 @@
-"""Unit tests for MixtureOfAgents (lightagent.agents.patterns.mixture_of_agents).
+"""Unit tests for MixtureOfAgents (prismal.agents.patterns.mixture_of_agents).
 
 MoA: N proposer models produce independent responses in parallel; an
 aggregator LLM synthesizes them. Optionally refines via additional
@@ -18,9 +18,9 @@ from prismal.agents.patterns.mixture_of_agents import (
     MoAError,
     MoAResult,
 )
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
-PROVIDER_REGISTRY_PATH = "lightagent.agents.patterns.mixture_of_agents.ProviderRegistry"
+PROVIDER_REGISTRY_PATH = "prismal.agents.patterns.mixture_of_agents.ProviderRegistry"
 
 
 def _response(text: str) -> MagicMock:
@@ -62,8 +62,8 @@ def test_moa_result_is_instantiable() -> None:
     assert r.providers_used == ["gpt-4o", "claude"]
 
 
-def test_moa_error_inherits_from_lightagent_error() -> None:
-    assert issubclass(MoAError, LightAgentError)
+def test_moa_error_inherits_from_prismal_error() -> None:
+    assert issubclass(MoAError, PrismalError)
 
 
 # ── Constructor ──────────────────────────────────────────────────────────────

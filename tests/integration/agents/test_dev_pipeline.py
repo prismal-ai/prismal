@@ -107,7 +107,7 @@ async def test_dev_pipeline_full_happy_path() -> None:
     state["messages"] = [HumanMessage(content="Build a user login feature")]
     state["metadata"] = {"dev_pipeline": {}}
 
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = mock_ainvoke
         result = await graph.ainvoke(state, config={"configurable": {"thread_id": "int-t1"}})
 

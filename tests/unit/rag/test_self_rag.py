@@ -1,4 +1,4 @@
-"""Unit tests for SelfRAGPipeline (lightagent.rag.self_rag).
+"""Unit tests for SelfRAGPipeline (prismal.rag.self_rag).
 
 Self-RAG decides whether to retrieve before generating, and self-assesses
 the produced answer. Full pipeline::
@@ -28,7 +28,7 @@ from prismal.rag.self_rag import (
     SupportedDecision,
 )
 
-PROVIDER_REGISTRY_PATH = "lightagent.rag.self_rag.ProviderRegistry"
+PROVIDER_REGISTRY_PATH = "prismal.rag.self_rag.ProviderRegistry"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ def test_init_builds_default_crag_when_none_provided() -> None:
     store = MagicMock()
     with (
         patch(PROVIDER_REGISTRY_PATH) as reg,
-        patch("lightagent.rag.self_rag.CRAGPipeline") as mock_crag_cls,
+        patch("prismal.rag.self_rag.CRAGPipeline") as mock_crag_cls,
     ):
         reg.return_value.get_llm.return_value = MagicMock()
         mock_crag_cls.return_value = "built-crag"

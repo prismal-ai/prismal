@@ -45,7 +45,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.patterns.reflection")
+logger = get_logger("prismal.agents.patterns.reflection")
 
 GenerateFn = Callable[..., Awaitable[str]]
 """Signature: ``generate_fn(state, previous_draft=None, critique=None) -> str``."""
@@ -76,7 +76,7 @@ async def reflection_loop(
     5. After ``max_iterations`` is reached the highest-scoring draft observed
        during the loop is returned regardless of whether the threshold was met.
 
-    When the global setting ``LIGHTAGENT_REFLECTION_ENABLED`` is ``False`` the
+    When the global setting ``PRISMAL_REFLECTION_ENABLED`` is ``False`` the
     loop is bypassed entirely and only the first draft is generated and
     returned with a sentinel score of ``1.0``.  This allows operators to disable
     reflection in production for latency-sensitive workloads without modifying

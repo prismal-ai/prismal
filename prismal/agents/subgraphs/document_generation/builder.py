@@ -34,7 +34,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from prismal.core.config import Settings
 
-logger = get_logger("lightagent.subgraphs.document_generation.builder")
+logger = get_logger("prismal.subgraphs.document_generation.builder")
 
 _NAME = "document_generation"
 _DESCRIPTION = "Document generation pipeline: planner → researcher → writer → editor → formatter."

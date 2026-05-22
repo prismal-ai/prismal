@@ -47,7 +47,7 @@ from prismal.security.prompt_builder import SecurePromptBuilder
 if TYPE_CHECKING:
     from prismal.core.config import Settings
 
-logger = get_logger("lightagent.agents.patterns.debate")
+logger = get_logger("prismal.agents.patterns.debate")
 
 
 @dataclass
@@ -153,8 +153,8 @@ async def debate_round(
             (``proponent``, ``opponent``, ``neutral``) and generates
             ``analyst_N`` for any overflow.
         synthesis_strategy: How to derive the final ``consensus``.
-        settings: LightAgent settings. ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+        settings: Prismal settings. ``None`` resolves via
+            :func:`~prismal.core.config.get_settings`.
 
     Returns:
         :class:`DebateResult` with consensus, agreement score, all positions.
@@ -184,9 +184,9 @@ async def debate_round(
 
     otel = OTelManager()
     with otel.start_span("debate.round") as span:
-        span.set_attribute("lightagent.debate.n_agents", n_agents)
-        span.set_attribute("lightagent.debate.n_rounds", n_rounds)
-        span.set_attribute("lightagent.debate.strategy", synthesis_strategy)
+        span.set_attribute("prismal.debate.n_agents", n_agents)
+        span.set_attribute("prismal.debate.n_rounds", n_rounds)
+        span.set_attribute("prismal.debate.strategy", synthesis_strategy)
 
         all_positions: list[DebatePosition] = []
         last_round_positions: list[DebatePosition] = []
@@ -239,8 +239,8 @@ async def debate_round(
         agreement = pairwise_jaccard([p.content for p in final_positions])
         dissenting = _dissenting_views(final_positions, consensus, agreement)
 
-        span.set_attribute("lightagent.debate.agreement", agreement)
-        span.set_attribute("lightagent.debate.positions_total", len(all_positions))
+        span.set_attribute("prismal.debate.agreement", agreement)
+        span.set_attribute("prismal.debate.positions_total", len(all_positions))
         logger.info(
             "debate_done",
             n_rounds=n_rounds,

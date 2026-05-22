@@ -27,7 +27,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-logger = get_logger("lightagent.subgraphs.data_etl.auditor")
+logger = get_logger("prismal.subgraphs.data_etl.auditor")
 
 
 def make_auditor_node() -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:

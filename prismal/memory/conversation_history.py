@@ -32,7 +32,7 @@ from typing import Literal
 
 import structlog
 
-logger = structlog.get_logger("lightagent.memory.conversation_history")
+logger = structlog.get_logger("prismal.memory.conversation_history")
 
 _DEFAULT_BASE = (
     Path(__file__).resolve().parent.parent.parent / "data" / "workspace" / "conversations"

@@ -21,7 +21,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-logger = get_logger("lightagent.subgraphs.customer_service.ticket_creator")
+logger = get_logger("prismal.subgraphs.customer_service.ticket_creator")
 
 
 def make_ticket_creator_node() -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:

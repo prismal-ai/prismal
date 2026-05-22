@@ -1,4 +1,4 @@
-"""Unit tests for EmbeddingsFactory (lightagent.rag.embeddings).
+"""Unit tests for EmbeddingsFactory (prismal.rag.embeddings).
 
 Tests follow the TDD spec from T-061.  All three embedding class constructors
 are mocked so no API calls or model downloads are triggered.
@@ -38,7 +38,7 @@ def test_create_openai_returns_openai_embeddings_instance() -> None:
     """create() with embeddings_model='openai' must return OpenAIEmbeddings."""
     settings = _make_settings("openai")
 
-    with patch("lightagent.rag.embeddings.OpenAIEmbeddings", autospec=True) as mock_cls:
+    with patch("prismal.rag.embeddings.OpenAIEmbeddings", autospec=True) as mock_cls:
         mock_instance = MagicMock()
         mock_cls.return_value = mock_instance
 
@@ -51,7 +51,7 @@ def test_create_openai_uses_text_embedding_3_small() -> None:
     """create() with 'openai' must pass model='text-embedding-3-small'."""
     settings = _make_settings("openai")
 
-    with patch("lightagent.rag.embeddings.OpenAIEmbeddings", autospec=True) as mock_cls:
+    with patch("prismal.rag.embeddings.OpenAIEmbeddings", autospec=True) as mock_cls:
         mock_cls.return_value = MagicMock()
 
         EmbeddingsFactory.create(settings=settings)
@@ -66,7 +66,7 @@ def test_create_huggingface_returns_huggingface_embeddings_instance() -> None:
     """create() with 'huggingface' must return a HuggingFaceEmbeddings instance."""
     settings = _make_settings("huggingface")
 
-    with patch("lightagent.rag.embeddings.HuggingFaceEmbeddings", autospec=True) as mock_cls:
+    with patch("prismal.rag.embeddings.HuggingFaceEmbeddings", autospec=True) as mock_cls:
         mock_instance = MagicMock()
         mock_cls.return_value = mock_instance
 
@@ -79,7 +79,7 @@ def test_create_huggingface_uses_all_minilm_l6_v2() -> None:
     """create() with 'huggingface' must pass model_name='all-MiniLM-L6-v2'."""
     settings = _make_settings("huggingface")
 
-    with patch("lightagent.rag.embeddings.HuggingFaceEmbeddings", autospec=True) as mock_cls:
+    with patch("prismal.rag.embeddings.HuggingFaceEmbeddings", autospec=True) as mock_cls:
         mock_cls.return_value = MagicMock()
 
         EmbeddingsFactory.create(settings=settings)
@@ -94,7 +94,7 @@ def test_create_ollama_returns_ollama_embeddings_instance() -> None:
     """create() with 'ollama' must return an OllamaEmbeddings instance."""
     settings = _make_settings("ollama")
 
-    with patch("lightagent.rag.embeddings.OllamaEmbeddings", autospec=True) as mock_cls:
+    with patch("prismal.rag.embeddings.OllamaEmbeddings", autospec=True) as mock_cls:
         mock_instance = MagicMock()
         mock_cls.return_value = mock_instance
 
@@ -107,7 +107,7 @@ def test_create_ollama_uses_nomic_embed_text() -> None:
     """create() with 'ollama' must pass model='nomic-embed-text' to constructor."""
     settings = _make_settings("ollama")
 
-    with patch("lightagent.rag.embeddings.OllamaEmbeddings", autospec=True) as mock_cls:
+    with patch("prismal.rag.embeddings.OllamaEmbeddings", autospec=True) as mock_cls:
         mock_cls.return_value = MagicMock()
 
         EmbeddingsFactory.create(settings=settings)
@@ -124,9 +124,9 @@ def test_create_calls_get_settings_when_settings_is_none() -> None:
 
     with (
         patch(
-            "lightagent.rag.embeddings.get_settings", return_value=fake_settings
+            "prismal.rag.embeddings.get_settings", return_value=fake_settings
         ) as mock_get_settings,
-        patch("lightagent.rag.embeddings.HuggingFaceEmbeddings", autospec=True) as mock_cls,
+        patch("prismal.rag.embeddings.HuggingFaceEmbeddings", autospec=True) as mock_cls,
     ):
         mock_cls.return_value = MagicMock()
 
@@ -140,8 +140,8 @@ def test_create_does_not_call_get_settings_when_settings_provided() -> None:
     settings = _make_settings("ollama")
 
     with (
-        patch("lightagent.rag.embeddings.get_settings") as mock_get_settings,
-        patch("lightagent.rag.embeddings.OllamaEmbeddings", autospec=True) as mock_cls,
+        patch("prismal.rag.embeddings.get_settings") as mock_get_settings,
+        patch("prismal.rag.embeddings.OllamaEmbeddings", autospec=True) as mock_cls,
     ):
         mock_cls.return_value = MagicMock()
 
@@ -177,8 +177,8 @@ def test_create_logs_selected_provider() -> None:
     settings = _make_settings("openai")
 
     with (
-        patch("lightagent.rag.embeddings.OpenAIEmbeddings", autospec=True) as mock_cls,
-        patch("lightagent.rag.embeddings.logger") as mock_logger,
+        patch("prismal.rag.embeddings.OpenAIEmbeddings", autospec=True) as mock_cls,
+        patch("prismal.rag.embeddings.logger") as mock_logger,
     ):
         mock_cls.return_value = MagicMock()
 
@@ -192,8 +192,8 @@ def test_create_logs_huggingface_provider() -> None:
     settings = _make_settings("huggingface")
 
     with (
-        patch("lightagent.rag.embeddings.HuggingFaceEmbeddings", autospec=True) as mock_cls,
-        patch("lightagent.rag.embeddings.logger") as mock_logger,
+        patch("prismal.rag.embeddings.HuggingFaceEmbeddings", autospec=True) as mock_cls,
+        patch("prismal.rag.embeddings.logger") as mock_logger,
     ):
         mock_cls.return_value = MagicMock()
 
@@ -207,8 +207,8 @@ def test_create_logs_ollama_provider() -> None:
     settings = _make_settings("ollama")
 
     with (
-        patch("lightagent.rag.embeddings.OllamaEmbeddings", autospec=True) as mock_cls,
-        patch("lightagent.rag.embeddings.logger") as mock_logger,
+        patch("prismal.rag.embeddings.OllamaEmbeddings", autospec=True) as mock_cls,
+        patch("prismal.rag.embeddings.logger") as mock_logger,
     ):
         mock_cls.return_value = MagicMock()
 
@@ -228,8 +228,8 @@ def test_create_accepts_settings_object_directly() -> None:
     real_settings = Settings(embeddings_model="huggingface")
 
     with (
-        patch("lightagent.rag.embeddings.get_settings") as mock_get_settings,
-        patch("lightagent.rag.embeddings.HuggingFaceEmbeddings", autospec=True) as mock_cls,
+        patch("prismal.rag.embeddings.get_settings") as mock_get_settings,
+        patch("prismal.rag.embeddings.HuggingFaceEmbeddings", autospec=True) as mock_cls,
     ):
         mock_cls.return_value = MagicMock()
 
@@ -245,9 +245,9 @@ def test_create_default_argument_is_none() -> None:
 
     with (
         patch(
-            "lightagent.rag.embeddings.get_settings", return_value=fake_settings
+            "prismal.rag.embeddings.get_settings", return_value=fake_settings
         ) as mock_get_settings,
-        patch("lightagent.rag.embeddings.OllamaEmbeddings", autospec=True) as mock_cls,
+        patch("prismal.rag.embeddings.OllamaEmbeddings", autospec=True) as mock_cls,
     ):
         mock_cls.return_value = MagicMock()
 

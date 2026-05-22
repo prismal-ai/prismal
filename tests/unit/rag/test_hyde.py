@@ -1,4 +1,4 @@
-"""Unit tests for HyDERetriever (lightagent.rag.hyde).
+"""Unit tests for HyDERetriever (prismal.rag.hyde).
 
 HyDE — Hypothetical Document Embeddings — generates a hypothetical document
 that would answer the query, embeds that, and uses the resulting vector to
@@ -20,8 +20,8 @@ from prismal.rag.hyde import HyDEResult, HyDERetriever
 
 # ── Paths for patching ─────────────────────────────────────────────────────────
 
-PROVIDER_REGISTRY_PATH = "lightagent.rag.hyde.ProviderRegistry"
-EMBEDDINGS_FACTORY_PATH = "lightagent.rag.hyde.EmbeddingsFactory"
+PROVIDER_REGISTRY_PATH = "prismal.rag.hyde.ProviderRegistry"
+EMBEDDINGS_FACTORY_PATH = "prismal.rag.hyde.EmbeddingsFactory"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -234,7 +234,7 @@ async def test_search_uses_secure_prompt_builder() -> None:
     with (
         patch(PROVIDER_REGISTRY_PATH) as mock_registry_cls,
         patch(EMBEDDINGS_FACTORY_PATH) as mock_emb_cls,
-        patch("lightagent.rag.hyde.SecurePromptBuilder") as mock_builder_cls,
+        patch("prismal.rag.hyde.SecurePromptBuilder") as mock_builder_cls,
     ):
         mock_registry_cls.return_value.get_llm.return_value = llm
         mock_emb_cls.create.return_value = embeddings

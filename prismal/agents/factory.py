@@ -2,7 +2,7 @@
 
 This module provides :class:`AgentFactory`, which constructs and compiles a
 fresh :class:`~langgraph.graph.state.CompiledStateGraph` for every supported
-:class:`~lightagent.agents.patterns.AgentPattern`.  Each call to
+:class:`~prismal.agents.patterns.AgentPattern`.  Each call to
 :meth:`AgentFactory.build` creates an independent graph backed by its own
 SQLite checkpoint database so that different topologies can coexist without
 interfering with one another.
@@ -62,7 +62,7 @@ from prismal.core.logging import get_logger
 from prismal.monitoring.langfuse_client import LangfuseManager
 from prismal.monitoring.otel import OTelManager
 
-logger = get_logger("lightagent.agents.factory")
+logger = get_logger("prismal.agents.factory")
 
 # ---------------------------------------------------------------------------
 # Default checkpoint base path
@@ -206,7 +206,7 @@ class AgentFactory:
         compiled graph.
 
         Args:
-            pattern: The :class:`~lightagent.agents.patterns.AgentPattern`
+            pattern: The :class:`~prismal.agents.patterns.AgentPattern`
                 topology to build.
             checkpoint_path: Optional explicit path for the SQLite checkpoint
                 database.  When omitted the path defaults to
@@ -240,8 +240,8 @@ class AgentFactory:
         with otel.start_span(
             "agent.factory.build",
             attributes={
-                "lightagent.pattern": pattern.value,
-                "lightagent.checkpoint_path": str(db_path),
+                "prismal.pattern": pattern.value,
+                "prismal.checkpoint_path": str(db_path),
             },
         ):
             logger.debug(

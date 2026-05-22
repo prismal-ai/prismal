@@ -1,4 +1,4 @@
-"""Unit tests for the lightagent-datetime MCP server (T-297 / SPEC-029 AC-029-7).
+"""Unit tests for the prismal-datetime MCP server (T-297 / SPEC-029 AC-029-7).
 
 All tools are tested by calling them directly as Python functions — no MCP
 transport is started.  This keeps the tests fast and independent of the MCP
@@ -39,21 +39,21 @@ def test_resolve_tz_explicit() -> None:
 
 def test_resolve_tz_invalid_falls_back_to_env_or_utc() -> None:
     """Invalid explicit tz_str falls through to next step."""
-    with patch.dict(os.environ, {"LIGHTAGENT_CRON_TIMEZONE": "America/Caracas"}, clear=False):
+    with patch.dict(os.environ, {"PRISMAL_CRON_TIMEZONE": "America/Caracas"}, clear=False):
         tz = _resolve_tz("Not/Real")
     assert tz == ZoneInfo("America/Caracas")
 
 
 def test_resolve_tz_uses_cron_timezone_env() -> None:
-    """LIGHTAGENT_CRON_TIMEZONE env var is used when tz_str is empty."""
-    with patch.dict(os.environ, {"LIGHTAGENT_CRON_TIMEZONE": "Europe/Berlin"}, clear=False):
+    """PRISMAL_CRON_TIMEZONE env var is used when tz_str is empty."""
+    with patch.dict(os.environ, {"PRISMAL_CRON_TIMEZONE": "Europe/Berlin"}, clear=False):
         tz = _resolve_tz("")
     assert tz == ZoneInfo("Europe/Berlin")
 
 
-def test_resolve_tz_uses_lightagent_timezone_env() -> None:
-    """LIGHTAGENT_TIMEZONE env var used when CRON_TIMEZONE is not set."""
-    env = {"LIGHTAGENT_TIMEZONE": "Asia/Seoul", "LIGHTAGENT_CRON_TIMEZONE": ""}
+def test_resolve_tz_uses_prismal_timezone_env() -> None:
+    """PRISMAL_TIMEZONE env var used when CRON_TIMEZONE is not set."""
+    env = {"PRISMAL_TIMEZONE": "Asia/Seoul", "PRISMAL_CRON_TIMEZONE": ""}
     with patch.dict(os.environ, env, clear=False):
         tz = _resolve_tz("")
     assert tz == ZoneInfo("Asia/Seoul")
@@ -97,7 +97,7 @@ def test_get_timezone_info_fields_present() -> None:
     result = datetime_get_timezone_info()
     assert isinstance(result, TimezoneInfoResult)
     assert hasattr(result, "os_timezone")
-    assert hasattr(result, "lightagent_timezone")
+    assert hasattr(result, "prismal_timezone")
     assert hasattr(result, "cron_timezone")
     assert hasattr(result, "resolved_timezone")
     assert hasattr(result, "utc_offset")
@@ -105,14 +105,14 @@ def test_get_timezone_info_fields_present() -> None:
 
 
 def test_get_timezone_info_uses_env_vars() -> None:
-    """Env vars appear in lightagent_timezone and cron_timezone fields."""
+    """Env vars appear in prismal_timezone and cron_timezone fields."""
     env = {
-        "LIGHTAGENT_TIMEZONE": "Europe/Madrid",
-        "LIGHTAGENT_CRON_TIMEZONE": "America/New_York",
+        "PRISMAL_TIMEZONE": "Europe/Madrid",
+        "PRISMAL_CRON_TIMEZONE": "America/New_York",
     }
     with patch.dict(os.environ, env, clear=False):
         result = datetime_get_timezone_info()
-    assert result.lightagent_timezone == "Europe/Madrid"
+    assert result.prismal_timezone == "Europe/Madrid"
     assert result.cron_timezone == "America/New_York"
     # resolved_timezone follows resolution chain: CRON_TIMEZONE wins
     assert result.resolved_timezone == "America/New_York"
@@ -388,10 +388,10 @@ def test_utc_offset_str_negative() -> None:
 
 def test_resolve_tz_falls_back_to_utc_when_tzlocal_raises() -> None:
     """When tzlocal raises and env vars are empty, _resolve_tz returns UTC."""
-    env = {"LIGHTAGENT_CRON_TIMEZONE": "", "LIGHTAGENT_TIMEZONE": ""}
+    env = {"PRISMAL_CRON_TIMEZONE": "", "PRISMAL_TIMEZONE": ""}
     with patch.dict(os.environ, env, clear=False):
         with patch(
-            "lightagent.mcp.servers.datetime_server.tzlocal.get_localzone",
+            "prismal.mcp.servers.datetime_server.tzlocal.get_localzone",
             side_effect=Exception("no tz db"),
         ):
             tz = _resolve_tz("")
@@ -462,7 +462,7 @@ def test_describe_cron_fallback_on_expand_error() -> None:
 
     schedule = "0 9 * * *"
     with mpatch(
-        "lightagent.mcp.servers.datetime_server.croniter.expand",
+        "prismal.mcp.servers.datetime_server.croniter.expand",
         side_effect=Exception("bad"),
     ):
         result = _describe_cron(schedule)
@@ -480,7 +480,7 @@ def test_describe_cron_complex_no_freq_part() -> None:
 def test_get_timezone_info_os_tz_fallback() -> None:
     """When tzlocal.get_localzone() raises, os_timezone defaults to 'UTC'."""
     with patch(
-        "lightagent.mcp.servers.datetime_server.tzlocal.get_localzone",
+        "prismal.mcp.servers.datetime_server.tzlocal.get_localzone",
         side_effect=Exception("no tz db"),
     ):
         result = datetime_get_timezone_info()
@@ -511,7 +511,7 @@ def test_cron_next_run_naive_fire_time() -> None:
     mock_cron.get_next.return_value = naive_dt
 
     with mpatch(
-        "lightagent.mcp.servers.datetime_server.croniter", return_value=mock_cron
+        "prismal.mcp.servers.datetime_server.croniter", return_value=mock_cron
     ) as mock_cls:
         mock_cls.is_valid.return_value = True
         result = datetime_cron_next_run(schedule="0 9 * * *", count=1, timezone="UTC")

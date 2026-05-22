@@ -1,4 +1,4 @@
-"""Tests for the global tool-count cap in :mod:`lightagent.agents.tool_registry`.
+"""Tests for the global tool-count cap in :mod:`prismal.agents.tool_registry`.
 
 OpenAI rejects ``tools`` arrays longer than 128 entries with a
 ``BadRequestError``.  ``get_tools_for_agent`` must enforce a hard upper

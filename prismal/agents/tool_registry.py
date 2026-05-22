@@ -1,4 +1,4 @@
-"""Dynamic tool registry for LightAgent sub-agents.
+"""Dynamic tool registry for Prismal sub-agents.
 
 Merges three tool sources at call time:
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
     from langchain_core.tools import BaseTool
 
-logger = get_logger("lightagent.agents.tool_registry")
+logger = get_logger("prismal.agents.tool_registry")
 
 # ---------------------------------------------------------------------------
 # MCP singleton

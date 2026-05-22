@@ -27,7 +27,7 @@ def test_langfuse_create_trace_noop_without_keys() -> None:
     s.langfuse_secret_key.get_secret_value.return_value = ""
     s.langfuse_host = "https://cloud.langfuse.com"
     with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings",
+        "prismal.monitoring._settings_proxy.get_monitoring_settings",
         return_value=s,
     ):
         mgr = LangfuseManager()
@@ -50,7 +50,7 @@ def test_langfuse_score_trace_noop_when_disabled() -> None:
     s.langfuse_public_key.get_secret_value.return_value = ""
     s.langfuse_secret_key.get_secret_value.return_value = ""
     with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings",
+        "prismal.monitoring._settings_proxy.get_monitoring_settings",
         return_value=s,
     ):
         mgr = LangfuseManager()
@@ -71,7 +71,7 @@ def test_langfuse_callback_handler_with_mock_client() -> None:
     # Langfuse and CallbackHandler are imported inside methods, so patch at source
     with (
         patch(
-            "lightagent.monitoring._settings_proxy.get_monitoring_settings",
+            "prismal.monitoring._settings_proxy.get_monitoring_settings",
             return_value=_enabled_settings(),
         ),
         patch("langfuse.Langfuse", return_value=mock_client),
@@ -94,7 +94,7 @@ def test_langfuse_singleton_identity() -> None:
     s.langfuse_public_key.get_secret_value.return_value = ""
     s.langfuse_secret_key.get_secret_value.return_value = ""
     with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings",
+        "prismal.monitoring._settings_proxy.get_monitoring_settings",
         return_value=s,
     ):
         a = LangfuseManager()

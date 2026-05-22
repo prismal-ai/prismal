@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from prismal.core.config import Settings
     from prismal.rag.vector_store import ChromaVectorStore
 
-logger = get_logger("lightagent.rag.hyde")
+logger = get_logger("prismal.rag.hyde")
 
 _DEFAULT_HYPOTHESIS_PROMPT = (
     "Write a short, plausible paragraph that directly answers the user's query "
@@ -74,8 +74,8 @@ class HyDERetriever:
 
     Args:
         vector_store: Initialised :class:`ChromaVectorStore` to search.
-        settings: LightAgent settings. ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+        settings: Prismal settings. ``None`` resolves via
+            :func:`~prismal.core.config.get_settings`.
         hypothesis_prompt: System prompt for hypothesis generation. ``None``
             uses the built-in default.
     """
@@ -108,14 +108,14 @@ class HyDERetriever:
         """
         otel = OTelManager()
         with otel.start_span("hyde.search") as span:
-            span.set_attribute("lightagent.query_len", len(query))
-            span.set_attribute("lightagent.k", k)
+            span.set_attribute("prismal.query_len", len(query))
+            span.set_attribute("prismal.k", k)
 
             hypothesis = await self._generate_hypothesis(query)
-            span.set_attribute("lightagent.hypothesis_len", len(hypothesis))
+            span.set_attribute("prismal.hypothesis_len", len(hypothesis))
 
             hypothesis_embedding = await self._embed_hypothesis(hypothesis)
-            span.set_attribute("lightagent.hypothesis_embedding_dims", len(hypothesis_embedding))
+            span.set_attribute("prismal.hypothesis_embedding_dims", len(hypothesis_embedding))
 
             raw_results = self._store.similarity_search(hypothesis, k=k)
             chunks: list[RetrievedChunk] = []
@@ -128,7 +128,7 @@ class HyDERetriever:
                         content=doc.page_content,
                     )
                 )
-            span.set_attribute("lightagent.num_results", len(chunks))
+            span.set_attribute("prismal.num_results", len(chunks))
             otel.increment_counter("rag_queries")
 
             logger.info(

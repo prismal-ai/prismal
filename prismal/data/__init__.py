@@ -4,14 +4,14 @@ Phase 14 — SPEC-012 Analytics Layer.
 
 Public re-exports:
 
-- :class:`~lightagent.data.duckdb_engine.DuckDBEngine` — validated SQL engine
-- :class:`~lightagent.data.duckdb_engine.SQLValidator` — SQL safety guard
-- :func:`~lightagent.data.polars_utils.filter_rows` — row filtering
-- :func:`~lightagent.data.polars_utils.group_by_aggregate` — group & aggregate
-- :func:`~lightagent.data.polars_utils.sort_by` — sort DataFrame
-- :func:`~lightagent.data.polars_utils.select_columns` — column projection
-- :func:`~lightagent.data.polars_utils.to_records` — convert to dicts
-- :func:`~lightagent.data.polars_utils.save_chart` — chart generation
+- :class:`~prismal.data.duckdb_engine.DuckDBEngine` — validated SQL engine
+- :class:`~prismal.data.duckdb_engine.SQLValidator` — SQL safety guard
+- :func:`~prismal.data.polars_utils.filter_rows` — row filtering
+- :func:`~prismal.data.polars_utils.group_by_aggregate` — group & aggregate
+- :func:`~prismal.data.polars_utils.sort_by` — sort DataFrame
+- :func:`~prismal.data.polars_utils.select_columns` — column projection
+- :func:`~prismal.data.polars_utils.to_records` — convert to dicts
+- :func:`~prismal.data.polars_utils.save_chart` — chart generation
 """
 
 from prismal.data.duckdb_engine import DuckDBEngine, SQLValidator

@@ -18,7 +18,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.cron_manager")
+logger = get_logger("prismal.agents.cron_manager")
 
 _SYSTEM_PROMPT = """You are a scheduling specialist that manages recurring \
 and one-time agent tasks.
@@ -88,8 +88,8 @@ The scheduling action is acceptable when ALL of the following hold:
 
 ### Timezone resolution order (enforced by `DateTimeService`)
 1. Explicit `timezone=` argument.
-2. `LIGHTAGENT_CRON_TIMEZONE`.
-3. `LIGHTAGENT_TIMEZONE`.
+2. `PRISMAL_CRON_TIMEZONE`.
+3. `PRISMAL_TIMEZONE`.
 4. OS `localzone()`.
 5. UTC fallback.
 

@@ -30,7 +30,7 @@ from prismal.agents.subgraphs.debate_consensus import (
 from prismal.agents.subgraphs.debate_consensus.builder import (
     build_debate_consensus_subgraph,
 )
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -51,8 +51,8 @@ def _llm_returning(*texts: str) -> MagicMock:
 # ── Exception ─────────────────────────────────────────────────────────────────
 
 
-def test_debate_consensus_error_inherits_from_lightagent_error() -> None:
-    assert issubclass(DebateConsensusError, LightAgentError)
+def test_debate_consensus_error_inherits_from_prismal_error() -> None:
+    assert issubclass(DebateConsensusError, PrismalError)
 
 
 # ── proponent_node ───────────────────────────────────────────────────────────

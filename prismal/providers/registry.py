@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from langchain_core.messages import BaseMessage
     from langchain_core.runnables.fallbacks import RunnableWithFallbacks
 
-logger = get_logger("lightagent.providers.registry")
+logger = get_logger("prismal.providers.registry")
 
 
 @dataclass
@@ -100,7 +100,7 @@ class ProviderRegistry:
 
         # Ollama needs no API key, but LiteLLM needs the base URL to route
         # ``ollama/*`` model strings.  Export from settings so a single
-        # LIGHTAGENT_OLLAMA_BASE_URL covers every codepath.
+        # PRISMAL_OLLAMA_BASE_URL covers every codepath.
         if self._settings.ollama_base_url:
             os.environ.setdefault("OLLAMA_API_BASE", self._settings.ollama_base_url)
 
@@ -158,9 +158,9 @@ class ProviderRegistry:
         with otel.start_span(
             "provider.get_llm",
             attributes={
-                "lightagent.model": resolved_model,
-                "lightagent.streaming": streaming,
-                "lightagent.temperature": temp,
+                "prismal.model": resolved_model,
+                "prismal.streaming": streaming,
+                "prismal.temperature": temp,
             },
         ):
             otel.increment_counter("llm_requests", attributes={"model": resolved_model})

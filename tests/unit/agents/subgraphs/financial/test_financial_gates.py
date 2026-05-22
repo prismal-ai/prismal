@@ -257,11 +257,11 @@ class TestMarketDataGate:
             on_fail="insufficient_data_report",
         )
         state = _market_state(missing_fields=["market_cap"], data_confidence=0.5)
-        with patch("lightagent.agents.subgraphs.financial.builder.get_settings") as mock_settings:
+        with patch("prismal.agents.subgraphs.financial.builder.get_settings") as mock_settings:
             mock_settings.return_value.financial_min_confidence = 0.3
             # 0.5 >= 0.3 → pass
             assert gate(state) == "technical_analyst"
-        with patch("lightagent.agents.subgraphs.financial.builder.get_settings") as mock_settings:
+        with patch("prismal.agents.subgraphs.financial.builder.get_settings") as mock_settings:
             mock_settings.return_value.financial_min_confidence = 0.9
             # 0.5 < 0.9 AND missing non-empty → fail
             assert gate(state) == "insufficient_data_report"
@@ -399,7 +399,7 @@ class TestLimitedTechnicalDisclaimerNode:
 
 class TestFinancialTopology:
     def _definition_with_settings(self, *, hitl: bool) -> Any:
-        with patch("lightagent.agents.subgraphs.financial.builder.get_settings") as mock_settings:
+        with patch("prismal.agents.subgraphs.financial.builder.get_settings") as mock_settings:
             mock_settings.return_value.financial_hitl_enabled = hitl
             mock_settings.return_value.financial_min_confidence = 0.4
             mock_settings.return_value.financial_technical_min_confidence = 0.6

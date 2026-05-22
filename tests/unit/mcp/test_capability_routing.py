@@ -177,7 +177,7 @@ def test_get_tools_for_agent_forwards_capabilities_to_manager() -> None:
         patch.object(tool_registry, "_mcp_manager", FakeMgr()),
         patch.object(tool_registry, "get_skill_tools", return_value=[]),
         patch(
-            "lightagent.mcp.client.MCPClientManager",
+            "prismal.mcp.client.MCPClientManager",
             FakeMgr,
         ),
     ):
@@ -200,7 +200,7 @@ def test_get_tools_for_agent_legacy_call_passes_none() -> None:
     with (
         patch.object(tool_registry, "_mcp_manager", FakeMgr()),
         patch.object(tool_registry, "get_skill_tools", return_value=[]),
-        patch("lightagent.mcp.client.MCPClientManager", FakeMgr),
+        patch("prismal.mcp.client.MCPClientManager", FakeMgr),
     ):
         tool_registry.get_tools_for_agent("researcher")
 

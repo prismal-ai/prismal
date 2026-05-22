@@ -9,7 +9,7 @@ blocking the event loop.
 The ``random_seed`` is always overridden from ``settings.ml_random_seed``
 to ensure reproducibility regardless of what the LLM suggests.
 
-Stores a :class:`~lightagent.agents.subgraphs.ml_pipeline.artifacts.TrainedModel`
+Stores a :class:`~prismal.agents.subgraphs.ml_pipeline.artifacts.TrainedModel`
 under ``state["metadata"]["ml_pipeline"]["trained_model"]``.
 """
 
@@ -29,7 +29,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.ml_pipeline.model_trainer")
+logger = structlog.get_logger("prismal.subgraphs.ml_pipeline.model_trainer")
 otel = OTelManager()
 
 _SYSTEM = """You are a Model Trainer for the ml_pipeline subgraph.
@@ -85,7 +85,7 @@ The `TrainedModel` is acceptable when ALL of the following hold:
 
 ## Background
 - Artifact schema:
-  `lightagent/agents/subgraphs/ml_pipeline/artifacts.py::TrainedModel`.
+  `prismal/agents/subgraphs/ml_pipeline/artifacts.py::TrainedModel`.
 - Lazy-import ML libs (`flaml`, `sklearn`, `torch`) inside the node —
   never at module level.
 - The trainer runs via `asyncio.to_thread(model.fit, ...)`; never
@@ -152,8 +152,8 @@ async def model_trainer_node(state: AgentState) -> dict[str, Any]:
         ``metadata["ml_pipeline"]["trained_model"]``.
     """
     with otel.start_span("ml_pipeline.model_trainer") as span:
-        span.set_attribute("lightagent.subgraph", "ml_pipeline")
-        span.set_attribute("lightagent.agent", "model_trainer")
+        span.set_attribute("prismal.subgraph", "ml_pipeline")
+        span.set_attribute("prismal.agent", "model_trainer")
 
         settings = get_settings()
         ml: dict[str, Any] = dict(state.get("metadata", {}).get("ml_pipeline", {}))
@@ -198,8 +198,8 @@ async def model_trainer_node(state: AgentState) -> dict[str, Any]:
             training_time=trained_model.training_time_seconds,
             random_seed=trained_model.random_seed,
         )
-        span.set_attribute("lightagent.ml.model_type", trained_model.model_type)
-        span.set_attribute("lightagent.ml.training_time", trained_model.training_time_seconds)
+        span.set_attribute("prismal.ml.model_type", trained_model.model_type)
+        span.set_attribute("prismal.ml.training_time", trained_model.training_time_seconds)
 
         return {
             "current_agent": "model_trainer",

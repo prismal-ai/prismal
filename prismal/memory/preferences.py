@@ -32,7 +32,7 @@ from pathlib import Path
 import structlog
 from pydantic import BaseModel, Field
 
-logger = structlog.get_logger("lightagent.memory.preferences")
+logger = structlog.get_logger("prismal.memory.preferences")
 
 _PROFILE_DIR = Path("data/workspace/profile")
 
@@ -76,7 +76,7 @@ Example output:
   "communication_style": ["Prefers responses in Spanish", "Concise style"],
   "tech_stack": ["Python 3.13", "Uses uv for package management"],
   "workflow": ["Commits frequently with conventional commits"],
-  "project_context": ["Working on LightAgent project"]
+  "project_context": ["Working on Prismal project"]
 }
 """
 

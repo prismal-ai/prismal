@@ -1,6 +1,6 @@
-"""APScheduler-backed cron execution engine for LightAgent.
+"""APScheduler-backed cron execution engine for Prismal.
 
-``CronExecutor`` bridges the :class:`~lightagent.scheduler.cron_manager.CronManager`
+``CronExecutor`` bridges the :class:`~prismal.scheduler.cron_manager.CronManager`
 (which persists job definitions in SQLite) and the live runtime: it loads all
 ``active`` jobs on :meth:`CronExecutor.start`, registers them with an
 :class:`~apscheduler.schedulers.asyncio.AsyncIOScheduler`, and invokes the
@@ -30,7 +30,7 @@ from prismal.scheduler.cron_manager import CronJob, CronManager
 from prismal.scheduler.datetime_service import DateTimeService
 from prismal.scheduler.notifier import CronNotifier
 
-logger = structlog.get_logger("lightagent.scheduler.executor")
+logger = structlog.get_logger("prismal.scheduler.executor")
 
 # Module-level singleton tracking the currently running executor instance.
 _running_executor: CronExecutor | None = None
@@ -69,7 +69,7 @@ _SOFT_FAILURE_SIGNATURES: tuple[str, ...] = (
 #: invalid-request errors never recover on a blind retry; retrying just
 #: wastes the job's ``max_retries`` budget and delays the user-visible
 #: failure notice.  Kept in sync with the equivalent regex inside
-#: :mod:`lightagent.agents.tool_registry`.
+#: :mod:`prismal.agents.tool_registry`.
 _PERMANENT_ERROR_RE = re.compile(
     r"credit.?balance|insufficient.?(?:credit|quota|funds)|billing|"
     r"invalid.?api.?key|invalid.?request.?error|invalid.?model|"
@@ -123,10 +123,10 @@ def get_running_executor() -> CronExecutor | None:
 
 
 class CronExecutor:
-    """APScheduler-backed executor that runs LightAgent cron jobs on schedule.
+    """APScheduler-backed executor that runs Prismal cron jobs on schedule.
 
     On :meth:`start` the executor reads every ``active`` job from
-    :class:`~lightagent.scheduler.cron_manager.CronManager`, registers each
+    :class:`~prismal.scheduler.cron_manager.CronManager`, registers each
     with APScheduler's :class:`~apscheduler.schedulers.asyncio.AsyncIOScheduler`
     using a :class:`~apscheduler.triggers.cron.CronTrigger`, then starts the
     scheduler.  On each tick APScheduler calls :meth:`_run_job` which invokes
@@ -209,7 +209,7 @@ class CronExecutor:
         replaced (``replace_existing=True``).
 
         Args:
-            job: The :class:`~lightagent.scheduler.cron_manager.CronJob` to
+            job: The :class:`~prismal.scheduler.cron_manager.CronJob` to
                 schedule.
         """
         self._register_job(job)
@@ -286,7 +286,7 @@ class CronExecutor:
         silently inherits the OS locale (Phase 28 / CLAUDE.md rule).
 
         Args:
-            job: The :class:`~lightagent.scheduler.cron_manager.CronJob` to
+            job: The :class:`~prismal.scheduler.cron_manager.CronJob` to
                 register.
         """
         # Resolve the operative timezone for this job: per-job → system chain.
@@ -345,7 +345,7 @@ class CronExecutor:
           send a notification yet.
         - If retries are exhausted (or ``max_retries == 0``): resets
           ``retry_count`` to 0, records the run as failed, and fires the
-          :class:`~lightagent.scheduler.notifier.CronNotifier`.
+          :class:`~prismal.scheduler.notifier.CronNotifier`.
 
         Errors are never re-raised so APScheduler continues scheduling
         future runs.

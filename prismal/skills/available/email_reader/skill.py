@@ -2,11 +2,11 @@
 
 Requires the following environment variables:
 
-* ``LIGHTAGENT_EMAIL_HOST`` — IMAP server hostname (e.g. ``imap.gmail.com``)
-* ``LIGHTAGENT_EMAIL_USER`` — Email address / username
-* ``LIGHTAGENT_EMAIL_PASSWORD`` — App password or IMAP password
-* ``LIGHTAGENT_EMAIL_PORT`` — IMAP port (default: 993)
-* ``LIGHTAGENT_EMAIL_FOLDER`` — Mailbox folder (default: INBOX)
+* ``PRISMAL_EMAIL_HOST`` — IMAP server hostname (e.g. ``imap.gmail.com``)
+* ``PRISMAL_EMAIL_USER`` — Email address / username
+* ``PRISMAL_EMAIL_PASSWORD`` — App password or IMAP password
+* ``PRISMAL_EMAIL_PORT`` — IMAP port (default: 993)
+* ``PRISMAL_EMAIL_FOLDER`` — Mailbox folder (default: INBOX)
 
 If any required variable is missing the tool returns a helpful error message
 without raising an exception (graceful degradation).
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 from prismal.core.logging import get_logger
 from prismal.skills.base import BaseSkill, SkillMetadata
 
-logger = get_logger("lightagent.skills.email_reader")
+logger = get_logger("prismal.skills.email_reader")
 
 _DEFAULT_PORT = 993
 _DEFAULT_FOLDER = "INBOX"
@@ -157,7 +157,7 @@ class EmailReaderSkill(BaseSkill):
             name="email_reader",
             description="Read recent emails from an IMAP mailbox",
             version="1.0.0",
-            author="lightagent",
+            author="prismal",
             safe_to_auto_activate=False,
             requires_permissions=["network.request", "credentials.read"],
             tags=["utility", "email", "imap", "communication"],
@@ -170,9 +170,9 @@ class EmailReaderSkill(BaseSkill):
             True if IMAP credentials are configured, False otherwise.
         """
         return bool(
-            os.getenv("LIGHTAGENT_EMAIL_HOST")
-            and os.getenv("LIGHTAGENT_EMAIL_USER")
-            and os.getenv("LIGHTAGENT_EMAIL_PASSWORD")
+            os.getenv("PRISMAL_EMAIL_HOST")
+            and os.getenv("PRISMAL_EMAIL_USER")
+            and os.getenv("PRISMAL_EMAIL_PASSWORD")
         )
 
     def get_tools(self) -> list[BaseTool]:
@@ -193,17 +193,17 @@ class EmailReaderSkill(BaseSkill):
             Returns:
                 Formatted email summaries (From, Date, Subject, Body snippet).
             """
-            host = os.getenv("LIGHTAGENT_EMAIL_HOST", "")
-            user = os.getenv("LIGHTAGENT_EMAIL_USER", "")
-            password = os.getenv("LIGHTAGENT_EMAIL_PASSWORD", "")
-            port = int(os.getenv("LIGHTAGENT_EMAIL_PORT", str(_DEFAULT_PORT)))
-            folder = os.getenv("LIGHTAGENT_EMAIL_FOLDER", _DEFAULT_FOLDER)
+            host = os.getenv("PRISMAL_EMAIL_HOST", "")
+            user = os.getenv("PRISMAL_EMAIL_USER", "")
+            password = os.getenv("PRISMAL_EMAIL_PASSWORD", "")
+            port = int(os.getenv("PRISMAL_EMAIL_PORT", str(_DEFAULT_PORT)))
+            folder = os.getenv("PRISMAL_EMAIL_FOLDER", _DEFAULT_FOLDER)
 
             if not host or not user or not password:
                 return (
                     "[email_reader] Missing configuration. "
-                    "Set LIGHTAGENT_EMAIL_HOST, LIGHTAGENT_EMAIL_USER, "
-                    "and LIGHTAGENT_EMAIL_PASSWORD."
+                    "Set PRISMAL_EMAIL_HOST, PRISMAL_EMAIL_USER, "
+                    "and PRISMAL_EMAIL_PASSWORD."
                 )
 
             logger.info("email_reader_fetch", user=user, folder=folder, max=max_emails)

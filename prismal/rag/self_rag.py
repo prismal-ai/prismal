@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from prismal.core.config import Settings
     from prismal.rag.vector_store import ChromaVectorStore
 
-logger = get_logger("lightagent.rag.self_rag")
+logger = get_logger("prismal.rag.self_rag")
 
 
 class RetrievalDecision(StrEnum):
@@ -107,8 +107,8 @@ class SelfRAGPipeline:
             internal CRAG fallback.
         crag_pipeline: Optional pre-built :class:`CRAGPipeline`. ``None`` builds
             a default one over *vector_store*.
-        settings: LightAgent settings. ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+        settings: Prismal settings. ``None`` resolves via
+            :func:`~prismal.core.config.get_settings`.
     """
 
     def __init__(
@@ -135,11 +135,11 @@ class SelfRAGPipeline:
         """
         otel = OTelManager()
         with otel.start_span("self_rag.run") as span:
-            span.set_attribute("lightagent.query_len", len(query))
+            span.set_attribute("prismal.query_len", len(query))
 
             decision, used_fallback = await self._decide_retrieval(query)
-            span.set_attribute("lightagent.retrieval_decision", decision.value)
-            span.set_attribute("lightagent.used_fallback", used_fallback)
+            span.set_attribute("prismal.retrieval_decision", decision.value)
+            span.set_attribute("prismal.used_fallback", used_fallback)
             logger.info(
                 "self_rag_decision",
                 decision=decision.value,
@@ -156,8 +156,8 @@ class SelfRAGPipeline:
                 sources = []
 
             support, utility = await self._assess_support(query, answer, sources)
-            span.set_attribute("lightagent.supported", support.value)
-            span.set_attribute("lightagent.utility", utility)
+            span.set_attribute("prismal.supported", support.value)
+            span.set_attribute("prismal.utility", utility)
             otel.increment_counter("rag_queries")
 
             return SelfRAGResult(

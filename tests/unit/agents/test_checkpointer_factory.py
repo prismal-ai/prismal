@@ -1,4 +1,4 @@
-"""Tests for :func:`lightagent.agents.graph.build_checkpointer`.
+"""Tests for :func:`prismal.agents.graph.build_checkpointer`.
 
 Covers SPEC-038 AC-038-1, AC-038-2, AC-038-3, AC-038-4 and AC-038-6: the
 factory selects the correct checkpointer backend based on the DB URL,
@@ -6,7 +6,7 @@ calls ``setup()`` for Postgres, and :class:`SubgraphFactory` falls back to
 it when ``checkpointer_path`` is ``None``.
 
 The ``langgraph-checkpoint-postgres`` package is intentionally not a hard
-dependency of LightAgent, so the Postgres branch is exercised by
+dependency of Prismal, so the Postgres branch is exercised by
 injecting a fake module into ``sys.modules``.
 """
 
@@ -109,7 +109,7 @@ class TestBuildCheckpointerSqlite:
 
     async def test_none_url_returns_memory_saver(self) -> None:
         """``db_url=None`` falls back to ``settings.db_url`` or ``:memory:``."""
-        with patch("lightagent.agents.graph.get_settings") as mock_settings:
+        with patch("prismal.agents.graph.get_settings") as mock_settings:
             mock_settings.return_value.db_url = ""
             saver = await build_checkpointer(None)
         assert isinstance(saver, AsyncSqliteSaver)
@@ -144,7 +144,7 @@ class TestBuildCheckpointerSqlite:
 
     async def test_explicit_url_wins_over_settings(self) -> None:
         """An explicit ``db_url`` argument takes precedence over settings."""
-        with patch("lightagent.agents.graph.get_settings") as mock_settings:
+        with patch("prismal.agents.graph.get_settings") as mock_settings:
             mock_settings.return_value.db_url = "postgresql://should-not-be-used"
             # Empty string is an explicit value: factory should NOT read settings.
             saver = await build_checkpointer("")
@@ -192,7 +192,7 @@ class TestBuildCheckpointerPostgres:
 
     async def test_postgres_url_via_settings(self, fake_postgres_module: Any) -> None:
         _, _, saver_instance = fake_postgres_module
-        with patch("lightagent.agents.graph.get_settings") as mock_settings:
+        with patch("prismal.agents.graph.get_settings") as mock_settings:
             mock_settings.return_value.db_url = "postgresql://user@host/db"
             saver = await build_checkpointer(None)
         assert saver is saver_instance
@@ -232,7 +232,7 @@ class TestSubgraphFactoryUsesBuildCheckpointer:
 
         sentinel = MemorySaver()
         with patch(
-            "lightagent.agents.graph.build_checkpointer",
+            "prismal.agents.graph.build_checkpointer",
             new=AsyncMock(return_value=sentinel),
         ) as mock_build:
             factory = SubgraphFactory()
@@ -265,7 +265,7 @@ class TestSubgraphFactoryUsesBuildCheckpointer:
 
         db_file = tmp_path / "legacy.db"
         with patch(
-            "lightagent.agents.graph.build_checkpointer",
+            "prismal.agents.graph.build_checkpointer",
             new=AsyncMock(),
         ) as mock_build:
             factory = SubgraphFactory()

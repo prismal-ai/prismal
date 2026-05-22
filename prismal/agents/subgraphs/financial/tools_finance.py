@@ -5,7 +5,7 @@ lazy — guarded by try/except ImportError — so the base package works without
 the [finance] extra installed.
 
 NEVER import these libraries at module level outside of
-lightagent/agents/subgraphs/financial/.
+prismal/agents/subgraphs/financial/.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import Any
 
 import structlog
 
-logger = structlog.get_logger("lightagent.subgraphs.financial.tools")
+logger = structlog.get_logger("prismal.subgraphs.financial.tools")
 
 _DISCLAIMER = (
     "\n\n---\n*This analysis is for informational purposes only and does not "

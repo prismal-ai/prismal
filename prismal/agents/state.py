@@ -29,11 +29,11 @@ from langgraph.graph.message import add_messages
 
 from prismal.core.logging import get_logger
 
-logger = get_logger("lightagent.agents.state")
+logger = get_logger("prismal.agents.state")
 
 
 class AgentState(TypedDict):
-    """Shared state for the LightAgent LangGraph state machine.
+    """Shared state for the Prismal LangGraph state machine.
 
     This TypedDict is passed between every node in the graph.  LangGraph
     serialises and merges values between nodes using the field annotations;
@@ -80,7 +80,7 @@ class AgentState(TypedDict):
         iteration_count: Number of Reflexion self-critique iterations performed.
         metadata: Arbitrary key-value pairs for extension without schema changes.
         channel_context: Origin channel context when the request entered
-            LightAgent through a messaging gateway (Telegram, Slack, Discord,
+            Prismal through a messaging gateway (Telegram, Slack, Discord,
             …).  When non-``None`` the dict contains ``channel``, ``chat_id``
             and ``user_id`` so tools like ``cron_add`` can auto-route their
             output back to the originating chat.  ``None`` for CLI, dashboard,

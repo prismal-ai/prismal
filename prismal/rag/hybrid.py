@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from prismal.core.config import Settings
     from prismal.rag.vector_store import ChromaVectorStore
 
-logger = get_logger("lightagent.rag.hybrid")
+logger = get_logger("prismal.rag.hybrid")
 
 _TOKEN_RE = re.compile(r"\w+", re.UNICODE)
 
@@ -63,8 +63,8 @@ class HybridSearchEngine:
             search.
         alpha: Weight of the semantic score in ``[0, 1]``. ``1.0`` = pure
             semantic; ``0.0`` = pure BM25; ``0.5`` = balanced (default).
-        settings: LightAgent settings. ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+        settings: Prismal settings. ``None`` resolves via
+            :func:`~prismal.core.config.get_settings`.
     """
 
     def __init__(
@@ -127,8 +127,8 @@ class HybridSearchEngine:
 
         otel = OTelManager()
         with otel.start_span("hybrid.search") as span:
-            span.set_attribute("lightagent.alpha", effective_alpha)
-            span.set_attribute("lightagent.k", k)
+            span.set_attribute("prismal.alpha", effective_alpha)
+            span.set_attribute("prismal.k", k)
 
             semantic_chunks = self._semantic_search(query, k)
             bm25_scores = self._bm25_scores(query) if self._bm25 is not None else {}
@@ -179,7 +179,7 @@ class HybridSearchEngine:
                 )
                 for key in ordered_keys
             ]
-            span.set_attribute("lightagent.num_results", len(results))
+            span.set_attribute("prismal.num_results", len(results))
             otel.increment_counter("rag_queries")
             return results
 

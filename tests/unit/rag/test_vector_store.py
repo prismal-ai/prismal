@@ -1,4 +1,4 @@
-"""Unit tests for ChromaVectorStore (lightagent.rag.vector_store).
+"""Unit tests for ChromaVectorStore (prismal.rag.vector_store).
 
 Tests follow the TDD spec from T-062.  Both ``Chroma`` and ``EmbeddingsFactory``
 are mocked so no real ChromaDB instances or embedding models are created.
@@ -14,7 +14,7 @@ Coverage targets:
 - similarity_search() logs the query and k value
 - delete_collection() delegates to self._chroma.delete_collection()
 - collection_name property returns the collection name from __init__
-- ChromaStoreError is defined and subclasses LightAgentError
+- ChromaStoreError is defined and subclasses PrismalError
 - Default collection name is "default"
 """
 
@@ -24,13 +24,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 from prismal.rag.vector_store import ChromaStoreError, ChromaVectorStore
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-CHROMA_PATH = "lightagent.rag.vector_store.Chroma"
-EMBEDDINGS_FACTORY_PATH = "lightagent.rag.vector_store.EmbeddingsFactory"
+CHROMA_PATH = "prismal.rag.vector_store.Chroma"
+EMBEDDINGS_FACTORY_PATH = "prismal.rag.vector_store.EmbeddingsFactory"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -77,8 +77,8 @@ def test_chroma_store_error_is_defined() -> None:
 
 
 def test_chroma_store_error_subclasses_light_agent_error() -> None:
-    """ChromaStoreError must subclass LightAgentError."""
-    assert issubclass(ChromaStoreError, LightAgentError)
+    """ChromaStoreError must subclass PrismalError."""
+    assert issubclass(ChromaStoreError, PrismalError)
 
 
 def test_chroma_store_error_is_exception() -> None:
@@ -181,7 +181,7 @@ def test_init_calls_get_settings_when_settings_is_none() -> None:
     fake_settings = _make_settings()
 
     with (
-        patch("lightagent.rag.vector_store.get_settings", return_value=fake_settings) as mock_gs,
+        patch("prismal.rag.vector_store.get_settings", return_value=fake_settings) as mock_gs,
         patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
         patch(CHROMA_PATH) as mock_chroma_cls,
     ):
@@ -263,7 +263,7 @@ def test_add_documents_logs_document_count() -> None:
     with (
         patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
         patch(CHROMA_PATH) as mock_chroma_cls,
-        patch("lightagent.rag.vector_store.logger") as mock_logger,
+        patch("prismal.rag.vector_store.logger") as mock_logger,
     ):
         mock_factory.create.return_value = MagicMock()
         mock_chroma_cls.return_value = mock_chroma_instance
@@ -351,7 +351,7 @@ def test_similarity_search_logs_query_and_k() -> None:
     with (
         patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
         patch(CHROMA_PATH) as mock_chroma_cls,
-        patch("lightagent.rag.vector_store.logger") as mock_logger,
+        patch("prismal.rag.vector_store.logger") as mock_logger,
     ):
         mock_factory.create.return_value = MagicMock()
         mock_chroma_cls.return_value = mock_chroma_instance

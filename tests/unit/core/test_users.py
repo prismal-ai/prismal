@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.core.users — UserRole, User, UserStore.
+"""Unit tests for prismal.core.users — UserRole, User, UserStore.
 
 Note: passlib 1.7.4 + bcrypt 4.x have a known incompatibility (passlib's
 wrap-bug detection uses an internal >72-byte password that bcrypt 4 rejects).

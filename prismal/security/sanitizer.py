@@ -11,7 +11,7 @@ import unicodedata
 
 from prismal.core.logging import get_logger
 
-logger = get_logger("lightagent.security.sanitizer")
+logger = get_logger("prismal.security.sanitizer")
 
 # Matches ASCII control chars except \t (0x09), \n (0x0A), \r (0x0D)
 _CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")

@@ -1,4 +1,4 @@
-"""Unit tests for AdaptiveRAGEngine (lightagent.rag.adaptive).
+"""Unit tests for AdaptiveRAGEngine (prismal.rag.adaptive).
 
 Adaptive RAG classifies the query and routes it to the best-suited engine
 from Fase A (CRAG / HyDE / Fusion / Hybrid / Hierarchical). Falls back to
@@ -225,7 +225,7 @@ async def test_search_with_llm_classifier_uses_llm(monkeypatch) -> None:
     """When use_llm_classifier=True, the LLM is consulted to classify."""
     crag = _mock_crag([])
     # Patch the LLM call site in adaptive.py
-    with patch("lightagent.rag.adaptive.ProviderRegistry") as reg:
+    with patch("prismal.rag.adaptive.ProviderRegistry") as reg:
         llm = MagicMock()
         mock_response = MagicMock()
         mock_response.content = "technical"
@@ -249,7 +249,7 @@ async def test_search_with_llm_classifier_uses_llm(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_llm_classifier_falls_back_to_regex_on_error() -> None:
     crag = _mock_crag([])
-    with patch("lightagent.rag.adaptive.ProviderRegistry") as reg:
+    with patch("prismal.rag.adaptive.ProviderRegistry") as reg:
         llm = MagicMock()
         llm.ainvoke = AsyncMock(side_effect=RuntimeError("boom"))
         reg.return_value.get_llm.return_value = llm

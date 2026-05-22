@@ -5,7 +5,7 @@ Linear pipeline::
     proponent → opponent → moderator → consensus
 
 Reuses the ``DebatePosition`` / ``pairwise_jaccard`` primitives from
-:mod:`lightagent.agents.patterns.debate` (SPEC-PAT-002). Each node produces
+:mod:`prismal.agents.patterns.debate` (SPEC-PAT-002). Each node produces
 one :class:`DebatePosition`; the terminal ``consensus`` node synthesises
 them into one final answer and records the Jaccard agreement score.
 """
@@ -32,7 +32,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from prismal.core.config import Settings
 
-logger = get_logger("lightagent.subgraphs.debate_consensus.builder")
+logger = get_logger("prismal.subgraphs.debate_consensus.builder")
 
 _NAME = "debate_consensus"
 _DESCRIPTION = "Debate/consensus pipeline: proponent → opponent → moderator → consensus"

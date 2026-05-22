@@ -26,7 +26,7 @@ from prismal.mcp.connection import (
 if TYPE_CHECKING:
     from langchain_core.tools import BaseTool
 
-logger = get_logger("lightagent.mcp.client")
+logger = get_logger("prismal.mcp.client")
 
 # Default location of the MCP server configuration file.
 _DEFAULT_CONFIG_PATH = Path("config/mcp_servers.yaml")

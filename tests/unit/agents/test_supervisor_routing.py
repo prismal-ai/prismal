@@ -55,7 +55,7 @@ async def test_supervisor_routes_to_researcher() -> None:
     state = create_initial_state(session_id="sess-test-researcher")
     state["messages"] = [HumanMessage(content="Find information about LangGraph")]
 
-    with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
+    with patch("prismal.agents.supervisor.ProviderRegistry") as mock_registry:
         mock_registry.return_value.get_llm_with_fallback.return_value = _make_mock_llm("researcher")
         result = await supervisor_node(state)
 
@@ -80,7 +80,7 @@ async def test_supervisor_routes_to_end_when_done() -> None:
     # bind_tools must return the same mock so its ainvoke AsyncMock is preserved.
     mock_llm.bind_tools.return_value = mock_llm
 
-    with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
+    with patch("prismal.agents.supervisor.ProviderRegistry") as mock_registry:
         mock_registry.return_value.get_llm_with_fallback.return_value = mock_llm
         result = await supervisor_node(state)
 
@@ -105,7 +105,7 @@ async def test_supervisor_handles_invalid_routing() -> None:
     # bind_tools must return the same mock so its ainvoke AsyncMock is preserved.
     mock_llm.bind_tools.return_value = mock_llm
 
-    with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
+    with patch("prismal.agents.supervisor.ProviderRegistry") as mock_registry:
         mock_registry.return_value.get_llm_with_fallback.return_value = mock_llm
         result = await supervisor_node(state)
 
@@ -120,7 +120,7 @@ async def test_supervisor_updates_current_agent() -> None:
     state = create_initial_state(session_id="sess-test-current-agent")
     state["messages"] = [HumanMessage(content="Write some code")]
 
-    with patch("lightagent.agents.supervisor.ProviderRegistry") as mock_registry:
+    with patch("prismal.agents.supervisor.ProviderRegistry") as mock_registry:
         mock_registry.return_value.get_llm_with_fallback.return_value = _make_mock_llm("coder")
         result = await supervisor_node(state)
 

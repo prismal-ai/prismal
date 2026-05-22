@@ -146,10 +146,10 @@ def test_telegram_max_sessions_per_user_zero_raises() -> None:
 
 
 def test_env_override_telegram_webhook_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    """LIGHTAGENT_TELEGRAM_WEBHOOK_ENABLED=true overrides default."""
-    monkeypatch.setenv("LIGHTAGENT_TELEGRAM_WEBHOOK_ENABLED", "true")
-    monkeypatch.setenv("LIGHTAGENT_TELEGRAM_WEBHOOK_URL", "https://bot.example.com/hook")
-    monkeypatch.setenv("LIGHTAGENT_TELEGRAM_WEBHOOK_SECRET", "supersecret")
+    """PRISMAL_TELEGRAM_WEBHOOK_ENABLED=true overrides default."""
+    monkeypatch.setenv("PRISMAL_TELEGRAM_WEBHOOK_ENABLED", "true")
+    monkeypatch.setenv("PRISMAL_TELEGRAM_WEBHOOK_URL", "https://bot.example.com/hook")
+    monkeypatch.setenv("PRISMAL_TELEGRAM_WEBHOOK_SECRET", "supersecret")
     s = Settings(_env_file=None)  # type: ignore[call-arg]
     assert s.telegram_webhook_enabled is True
     assert s.telegram_webhook_url == "https://bot.example.com/hook"
@@ -157,8 +157,8 @@ def test_env_override_telegram_webhook_enabled(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_env_override_telegram_parse_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    """LIGHTAGENT_TELEGRAM_PARSE_MODE overrides default HTML."""
-    monkeypatch.setenv("LIGHTAGENT_TELEGRAM_PARSE_MODE", "MarkdownV2")
+    """PRISMAL_TELEGRAM_PARSE_MODE overrides default HTML."""
+    monkeypatch.setenv("PRISMAL_TELEGRAM_PARSE_MODE", "MarkdownV2")
     s = Settings(_env_file=None)  # type: ignore[call-arg]
     assert s.telegram_parse_mode == "MarkdownV2"
 
@@ -166,7 +166,7 @@ def test_env_override_telegram_parse_mode(monkeypatch: pytest.MonkeyPatch) -> No
 def test_env_override_telegram_message_track_false(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """LIGHTAGENT_TELEGRAM_MESSAGE_TRACK=false disables tracking."""
-    monkeypatch.setenv("LIGHTAGENT_TELEGRAM_MESSAGE_TRACK", "false")
+    """PRISMAL_TELEGRAM_MESSAGE_TRACK=false disables tracking."""
+    monkeypatch.setenv("PRISMAL_TELEGRAM_MESSAGE_TRACK", "false")
     s = Settings(_env_file=None)  # type: ignore[call-arg]
     assert s.telegram_message_track is False

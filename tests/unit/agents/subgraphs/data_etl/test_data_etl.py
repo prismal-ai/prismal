@@ -34,7 +34,7 @@ from prismal.agents.subgraphs.data_etl import (
     make_validator_node,
 )
 from prismal.agents.subgraphs.data_etl.builder import build_data_etl_subgraph
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -64,8 +64,8 @@ def _state(
 # ── Exception ─────────────────────────────────────────────────────────────────
 
 
-def test_data_etl_error_inherits_from_lightagent_error() -> None:
-    assert issubclass(DataETLError, LightAgentError)
+def test_data_etl_error_inherits_from_prismal_error() -> None:
+    assert issubclass(DataETLError, PrismalError)
 
 
 # ── extractor ────────────────────────────────────────────────────────────────

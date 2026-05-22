@@ -17,7 +17,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.coder")
+logger = get_logger("prismal.agents.coder")
 
 _SYSTEM_PROMPT = """You are a software engineering specialist.
 

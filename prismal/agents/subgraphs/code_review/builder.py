@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from prismal.agents.subgraphs.code_review.types import CodeIssue
     from prismal.core.config import Settings
 
-logger = get_logger("lightagent.subgraphs.code_review.builder")
+logger = get_logger("prismal.subgraphs.code_review.builder")
 
 _NAME = "code_review"
 _DESCRIPTION = (

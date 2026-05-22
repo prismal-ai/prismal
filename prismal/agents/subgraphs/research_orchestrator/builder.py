@@ -3,7 +3,7 @@
 SPEC-042 AC-042-1 — the research domain aggregates every leaf agent
 whose job is to *gather information*: web research, internal RAG Q&A,
 and (eventually) a Computer Use Agent for interactive UI scraping. In
-hierarchical mode (``LIGHTAGENT_HIERARCHICAL_MODE=true``) the root
+hierarchical mode (``PRISMAL_HIERARCHICAL_MODE=true``) the root
 supervisor delegates any investigation-flavoured request to this
 subgraph instead of picking individual leaves.
 
@@ -17,7 +17,7 @@ Topology
                           └──► __end__
 
 The entry point is the ``research_supervisor`` node produced by
-:func:`~lightagent.agents.domain_supervisor.make_domain_supervisor`.
+:func:`~prismal.agents.domain_supervisor.make_domain_supervisor`.
 Its built-in loop breaker guarantees that a single specialist
 response terminates the subgraph after at most two supervisor calls
 per invocation, so the routing conditional edge is a thin wrapper
@@ -39,7 +39,7 @@ from prismal.agents.subgraphs.registry import (
     SubgraphRegistry,
 )
 
-logger = structlog.get_logger("lightagent.subgraphs.research_orchestrator.builder")
+logger = structlog.get_logger("prismal.subgraphs.research_orchestrator.builder")
 
 _NAME = "research_orchestrator"
 _DESCRIPTION = (

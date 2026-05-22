@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.events.file_watcher (T-082)."""
+"""Unit tests for prismal.events.file_watcher (T-082)."""
 
 from __future__ import annotations
 
@@ -127,17 +127,17 @@ def test_start_schedules_existing_paths(tmp_path: Path) -> None:
 
 
 def test_handler_calls_callback_on_created() -> None:
-    """_LightAgentEventHandler calls callback on file creation."""
+    """_PrismalEventHandler calls callback on file creation."""
     from watchdog.events import FileCreatedEvent
 
-    from prismal.events.file_watcher import _LightAgentEventHandler
+    from prismal.events.file_watcher import _PrismalEventHandler
 
     received: list[tuple[str, str]] = []
 
     def cb(event_type: str, path: str) -> None:
         received.append((event_type, path))
 
-    handler = _LightAgentEventHandler(callback=cb, event_name="doc_event")
+    handler = _PrismalEventHandler(callback=cb, event_name="doc_event")
     handler.on_created(FileCreatedEvent("/data/docs/new_file.pdf"))
 
     assert len(received) == 1
@@ -146,17 +146,17 @@ def test_handler_calls_callback_on_created() -> None:
 
 
 def test_handler_calls_callback_on_modified() -> None:
-    """_LightAgentEventHandler calls callback on file modification."""
+    """_PrismalEventHandler calls callback on file modification."""
     from watchdog.events import FileModifiedEvent
 
-    from prismal.events.file_watcher import _LightAgentEventHandler
+    from prismal.events.file_watcher import _PrismalEventHandler
 
     received: list[tuple[str, str]] = []
 
     def cb(event_type: str, path: str) -> None:
         received.append((event_type, path))
 
-    handler = _LightAgentEventHandler(callback=cb, event_name="ws_event")
+    handler = _PrismalEventHandler(callback=cb, event_name="ws_event")
     handler.on_modified(FileModifiedEvent("/data/workspace/file.txt"))
 
     assert len(received) == 1
@@ -164,13 +164,13 @@ def test_handler_calls_callback_on_modified() -> None:
 
 
 def test_handler_ignores_directory_created() -> None:
-    """_LightAgentEventHandler ignores directory creation events."""
+    """_PrismalEventHandler ignores directory creation events."""
     from watchdog.events import DirCreatedEvent
 
-    from prismal.events.file_watcher import _LightAgentEventHandler
+    from prismal.events.file_watcher import _PrismalEventHandler
 
     received: list[tuple[str, str]] = []
-    handler = _LightAgentEventHandler(
+    handler = _PrismalEventHandler(
         callback=lambda e, p: received.append((e, p)),
         event_name="doc_event",
     )
@@ -179,13 +179,13 @@ def test_handler_ignores_directory_created() -> None:
 
 
 def test_handler_ignores_directory_modified() -> None:
-    """_LightAgentEventHandler ignores directory modification events."""
+    """_PrismalEventHandler ignores directory modification events."""
     from watchdog.events import DirModifiedEvent
 
-    from prismal.events.file_watcher import _LightAgentEventHandler
+    from prismal.events.file_watcher import _PrismalEventHandler
 
     received: list[tuple[str, str]] = []
-    handler = _LightAgentEventHandler(
+    handler = _PrismalEventHandler(
         callback=lambda e, p: received.append((e, p)),
         event_name="doc_event",
     )

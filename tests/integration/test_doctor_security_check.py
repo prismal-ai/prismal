@@ -1,9 +1,9 @@
 """Integration tests — DoctorService.security_check (SPEC-031).
 
 These tests call the real OSV API (https://api.osv.dev/v1/query) and are
-network-gated.  Set ``LIGHTAGENT_TEST_NETWORK=1`` to enable them:
+network-gated.  Set ``PRISMAL_TEST_NETWORK=1`` to enable them:
 
-    LIGHTAGENT_TEST_NETWORK=1 pytest tests/integration/test_doctor_security_check.py -v
+    PRISMAL_TEST_NETWORK=1 pytest tests/integration/test_doctor_security_check.py -v
 
 Without the env-var the tests are collected but immediately skipped.
 
@@ -22,12 +22,12 @@ from pathlib import Path
 
 import pytest
 
-_NETWORK = bool(os.environ.get("LIGHTAGENT_TEST_NETWORK"))
+_NETWORK = bool(os.environ.get("PRISMAL_TEST_NETWORK"))
 
 pytestmark = pytest.mark.skipif(
     not _NETWORK,
     reason=(
-        "Network integration test — set LIGHTAGENT_TEST_NETWORK=1 to enable. "
+        "Network integration test — set PRISMAL_TEST_NETWORK=1 to enable. "
         "Calls the real OSV API (https://api.osv.dev)."
     ),
 )

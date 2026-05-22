@@ -44,7 +44,7 @@ from prismal.security.prompt_builder import SecurePromptBuilder
 if TYPE_CHECKING:
     from prismal.core.config import Settings
 
-logger = get_logger("lightagent.agents.patterns.constitutional")
+logger = get_logger("prismal.agents.patterns.constitutional")
 
 
 @dataclass
@@ -164,8 +164,8 @@ class ConstitutionalFilter:
         principles: Principles to apply in order. ``None`` uses
             :data:`DEFAULT_PRINCIPLES`.
         max_revisions: Maximum revision attempts per principle. Must be ≥ 1.
-        settings: LightAgent settings. ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+        settings: Prismal settings. ``None`` resolves via
+            :func:`~prismal.core.config.get_settings`.
     """
 
     def __init__(
@@ -189,7 +189,7 @@ class ConstitutionalFilter:
         """Check *output* against every principle and revise on violations."""
         otel = OTelManager()
         with otel.start_span("constitutional.apply") as span:
-            span.set_attribute("lightagent.output_len", len(output))
+            span.set_attribute("prismal.output_len", len(output))
 
             current = output
             revisions: list[ConstitutionalRevision] = []
@@ -232,8 +232,8 @@ class ConstitutionalFilter:
                     max_reached = True
                     all_satisfied = False
 
-            span.set_attribute("lightagent.revisions_applied", len(revisions))
-            span.set_attribute("lightagent.all_satisfied", all_satisfied)
+            span.set_attribute("prismal.revisions_applied", len(revisions))
+            span.set_attribute("prismal.all_satisfied", all_satisfied)
             logger.info(
                 "constitutional_apply_done",
                 principles_checked=len(self._principles),

@@ -1,6 +1,6 @@
 """Sandbox unit-test fixtures.
 
-The production default is ``LIGHTAGENT_SHELL_ENABLED=false`` (Phase 43 / L4
+The production default is ``PRISMAL_SHELL_ENABLED=false`` (Phase 43 / L4
 ActionInterceptor blocks subprocess calls). Sandbox unit tests exercise the
 backend logic *through* that gate with a mocked ``_spawn_container`` — the gate
 itself isn't what they're testing — so we open it for the duration of every
@@ -20,7 +20,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def _allow_shell_for_sandbox_tests() -> Iterator[None]:
     with patch(
-        "lightagent.security.action_interceptor.ActionInterceptor.check_shell",
+        "prismal.security.action_interceptor.ActionInterceptor.check_shell",
         return_value=True,
     ):
         yield

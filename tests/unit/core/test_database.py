@@ -108,7 +108,7 @@ def test_create_async_engine_postgresql_url() -> None:
 
     mock_engine = MagicMock()
     with patch(
-        "lightagent.core.database.create_async_engine", return_value=mock_engine
+        "prismal.core.database.create_async_engine", return_value=mock_engine
     ) as mock_create:
         engine = create_async_engine_from_url("postgresql+asyncpg://user:pass@localhost/testdb")
 
@@ -129,8 +129,8 @@ def test_get_backend_type_returns_sqlite() -> None:
 
     from prismal.core.database import get_backend_type
 
-    with patch("lightagent.core.database.get_settings") as mock_settings:
-        mock_settings.return_value.db_url = "sqlite:///data/db/lightagent.db"
+    with patch("prismal.core.database.get_settings") as mock_settings:
+        mock_settings.return_value.db_url = "sqlite:///data/db/prismal.db"
         result = get_backend_type()
 
     assert result == "sqlite"
@@ -142,7 +142,7 @@ def test_get_backend_type_returns_postgresql() -> None:
 
     from prismal.core.database import get_backend_type
 
-    with patch("lightagent.core.database.get_settings") as mock_settings:
+    with patch("prismal.core.database.get_settings") as mock_settings:
         mock_settings.return_value.db_url = "postgresql+asyncpg://localhost/db"
         result = get_backend_type()
 
@@ -167,7 +167,7 @@ def test_get_checkpointer_sqlite_returns_saver() -> None:
     mock_aio.AsyncSqliteSaver = mock_saver_cls
 
     with (
-        patch("lightagent.core.database.get_settings") as mock_settings,
+        patch("prismal.core.database.get_settings") as mock_settings,
         patch.dict(
             sys.modules,
             {
@@ -175,11 +175,11 @@ def test_get_checkpointer_sqlite_returns_saver() -> None:
             },
         ),
     ):
-        mock_settings.return_value.db_url = "sqlite:///data/db/lightagent.db"
+        mock_settings.return_value.db_url = "sqlite:///data/db/prismal.db"
         checkpointer = get_checkpointer()
 
     assert checkpointer is mock_saver_instance
-    mock_saver_cls.from_conn_string.assert_called_once_with("data/db/lightagent.db")
+    mock_saver_cls.from_conn_string.assert_called_once_with("data/db/prismal.db")
 
 
 def test_get_checkpointer_sqlite_import_error_raises() -> None:
@@ -192,10 +192,10 @@ def test_get_checkpointer_sqlite_import_error_raises() -> None:
     from prismal.core.database import get_checkpointer
 
     with (
-        patch("lightagent.core.database.get_settings") as mock_settings,
+        patch("prismal.core.database.get_settings") as mock_settings,
         patch.dict(sys.modules, {"langgraph.checkpoint.sqlite.aio": None}),
     ):
-        mock_settings.return_value.db_url = "sqlite:///data/db/lightagent.db"
+        mock_settings.return_value.db_url = "sqlite:///data/db/prismal.db"
         with pytest.raises(ImportError, match="langgraph-checkpoint-sqlite"):
             get_checkpointer()
 
@@ -210,7 +210,7 @@ def test_get_checkpointer_postgresql_import_error_raises() -> None:
     from prismal.core.database import get_checkpointer
 
     with (
-        patch("lightagent.core.database.get_settings") as mock_settings,
+        patch("prismal.core.database.get_settings") as mock_settings,
         patch.dict(sys.modules, {"langgraph.checkpoint.postgres.aio": None}),
     ):
         mock_settings.return_value.db_url = "postgresql+asyncpg://localhost/db"

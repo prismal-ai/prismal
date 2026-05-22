@@ -1,4 +1,4 @@
-"""SkillCreatorAgent — generates new LightAgent skills from a natural language spec.
+"""SkillCreatorAgent — generates new Prismal skills from a natural language spec.
 
 Uses the configured LLM to write a ``skill.py`` file, places it in
 ``skills/custom/<name>/`` together with a ``human_review_required.txt`` sentinel
@@ -53,7 +53,7 @@ from prismal.security.prompt_builder import SecurePromptBuilder
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.skill_creator")
+logger = get_logger("prismal.agents.skill_creator")
 
 _SKILLS_CUSTOM_DIR = Path(__file__).parent.parent / "skills" / "custom"
 
@@ -73,14 +73,14 @@ _SHELL_DETECT_TERMS: tuple[str, ...] = (
 )
 
 _SYSTEM_PROMPT = textwrap.dedent("""\
-    You are a Python 3.13 expert specialising in writing LightAgent skills.
+    You are a Python 3.13 expert specialising in writing Prismal skills.
 
-    A LightAgent skill lives in a single file called ``skill.py`` inside a
-    subdirectory of ``lightagent/skills/available/`` (or ``custom/`` for
+    A Prismal skill lives in a single file called ``skill.py`` inside a
+    subdirectory of ``prismal/skills/available/`` (or ``custom/`` for
     AI-generated skills).
 
     Every skill.py MUST:
-    1. Import and subclass ``BaseSkill`` from ``lightagent.skills.base``.
+    1. Import and subclass ``BaseSkill`` from ``prismal.skills.base``.
     2. Implement the ``metadata`` property returning a ``SkillMetadata`` instance.
     3. Implement ``get_tools()`` returning a list of LangChain BaseTool instances.
     4. Use the ``@tool`` decorator from ``langchain_core.tools`` for each tool.
@@ -97,7 +97,7 @@ _SYSTEM_PROMPT = textwrap.dedent("""\
 """)
 
 _FIX_SYSTEM_PROMPT = textwrap.dedent("""\
-    You are a Python 3.13 expert fixing quality issues in a LightAgent skill file.
+    You are a Python 3.13 expert fixing quality issues in a Prismal skill file.
 
     You will be given the current skill.py code and a list of quality tool errors.
     Fix ALL reported errors. Output ONLY the corrected Python source code —
@@ -327,7 +327,7 @@ async def create_skill(
     builder = SecurePromptBuilder()
     generation_messages = builder.build(
         system=_SYSTEM_PROMPT,
-        user=(f"Write a complete LightAgent skill.py for the following specification:\n\n{spec}"),
+        user=(f"Write a complete Prismal skill.py for the following specification:\n\n{spec}"),
     )
 
     logger.info("skill_creator_generating", spec_length=len(spec))
@@ -456,7 +456,7 @@ async def create_skill(
         f"  1. Review generated code in {skill_py}",
         "  2. Check quality_report.json for tool output",
         f"  3. Rename '{skill_dir}/human_review_required.txt' → 'validated_by_human.txt'",
-        f"  4. Activate:  lightagent skills enable {slug}",
+        f"  4. Activate:  prismal skills enable {slug}",
     ]
     return "\n".join(result_lines)
 

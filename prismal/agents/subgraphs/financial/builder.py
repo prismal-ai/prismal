@@ -23,7 +23,7 @@ unreliable data:
    the report generator. Matches AC-041-3.
 
 3. **Optional HITL gate** after ``report_generator``. Activated by
-   ``LIGHTAGENT_FINANCIAL_HITL_ENABLED=true``. Reuses the Phase 35 HITL
+   ``PRISMAL_FINANCIAL_HITL_ENABLED=true``. Reuses the Phase 35 HITL
    primitives (``seed_hitl_metadata`` + ``human_approval_node`` +
    ``hitl_gate``). Matches AC-041-4.
 
@@ -70,7 +70,7 @@ from prismal.core.config import get_settings
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-logger = structlog.get_logger("lightagent.subgraphs.financial.builder")
+logger = structlog.get_logger("prismal.subgraphs.financial.builder")
 
 _NAME = "financial_analyst"
 _DESCRIPTION = (
@@ -308,7 +308,7 @@ def _make_definition() -> SubgraphDefinition:
     The topology is assembled in two steps: (1) a base definition with
     the linear pipeline, then (2) conditional edges that splice the
     quality gates between the original nodes. When
-    ``LIGHTAGENT_FINANCIAL_HITL_ENABLED=true`` an extra pair of nodes
+    ``PRISMAL_FINANCIAL_HITL_ENABLED=true`` an extra pair of nodes
     (``hitl_seed`` + ``human_approval``) is inserted between
     ``report_generator`` and END.
 

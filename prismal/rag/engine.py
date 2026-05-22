@@ -1,14 +1,14 @@
-"""RAG Engine — main public entry point for LightAgent's RAG system.
+"""RAG Engine — main public entry point for Prismal's RAG system.
 
 Provides :class:`RAGEngine`, which composes document loading
-(:class:`~lightagent.rag.loaders.DocumentProcessorFactory`), the vector store
-(:class:`~lightagent.rag.vector_store.ChromaVectorStore`), and the CRAG pipeline
-(:class:`~lightagent.rag.crag.CRAGPipeline`) behind a single, high-level API.
+(:class:`~prismal.rag.loaders.DocumentProcessorFactory`), the vector store
+(:class:`~prismal.rag.vector_store.ChromaVectorStore`), and the CRAG pipeline
+(:class:`~prismal.rag.crag.CRAGPipeline`) behind a single, high-level API.
 
 SPEC-005 acceptance criteria implemented here:
 - AC-005-3: ``index_file`` / ``index_directory`` — manual indexing
 - AC-005-4: ``search`` — top-k results with source citations
-- AC-005-5: Each :class:`~lightagent.rag.crag.RetrievedChunk` carries ``source``,
+- AC-005-5: Each :class:`~prismal.rag.crag.RetrievedChunk` carries ``source``,
   ``chunk_id``, ``relevance_score``, and ``content``
 - AC-005-7: Re-indexing a file deletes existing vectors first (no duplicates)
 - AC-005-8: ``create_collection`` — per-domain collection management
@@ -20,7 +20,7 @@ Example::
 
     engine = RAGEngine(collection_name="docs")
     engine.index_directory(Path("data/documents/"))
-    chunks = engine.search("What is LightAgent?", k=5)
+    chunks = engine.search("What is Prismal?", k=5)
     for chunk in chunks:
         print(chunk.source, chunk.relevance_score, chunk.content[:80])
 """
@@ -42,11 +42,11 @@ if TYPE_CHECKING:
     from prismal.core.config import Settings
     from prismal.rag.crag import CRAGResult
 
-logger = get_logger("lightagent.rag.engine")
+logger = get_logger("prismal.rag.engine")
 
 
 class RAGEngine:
-    """High-level entry point for the LightAgent RAG system.
+    """High-level entry point for the Prismal RAG system.
 
     Composes document loading, ChromaDB vector storage, and the CRAG pipeline
     into a single, ergonomic interface.
@@ -59,7 +59,7 @@ class RAGEngine:
         collection_name: Name of the ChromaDB collection to operate on.
             Defaults to ``"default"``.
         settings: Application settings.  ``None`` resolves automatically via
-            :func:`~lightagent.core.config.get_settings`.
+            :func:`~prismal.core.config.get_settings`.
     """
 
     def __init__(
@@ -69,14 +69,14 @@ class RAGEngine:
     ) -> None:
         """Initialise the RAGEngine.
 
-        Creates a :class:`~lightagent.rag.vector_store.ChromaVectorStore` for
+        Creates a :class:`~prismal.rag.vector_store.ChromaVectorStore` for
         the given collection and stores the resolved settings for later use by
         the CRAG pipeline and sub-components.
 
         Args:
             collection_name: ChromaDB collection to use.  Defaults to
                 ``"default"``.
-            settings: LightAgent settings.  ``None`` uses ``get_settings()``.
+            settings: Prismal settings.  ``None`` uses ``get_settings()``.
         """
         self._settings: Settings = settings if settings is not None else get_settings()
         self._collection_name = collection_name
@@ -108,14 +108,14 @@ class RAGEngine:
         Args:
             path: Path to the document to index.  Must have a supported
                 extension; see
-                :attr:`~lightagent.rag.loaders.DocumentProcessorFactory.SUPPORTED_EXTENSIONS`.
+                :attr:`~prismal.rag.loaders.DocumentProcessorFactory.SUPPORTED_EXTENSIONS`.
 
         Returns:
             The number of document chunks indexed.
 
         Raises:
             UnsupportedDocumentTypeError: If the file extension is not
-                supported by :class:`~lightagent.rag.loaders.DocumentProcessorFactory`.
+                supported by :class:`~prismal.rag.loaders.DocumentProcessorFactory`.
         """
         logger.info("rag_engine_index_file_start", path=str(path))
 
@@ -139,7 +139,7 @@ class RAGEngine:
 
         Iterates over the directory tree and calls :meth:`index_file` for each
         file whose extension is in
-        :attr:`~lightagent.rag.loaders.DocumentProcessorFactory.SUPPORTED_EXTENSIONS`.
+        :attr:`~prismal.rag.loaders.DocumentProcessorFactory.SUPPORTED_EXTENSIONS`.
         Files with unsupported extensions are silently skipped.  Per-file
         errors are logged at WARNING level but do not abort the whole run —
         indexing continues with the remaining files.
@@ -188,9 +188,9 @@ class RAGEngine:
         """Search the vector store for the most relevant chunks.
 
         Delegates to
-        :meth:`~lightagent.rag.vector_store.ChromaVectorStore.similarity_search`
+        :meth:`~prismal.rag.vector_store.ChromaVectorStore.similarity_search`
         and converts the raw ``(Document, float)`` tuples into
-        :class:`~lightagent.rag.crag.RetrievedChunk` objects that include all
+        :class:`~prismal.rag.crag.RetrievedChunk` objects that include all
         AC-005-5 fields (``source``, ``chunk_id``, ``relevance_score``,
         ``content``).
 
@@ -199,13 +199,13 @@ class RAGEngine:
             k: Maximum number of results to return.  Defaults to ``5``.
 
         Returns:
-            List of :class:`~lightagent.rag.crag.RetrievedChunk` objects
+            List of :class:`~prismal.rag.crag.RetrievedChunk` objects
             ordered by descending relevance.
         """
         otel = OTelManager()
         with otel.start_span("rag.search") as span:
-            span.set_attribute("lightagent.query_len", len(query))
-            span.set_attribute("lightagent.k", k)
+            span.set_attribute("prismal.query_len", len(query))
+            span.set_attribute("prismal.k", k)
 
             logger.info("rag_engine_search", query_len=len(query), k=k)
             raw_results = self._store.similarity_search(query, k=k)
@@ -220,7 +220,7 @@ class RAGEngine:
                 )
                 chunks.append(chunk)
 
-            span.set_attribute("lightagent.num_results", len(chunks))
+            span.set_attribute("prismal.num_results", len(chunks))
             otel.increment_counter("rag_queries")
 
             logger.info(
@@ -232,7 +232,7 @@ class RAGEngine:
     async def query(self, query: str) -> CRAGResult:
         """Run the full CRAG pipeline on *query*.
 
-        Creates a fresh :class:`~lightagent.rag.crag.CRAGPipeline` using the
+        Creates a fresh :class:`~prismal.rag.crag.CRAGPipeline` using the
         current vector store and settings, then executes the five-step
         Corrective RAG flow (retrieve → grade → filter → decide → generate).
 
@@ -240,18 +240,18 @@ class RAGEngine:
             query: The user query string.
 
         Returns:
-            :class:`~lightagent.rag.crag.CRAGResult` containing the generated
+            :class:`~prismal.rag.crag.CRAGResult` containing the generated
             answer, the list of cited source chunks, and a flag indicating
             whether the web-search fallback was activated.
         """
         otel = OTelManager()
         with otel.start_span("rag.query") as span:
-            span.set_attribute("lightagent.query_len", len(query))
+            span.set_attribute("prismal.query_len", len(query))
             logger.info("rag_engine_query", query_len=len(query))
             pipeline = CRAGPipeline(vector_store=self._store, settings=self._settings)
             result = await pipeline.run(query)
-            span.set_attribute("lightagent.used_web_fallback", result.used_web_fallback)
-            span.set_attribute("lightagent.num_sources", len(result.sources))
+            span.set_attribute("prismal.used_web_fallback", result.used_web_fallback)
+            span.set_attribute("prismal.num_sources", len(result.sources))
             otel.increment_counter("rag_queries")
             return result
 

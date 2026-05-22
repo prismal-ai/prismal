@@ -32,7 +32,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-logger = get_logger("lightagent.subgraphs.gates")
+logger = get_logger("prismal.subgraphs.gates")
 
 
 def _get_nested(data: dict[str, Any], dotted_path: str) -> Any:
@@ -289,7 +289,7 @@ def hitl_gate(
       current state, the gate routes directly to ``on_approve`` without
       involving the human, logging ``hitl_bypassed_by_callback`` at WARNING.
     * If ``settings.hitl_enabled`` is ``False`` (default
-      ``LIGHTAGENT_HITL_ENABLED=true``), the gate routes directly to
+      ``PRISMAL_HITL_ENABLED=true``), the gate routes directly to
       ``on_approve`` and logs ``hitl_bypassed_by_config`` at WARNING.
 
     Args:

@@ -1,4 +1,4 @@
-"""Short-term (in-session) message memory for LightAgent.
+"""Short-term (in-session) message memory for Prismal.
 
 Holds a bounded, thread-safe list of LangChain ``BaseMessage`` objects
 for the duration of one agent session.  When the buffer is full, the
@@ -30,7 +30,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from langchain_core.messages import BaseMessage
 
-logger = get_logger("lightagent.memory.short_term")
+logger = get_logger("prismal.memory.short_term")
 
 _DEFAULT_MAX = 100
 

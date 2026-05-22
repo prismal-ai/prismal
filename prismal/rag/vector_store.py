@@ -1,12 +1,12 @@
-"""ChromaDB vector store wrapper for the LightAgent RAG system.
+"""ChromaDB vector store wrapper for the Prismal RAG system.
 
 Provides ``ChromaVectorStore``, a thin wrapper around
 :class:`~langchain_community.vectorstores.Chroma` that integrates with the
-LightAgent settings and embeddings systems.
+Prismal settings and embeddings systems.
 
 The wrapper handles:
-- Embedding initialisation via :class:`~lightagent.rag.embeddings.EmbeddingsFactory`
-- Persistence directory from :class:`~lightagent.core.config.Settings`
+- Embedding initialisation via :class:`~prismal.rag.embeddings.EmbeddingsFactory`
+- Persistence directory from :class:`~prismal.core.config.Settings`
 - Document addition, similarity search, and collection deletion
 - Structured logging via structlog
 
@@ -19,7 +19,7 @@ Example::
 
     store = ChromaVectorStore(collection_name="docs")
     ids = store.add_documents(documents)
-    results = store.similarity_search("What is LightAgent?", k=3)
+    results = store.similarity_search("What is Prismal?", k=3)
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING
 from langchain_community.vectorstores import Chroma
 
 from prismal.core.config import get_settings
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 from prismal.core.logging import get_logger
 from prismal.rag.embeddings import EmbeddingsFactory
 
@@ -38,13 +38,13 @@ if TYPE_CHECKING:
 
     from prismal.core.config import Settings
 
-logger = get_logger("lightagent.rag.vector_store")
+logger = get_logger("prismal.rag.vector_store")
 
 
 # ── Exception ─────────────────────────────────────────────────────────────────
 
 
-class ChromaStoreError(LightAgentError):
+class ChromaStoreError(PrismalError):
     """Raised when a ChromaDB vector store operation fails."""
 
 
@@ -54,7 +54,7 @@ class ChromaStoreError(LightAgentError):
 class ChromaVectorStore:
     """Wrapper around ``langchain_community.vectorstores.Chroma``.
 
-    Integrates ChromaDB with the LightAgent settings and embeddings systems.
+    Integrates ChromaDB with the Prismal settings and embeddings systems.
     All ChromaDB interactions are delegated to the underlying ``Chroma``
     instance obtained at construction time.
 
@@ -62,7 +62,7 @@ class ChromaVectorStore:
         collection_name: Name of the ChromaDB collection to use.  Defaults to
             ``"default"``.
         settings: Application settings.  When ``None``, resolved automatically
-            via :func:`~lightagent.core.config.get_settings`.
+            via :func:`~prismal.core.config.get_settings`.
     """
 
     def __init__(
@@ -72,14 +72,14 @@ class ChromaVectorStore:
     ) -> None:
         """Initialise the ChromaVectorStore.
 
-        Calls :meth:`~lightagent.rag.embeddings.EmbeddingsFactory.create` to
+        Calls :meth:`~prismal.rag.embeddings.EmbeddingsFactory.create` to
         obtain the configured embeddings implementation, then constructs a
         ``Chroma`` instance pointing at ``settings.chroma_path``.
 
         Args:
             collection_name: ChromaDB collection name.  Defaults to
                 ``"default"``.
-            settings: LightAgent settings.  ``None`` uses ``get_settings()``.
+            settings: Prismal settings.  ``None`` uses ``get_settings()``.
         """
         resolved: Settings = settings if settings is not None else get_settings()
         self._collection_name = collection_name

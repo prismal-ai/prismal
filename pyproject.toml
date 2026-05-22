@@ -369,6 +369,8 @@ filterwarnings = [
   "error",
   # Transitional 'lightagent' -> 'prismal' namespace shim (removed in Fase 6).
   "ignore:The 'lightagent' import namespace is deprecated:DeprecationWarning",
+  # Transitional 'LIGHTAGENT_' -> 'PRISMAL_' env-prefix fallback (env_compat).
+  "ignore:The 'LIGHTAGENT_' environment-variable prefix is deprecated:DeprecationWarning",
   "ignore::DeprecationWarning:pydantic.*",
   "ignore::DeprecationWarning:chromadb.*",
   "ignore::DeprecationWarning:distutils.*",

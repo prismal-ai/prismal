@@ -7,7 +7,7 @@ DataFrame / charts), plus the three pre-existing pipeline subgraphs
 (AutoML / training / evaluation), and ``financial_analyst`` (market
 data → technical → fundamental → risk → report). The root supervisor
 routes analytical tasks to this orchestrator when
-``LIGHTAGENT_HIERARCHICAL_MODE=true``.
+``PRISMAL_HIERARCHICAL_MODE=true``.
 
 Because three of the four leaves are themselves compiled
 ``CompiledStateGraph`` instances built by their own async factories,
@@ -31,7 +31,7 @@ from prismal.agents.subgraphs.registry import (
     SubgraphRegistry,
 )
 
-logger = structlog.get_logger("lightagent.subgraphs.analysis_orchestrator.builder")
+logger = structlog.get_logger("prismal.subgraphs.analysis_orchestrator.builder")
 
 _NAME = "analysis_orchestrator"
 _DESCRIPTION = (

@@ -51,7 +51,7 @@ def captured_audit():
         )
 
     with patch(
-        "lightagent.security.audit.AuditLogger.log_tool_call",
+        "prismal.security.audit.AuditLogger.log_tool_call",
         new=_fake_log,
     ):
         yield calls
@@ -148,15 +148,15 @@ async def test_none_backend_logs_degraded_warning(captured_audit) -> None:
 
     with (
         patch(
-            "lightagent.sandbox.executor.SandboxExecutor._run",
+            "prismal.sandbox.executor.SandboxExecutor._run",
             return_value=fake_result,
         ),
         patch(
-            "lightagent.sandbox.executor.SandboxExecutor._build_command",
+            "prismal.sandbox.executor.SandboxExecutor._build_command",
             return_value=(["python", "-c", "print(1)"], []),
         ),
         patch(
-            "lightagent.sandbox.executor.SandboxExecutor._resolve_cwd",
+            "prismal.sandbox.executor.SandboxExecutor._resolve_cwd",
             return_value="/tmp",  # noqa: S108 - test-only stub path,
         ),
         patch.object(isolation_mod.logger, "warning", side_effect=_capture_warn),

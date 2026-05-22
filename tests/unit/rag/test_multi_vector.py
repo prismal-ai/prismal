@@ -1,4 +1,4 @@
-"""Unit tests for MultiVectorRAGEngine (lightagent.rag.multi_vector).
+"""Unit tests for MultiVectorRAGEngine (prismal.rag.multi_vector).
 
 Multi-Vector RAG indexes each document under multiple vector representations
 (original chunk + LLM-generated summary + LLM-generated hypothetical
@@ -18,8 +18,8 @@ import pytest
 from prismal.core.exceptions import MultiVectorError, RAGError
 from prismal.rag.multi_vector import MultiVectorRAGEngine, MultiVectorResult
 
-PROVIDER_REGISTRY_PATH = "lightagent.rag.multi_vector.ProviderRegistry"
-LOADER_PATH = "lightagent.rag.multi_vector.DocumentProcessorFactory"
+PROVIDER_REGISTRY_PATH = "prismal.rag.multi_vector.ProviderRegistry"
+LOADER_PATH = "prismal.rag.multi_vector.DocumentProcessorFactory"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

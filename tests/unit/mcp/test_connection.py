@@ -264,10 +264,10 @@ class TestStdioConnect:
 
         with (
             patch(
-                "lightagent.mcp.connection.stdio_client",
+                "prismal.mcp.connection.stdio_client",
                 return_value=_fake_transport(read_mock, write_mock),
             ),
-            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+            patch("prismal.mcp.connection.ClientSession") as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -286,11 +286,11 @@ class TestStdioConnect:
 
         with (
             patch(
-                "lightagent.mcp.connection.stdio_client",
+                "prismal.mcp.connection.stdio_client",
                 return_value=_fake_transport(read_mock, write_mock),
             ),
             patch(
-                "lightagent.mcp.connection.ClientSession",
+                "prismal.mcp.connection.ClientSession",
             ) as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
@@ -309,10 +309,10 @@ class TestStdioConnect:
 
         with (
             patch(
-                "lightagent.mcp.connection.stdio_client",
+                "prismal.mcp.connection.stdio_client",
                 return_value=_fake_transport(read_mock, write_mock),
             ),
-            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+            patch("prismal.mcp.connection.ClientSession") as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -332,10 +332,10 @@ class TestStdioConnect:
 
         with (
             patch(
-                "lightagent.mcp.connection.stdio_client",
+                "prismal.mcp.connection.stdio_client",
                 return_value=_fake_transport(read_mock, write_mock),
             ),
-            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+            patch("prismal.mcp.connection.ClientSession") as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -357,10 +357,10 @@ class TestStdioConnect:
 
         with (
             patch(
-                "lightagent.mcp.connection.stdio_client",
+                "prismal.mcp.connection.stdio_client",
                 return_value=_fake_transport(read_mock, write_mock),
             ),
-            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+            patch("prismal.mcp.connection.ClientSession") as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -404,8 +404,8 @@ class TestSSEConnect:
             yield read_mock, write_mock
 
         with (
-            patch("lightagent.mcp.connection.sse_client", fake_sse),
-            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+            patch("prismal.mcp.connection.sse_client", fake_sse),
+            patch("prismal.mcp.connection.ClientSession") as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=session)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -440,8 +440,8 @@ class TestSSEConnect:
             yield read_mock, write_mock
 
         with (
-            patch("lightagent.mcp.connection.sse_client", fake_sse),
-            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+            patch("prismal.mcp.connection.sse_client", fake_sse),
+            patch("prismal.mcp.connection.ClientSession") as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=session)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -477,8 +477,8 @@ class TestSSEConnect:
             yield read_mock, write_mock
 
         with (
-            patch("lightagent.mcp.connection.sse_client", fake_sse),
-            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+            patch("prismal.mcp.connection.sse_client", fake_sse),
+            patch("prismal.mcp.connection.ClientSession") as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=session)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -504,7 +504,7 @@ class TestConnectionErrorHandling:
         conn = MCPServerConnection(cfg)
 
         with patch(
-            "lightagent.mcp.connection.stdio_client",
+            "prismal.mcp.connection.stdio_client",
             side_effect=OSError("Process failed to start"),
         ):
             await conn.connect()  # must NOT raise
@@ -520,7 +520,7 @@ class TestConnectionErrorHandling:
         conn = MCPServerConnection(cfg)
 
         with patch(
-            "lightagent.mcp.connection.stdio_client",
+            "prismal.mcp.connection.stdio_client",
             side_effect=RuntimeError("unexpected error"),
         ):
             # Must complete without raising
@@ -561,10 +561,10 @@ class TestConnectionErrorHandling:
 
         with (
             patch(
-                "lightagent.mcp.connection.stdio_client",
+                "prismal.mcp.connection.stdio_client",
                 return_value=_fake_transport(read_mock, write_mock),
             ),
-            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+            patch("prismal.mcp.connection.ClientSession") as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=session)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -591,10 +591,10 @@ class TestConnectionErrorHandling:
 
         with (
             patch(
-                "lightagent.mcp.connection.stdio_client",
+                "prismal.mcp.connection.stdio_client",
                 return_value=_fake_transport(read_mock, write_mock),
             ),
-            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+            patch("prismal.mcp.connection.ClientSession") as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=session)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -643,10 +643,10 @@ class TestTimeoutEnforcement:
 
         with (
             patch(
-                "lightagent.mcp.connection.stdio_client",
+                "prismal.mcp.connection.stdio_client",
                 return_value=_fake_transport(read_mock, write_mock),
             ),
-            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+            patch("prismal.mcp.connection.ClientSession") as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=session)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -680,7 +680,7 @@ class TestRetryBehaviour:
             raise OSError("Transient error")
             yield MagicMock(), MagicMock()  # unreachable; needed for generator
 
-        with patch("lightagent.mcp.connection.stdio_client", failing_transport):
+        with patch("prismal.mcp.connection.stdio_client", failing_transport):
             await conn.connect()
 
         assert call_count == 3
@@ -710,8 +710,8 @@ class TestRetryBehaviour:
             yield MagicMock(), MagicMock()
 
         with (
-            patch("lightagent.mcp.connection.stdio_client", flaky_transport),
-            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+            patch("prismal.mcp.connection.stdio_client", flaky_transport),
+            patch("prismal.mcp.connection.ClientSession") as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=session)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -754,7 +754,7 @@ class TestStatusProperty:
         conn = MCPServerConnection(cfg)
 
         with patch(
-            "lightagent.mcp.connection.stdio_client",
+            "prismal.mcp.connection.stdio_client",
             side_effect=OSError("connection refused"),
         ):
             await conn.connect()
@@ -781,10 +781,10 @@ class TestStatusProperty:
 
         with (
             patch(
-                "lightagent.mcp.connection.stdio_client",
+                "prismal.mcp.connection.stdio_client",
                 return_value=_fake_transport(read_mock, write_mock),
             ),
-            patch("lightagent.mcp.connection.ClientSession") as mock_cls,
+            patch("prismal.mcp.connection.ClientSession") as mock_cls,
         ):
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=session)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -901,7 +901,7 @@ async def test_cleanup_stack_kills_processes_after_aclose() -> None:
     conn._connected = True
 
     with patch(
-        "lightagent.mcp.connection._kill_process_tree",
+        "prismal.mcp.connection._kill_process_tree",
         side_effect=lambda _pids: call_order.append("kill"),
     ):
         await conn._cleanup_stack()
@@ -937,9 +937,9 @@ async def test_do_connect_timeout_with_process_lookup_error_on_cleanup() -> None
     timeout_session.initialize = AsyncMock(side_effect=TimeoutError("timed out"))
 
     with (
-        patch("lightagent.mcp.connection.stdio_client", _timeout_client),
+        patch("prismal.mcp.connection.stdio_client", _timeout_client),
         patch(
-            "lightagent.mcp.connection.ClientSession",
+            "prismal.mcp.connection.ClientSession",
             return_value=AsyncMock(
                 __aenter__=AsyncMock(return_value=timeout_session),
                 __aexit__=AsyncMock(side_effect=ProcessLookupError(3, "No such process")),

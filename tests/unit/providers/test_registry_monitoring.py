@@ -19,9 +19,9 @@ def test_get_llm_increments_otel_counter() -> None:
     mock_llm_instance = MagicMock()
 
     with (
-        patch("lightagent.providers.registry.OTelManager", return_value=mock_otel),
-        patch("lightagent.providers.registry.LangfuseManager", return_value=mock_langfuse),
-        patch("lightagent.providers.registry.ChatLiteLLM", return_value=mock_llm_instance),
+        patch("prismal.providers.registry.OTelManager", return_value=mock_otel),
+        patch("prismal.providers.registry.LangfuseManager", return_value=mock_langfuse),
+        patch("prismal.providers.registry.ChatLiteLLM", return_value=mock_llm_instance),
     ):
         registry = ProviderRegistry()
         registry.get_llm("ollama/llama3")
@@ -33,7 +33,7 @@ def test_track_usage_records_otel_tokens() -> None:
     """track_usage records token count in OTEL metrics."""
     mock_otel = MagicMock()
 
-    with patch("lightagent.providers.registry.OTelManager", return_value=mock_otel):
+    with patch("prismal.providers.registry.OTelManager", return_value=mock_otel):
         registry = ProviderRegistry()
         registry.track_usage("session-1", prompt_tokens=100, completion_tokens=50)
 
@@ -56,9 +56,9 @@ def test_get_llm_injects_langfuse_handler() -> None:
     mock_llm_instance.callbacks = None
 
     with (
-        patch("lightagent.providers.registry.OTelManager", return_value=mock_otel),
-        patch("lightagent.providers.registry.LangfuseManager", return_value=mock_langfuse),
-        patch("lightagent.providers.registry.ChatLiteLLM", return_value=mock_llm_instance),
+        patch("prismal.providers.registry.OTelManager", return_value=mock_otel),
+        patch("prismal.providers.registry.LangfuseManager", return_value=mock_langfuse),
+        patch("prismal.providers.registry.ChatLiteLLM", return_value=mock_llm_instance),
     ):
         registry = ProviderRegistry()
         llm = registry.get_llm("ollama/llama3")

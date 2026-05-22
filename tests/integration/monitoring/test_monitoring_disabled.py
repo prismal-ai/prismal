@@ -22,7 +22,7 @@ def test_langfuse_manager_disabled_no_crash() -> None:
     LangfuseManager._instance = None
     LangfuseManager._initialized = False
     with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings",
+        "prismal.monitoring._settings_proxy.get_monitoring_settings",
         return_value=_disabled_settings(),
     ):
         mgr = LangfuseManager()
@@ -48,7 +48,7 @@ def test_otel_manager_disabled_no_crash() -> None:
     OTelManager._instance = None
     OTelManager._initialized = False
     with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings",
+        "prismal.monitoring._settings_proxy.get_monitoring_settings",
         return_value=_disabled_settings(),
     ):
         otel = OTelManager()
@@ -78,7 +78,7 @@ def test_both_managers_disabled_coexist() -> None:
 
     disabled = _disabled_settings()
     with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings",
+        "prismal.monitoring._settings_proxy.get_monitoring_settings",
         return_value=disabled,
     ):
         langfuse = LangfuseManager()
@@ -90,7 +90,7 @@ def test_both_managers_disabled_coexist() -> None:
     # Simulate what a monitored function would do
     trace = langfuse.create_trace(name="agent.run", session_id="sess-1")
     with otel.start_span("agent.execute") as span:
-        span.set_attribute("lightagent.model", "gpt-4o")
+        span.set_attribute("prismal.model", "gpt-4o")
         otel.increment_counter("llm_requests")
         handler = langfuse.get_callback_handler()
         assert handler is None

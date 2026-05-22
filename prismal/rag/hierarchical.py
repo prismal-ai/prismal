@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from prismal.core.config import Settings
     from prismal.rag.vector_store import ChromaVectorStore
 
-logger = get_logger("lightagent.rag.hierarchical")
+logger = get_logger("prismal.rag.hierarchical")
 
 
 @dataclass
@@ -109,8 +109,8 @@ class HierarchicalRAGEngine:
         parent_chunk_size: Parent block size in characters (default 500).
         child_chunk_size: Child block size in characters (default 100).
         child_overlap: Overlap between consecutive child chunks (default 20).
-        settings: LightAgent settings. ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+        settings: Prismal settings. ``None`` resolves via
+            :func:`~prismal.core.config.get_settings`.
 
     Raises:
         ValueError: If ``child_chunk_size >= parent_chunk_size`` or
@@ -213,8 +213,8 @@ class HierarchicalRAGEngine:
         """
         otel = OTelManager()
         with otel.start_span("hierarchical.search") as span:
-            span.set_attribute("lightagent.query_len", len(query))
-            span.set_attribute("lightagent.k", k)
+            span.set_attribute("prismal.query_len", len(query))
+            span.set_attribute("prismal.k", k)
 
             # Over-fetch children so we have enough to fill k distinct parents.
             raw = self._store.similarity_search(query, k=k * 4)
@@ -259,8 +259,8 @@ class HierarchicalRAGEngine:
                 for pid in ordered_parent_ids
             ]
 
-            span.set_attribute("lightagent.num_parents", len(parent_chunks))
-            span.set_attribute("lightagent.num_matched_children", len(matched_child_ids))
+            span.set_attribute("prismal.num_parents", len(parent_chunks))
+            span.set_attribute("prismal.num_matched_children", len(matched_child_ids))
             otel.increment_counter("rag_queries")
 
             logger.info(

@@ -29,13 +29,13 @@ def test_cron_add_schedules_ml_retrain() -> None:
     )
     with (
         patch(
-            "lightagent.agents.tools.CronManager",
+            "prismal.agents.tools.CronManager",
             return_value=mock_manager,
         ),
         patch(
-            "lightagent.agents.tools.cron_add.func.__globals__"
+            "prismal.agents.tools.cron_add.func.__globals__"
             if False
-            else "lightagent.scheduler.executor.get_running_executor",
+            else "prismal.scheduler.executor.get_running_executor",
             return_value=None,
         ),
     ):
@@ -75,11 +75,11 @@ def test_cron_ml_retrain_description_preserved() -> None:
     )
     with (
         patch(
-            "lightagent.agents.tools.CronManager",
+            "prismal.agents.tools.CronManager",
             return_value=mock_manager,
         ),
         patch(
-            "lightagent.scheduler.executor.get_running_executor",
+            "prismal.scheduler.executor.get_running_executor",
             return_value=None,
         ),
     ):

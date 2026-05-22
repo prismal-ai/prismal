@@ -47,7 +47,7 @@ async def test_market_data_collector_produces_snapshot(
         }
     )
     with patch(
-        "lightagent.agents.subgraphs.financial.market_data_collector.ProviderRegistry.get_llm",
+        "prismal.agents.subgraphs.financial.market_data_collector.ProviderRegistry.get_llm",
         return_value=type("LLM", (), {"ainvoke": _ai(snapshot_json)})(),
     ):
         result = await market_data_collector_node(base_state)
@@ -68,7 +68,7 @@ async def test_market_data_collector_graceful_fallback(
     )
 
     with patch(
-        "lightagent.agents.subgraphs.financial.market_data_collector.ProviderRegistry.get_llm",
+        "prismal.agents.subgraphs.financial.market_data_collector.ProviderRegistry.get_llm",
         return_value=type("LLM", (), {"ainvoke": _ai("not valid json")})(),
     ):
         result = await market_data_collector_node(base_state)
@@ -105,7 +105,7 @@ async def test_technical_analyst_produces_analysis(base_state: dict[str, Any]) -
         }
     )
     with patch(
-        "lightagent.agents.subgraphs.financial.technical_analyst.ProviderRegistry.get_llm",
+        "prismal.agents.subgraphs.financial.technical_analyst.ProviderRegistry.get_llm",
         return_value=type("LLM", (), {"ainvoke": _ai(ta_json)})(),
     ):
         result = await technical_analyst_node(state)
@@ -141,7 +141,7 @@ async def test_fundamental_analyst_produces_analysis(
         }
     )
     with patch(
-        "lightagent.agents.subgraphs.financial.fundamental_analyst.ProviderRegistry.get_llm",
+        "prismal.agents.subgraphs.financial.fundamental_analyst.ProviderRegistry.get_llm",
         return_value=type("LLM", (), {"ainvoke": _ai(fa_json)})(),
     ):
         result = await fundamental_analyst_node(state)
@@ -179,7 +179,7 @@ async def test_risk_sentiment_analyst_produces_report(
         }
     )
     with patch(
-        "lightagent.agents.subgraphs.financial.risk_sentiment_analyst.ProviderRegistry.get_llm",
+        "prismal.agents.subgraphs.financial.risk_sentiment_analyst.ProviderRegistry.get_llm",
         return_value=type("LLM", (), {"ainvoke": _ai(rs_json)})(),
     ):
         result = await risk_sentiment_analyst_node(state)
@@ -239,7 +239,7 @@ async def test_report_generator_always_has_disclaimer(
         }
     )
     with patch(
-        "lightagent.agents.subgraphs.financial.report_generator.ProviderRegistry.get_llm",
+        "prismal.agents.subgraphs.financial.report_generator.ProviderRegistry.get_llm",
         return_value=type("LLM", (), {"ainvoke": _ai(report_json)})(),
     ):
         result = await report_generator_node(state)
@@ -265,7 +265,7 @@ async def test_report_generator_disclaimer_injected_on_bad_llm_json(
         "financial_analyst": {"market_snapshot": {"symbol": "BTC-USD", "asset_type": "crypto"}}
     }
     with patch(
-        "lightagent.agents.subgraphs.financial.report_generator.ProviderRegistry.get_llm",
+        "prismal.agents.subgraphs.financial.report_generator.ProviderRegistry.get_llm",
         return_value=type("LLM", (), {"ainvoke": _ai("not json at all")})(),
     ):
         result = await report_generator_node(state)

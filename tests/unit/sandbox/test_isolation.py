@@ -121,7 +121,7 @@ def test_select_backend_autoselect_picks_first_available() -> None:
 
     with (
         patch.object(isolation.IsolationBackend, "is_available", _only_nsjail),
-        patch("lightagent.core.config.get_settings") as mock_settings,
+        patch("prismal.core.config.get_settings") as mock_settings,
     ):
         mock_settings.return_value.sandbox_isolation_backend = ""
         mock_settings.return_value.is_production = False
@@ -137,7 +137,7 @@ def test_select_backend_none_blocked_in_production() -> None:
 
     with (
         patch.object(isolation.IsolationBackend, "is_available", _only_none),
-        patch("lightagent.core.config.get_settings") as mock_settings,
+        patch("prismal.core.config.get_settings") as mock_settings,
     ):
         mock_settings.return_value.sandbox_isolation_backend = ""
         mock_settings.return_value.is_production = True
@@ -153,7 +153,7 @@ def test_select_backend_none_allowed_in_dev() -> None:
 
     with (
         patch.object(isolation.IsolationBackend, "is_available", _only_none),
-        patch("lightagent.core.config.get_settings") as mock_settings,
+        patch("prismal.core.config.get_settings") as mock_settings,
     ):
         mock_settings.return_value.sandbox_isolation_backend = ""
         mock_settings.return_value.is_production = False
@@ -183,14 +183,14 @@ def test_build_env_args_rejects_sensitive_keys(monkeypatch, key) -> None:
 
 def test_build_env_args_forwards_allowed_keys(monkeypatch) -> None:
     """Non-sensitive keys that exist in the process env are emitted as -e pairs."""
-    monkeypatch.setenv("LIGHTAGENT_TEST_FOO", "bar")
-    monkeypatch.setenv("LIGHTAGENT_TEST_BAZ", "qux")
-    args = _build_env_args("LIGHTAGENT_TEST_FOO,LIGHTAGENT_TEST_BAZ")
+    monkeypatch.setenv("PRISMAL_TEST_FOO", "bar")
+    monkeypatch.setenv("PRISMAL_TEST_BAZ", "qux")
+    args = _build_env_args("PRISMAL_TEST_FOO,PRISMAL_TEST_BAZ")
     assert args == [
         "-e",
-        "LIGHTAGENT_TEST_FOO=bar",
+        "PRISMAL_TEST_FOO=bar",
         "-e",
-        "LIGHTAGENT_TEST_BAZ=qux",
+        "PRISMAL_TEST_BAZ=qux",
     ]
 
 
@@ -202,8 +202,8 @@ def test_build_env_args_empty_string_returns_empty() -> None:
 
 def test_build_env_args_drops_missing_keys(monkeypatch) -> None:
     """Allowlist entries that aren't present in os.environ are silently dropped."""
-    monkeypatch.delenv("LIGHTAGENT_NOT_SET", raising=False)
-    args = _build_env_args("LIGHTAGENT_NOT_SET")
+    monkeypatch.delenv("PRISMAL_NOT_SET", raising=False)
+    args = _build_env_args("PRISMAL_NOT_SET")
     assert args == []
 
 
@@ -247,7 +247,7 @@ async def test_docker_backend_shell_gate_blocks() -> None:
     """When ActionInterceptor.check_shell() returns False, run is blocked."""
     backend = DockerBackend()
     with patch(
-        "lightagent.security.action_interceptor.ActionInterceptor.check_shell",
+        "prismal.security.action_interceptor.ActionInterceptor.check_shell",
         return_value=False,
     ):
         result = await backend.run("print('hi')", "python", timeout=5)
@@ -304,7 +304,7 @@ async def test_audit_entry_shape_from_container_backend() -> None:
         )
 
     with (
-        patch("lightagent.security.audit.AuditLogger.log_tool_call", new=_fake_log),
+        patch("prismal.security.audit.AuditLogger.log_tool_call", new=_fake_log),
         patch.object(
             isolation,
             "_spawn_container",

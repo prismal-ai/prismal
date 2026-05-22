@@ -25,7 +25,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-logger = get_logger("lightagent.subgraphs.document_generation.formatter")
+logger = get_logger("prismal.subgraphs.document_generation.formatter")
 
 _VALID_FORMATS: frozenset[str] = frozenset({"markdown", "plain", "html"})
 

@@ -3,7 +3,7 @@
 Pipeline: proponent → opponent → moderator → consensus.
 
 Thin LangGraph wrapper around the debate primitives from
-:mod:`lightagent.agents.patterns.debate` (SPEC-PAT-002). Each debate role
+:mod:`prismal.agents.patterns.debate` (SPEC-PAT-002). Each debate role
 becomes a node; the terminal ``consensus`` node synthesises a final answer
 and records the Jaccard agreement score.
 

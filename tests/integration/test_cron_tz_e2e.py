@@ -61,12 +61,12 @@ async def test_recurring_job_fires_in_user_timezone(tmp_path: Path) -> None:
 
     caracas_tz = ZoneInfo("America/Caracas")
 
-    with patch("lightagent.scheduler.executor.CronTrigger.from_crontab") as mock_from_crontab:
+    with patch("prismal.scheduler.executor.CronTrigger.from_crontab") as mock_from_crontab:
         mock_from_crontab.return_value = MagicMock()  # trigger stub
 
         # Simulate system timezone = UTC (container environment)
         with patch(
-            "lightagent.scheduler.datetime_service.tzlocal.get_localzone",
+            "prismal.scheduler.datetime_service.tzlocal.get_localzone",
             return_value=ZoneInfo("UTC"),
         ):
             mock_scheduler.running = False
@@ -116,7 +116,7 @@ async def test_once_job_fires_correctly_in_utc_container(tmp_path: Path) -> None
 
     # Simulate UTC container — system TZ is UTC
     with patch(
-        "lightagent.scheduler.datetime_service.tzlocal.get_localzone",
+        "prismal.scheduler.datetime_service.tzlocal.get_localzone",
         return_value=ZoneInfo("UTC"),
     ):
         mock_scheduler.running = False
@@ -187,7 +187,7 @@ async def test_once_job_past_time_is_not_scheduled(
     conn.close()
 
     with patch(
-        "lightagent.scheduler.datetime_service.tzlocal.get_localzone",
+        "prismal.scheduler.datetime_service.tzlocal.get_localzone",
         return_value=ZoneInfo("UTC"),
     ):
         mock_scheduler.running = False

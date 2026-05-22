@@ -19,7 +19,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-logger = get_logger("lightagent.subgraphs.customer_service.faq_retrieval")
+logger = get_logger("prismal.subgraphs.customer_service.faq_retrieval")
 
 
 def make_faq_retrieval_node(

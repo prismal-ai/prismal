@@ -1,6 +1,6 @@
 """Calendar skill — reads and creates events from .ics files using icalendar.
 
-Reads ICS files from the directory specified by ``LIGHTAGENT_CALENDAR_DIR``
+Reads ICS files from the directory specified by ``PRISMAL_CALENDAR_DIR``
 (defaults to ``~/calendars``). Parses VEVENT components and returns upcoming
 events sorted by start date.
 
@@ -23,16 +23,16 @@ from langchain_core.tools import BaseTool, tool
 from prismal.core.logging import get_logger
 from prismal.skills.base import BaseSkill, SkillMetadata
 
-logger = get_logger("lightagent.skills.calendar")
+logger = get_logger("prismal.skills.calendar")
 
 
 def _get_calendar_dir() -> Path:
     """Return the configured calendar directory.
 
     Returns:
-        Path to the calendar directory (LIGHTAGENT_CALENDAR_DIR or ~/calendars).
+        Path to the calendar directory (PRISMAL_CALENDAR_DIR or ~/calendars).
     """
-    return Path(os.getenv("LIGHTAGENT_CALENDAR_DIR", str(Path.home() / "calendars")))
+    return Path(os.getenv("PRISMAL_CALENDAR_DIR", str(Path.home() / "calendars")))
 
 
 def _parse_dt(value: object) -> datetime | None:
@@ -120,7 +120,7 @@ class CalendarSkill(BaseSkill):
             name="calendar",
             description="Read upcoming calendar events from local .ics files",
             version="1.0.0",
-            author="lightagent",
+            author="prismal",
             safe_to_auto_activate=True,
             tags=["utility", "calendar", "ics", "scheduling"],
         )
@@ -146,7 +146,7 @@ class CalendarSkill(BaseSkill):
             if not cal_dir.is_dir():
                 return (
                     f"[calendar] Calendar directory not found: {cal_dir}. "
-                    "Set LIGHTAGENT_CALENDAR_DIR to a directory containing .ics files."
+                    "Set PRISMAL_CALENDAR_DIR to a directory containing .ics files."
                 )
 
             events = _read_events(cal_dir, days_ahead)

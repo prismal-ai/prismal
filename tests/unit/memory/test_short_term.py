@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.memory.short_term (T-090)."""
+"""Unit tests for prismal.memory.short_term (T-090)."""
 
 from __future__ import annotations
 

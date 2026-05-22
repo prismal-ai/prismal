@@ -1,4 +1,4 @@
-"""LightAgent security package — 5-layer defense-in-depth.
+"""Prismal security package — 5-layer defense-in-depth.
 
 L1: InputSanitizer     — strip control chars, normalize unicode, enforce length
 L2: GuardrailsEngine   — regex pattern matching + risk scoring

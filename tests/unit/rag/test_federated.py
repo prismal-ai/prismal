@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.rag.federated."""
+"""Unit tests for prismal.rag.federated."""
 
 from __future__ import annotations
 
@@ -123,7 +123,7 @@ def test_federated_default_local_engine_created() -> None:
     from unittest.mock import MagicMock, patch
 
     mock_rag = MagicMock()
-    with patch("lightagent.rag.engine.RAGEngine", return_value=mock_rag) as mock_cls:
+    with patch("prismal.rag.engine.RAGEngine", return_value=mock_rag) as mock_cls:
         engine = FederatedRAGEngine(remote_nodes=[])
 
     mock_cls.assert_called_once()
@@ -169,7 +169,7 @@ def test_load_rag_nodes_returns_nodes_with_rag_capability() -> None:
         ),
     ]
 
-    with patch("lightagent.agents.network_supervisor._load_nodes", return_value=nodes):
+    with patch("prismal.agents.network_supervisor._load_nodes", return_value=nodes):
         result = FederatedRAGEngine._load_rag_nodes()
 
     assert len(result) == 1
@@ -182,7 +182,7 @@ def test_load_rag_nodes_returns_empty_on_exception() -> None:
     from unittest.mock import patch
 
     with patch(
-        "lightagent.agents.network_supervisor._load_nodes",
+        "prismal.agents.network_supervisor._load_nodes",
         side_effect=RuntimeError("config not found"),
     ):
         result = FederatedRAGEngine._load_rag_nodes()
@@ -201,7 +201,7 @@ async def test_query_remote_node_raises_when_httpx_missing() -> None:
     mock_local = MagicMock()
     engine = FederatedRAGEngine(local_engine=mock_local, remote_nodes=[])
 
-    with patch("lightagent.rag.federated.httpx", None):
+    with patch("prismal.rag.federated.httpx", None):
         with pytest.raises(RuntimeError, match="httpx not installed"):
             await engine._query_remote_node({"url": "http://test:8000", "name": "node"}, "query", 5)
 
@@ -236,9 +236,9 @@ async def test_query_remote_node_returns_parsed_chunks() -> None:
     mock_httpx.AsyncClient.return_value = mock_async_client
 
     with (
-        patch("lightagent.rag.federated.httpx", mock_httpx),
+        patch("prismal.rag.federated.httpx", mock_httpx),
         patch(
-            "lightagent.agents.network_supervisor._make_a2a_jwt",
+            "prismal.agents.network_supervisor._make_a2a_jwt",
             return_value="test-token",
         ),
     ):

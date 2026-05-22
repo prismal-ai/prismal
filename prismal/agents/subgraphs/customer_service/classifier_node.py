@@ -21,7 +21,7 @@ from prismal.security.prompt_builder import SecurePromptBuilder
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-logger = get_logger("lightagent.subgraphs.customer_service.classifier")
+logger = get_logger("prismal.subgraphs.customer_service.classifier")
 
 CUSTOMER_SERVICE_CATEGORIES: tuple[str, ...] = ("faq", "complaint", "technical", "other")
 

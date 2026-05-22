@@ -31,7 +31,7 @@ class WebhookDispatcher:
         db_path: Path to the SQLite database holding webhook registrations.
     """
 
-    def __init__(self, db_path: str = "data/db/lightagent.db") -> None:
+    def __init__(self, db_path: str = "data/db/prismal.db") -> None:
         """Initialize dispatcher with database path.
 
         Args:
@@ -119,8 +119,8 @@ class WebhookDispatcher:
                         content=body,
                         headers={
                             "Content-Type": "application/json",
-                            "X-LightAgent-Signature": sig,
-                            "X-LightAgent-Event": event,
+                            "X-Prismal-Signature": sig,
+                            "X-Prismal-Event": event,
                         },
                     )
                     if r.is_success:

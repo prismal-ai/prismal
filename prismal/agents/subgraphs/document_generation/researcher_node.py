@@ -23,7 +23,7 @@ from prismal.security.prompt_builder import SecurePromptBuilder
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-logger = get_logger("lightagent.subgraphs.document_generation.researcher")
+logger = get_logger("prismal.subgraphs.document_generation.researcher")
 
 _PROMPT = (
     "You are a researcher gathering notes for one section of a document. "

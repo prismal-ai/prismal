@@ -18,7 +18,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-logger = get_logger("lightagent.subgraphs.customer_service.escalation")
+logger = get_logger("prismal.subgraphs.customer_service.escalation")
 
 
 def make_escalation_gate(threshold: float = 0.6) -> Callable[[dict[str, Any]], str]:

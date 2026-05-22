@@ -120,7 +120,7 @@ async def test_full_pipeline_produces_all_artifacts(base_state: dict[str, Any]) 
         (report_generator_node, "report_generator", report_json),
     ]
     for node_fn, mod_name, resp in nodes:
-        mod_path = f"lightagent.agents.subgraphs.financial.{mod_name}.ProviderRegistry.get_llm"
+        mod_path = f"prismal.agents.subgraphs.financial.{mod_name}.ProviderRegistry.get_llm"
         with patch(mod_path, return_value=make_llm(resp)):
             update = await node_fn(state)  # type: ignore[arg-type]
         state.update(update)

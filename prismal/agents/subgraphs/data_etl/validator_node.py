@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     import polars as pl
 
-logger = get_logger("lightagent.subgraphs.data_etl.validator")
+logger = get_logger("prismal.subgraphs.data_etl.validator")
 
 
 def make_validator_node(

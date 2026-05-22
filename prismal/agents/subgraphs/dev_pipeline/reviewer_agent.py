@@ -1,7 +1,7 @@
 # ruff: noqa: E501  # Prompt constants contain long JSON example lines.
 """Reviewer agent node for the dev_pipeline subgraph.
 
-Produces a :class:`~lightagent.agents.subgraphs.artifacts.ReviewResult` with
+Produces a :class:`~prismal.agents.subgraphs.artifacts.ReviewResult` with
 a score in [0.0, 1.0].  When score < 0.8 the approval gate routes back to
 the developer node.
 """
@@ -21,7 +21,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.reviewer")
+logger = structlog.get_logger("prismal.subgraphs.dev_pipeline.reviewer")
 otel = OTelManager()
 
 _SYSTEM = """You are a Senior Code Reviewer for the dev_pipeline subgraph.
@@ -76,7 +76,7 @@ The `ReviewResult` itself is well-formed when ALL of the following hold:
 7. Emit JSON only.
 
 ## Background
-- Artifact schema: `lightagent/agents/subgraphs/artifacts.py::ReviewResult`.
+- Artifact schema: `prismal/agents/subgraphs/artifacts.py::ReviewResult`.
 - Parsed via `ReviewResult.model_validate`; parse failure stores
   `score=0.0, approved=False`.
 - The 0.8 threshold is the canonical gate value; it MUST stay in sync
@@ -132,8 +132,8 @@ async def reviewer_agent_node(state: AgentState) -> dict[str, Any]:
         Partial state update with ReviewResult in metadata.
     """
     with otel.start_span("dev_pipeline.reviewer") as span:
-        span.set_attribute("lightagent.subgraph", "dev_pipeline")
-        span.set_attribute("lightagent.agent", "reviewer")
+        span.set_attribute("prismal.subgraph", "dev_pipeline")
+        span.set_attribute("prismal.agent", "reviewer")
 
         dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
 

@@ -15,7 +15,7 @@ def test_no_openbb_import_at_module_level_in_graph() -> None:
     import ast
     import pathlib
 
-    source = pathlib.Path("lightagent/agents/graph.py").read_text()
+    source = pathlib.Path("prismal/agents/graph.py").read_text()
     tree = ast.parse(source)
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -32,7 +32,7 @@ def test_no_ccxt_import_at_module_level_in_supervisor() -> None:
     import ast
     import pathlib
 
-    source = pathlib.Path("lightagent/agents/supervisor.py").read_text()
+    source = pathlib.Path("prismal/agents/supervisor.py").read_text()
     tree = ast.parse(source)
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):

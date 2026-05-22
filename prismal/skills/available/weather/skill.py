@@ -1,7 +1,7 @@
 """Weather skill — fetches current conditions via wttr.in or OpenWeatherMap.
 
 Uses the free wttr.in JSON API by default (no API key required).
-Set ``LIGHTAGENT_WEATHER_API_KEY`` and ``LIGHTAGENT_WEATHER_PROVIDER=openweathermap``
+Set ``PRISMAL_WEATHER_API_KEY`` and ``PRISMAL_WEATHER_PROVIDER=openweathermap``
 to switch to OpenWeatherMap.
 
 Example::
@@ -21,7 +21,7 @@ from langchain_core.tools import BaseTool, tool
 from prismal.core.logging import get_logger
 from prismal.skills.base import BaseSkill, SkillMetadata
 
-logger = get_logger("lightagent.skills.weather")
+logger = get_logger("prismal.skills.weather")
 
 _WTTR_URL = "https://wttr.in/{city}?format=j1"
 _OWM_URL = "https://api.openweathermap.org/data/2.5/weather"
@@ -105,7 +105,7 @@ class WeatherSkill(BaseSkill):
             name="weather",
             description="Get current weather conditions and forecasts for any city",
             version="1.0.0",
-            author="lightagent",
+            author="prismal",
             safe_to_auto_activate=True,
             tags=["utility", "weather", "api"],
         )
@@ -128,8 +128,8 @@ class WeatherSkill(BaseSkill):
             Returns:
                 Weather summary string with temperature, description, humidity.
             """
-            api_key = os.getenv("LIGHTAGENT_WEATHER_API_KEY", "")
-            provider = os.getenv("LIGHTAGENT_WEATHER_PROVIDER", "wttr")
+            api_key = os.getenv("PRISMAL_WEATHER_API_KEY", "")
+            provider = os.getenv("PRISMAL_WEATHER_PROVIDER", "wttr")
             if provider == "openweathermap" and api_key:
                 return _get_weather_owm(city, units, api_key)
             return _get_weather_wttr(city, units)

@@ -20,7 +20,7 @@ from prismal.security.prompt_builder import SecurePromptBuilder
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-logger = get_logger("lightagent.subgraphs.debate_consensus._helpers")
+logger = get_logger("prismal.subgraphs.debate_consensus._helpers")
 
 
 def make_role_node(

@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for lightagent-agents tests."""
+"""Shared pytest fixtures for prismal tests."""
 
 from __future__ import annotations
 

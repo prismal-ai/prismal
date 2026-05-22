@@ -69,8 +69,8 @@ def test_resolve_timezone_invalid_falls_back_utc() -> None:
 
 
 def test_resolve_timezone_empty_uses_cron_tz_env() -> None:
-    """Empty tz_str + LIGHTAGENT_CRON_TIMEZONE → cron tz wins."""
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    """Empty tz_str + PRISMAL_CRON_TIMEZONE → cron tz wins."""
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             cron_timezone="America/Caracas",
             timezone="",
@@ -82,8 +82,8 @@ def test_resolve_timezone_empty_uses_cron_tz_env() -> None:
 
 
 def test_resolve_timezone_empty_uses_tz_env() -> None:
-    """Empty tz_str + LIGHTAGENT_TIMEZONE (no cron tz) → timezone field wins."""
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    """Empty tz_str + PRISMAL_TIMEZONE (no cron tz) → timezone field wins."""
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             cron_timezone="",
             timezone="Europe/Berlin",
@@ -95,8 +95,8 @@ def test_resolve_timezone_empty_uses_tz_env() -> None:
 
 
 def test_resolve_timezone_chain_priority() -> None:
-    """Per-job tz_str overrides LIGHTAGENT_CRON_TIMEZONE."""
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    """Per-job tz_str overrides PRISMAL_CRON_TIMEZONE."""
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             cron_timezone="America/Caracas",
             timezone="Europe/Berlin",
@@ -109,13 +109,13 @@ def test_resolve_timezone_chain_priority() -> None:
 
 def test_resolve_timezone_falls_back_to_os_tz() -> None:
     """When both env vars are empty, OS localzone is used."""
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             cron_timezone="",
             timezone="",
             ntp_enabled=False,
         )
-        with patch("lightagent.scheduler.datetime_service.tzlocal.get_localzone") as mock_local:
+        with patch("prismal.scheduler.datetime_service.tzlocal.get_localzone") as mock_local:
             mock_local.return_value = ZoneInfo("America/New_York")
             dts = DateTimeService()
             tz = dts.resolve_timezone(None)
@@ -124,14 +124,14 @@ def test_resolve_timezone_falls_back_to_os_tz() -> None:
 
 def test_resolve_timezone_falls_back_to_utc_when_localzone_fails() -> None:
     """When tzlocal raises, UTC is the final fallback."""
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             cron_timezone="",
             timezone="",
             ntp_enabled=False,
         )
         with patch(
-            "lightagent.scheduler.datetime_service.tzlocal.get_localzone",
+            "prismal.scheduler.datetime_service.tzlocal.get_localzone",
             side_effect=Exception("no tz db"),
         ):
             dts = DateTimeService()
@@ -144,7 +144,7 @@ def test_resolve_timezone_falls_back_to_utc_when_localzone_fails() -> None:
 
 def test_get_scheduler_tz_returns_cron_tz() -> None:
     """get_scheduler_tz() uses the cron_timezone resolution chain."""
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             cron_timezone="America/Caracas",
             timezone="",
@@ -272,7 +272,7 @@ def test_parse_local_invalid_raises() -> None:
 
 def test_parse_local_uses_resolved_tz_when_none() -> None:
     """parse_local() uses resolve_timezone() when tz=None."""
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             cron_timezone="Asia/Tokyo",
             timezone="",
@@ -297,7 +297,7 @@ def test_ntp_enabled_mocked_server() -> None:
     mock_response = MagicMock()
     mock_response.offset = 2.5
 
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             ntp_enabled=True,
             ntp_server="pool.ntp.org",
@@ -322,7 +322,7 @@ def test_ntp_unreachable_falls_back(caplog: pytest.LogCaptureFixture) -> None:
     """ntp_offset() logs WARNING and returns None when server is unreachable."""
     import logging
 
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             ntp_enabled=True,
             ntp_server="unreachable.ntp.test",
@@ -352,7 +352,7 @@ def test_ntp_large_offset_logs_warning() -> None:
     mock_response.offset = 30.0  # 30 s > default threshold of 5 s
 
     with capture_logs() as cap_logs:
-        with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+        with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
             mock_cfg.return_value = MagicMock(
                 ntp_enabled=True,
                 ntp_server="pool.ntp.org",
@@ -381,7 +381,7 @@ def test_ntp_resync_after_interval() -> None:
     mock_response = MagicMock()
     mock_response.offset = 1.0
 
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             ntp_enabled=True,
             ntp_server="pool.ntp.org",
@@ -409,7 +409,7 @@ def test_ntp_no_resync_within_interval() -> None:
     mock_response = MagicMock()
     mock_response.offset = 1.0
 
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             ntp_enabled=True,
             ntp_server="pool.ntp.org",
@@ -438,7 +438,7 @@ def test_now_applies_ntp_offset() -> None:
     mock_response = MagicMock()
     mock_response.offset = 10.0  # 10 seconds ahead
 
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             ntp_enabled=True,
             ntp_server="pool.ntp.org",
@@ -474,7 +474,7 @@ def test_next_run_croniter_naive_result() -> None:
     mock_cron_instance.get_next.return_value = naive_result
 
     with patch(
-        "lightagent.scheduler.datetime_service.croniter",
+        "prismal.scheduler.datetime_service.croniter",
         return_value=mock_cron_instance,
     ):
         result = dts.next_run("0 9 * * *", tz=tz)
@@ -485,7 +485,7 @@ def test_next_run_croniter_naive_result() -> None:
 
 def test_get_ntp_offset_with_ntp_enabled_returns_cached() -> None:
     """_get_ntp_offset() returns _ntp_offset when ntp_enabled=True."""
-    with patch("lightagent.scheduler.datetime_service.get_settings") as mock_cfg:
+    with patch("prismal.scheduler.datetime_service.get_settings") as mock_cfg:
         mock_cfg.return_value = MagicMock(
             ntp_enabled=True,
             cron_timezone="",

@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.data.duckdb_engine — T-130."""
+"""Unit tests for prismal.data.duckdb_engine — T-130."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 from prismal.data.duckdb_engine import DuckDBEngine, SQLValidator
 
 # ── SQLValidator ─────────────────────────────────────────────────────────────
@@ -23,42 +23,42 @@ def test_validator_allows_select() -> None:
 def test_validator_blocks_drop() -> None:
     """DROP TABLE is blocked."""
     v = SQLValidator()
-    with pytest.raises(LightAgentError, match="DROP"):
+    with pytest.raises(PrismalError, match="DROP"):
         v.validate("DROP TABLE foo")
 
 
 def test_validator_blocks_delete() -> None:
     """DELETE is blocked."""
     v = SQLValidator()
-    with pytest.raises(LightAgentError, match="DELETE"):
+    with pytest.raises(PrismalError, match="DELETE"):
         v.validate("DELETE FROM foo WHERE id=1")
 
 
 def test_validator_blocks_insert() -> None:
     """INSERT is blocked."""
     v = SQLValidator()
-    with pytest.raises(LightAgentError, match="INSERT"):
+    with pytest.raises(PrismalError, match="INSERT"):
         v.validate("INSERT INTO foo VALUES (1)")
 
 
 def test_validator_blocks_update() -> None:
     """UPDATE is blocked."""
     v = SQLValidator()
-    with pytest.raises(LightAgentError, match="UPDATE"):
+    with pytest.raises(PrismalError, match="UPDATE"):
         v.validate("UPDATE foo SET bar=1")
 
 
 def test_validator_blocks_create() -> None:
     """CREATE TABLE is blocked."""
     v = SQLValidator()
-    with pytest.raises(LightAgentError, match="CREATE"):
+    with pytest.raises(PrismalError, match="CREATE"):
         v.validate("CREATE TABLE foo (id INT)")
 
 
 def test_validator_case_insensitive() -> None:
     """Validation is case-insensitive."""
     v = SQLValidator()
-    with pytest.raises(LightAgentError):
+    with pytest.raises(PrismalError):
         v.validate("drop table foo")
 
 
@@ -88,9 +88,9 @@ def test_query_returns_list_of_dicts() -> None:
 
 
 def test_query_raises_on_destructive_sql() -> None:
-    """query() raises LightAgentError for destructive SQL."""
+    """query() raises PrismalError for destructive SQL."""
     engine = DuckDBEngine()
-    with pytest.raises(LightAgentError):
+    with pytest.raises(PrismalError):
         engine.query("DROP TABLE IF EXISTS foo")
 
 

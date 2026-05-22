@@ -7,17 +7,17 @@ from collections.abc import Iterator
 import pytest
 
 #: Environment variables that the developer's local ``.env`` may populate
-#: and that cause :class:`~lightagent.core.config.Settings` construction to
+#: and that cause :class:`~prismal.core.config.Settings` construction to
 #: either override test expectations or emit warnings that pytest's
 #: ``filterwarnings = ["error", ...]`` turns into test failures.  The
 #: autouse fixture below hides them for the duration of every test so
 #: unit tests are reproducible regardless of the developer's .env state.
 _ENV_ISOLATION_KEYS: tuple[str, ...] = (
-    "LIGHTAGENT_LLM_PROVIDER",
-    "LIGHTAGENT_DEFAULT_MODEL",
-    "LIGHTAGENT_MODEL",
-    "LIGHTAGENT_FALLBACK_MODEL",
-    "LIGHTAGENT_OLLAMA_BASE_URL",
+    "PRISMAL_LLM_PROVIDER",
+    "PRISMAL_DEFAULT_MODEL",
+    "PRISMAL_MODEL",
+    "PRISMAL_FALLBACK_MODEL",
+    "PRISMAL_OLLAMA_BASE_URL",
 )
 
 

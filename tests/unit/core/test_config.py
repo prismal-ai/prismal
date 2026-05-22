@@ -73,7 +73,7 @@ def test_settings_shell_disabled_by_default(monkeypatch: pytest.MonkeyPatch) -> 
     """Shell execution is disabled by default (security)."""
     from prismal.core.config import Settings
 
-    monkeypatch.delenv("LIGHTAGENT_SHELL_ENABLED", raising=False)
+    monkeypatch.delenv("PRISMAL_SHELL_ENABLED", raising=False)
     # Pass _env_file=None so .env on disk cannot override the default.
     s = Settings(_env_file=None)  # type: ignore[call-arg]
     assert s.shell_enabled is False
@@ -91,11 +91,11 @@ def test_get_settings_cache_clear(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_settings_env_var_override(monkeypatch: pytest.MonkeyPatch) -> None:
-    """LIGHTAGENT_ env vars override defaults."""
+    """PRISMAL_ env vars override defaults."""
     from prismal.core.config import Settings, get_settings
 
     get_settings.cache_clear()
-    monkeypatch.setenv("LIGHTAGENT_DEFAULT_MODEL", "gpt-4o")
+    monkeypatch.setenv("PRISMAL_DEFAULT_MODEL", "gpt-4o")
     s = Settings()  # fresh instance, not cached
     assert s.default_model == "gpt-4o"
     get_settings.cache_clear()
@@ -174,8 +174,8 @@ def test_llm_provider_conflict_warns_and_overrides() -> None:
     assert s.default_model.startswith("ollama_chat/")
     assert s.fallback_model == ""
     messages = [str(w.message) for w in captured]
-    assert any("LIGHTAGENT_DEFAULT_MODEL" in m for m in messages)
-    assert any("LIGHTAGENT_FALLBACK_MODEL" in m for m in messages)
+    assert any("PRISMAL_DEFAULT_MODEL" in m for m in messages)
+    assert any("PRISMAL_FALLBACK_MODEL" in m for m in messages)
 
 
 def test_llm_provider_unknown_value_raises() -> None:
@@ -184,16 +184,16 @@ def test_llm_provider_unknown_value_raises() -> None:
 
     with pytest.raises(ValidationError) as excinfo:
         Settings(_env_file=None, llm_provider="cohere")  # type: ignore[call-arg]
-    assert "Unknown LIGHTAGENT_LLM_PROVIDER" in str(excinfo.value)
+    assert "Unknown PRISMAL_LLM_PROVIDER" in str(excinfo.value)
 
 
-def test_default_model_accepts_lightagent_model_alias(
+def test_default_model_accepts_prismal_model_alias(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """LIGHTAGENT_MODEL is accepted as an alias for default_model."""
+    """PRISMAL_MODEL is accepted as an alias for default_model."""
     from prismal.core.config import Settings
 
-    monkeypatch.delenv("LIGHTAGENT_DEFAULT_MODEL", raising=False)
-    monkeypatch.setenv("LIGHTAGENT_MODEL", "ollama/codellama")
+    monkeypatch.delenv("PRISMAL_DEFAULT_MODEL", raising=False)
+    monkeypatch.setenv("PRISMAL_MODEL", "ollama/codellama")
     s = Settings(_env_file=None)  # type: ignore[call-arg]
     assert s.default_model == "ollama/codellama"

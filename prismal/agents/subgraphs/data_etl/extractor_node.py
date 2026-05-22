@@ -23,7 +23,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-logger = get_logger("lightagent.subgraphs.data_etl.extractor")
+logger = get_logger("prismal.subgraphs.data_etl.extractor")
 
 
 async def _default_extractor(source: dict[str, Any]) -> pl.DataFrame:

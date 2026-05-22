@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.memory.mongodb_store — MongoDBMemoryStore.
+"""Unit tests for prismal.memory.mongodb_store — MongoDBMemoryStore.
 
 All MongoDB operations are fully mocked via AsyncMock since `motor` is
 an optional dependency not required in the standard test environment.
@@ -85,9 +85,9 @@ def test_init_uses_custom_retention() -> None:
 
 def test_init_creates_vector_store_when_not_provided() -> None:
     """MongoDBMemoryStore creates a ChromaVectorStore when vector_store=None."""
-    with patch("lightagent.rag.vector_store.ChromaVectorStore") as mock_cls:
+    with patch("prismal.rag.vector_store.ChromaVectorStore") as mock_cls:
         mock_cls.return_value = MagicMock()
-        with patch("lightagent.core.config.get_settings") as mock_cfg:
+        with patch("prismal.core.config.get_settings") as mock_cfg:
             mock_settings = MagicMock()
             mock_settings.mongodb_url = "mongodb://localhost"
             mock_settings.memory_retention_days = 30

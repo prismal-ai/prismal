@@ -2,11 +2,11 @@
 
 Orchestrates three layers of security:
 
-* **L1** — :class:`~lightagent.security.sanitizer.InputSanitizer` (control
+* **L1** — :class:`~prismal.security.sanitizer.InputSanitizer` (control
   chars, Unicode normalisation, length truncation).
 * **L2** — Regex pattern matching from ``security/patterns/injection_patterns.yaml``.
-* **L3** — :class:`~lightagent.security.nemo_rails.NemoRailsLayer` (NVIDIA NeMo
-  Guardrails — optional, enabled via ``LIGHTAGENT_NEMO_GUARDRAILS_ENABLED=true``).
+* **L3** — :class:`~prismal.security.nemo_rails.NemoRailsLayer` (NVIDIA NeMo
+  Guardrails — optional, enabled via ``PRISMAL_NEMO_GUARDRAILS_ENABLED=true``).
 
 Supports three enforcement modes: strict, permissive, audit-only.
 """
@@ -25,7 +25,7 @@ from prismal.monitoring.otel import OTelManager
 from prismal.security.audit import AuditLogger
 from prismal.security.sanitizer import InputSanitizer
 
-logger = get_logger("lightagent.security.guardrails")
+logger = get_logger("prismal.security.guardrails")
 _audit_logger = AuditLogger()
 
 _PATTERNS_FILE = Path(__file__).parent / "patterns" / "injection_patterns.yaml"
@@ -139,8 +139,8 @@ class GuardrailsEngine:
                 if nemo_blocked:
                     reasons.append(f"nemo:{nemo_category}")
                     risk_score = max(risk_score, 85)
-                    span.set_attribute("lightagent.nemo_blocked", True)
-                    span.set_attribute("lightagent.nemo_category", nemo_category)
+                    span.set_attribute("prismal.nemo_blocked", True)
+                    span.set_attribute("prismal.nemo_category", nemo_category)
 
             mode = settings.security_mode
             if mode in ("audit-only", "permissive"):
@@ -161,8 +161,8 @@ class GuardrailsEngine:
                     session_id="guardrails",
                 )
 
-            span.set_attribute("lightagent.risk_score", risk_score)
-            span.set_attribute("lightagent.blocked", not safe)
+            span.set_attribute("prismal.risk_score", risk_score)
+            span.set_attribute("prismal.blocked", not safe)
             if not safe:
                 otel.increment_counter("security_blocks", attributes={"mode": mode})
 
@@ -200,8 +200,8 @@ class GuardrailsEngine:
                 nemo_blocked, nemo_category = await self._nemo_layer.check_output(text)
                 if nemo_blocked:
                     reasons.append(f"nemo_output:{nemo_category}")
-                    span.set_attribute("lightagent.nemo_output_blocked", True)
-                    span.set_attribute("lightagent.nemo_output_category", nemo_category)
+                    span.set_attribute("prismal.nemo_output_blocked", True)
+                    span.set_attribute("prismal.nemo_output_category", nemo_category)
 
             risk_score = min(100, len(reasons) * 30)
             safe = len(reasons) == 0
@@ -213,8 +213,8 @@ class GuardrailsEngine:
             if not safe:
                 logger.warning("output_flagged", reasons=reasons, risk_score=risk_score)
 
-            span.set_attribute("lightagent.risk_score", risk_score)
-            span.set_attribute("lightagent.blocked", not safe)
+            span.set_attribute("prismal.risk_score", risk_score)
+            span.set_attribute("prismal.blocked", not safe)
 
             return GuardrailResult(
                 safe=safe,

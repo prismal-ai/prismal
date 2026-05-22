@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.scheduler.cron_manager (T-081)."""
+"""Unit tests for prismal.scheduler.cron_manager (T-081)."""
 
 from __future__ import annotations
 

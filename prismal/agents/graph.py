@@ -1,7 +1,7 @@
 """
 LangGraph SUPERVISOR state machine assembly.
 
-Builds and compiles the complete multi-agent graph for LightAgent.  The graph
+Builds and compiles the complete multi-agent graph for Prismal.  The graph
 follows the SUPERVISOR pattern: a central supervisor node routes each turn to
 the most appropriate specialist sub-agent; each sub-agent processes the request
 and returns control to the supervisor; the supervisor routes to END when the
@@ -59,7 +59,7 @@ from prismal.agents.supervisor import supervisor_node, supervisor_router
 from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 
-logger = get_logger("lightagent.agents.graph")
+logger = get_logger("prismal.agents.graph")
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ def _supervisor_router(state: AgentState) -> str:
 
     This wrapper exists solely to satisfy LangGraph's ``get_type_hints`` call
     during conditional-edge registration.  All routing logic remains in
-    :func:`~lightagent.agents.supervisor.supervisor_router`.
+    :func:`~prismal.agents.supervisor.supervisor_router`.
 
     Args:
         state: Current agent state.
@@ -208,7 +208,7 @@ def build_supervisor_graph(
     Constructs a :class:`~langgraph.graph.StateGraph` wired with the supervisor
     node as the entry point, all seven specialist sub-agent nodes, conditional
     edges from the supervisor (via
-    :func:`~lightagent.agents.supervisor.supervisor_router`),
+    :func:`~prismal.agents.supervisor.supervisor_router`),
     and direct return edges from every sub-agent back to the supervisor.
 
     The graph is compiled with a SQLite-backed checkpointer so that conversation
@@ -436,7 +436,7 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
         return _async_graph
 
     # Phase 40 / SPEC-042 AC-042-4: flat mode is the default; hierarchical
-    # mode is opt-in via ``LIGHTAGENT_HIERARCHICAL_MODE=true``. The two
+    # mode is opt-in via ``PRISMAL_HIERARCHICAL_MODE=true``. The two
     # topologies share the same checkpointer backend and caching
     # mechanism so callers never need to care which one is active.
     if get_settings().hierarchical_mode:

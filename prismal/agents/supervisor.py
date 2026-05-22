@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.supervisor")
+logger = get_logger("prismal.agents.supervisor")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -288,7 +288,7 @@ def _get_memory_store() -> LongTermMemoryStore:
 def _derive_user_id(state: AgentState) -> str:
     """Extract a stable user identifier from ``state["session_id"]``.
 
-    LightAgent session IDs follow the shape ``{user}-{timestamp}``; this
+    Prismal session IDs follow the shape ``{user}-{timestamp}``; this
     helper returns the leading segment so long-term memory is keyed per
     user rather than per session. Falls back to ``"unknown"`` when no
     session ID is present.
@@ -620,9 +620,9 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
     with otel.start_span(
         "agent.supervisor",
         attributes={
-            "lightagent.agent": "supervisor",
-            "lightagent.session_id": session_id,
-            "lightagent.message_count": len(state["messages"]),
+            "prismal.agent": "supervisor",
+            "prismal.session_id": session_id,
+            "prismal.message_count": len(state["messages"]),
         },
     ) as span:
         # Trim history before anything else — long sessions otherwise
@@ -633,14 +633,14 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
 
         loop_break = _loop_break_decision(state, trimmed, session_id)
         if loop_break is not None:
-            span.set_attribute("lightagent.routing_decision", "END")
+            span.set_attribute("prismal.routing_decision", "END")
             return loop_break
 
         short_circuit = _intent_short_circuit(trimmed, session_id)
         if short_circuit is not None:
             matched_intent, result = short_circuit
-            span.set_attribute("lightagent.routing_decision", matched_intent)
-            span.set_attribute("lightagent.routing_source", "intent_router")
+            span.set_attribute("prismal.routing_decision", matched_intent)
+            span.set_attribute("prismal.routing_source", "intent_router")
             return result
 
         llm = ProviderRegistry().get_llm_with_fallback()
@@ -662,7 +662,7 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
         next_agent: str | None = None if matched == "END" else matched
         next_agent = _apply_routing_overrides(next_agent, state, session_id)
 
-        span.set_attribute("lightagent.routing_decision", next_agent if next_agent else "END")
+        span.set_attribute("prismal.routing_decision", next_agent if next_agent else "END")
         logger.info(
             "supervisor_routing_decision",
             next_agent=next_agent,
@@ -686,7 +686,7 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
 # Hierarchical root supervisor (Phase 40 / SPEC-042 AC-042-2)
 # ---------------------------------------------------------------------------
 
-#: Valid routing targets when ``LIGHTAGENT_HIERARCHICAL_MODE=true``. The
+#: Valid routing targets when ``PRISMAL_HIERARCHICAL_MODE=true``. The
 #: root supervisor only sees 3 domain orchestrators plus cron_manager,
 #: keeping the routing LLM prompt focused on ~4 targets instead of 12+.
 HIERARCHICAL_MEMBERS: list[str] = [
@@ -787,9 +787,9 @@ async def hierarchical_supervisor_node(
     with otel.start_span(
         "agent.hierarchical_supervisor",
         attributes={
-            "lightagent.agent": "hierarchical_supervisor",
-            "lightagent.session_id": session_id,
-            "lightagent.mode": "hierarchical",
+            "prismal.agent": "hierarchical_supervisor",
+            "prismal.session_id": session_id,
+            "prismal.mode": "hierarchical",
         },
     ) as span:
         llm = ProviderRegistry().get_llm_with_fallback()
@@ -807,7 +807,7 @@ async def hierarchical_supervisor_node(
                     last_agent=last_agent,
                     session_id=session_id,
                 )
-                span.set_attribute("lightagent.routing_decision", "END")
+                span.set_attribute("prismal.routing_decision", "END")
                 return {
                     "current_agent": "supervisor",
                     "next_agent": None,
@@ -831,8 +831,8 @@ async def hierarchical_supervisor_node(
                 next_agent=matched_intent,
                 session_id=session_id,
             )
-            span.set_attribute("lightagent.routing_decision", matched_intent)
-            span.set_attribute("lightagent.routing_source", "intent_router")
+            span.set_attribute("prismal.routing_decision", matched_intent)
+            span.set_attribute("prismal.routing_source", "intent_router")
             return {
                 "current_agent": "supervisor",
                 "next_agent": matched_intent,
@@ -875,7 +875,7 @@ async def hierarchical_supervisor_node(
             matched = "END"
 
         next_agent: str | None = None if matched == "END" else matched
-        span.set_attribute("lightagent.routing_decision", matched)
+        span.set_attribute("prismal.routing_decision", matched)
 
         logger.info(
             "hierarchical_supervisor_routing_decision",

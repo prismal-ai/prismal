@@ -8,7 +8,7 @@ session starts, entries written here are keyed by ``user_id`` /
 ``project_id`` namespaces and survive indefinitely (subject to TTL).
 
 The critical invariant: **every value written to this store is passed
-through** :class:`~lightagent.security.pii_sanitizer.PIISanitizer` **before
+through** :class:`~prismal.security.pii_sanitizer.PIISanitizer` **before
 it hits persistent storage**. This is enforced inside :meth:`store_fact`
 and cannot be bypassed — callers never need (and never should) call the
 sanitizer themselves.
@@ -16,7 +16,7 @@ sanitizer themselves.
 Backend selection
 -----------------
 
-The backend is chosen by ``LIGHTAGENT_MEMORY_BACKEND``:
+The backend is chosen by ``PRISMAL_MEMORY_BACKEND``:
 
 * ``memory`` (default) — :class:`langgraph.store.memory.InMemoryStore`,
   perfect for dev / unit tests / single-process deployments.
@@ -42,7 +42,7 @@ from prismal.security.pii_sanitizer import PIISanitizer
 if TYPE_CHECKING:
     from langgraph.store.base import BaseStore
 
-logger = get_logger("lightagent.memory.long_term_store")
+logger = get_logger("prismal.memory.long_term_store")
 
 
 # Namespace templates from SPEC-039 AC-039-5. Exposed as module-level
@@ -130,7 +130,7 @@ class LongTermMemoryStore:
             logger.warning(
                 "memory_sqlite_backend_fallback",
                 message=(
-                    "LIGHTAGENT_MEMORY_BACKEND=sqlite currently uses an "
+                    "PRISMAL_MEMORY_BACKEND=sqlite currently uses an "
                     "InMemoryStore fallback — entries do not persist "
                     "across restarts. Set backend=postgresql for durable "
                     "cross-process memory."

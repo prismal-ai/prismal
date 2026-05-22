@@ -2,7 +2,7 @@
 
 APScheduler is only available inside the project venv. When the test runner
 uses the system Python (e.g. Anaconda) the ``apscheduler`` import chain
-inside ``lightagent.scheduler.__init__`` would otherwise abort collection.
+inside ``prismal.scheduler.__init__`` would otherwise abort collection.
 Injecting lightweight stubs into ``sys.modules`` before any test module is
 imported prevents that failure while keeping the scheduler tests independent
 of APScheduler internals.

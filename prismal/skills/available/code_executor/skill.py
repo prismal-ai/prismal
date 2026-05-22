@@ -1,14 +1,14 @@
 """Code executor skill — runs Python code snippets in a sandboxed subprocess.
 
-Requires ``LIGHTAGENT_SHELL_ENABLED=true`` (or ``settings.shell_enabled=True``).
+Requires ``PRISMAL_SHELL_ENABLED=true`` (or ``settings.shell_enabled=True``).
 If shell execution is disabled the tool returns an error without running anything.
 
 Safety notes:
 
 * Execution is isolated via ``subprocess`` with a configurable timeout.
-* ``LIGHTAGENT_CODE_EXEC_TIMEOUT`` controls the timeout in seconds (default: 10).
+* ``PRISMAL_CODE_EXEC_TIMEOUT`` controls the timeout in seconds (default: 10).
 * Only Python is supported. No shell passthrough is provided.
-* Always gated by :func:`lightagent.core.config.Settings.shell_enabled`.
+* Always gated by :func:`prismal.core.config.Settings.shell_enabled`.
 
 Example::
 
@@ -30,7 +30,7 @@ from langchain_core.tools import BaseTool, tool
 from prismal.core.logging import get_logger
 from prismal.skills.base import BaseSkill, SkillMetadata
 
-logger = get_logger("lightagent.skills.code_executor")
+logger = get_logger("prismal.skills.code_executor")
 
 _DEFAULT_TIMEOUT = 10
 
@@ -39,9 +39,9 @@ def _is_shell_enabled() -> bool:
     """Check whether shell execution is permitted.
 
     Returns:
-        True if LIGHTAGENT_SHELL_ENABLED is 'true' (case-insensitive).
+        True if PRISMAL_SHELL_ENABLED is 'true' (case-insensitive).
     """
-    return os.getenv("LIGHTAGENT_SHELL_ENABLED", "false").lower() == "true"
+    return os.getenv("PRISMAL_SHELL_ENABLED", "false").lower() == "true"
 
 
 def _run_python(code: str, timeout: int) -> str:
@@ -89,7 +89,7 @@ class CodeExecutorSkill(BaseSkill):
             name="code_executor",
             description="Execute Python code snippets and return their output",
             version="1.0.0",
-            author="lightagent",
+            author="prismal",
             safe_to_auto_activate=False,
             requires_permissions=["shell.execute"],
             tags=["utility", "code", "python", "execution"],
@@ -116,10 +116,10 @@ class CodeExecutorSkill(BaseSkill):
             if not _is_shell_enabled():
                 return (
                     "[code_executor] Shell execution is disabled. "
-                    "Set LIGHTAGENT_SHELL_ENABLED=true to enable."
+                    "Set PRISMAL_SHELL_ENABLED=true to enable."
                 )
 
-            configured_timeout = int(os.getenv("LIGHTAGENT_CODE_EXEC_TIMEOUT", str(timeout)))
+            configured_timeout = int(os.getenv("PRISMAL_CODE_EXEC_TIMEOUT", str(timeout)))
             logger.info(
                 "code_executor_run",
                 code_length=len(code),

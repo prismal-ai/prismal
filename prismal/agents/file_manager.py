@@ -18,7 +18,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.file_manager")
+logger = get_logger("prismal.agents.file_manager")
 
 _SYSTEM_PROMPT = """You are a file management specialist.
 
@@ -80,7 +80,7 @@ The operation is acceptable when ALL of the following hold:
 7. Return the concise Output format.
 
 ## Background
-- `FilesystemGuard` (`lightagent/security/filesystem_guard.py`) enforces
+- `FilesystemGuard` (`prismal/security/filesystem_guard.py`) enforces
   all path confinement — every tool call routes through it.
 - Allowed root is `settings.fs_workspace_root` (default
   `data/workspace/`); escaping the root raises `PathViolation`.

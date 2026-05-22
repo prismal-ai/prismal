@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
     from prismal.core.config import Settings
 
-logger = get_logger("lightagent.subgraphs.data_etl.builder")
+logger = get_logger("prismal.subgraphs.data_etl.builder")
 
 _NAME = "data_etl"
 _DESCRIPTION = "Data ETL pipeline: extractor → validator → transformer → loader → auditor"

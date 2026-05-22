@@ -52,7 +52,7 @@ if TYPE_CHECKING:
     from prismal.core.config import Settings
     from prismal.rag.vector_store import ChromaVectorStore
 
-logger = get_logger("lightagent.rag.multi_vector")
+logger = get_logger("prismal.rag.multi_vector")
 
 _SUMMARY_PROMPT = (
     "Write a concise summary (2-3 sentences) of the provided text. Do not add "
@@ -89,8 +89,8 @@ class MultiVectorRAGEngine:
         vector_store: Initialised :class:`ChromaVectorStore`.
         n_questions: Number of hypothetical questions to generate per chunk
             (default 3).
-        settings: LightAgent settings. ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+        settings: Prismal settings. ``None`` resolves via
+            :func:`~prismal.core.config.get_settings`.
     """
 
     def __init__(
@@ -186,8 +186,8 @@ class MultiVectorRAGEngine:
         """
         otel = OTelManager()
         with otel.start_span("multi_vector.search") as span:
-            span.set_attribute("lightagent.query_len", len(query))
-            span.set_attribute("lightagent.k", k)
+            span.set_attribute("prismal.query_len", len(query))
+            span.set_attribute("prismal.k", k)
 
             raw = self._store.similarity_search(query, k=k * 4)
 
@@ -222,7 +222,7 @@ class MultiVectorRAGEngine:
             # Trim matched_representations to the returned docs for clarity.
             matched = {did: matched[did] for did in ordered_ids}
 
-            span.set_attribute("lightagent.num_unique_docs", len(chunks))
+            span.set_attribute("prismal.num_unique_docs", len(chunks))
             otel.increment_counter("rag_queries")
             logger.info(
                 "multi_vector_search_done",

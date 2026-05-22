@@ -5,7 +5,7 @@ Feature Engineer agent node for the ml_pipeline subgraph.
 Applies feature transformations (encoding, scaling, feature selection, SMOTE for
 class imbalance) and produces a train/test split plan.
 
-Stores a :class:`~lightagent.agents.subgraphs.ml_pipeline.artifacts.FeatureSet`
+Stores a :class:`~prismal.agents.subgraphs.ml_pipeline.artifacts.FeatureSet`
 under ``state["metadata"]["ml_pipeline"]["feature_set"]``.
 """
 
@@ -24,7 +24,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.ml_pipeline.feature_engineer")
+logger = structlog.get_logger("prismal.subgraphs.ml_pipeline.feature_engineer")
 otel = OTelManager()
 
 _SYSTEM = """You are a Feature Engineer for the ml_pipeline subgraph.
@@ -80,7 +80,7 @@ The `FeatureSet` is acceptable when ALL of the following hold:
 
 ## Background
 - Artifact schema:
-  `lightagent/agents/subgraphs/ml_pipeline/artifacts.py::FeatureSet`.
+  `prismal/agents/subgraphs/ml_pipeline/artifacts.py::FeatureSet`.
 - Pipelines are serialised via joblib; path must stay inside
   `data/workspace/ml_models/{name}/features/`.
 
@@ -137,8 +137,8 @@ async def feature_engineer_node(state: AgentState) -> dict[str, Any]:
         ``metadata["ml_pipeline"]["feature_set"]``.
     """
     with otel.start_span("ml_pipeline.feature_engineer") as span:
-        span.set_attribute("lightagent.subgraph", "ml_pipeline")
-        span.set_attribute("lightagent.agent", "feature_engineer")
+        span.set_attribute("prismal.subgraph", "ml_pipeline")
+        span.set_attribute("prismal.agent", "feature_engineer")
 
         ml: dict[str, Any] = dict(state.get("metadata", {}).get("ml_pipeline", {}))
         profile_data = ml.get("dataset_profile", {})
@@ -174,7 +174,7 @@ async def feature_engineer_node(state: AgentState) -> dict[str, Any]:
             train_rows=feature_set.train_shape[0],
             scaling=feature_set.scaling_method,
         )
-        span.set_attribute("lightagent.ml.feature_count", n_features)
+        span.set_attribute("prismal.ml.feature_count", n_features)
 
         return {
             "current_agent": "feature_engineer",

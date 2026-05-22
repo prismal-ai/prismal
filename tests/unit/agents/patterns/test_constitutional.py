@@ -1,4 +1,4 @@
-"""Unit tests for ConstitutionalFilter (lightagent.agents.patterns.constitutional).
+"""Unit tests for ConstitutionalFilter (prismal.agents.patterns.constitutional).
 
 Constitutional AI pattern: for each principle, ask an LLM whether the output
 violates it; if so, ask the LLM to revise. Cap total revisions per principle
@@ -19,9 +19,9 @@ from prismal.agents.patterns.constitutional import (
     ConstitutionalResult,
     ConstitutionalRevision,
 )
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
-PROVIDER_REGISTRY_PATH = "lightagent.agents.patterns.constitutional.ProviderRegistry"
+PROVIDER_REGISTRY_PATH = "prismal.agents.patterns.constitutional.ProviderRegistry"
 
 
 def _response(text: str) -> MagicMock:
@@ -83,8 +83,8 @@ def test_default_principles_has_at_least_three() -> None:
         assert p.severity in {"critical", "high", "medium"}
 
 
-def test_constitutional_error_inherits_from_lightagent_error() -> None:
-    assert issubclass(ConstitutionalError, LightAgentError)
+def test_constitutional_error_inherits_from_prismal_error() -> None:
+    assert issubclass(ConstitutionalError, PrismalError)
 
 
 # ── Constructor ───────────────────────────────────────────────────────────────
@@ -245,7 +245,7 @@ async def test_apply_logs_each_revision() -> None:
     )
     with (
         patch(PROVIDER_REGISTRY_PATH) as reg,
-        patch("lightagent.agents.patterns.constitutional.logger") as mock_logger,
+        patch("prismal.agents.patterns.constitutional.logger") as mock_logger,
     ):
         reg.return_value.get_llm.return_value = llm
         f = ConstitutionalFilter(principles=[principle], settings=MagicMock())

@@ -35,7 +35,7 @@ def _make_nemo_layer(
 @pytest.mark.asyncio
 async def test_l3_blocked_input_raises_risk_score() -> None:
     """NeMo blocking input sets risk_score >= 85 and adds nemo: reason."""
-    with patch("lightagent.security.nemo_rails.get_nemo_layer") as mock_get:
+    with patch("prismal.security.nemo_rails.get_nemo_layer") as mock_get:
         mock_get.return_value = _make_nemo_layer(input_blocked=True, input_category="violence")
         engine = GuardrailsEngine()
 
@@ -48,7 +48,7 @@ async def test_l3_blocked_input_raises_risk_score() -> None:
 @pytest.mark.asyncio
 async def test_l3_not_blocked_does_not_add_nemo_reason() -> None:
     """When NeMo does not block, no nemo: reason is added."""
-    with patch("lightagent.security.nemo_rails.get_nemo_layer") as mock_get:
+    with patch("prismal.security.nemo_rails.get_nemo_layer") as mock_get:
         mock_get.return_value = _make_nemo_layer(input_blocked=False)
         engine = GuardrailsEngine()
 
@@ -60,7 +60,7 @@ async def test_l3_not_blocked_does_not_add_nemo_reason() -> None:
 @pytest.mark.asyncio
 async def test_l3_disabled_zero_overhead() -> None:
     """When nemo_guardrails_enabled=False the NeMo layer is None (zero overhead)."""
-    with patch("lightagent.security.nemo_rails.get_nemo_layer", return_value=None):
+    with patch("prismal.security.nemo_rails.get_nemo_layer", return_value=None):
         engine = GuardrailsEngine()
 
     assert engine._nemo_layer is None
@@ -72,7 +72,7 @@ async def test_l3_disabled_zero_overhead() -> None:
 @pytest.mark.asyncio
 async def test_l2_and_l3_combined_risk_score() -> None:
     """L2 injection detection + L3 NeMo block combine to cap risk_score at 100."""
-    with patch("lightagent.security.nemo_rails.get_nemo_layer") as mock_get:
+    with patch("prismal.security.nemo_rails.get_nemo_layer") as mock_get:
         mock_get.return_value = _make_nemo_layer(
             input_blocked=True, input_category="illegal_activities"
         )
@@ -91,7 +91,7 @@ async def test_l2_and_l3_combined_risk_score() -> None:
 @pytest.mark.asyncio
 async def test_audit_only_mode_always_safe_even_with_l3_block() -> None:
     """In audit-only mode, validate_input returns safe=True even when NeMo blocks."""
-    with patch("lightagent.security.nemo_rails.get_nemo_layer") as mock_get:
+    with patch("prismal.security.nemo_rails.get_nemo_layer") as mock_get:
         mock_get.return_value = _make_nemo_layer(input_blocked=True, input_category="violence")
         engine = GuardrailsEngine()
 
@@ -99,7 +99,7 @@ async def test_audit_only_mode_always_safe_even_with_l3_block() -> None:
     mock_settings.security_mode = "audit-only"
     mock_settings.risk_threshold = 30
 
-    with patch("lightagent.core.config.get_settings", return_value=mock_settings):
+    with patch("prismal.core.config.get_settings", return_value=mock_settings):
         result: GuardrailResult = await engine.validate_input("how do I hurt someone")
 
     assert result.safe is True
@@ -112,7 +112,7 @@ async def test_audit_only_mode_always_safe_even_with_l3_block() -> None:
 @pytest.mark.asyncio
 async def test_l3_blocked_output_flags_result() -> None:
     """NeMo blocking output adds nemo_output: reason and sets safe=False."""
-    with patch("lightagent.security.nemo_rails.get_nemo_layer") as mock_get:
+    with patch("prismal.security.nemo_rails.get_nemo_layer") as mock_get:
         mock_get.return_value = _make_nemo_layer(
             output_blocked=True, output_category="unsafe_output"
         )
@@ -121,7 +121,7 @@ async def test_l3_blocked_output_flags_result() -> None:
     mock_settings = MagicMock()
     mock_settings.security_mode = "strict"
 
-    with patch("lightagent.core.config.get_settings", return_value=mock_settings):
+    with patch("prismal.core.config.get_settings", return_value=mock_settings):
         result: GuardrailResult = await engine.validate_output("Here is how to hurt someone")
 
     assert "nemo_output:unsafe_output" in result.reasons
@@ -131,14 +131,14 @@ async def test_l3_blocked_output_flags_result() -> None:
 @pytest.mark.asyncio
 async def test_l3_safe_output_passes_through() -> None:
     """Safe output with no L2 or L3 flags returns safe=True."""
-    with patch("lightagent.security.nemo_rails.get_nemo_layer") as mock_get:
+    with patch("prismal.security.nemo_rails.get_nemo_layer") as mock_get:
         mock_get.return_value = _make_nemo_layer(output_blocked=False)
         engine = GuardrailsEngine()
 
     mock_settings = MagicMock()
     mock_settings.security_mode = "strict"
 
-    with patch("lightagent.core.config.get_settings", return_value=mock_settings):
+    with patch("prismal.core.config.get_settings", return_value=mock_settings):
         result: GuardrailResult = await engine.validate_output("Paris is the capital of France.")
 
     assert result.safe is True
@@ -149,7 +149,7 @@ async def test_l3_safe_output_passes_through() -> None:
 async def test_canary_leak_and_l3_combined() -> None:
     """Canary leak + NeMo output block both appear in reasons."""
     canary = "SECRET_CANARY_12345"
-    with patch("lightagent.security.nemo_rails.get_nemo_layer") as mock_get:
+    with patch("prismal.security.nemo_rails.get_nemo_layer") as mock_get:
         mock_get.return_value = _make_nemo_layer(
             output_blocked=True, output_category="unsafe_output"
         )
@@ -158,7 +158,7 @@ async def test_canary_leak_and_l3_combined() -> None:
     mock_settings = MagicMock()
     mock_settings.security_mode = "strict"
 
-    with patch("lightagent.core.config.get_settings", return_value=mock_settings):
+    with patch("prismal.core.config.get_settings", return_value=mock_settings):
         result: GuardrailResult = await engine.validate_output(
             f"The answer is {canary}. Here is how to hurt someone.",
             canary=canary,

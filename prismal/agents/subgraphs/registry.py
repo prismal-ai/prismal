@@ -29,7 +29,7 @@ class SubgraphDefinition(BaseModel):
     map-reduce fan-out edges built on top of LangGraph's ``Send`` primitive.
     Each entry pairs a source node with a dispatcher callable (typically
     produced by
-    :func:`~lightagent.agents.patterns.parallel.make_parallel_dispatcher`)
+    :func:`~prismal.agents.patterns.parallel.make_parallel_dispatcher`)
     that returns either a list of ``Send`` objects or a fallback node name.
     """
 
@@ -83,7 +83,7 @@ class SubgraphRegistry:
         """Initialise an empty registry."""
         self._subgraphs: dict[str, SubgraphDefinition] = {}
         self._lock: asyncio.Lock = asyncio.Lock()
-        self._log = structlog.get_logger("lightagent.subgraphs.registry")
+        self._log = structlog.get_logger("prismal.subgraphs.registry")
 
     @classmethod
     def get_instance(cls) -> SubgraphRegistry:

@@ -23,7 +23,7 @@ from prismal.sandbox.manager import SandboxManager
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-logger = get_logger("lightagent.sandbox.installer")
+logger = get_logger("prismal.sandbox.installer")
 
 __all__ = ["SandboxInstaller"]
 
@@ -38,7 +38,7 @@ class SandboxInstaller:
     """Instala paquetes y runtimes en la sandbox.
 
     Args:
-        manager: :class:`~lightagent.sandbox.manager.SandboxManager` configurado.
+        manager: :class:`~prismal.sandbox.manager.SandboxManager` configurado.
     """
 
     def __init__(self, manager: SandboxManager | None = None) -> None:

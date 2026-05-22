@@ -17,7 +17,7 @@ from prismal.security.prompt_builder import SecurePromptBuilder
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-logger = get_logger("lightagent.subgraphs.document_generation.editor")
+logger = get_logger("prismal.subgraphs.document_generation.editor")
 
 _PROMPT = (
     "You are a copy editor. Polish the draft: fix grammar, improve clarity, "

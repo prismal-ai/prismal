@@ -63,7 +63,7 @@ def _kill_process_tree(pids: list[int]) -> None:
         pass
 
 
-logger = get_logger("lightagent.mcp.connection")
+logger = get_logger("prismal.mcp.connection")
 
 # ---------------------------------------------------------------------------
 # Pydantic config / status models

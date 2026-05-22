@@ -3,7 +3,7 @@
 Covers AC-042-1 (domain orchestrator topology), AC-042-2 (root
 supervisor routing + simplified prompt), AC-042-3 (domain supervisor
 factory loop-breaker + iteration cap), AC-042-4 (flat mode remains
-unchanged when ``LIGHTAGENT_HIERARCHICAL_MODE=false``), and AC-042-5
+unchanged when ``PRISMAL_HIERARCHICAL_MODE=false``), and AC-042-5
 (the explicit test coverage requirement).
 
 These tests never invoke real LLMs or real leaf agents — every LLM
@@ -97,12 +97,12 @@ def _patch_supervisor_llm(llm: MagicMock) -> Any:
     @contextlib.contextmanager
     def _cm() -> Any:
         with (
-            patch("lightagent.agents.supervisor.ProviderRegistry") as provider,
+            patch("prismal.agents.supervisor.ProviderRegistry") as provider,
             patch(
-                "lightagent.agents.supervisor._recall_memory_context",
+                "prismal.agents.supervisor._recall_memory_context",
                 new=AsyncMock(return_value=""),
             ),
-            patch("lightagent.agents.supervisor.get_settings") as mock_settings,
+            patch("prismal.agents.supervisor.get_settings") as mock_settings,
         ):
             provider.return_value.get_llm_with_fallback.return_value = llm
             mock_settings.return_value.memory_recall_limit = 0
@@ -267,7 +267,7 @@ class TestHierarchicalSupervisorNodeDirectAnswer:
         llm = _mock_llm("END", "¡Hola! ¿En qué puedo ayudarte hoy?")
         with (
             _patch_supervisor_llm(llm),
-            patch("lightagent.agents.supervisor.ProfileManager") as mock_profile,
+            patch("prismal.agents.supervisor.ProfileManager") as mock_profile,
         ):
             mock_profile.return_value.load_system_prompt.return_value = None
             out = await hierarchical_supervisor_node(_state(message="hola"))
@@ -319,7 +319,7 @@ class TestDomainSupervisorLoopBreaker:
             current_agent="researcher",
             extra_messages=[AIMessage(content="done")],
         )
-        with patch("lightagent.agents.domain_supervisor.ProviderRegistry") as pr:
+        with patch("prismal.agents.domain_supervisor.ProviderRegistry") as pr:
             pr.return_value.get_llm_with_fallback.return_value = llm
             out = await node(state)
         assert out["next_agent"] is None
@@ -332,7 +332,7 @@ class TestDomainSupervisorLoopBreaker:
         node = make_domain_supervisor("research", ["researcher"], "description")
         state = _state(metadata={"domain_research": {"iteration_count": _MAX_DOMAIN_ITERATIONS}})
         llm = _mock_llm("researcher")
-        with patch("lightagent.agents.domain_supervisor.ProviderRegistry") as pr:
+        with patch("prismal.agents.domain_supervisor.ProviderRegistry") as pr:
             pr.return_value.get_llm_with_fallback.return_value = llm
             out = await node(state)
 
@@ -345,7 +345,7 @@ class TestDomainSupervisorLoopBreaker:
         """Two factories write to independent metadata slots."""
         research = make_domain_supervisor("research", ["researcher"], "desc")
         engineering = make_domain_supervisor("engineering", ["coder"], "desc")
-        with patch("lightagent.agents.domain_supervisor.ProviderRegistry") as pr:
+        with patch("prismal.agents.domain_supervisor.ProviderRegistry") as pr:
             pr.return_value.get_llm_with_fallback.return_value = _mock_llm("researcher")
             out1 = await research(_state())
             pr.return_value.get_llm_with_fallback.return_value = _mock_llm("coder")
@@ -360,7 +360,7 @@ class TestDomainSupervisorLoopBreaker:
         """
         node = make_domain_supervisor("research", ["researcher", "rag_agent"], "desc")
         llm = _mock_llm("coder")  # coder is not in RESEARCH_AGENTS
-        with patch("lightagent.agents.domain_supervisor.ProviderRegistry") as pr:
+        with patch("prismal.agents.domain_supervisor.ProviderRegistry") as pr:
             pr.return_value.get_llm_with_fallback.return_value = llm
             out = await node(_state())
         assert out["next_agent"] is None
@@ -385,9 +385,9 @@ class TestFlatModeUnchangedWhenHierarchicalDisabled:
         graph_module._async_graph = None  # reset singleton
         try:
             with (
-                patch("lightagent.agents.graph.get_settings") as mock_settings,
+                patch("prismal.agents.graph.get_settings") as mock_settings,
                 patch(
-                    "lightagent.agents.graph._build_hierarchical_graph",
+                    "prismal.agents.graph._build_hierarchical_graph",
                     new=AsyncMock(),
                 ) as mock_hier,
             ):
@@ -420,7 +420,7 @@ class TestFlatModeUnchangedWhenHierarchicalDisabled:
 
         graph_module._async_graph = None
         try:
-            with patch("lightagent.agents.graph.get_settings") as mock_settings:
+            with patch("prismal.agents.graph.get_settings") as mock_settings:
                 mock_settings.return_value.hierarchical_mode = True
                 mock_settings.return_value.db_url = ""
                 mock_settings.return_value.enable_subgraphs = True
@@ -454,7 +454,7 @@ class TestFlatModeUnchangedWhenHierarchicalDisabled:
 
         graph_module._async_graph = None
         try:
-            with patch("lightagent.agents.graph.get_settings") as mock_settings:
+            with patch("prismal.agents.graph.get_settings") as mock_settings:
                 mock_settings.return_value.hierarchical_mode = True
                 mock_settings.return_value.db_url = ""
                 mock_settings.return_value.enable_subgraphs = True

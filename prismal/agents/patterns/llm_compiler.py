@@ -59,7 +59,7 @@ from prismal.monitoring.otel import OTelManager
 if TYPE_CHECKING:
     from prismal.core.config import Settings
 
-logger = get_logger("lightagent.agents.patterns.llm_compiler")
+logger = get_logger("prismal.agents.patterns.llm_compiler")
 
 _REFERENCE_RE = re.compile(r"\$(\w+)\.output")
 
@@ -156,8 +156,8 @@ class LLMCompiler:
         joiner: Async callable synthesising the final answer.
         max_replanning: Maximum additional planning attempts on failure
             (default 2; must be ≥ 0).
-        settings: LightAgent settings. ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+        settings: Prismal settings. ``None`` resolves via
+            :func:`~prismal.core.config.get_settings`.
     """
 
     def __init__(
@@ -271,7 +271,7 @@ class LLMCompiler:
         """Plan → validate → execute → join (with retries on task failure)."""
         otel = OTelManager()
         with otel.start_span("llm_compiler.run") as span:
-            span.set_attribute("lightagent.compiler.goal_len", len(goal))
+            span.set_attribute("prismal.compiler.goal_len", len(goal))
 
             replanning_count = 0
             previous_results: dict[str, Any] | None = None
@@ -282,8 +282,8 @@ class LLMCompiler:
 
                 if failed == 0:
                     final = await self._joiner(goal, plan.tasks)
-                    span.set_attribute("lightagent.compiler.replanning_count", replanning_count)
-                    span.set_attribute("lightagent.compiler.tasks_succeeded", succeeded)
+                    span.set_attribute("prismal.compiler.replanning_count", replanning_count)
+                    span.set_attribute("prismal.compiler.tasks_succeeded", succeeded)
                     logger.info(
                         "llm_compiler_done",
                         goal_len=len(goal),

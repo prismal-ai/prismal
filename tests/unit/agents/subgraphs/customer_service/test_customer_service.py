@@ -33,7 +33,7 @@ from prismal.agents.subgraphs.customer_service import (
 from prismal.agents.subgraphs.customer_service.builder import (
     build_customer_service_subgraph,
 )
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -67,8 +67,8 @@ def test_customer_service_categories_exposed() -> None:
     }
 
 
-def test_customer_service_error_inherits_from_lightagent_error() -> None:
-    assert issubclass(CustomerServiceError, LightAgentError)
+def test_customer_service_error_inherits_from_prismal_error() -> None:
+    assert issubclass(CustomerServiceError, PrismalError)
 
 
 # ── classifier_node ──────────────────────────────────────────────────────────

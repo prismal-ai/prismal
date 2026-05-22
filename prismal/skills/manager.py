@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
     from prismal.skills.base import BaseSkill
 
-logger = get_logger("lightagent.skills.manager")
+logger = get_logger("prismal.skills.manager")
 
 SkillStatus = Literal["active", "available", "custom", "external", "error"]
 
@@ -520,14 +520,14 @@ class SkillsManager:
             skill_py: Absolute path to the skill module file.
 
         Returns:
-            The first :class:`~lightagent.skills.base.BaseSkill` subclass found.
+            The first :class:`~prismal.skills.base.BaseSkill` subclass found.
 
         Raises:
             SkillLoadError: No BaseSkill subclass found in the module.
         """
         from prismal.skills.base import BaseSkill  # local to avoid circular
 
-        module_name = f"lightagent.skills._dynamic.{skill_py.parent.name}"
+        module_name = f"prismal.skills._dynamic.{skill_py.parent.name}"
         # Evict cached module so changes are picked up on reload
         sys.modules.pop(module_name, None)
 

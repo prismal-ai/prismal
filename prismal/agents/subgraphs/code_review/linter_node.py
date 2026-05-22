@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from prismal.agents.subgraphs.code_review.types import CodeIssue
 
-logger = get_logger("lightagent.subgraphs.code_review.linter")
+logger = get_logger("prismal.subgraphs.code_review.linter")
 
 
 async def _default_linter(_code: str, _file: str) -> list[CodeIssue]:

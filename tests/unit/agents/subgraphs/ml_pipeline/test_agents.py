@@ -31,7 +31,7 @@ async def test_data_ingester_produces_dataset_profile() -> None:
             '"target_column": "species"}'
         )
     )
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         state = _base_state("Train a classifier on iris data")
         result = await data_ingester_node(state)
@@ -48,7 +48,7 @@ async def test_data_ingester_handles_bad_llm_response() -> None:
     from prismal.agents.subgraphs.ml_pipeline.data_ingester import data_ingester_node
 
     mock_response = AIMessage(content="I cannot parse this")
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await data_ingester_node(_base_state())
 
@@ -82,7 +82,7 @@ async def test_eda_analyst_produces_eda_report() -> None:
         "task_type": "classification",
         "target_column": "churned",
     }
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await eda_analyst_node(state)
 
@@ -133,7 +133,7 @@ async def test_feature_engineer_produces_feature_set() -> None:
             "chart_paths": [],
         },
     }
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await feature_engineer_node(state)
 
@@ -182,7 +182,7 @@ async def test_model_trainer_produces_trained_model() -> None:
             "test_shape": [1, 1],
         },
     }
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await model_trainer_node(state)
 
@@ -229,7 +229,7 @@ async def test_model_trainer_enforces_random_seed() -> None:
             "test_shape": [2, 4],
         },
     }
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await model_trainer_node(state)
 
@@ -278,7 +278,7 @@ async def test_model_evaluator_produces_evaluation_report() -> None:
             "validation_score": 0.83,
         },
     }
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await model_evaluator_node(state)
 
@@ -326,7 +326,7 @@ async def test_model_evaluator_low_score_recommends_retrain() -> None:
             "validation_score": 0.50,
         },
     }
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await model_evaluator_node(state)
 
@@ -384,7 +384,7 @@ async def test_model_exporter_produces_model_package() -> None:
             "recommendation": "deploy",
         },
     }
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await model_exporter_node(state)
 

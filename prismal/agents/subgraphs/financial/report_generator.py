@@ -6,7 +6,7 @@ Consolidates all prior analyses (market, technical, fundamental, risk/sentiment)
 into an executive financial report. The legal disclaimer is ALWAYS present —
 even if the LLM fails to include it, it is injected automatically (Phase 27 rule 2).
 
-Stores a :class:`~lightagent.agents.subgraphs.financial.artifacts.FinancialReport`
+Stores a :class:`~prismal.agents.subgraphs.financial.artifacts.FinancialReport`
 under ``state["metadata"]["financial_analyst"]["financial_report"]``.
 """
 
@@ -28,7 +28,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.financial.report_generator")
+logger = structlog.get_logger("prismal.subgraphs.financial.report_generator")
 otel = OTelManager()
 
 _SYSTEM = """You are a Financial Report Generator for the financial subgraph.
@@ -97,7 +97,7 @@ The `FinancialReport` is acceptable when ALL of the following hold:
 
 ## Background
 - Artifact schema:
-  `lightagent/agents/subgraphs/financial/artifacts.py::FinancialReport`.
+  `prismal/agents/subgraphs/financial/artifacts.py::FinancialReport`.
 - `_DISCLAIMER` constant lives in the same module; the runtime
   re-injects it on the parsed artifact as a safety net.
 - Workspace:
@@ -159,8 +159,8 @@ async def report_generator_node(state: AgentState) -> dict[str, Any]:
         ``metadata["financial_analyst"]["financial_report"]``.
     """
     with otel.start_span("financial_analyst.report_generator") as span:
-        span.set_attribute("lightagent.subgraph", "financial_analyst")
-        span.set_attribute("lightagent.agent", "report_generator")
+        span.set_attribute("prismal.subgraph", "financial_analyst")
+        span.set_attribute("prismal.agent", "report_generator")
 
         fin: dict[str, Any] = dict(state.get("metadata", {}).get("financial_analyst", {}))
         snapshot = fin.get("market_snapshot", {})
@@ -212,7 +212,7 @@ async def report_generator_node(state: AgentState) -> dict[str, Any]:
             mode=report.report_mode,
             sections=list(report.sections.keys()),
         )
-        span.set_attribute("lightagent.financial.symbol", report.symbol)
+        span.set_attribute("prismal.financial.symbol", report.symbol)
 
         return {
             "current_agent": "report_generator",

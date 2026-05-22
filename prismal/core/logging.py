@@ -1,7 +1,7 @@
 """
 Structured logging with structlog API and Loguru sink backend.
 
-All LightAgent modules obtain loggers via :func:`get_logger`.
+All Prismal modules obtain loggers via :func:`get_logger`.
 :func:`setup_logging` must be called once at startup (CLI main or
 FastAPI lifespan). Loguru handles file rotation, retention, and
 compression; structlog provides the structured-event API.
@@ -60,7 +60,7 @@ def _loguru_factory(*_args: object, **_kw: object) -> _LoguruBridge:
 def setup_logging(
     log_level: LogLevel = "INFO",
     log_format: Literal["json", "pretty"] = "pretty",
-    log_file: str | None = "data/logs/lightagent.log",
+    log_file: str | None = "data/logs/prismal.log",
     rotation: str = "500 MB",
     retention: str = "30 days",
     compression: str = "gz",
@@ -129,7 +129,7 @@ def setup_logging(
     )
 
 
-def setup_chat_logging(log_file: str = "data/logs/lightagent.log") -> None:
+def setup_chat_logging(log_file: str = "data/logs/prismal.log") -> None:
     """Configure logging for interactive chat: file-only, no console output.
 
     Removes ALL Loguru sinks (including stderr) and adds a single file sink so
@@ -157,7 +157,7 @@ def setup_chat_logging(log_file: str = "data/logs/lightagent.log") -> None:
         _loguru.add(_sys.stderr, level="ERROR", format="{message}")
 
 
-def get_logger(name: str = "lightagent") -> structlog.stdlib.BoundLogger:
+def get_logger(name: str = "prismal") -> structlog.stdlib.BoundLogger:
     """
     Return a structlog BoundLogger bound to the given module name.
 

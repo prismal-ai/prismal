@@ -6,11 +6,11 @@ that **writes, plans, or manipulates code and files**: ``coder``
 ``planner`` (SDD spec decomposition), ``file_manager``, and
 ``skill_manager``. The root supervisor delegates any
 "build / implement / refactor / plan" request to this subgraph when
-``LIGHTAGENT_HIERARCHICAL_MODE=true``.
+``PRISMAL_HIERARCHICAL_MODE=true``.
 
 Topology mirrors the research orchestrator (domain supervisor → 5
 leaves → back to supervisor) — see
-:mod:`lightagent.agents.subgraphs.research_orchestrator.builder` for
+:mod:`prismal.agents.subgraphs.research_orchestrator.builder` for
 the design rationale.
 """
 
@@ -32,7 +32,7 @@ from prismal.agents.subgraphs.registry import (
     SubgraphRegistry,
 )
 
-logger = structlog.get_logger("lightagent.subgraphs.engineering_orchestrator.builder")
+logger = structlog.get_logger("prismal.subgraphs.engineering_orchestrator.builder")
 
 _NAME = "engineering_orchestrator"
 _DESCRIPTION = (

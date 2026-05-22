@@ -1,4 +1,4 @@
-"""Unit tests for LLMCompiler (lightagent.agents.patterns.llm_compiler).
+"""Unit tests for LLMCompiler (prismal.agents.patterns.llm_compiler).
 
 LLM-Compiler: plan a goal into a DAG of tool-executing tasks, validate the
 DAG (topological sort), run independent tasks in parallel, re-plan on
@@ -25,7 +25,7 @@ from prismal.agents.patterns.llm_compiler import (
     LLMCompiler,
     TaskNode,
 )
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
 
 def _task(
@@ -83,8 +83,8 @@ def test_compiler_result_is_instantiable() -> None:
     assert r.final_answer == "42"
 
 
-def test_compiler_error_inherits_from_lightagent_error() -> None:
-    assert issubclass(CompilerError, LightAgentError)
+def test_compiler_error_inherits_from_prismal_error() -> None:
+    assert issubclass(CompilerError, PrismalError)
 
 
 # ── validate_dag ─────────────────────────────────────────────────────────────

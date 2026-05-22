@@ -2,13 +2,13 @@
 
 Exposes :data:`channel_context_var`, a :class:`~contextvars.ContextVar` used
 to propagate the originating channel metadata (Telegram, Slack, Discord, ...)
-from :class:`~lightagent.channels.router.ChannelRouter` all the way down to
+from :class:`~prismal.channels.router.ChannelRouter` all the way down to
 tools such as ``cron_add`` / ``cron_once``.
 
 Rationale
 ---------
-LangGraph nodes receive the full :class:`~lightagent.agents.state.AgentState`,
-but our custom :func:`~lightagent.agents.tool_registry.react_loop` invokes
+LangGraph nodes receive the full :class:`~prismal.agents.state.AgentState`,
+but our custom :func:`~prismal.agents.tool_registry.react_loop` invokes
 tools via ``tool_fn.ainvoke(args)`` without the LangGraph ``ToolNode`` that
 normally resolves ``Annotated[..., InjectedState]`` parameters.  Passing
 ``state`` through every call site would bloat signatures and couple every
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 #: channel gateway (API, dashboard, CLI, cron tick, …).  Tools must tolerate
 #: ``None`` gracefully and fall through to their explicit routing arguments.
 channel_context_var: ContextVar[dict[str, str] | None] = ContextVar(
-    "lightagent_channel_context",
+    "prismal_channel_context",
     default=None,
 )
 

@@ -5,7 +5,7 @@ callbacks.  Four paths are pre-wired by :func:`create_default_watcher`:
 
 * ``data/documents/``         → ``index_document_event``   (AC-007-5)
 * ``data/workspace/``         → ``workspace_update_event`` (AC-007-5)
-* ``lightagent/skills/available/`` → ``skill_discovery_event``  (AC-007-6)
+* ``prismal/skills/available/`` → ``skill_discovery_event``  (AC-007-6)
 * ``config/``                 → ``config_reload_event``    (AC-007-7)
 
 Example::
@@ -41,7 +41,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from watchdog.observers.api import BaseObserver
 
-logger = get_logger("lightagent.events.file_watcher")
+logger = get_logger("prismal.events.file_watcher")
 
 # ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -54,7 +54,7 @@ _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _DEFAULT_WATCHES: list[tuple[str, str]] = [
     ("data/documents", "index_document_event"),
     ("data/workspace", "workspace_update_event"),
-    ("lightagent/skills/available", "skill_discovery_event"),
+    ("prismal/skills/available", "skill_discovery_event"),
     ("config", "config_reload_event"),
 ]
 
@@ -62,8 +62,8 @@ _DEFAULT_WATCHES: list[tuple[str, str]] = [
 # ── Event handler ─────────────────────────────────────────────────────────────
 
 
-class _LightAgentEventHandler(FileSystemEventHandler):
-    """Watchdog handler that converts FS events into named LightAgent events.
+class _PrismalEventHandler(FileSystemEventHandler):
+    """Watchdog handler that converts FS events into named Prismal events.
 
     Args:
         callback: Callable receiving ``(event_name, file_path)`` on each
@@ -180,7 +180,7 @@ class FileWatcher:
                     watch_event=entry.event_name,
                 )
                 continue
-            handler = _LightAgentEventHandler(entry.callback, entry.event_name)
+            handler = _PrismalEventHandler(entry.callback, entry.event_name)
             self._observer.schedule(handler, str(entry.path), recursive=True)
             logger.info(
                 "file_watcher_scheduled",
@@ -218,7 +218,7 @@ def create_default_watcher(
 
     * ``data/documents/``         → ``index_document_event``
     * ``data/workspace/``         → ``workspace_update_event``
-    * ``lightagent/skills/available/`` → ``skill_discovery_event``
+    * ``prismal/skills/available/`` → ``skill_discovery_event``
     * ``config/``                 → ``config_reload_event``
 
     Args:
@@ -228,7 +228,7 @@ def create_default_watcher(
     Returns:
         A configured (but not yet started) :class:`FileWatcher`.
 
-    AC-007-5 / AC-007-6 / AC-007-7: Standard LightAgent event bindings.
+    AC-007-5 / AC-007-6 / AC-007-7: Standard Prismal event bindings.
     """
     cbs: dict[str, EventCallback] = callbacks or {}
 
@@ -246,6 +246,6 @@ def create_default_watcher(
 __all__ = [
     "EventCallback",
     "FileWatcher",
-    "_LightAgentEventHandler",
+    "_PrismalEventHandler",
     "create_default_watcher",
 ]

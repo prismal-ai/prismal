@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from prismal.rag.hybrid import HybridSearchEngine
     from prismal.rag.hyde import HyDERetriever
 
-logger = get_logger("lightagent.rag.adaptive")
+logger = get_logger("prismal.rag.adaptive")
 
 
 class QueryType(StrEnum):
@@ -117,8 +117,8 @@ class AdaptiveRAGEngine:
             ``force_strategy="hierarchical"``).
         use_llm_classifier: When ``True``, consult the LLM for classification
             (slower, more nuanced). Defaults to ``False`` (regex-only).
-        settings: LightAgent settings. ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+        settings: Prismal settings. ``None`` resolves via
+            :func:`~prismal.core.config.get_settings`.
     """
 
     def __init__(
@@ -169,8 +169,8 @@ class AdaptiveRAGEngine:
         """
         otel = OTelManager()
         with otel.start_span("adaptive.search") as span:
-            span.set_attribute("lightagent.query_len", len(query))
-            span.set_attribute("lightagent.k", k)
+            span.set_attribute("prismal.query_len", len(query))
+            span.set_attribute("prismal.k", k)
 
             if force_strategy is not None:
                 if force_strategy not in _VALID_FORCED_STRATEGIES:
@@ -188,9 +188,9 @@ class AdaptiveRAGEngine:
                     query_type, confidence = self.classify_query(query)
                 strategy, chunks = await self._route_and_run(query_type, query, k)
 
-            span.set_attribute("lightagent.query_type", query_type.value)
-            span.set_attribute("lightagent.strategy", strategy)
-            span.set_attribute("lightagent.num_results", len(chunks))
+            span.set_attribute("prismal.query_type", query_type.value)
+            span.set_attribute("prismal.strategy", strategy)
+            span.set_attribute("prismal.num_results", len(chunks))
             otel.increment_counter("rag_queries")
 
             logger.info(

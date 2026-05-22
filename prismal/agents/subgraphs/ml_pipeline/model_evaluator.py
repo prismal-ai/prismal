@@ -12,7 +12,7 @@ and routes to ``model_exporter`` (score >= threshold) or ``model_trainer``
 
 IMPORTANT: Never log raw datasets or model files to traces — only metadata.
 
-Stores an :class:`~lightagent.agents.subgraphs.ml_pipeline.artifacts.EvaluationReport`
+Stores an :class:`~prismal.agents.subgraphs.ml_pipeline.artifacts.EvaluationReport`
 under ``state["metadata"]["ml_pipeline"]["evaluation_report"]``.
 """
 
@@ -32,7 +32,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.ml_pipeline.model_evaluator")
+logger = structlog.get_logger("prismal.subgraphs.ml_pipeline.model_evaluator")
 otel = OTelManager()
 
 _SYSTEM = """You are a Model Evaluator for the ml_pipeline subgraph.
@@ -92,7 +92,7 @@ The `EvaluationReport` is acceptable when ALL of the following hold:
 
 ## Background
 - Artifact schema:
-  `lightagent/agents/subgraphs/ml_pipeline/artifacts.py::EvaluationReport`.
+  `prismal/agents/subgraphs/ml_pipeline/artifacts.py::EvaluationReport`.
 - The quality gate downstream uses `primary_score` vs
   `settings.ml_quality_threshold` (default `0.7`) — keep them aligned.
 
@@ -148,8 +148,8 @@ async def model_evaluator_node(state: AgentState) -> dict[str, Any]:
         ``metadata["ml_pipeline"]["evaluation_report"]``.
     """
     with otel.start_span("ml_pipeline.model_evaluator") as span:
-        span.set_attribute("lightagent.subgraph", "ml_pipeline")
-        span.set_attribute("lightagent.agent", "model_evaluator")
+        span.set_attribute("prismal.subgraph", "ml_pipeline")
+        span.set_attribute("prismal.agent", "model_evaluator")
 
         settings = get_settings()
         ml: dict[str, Any] = dict(state.get("metadata", {}).get("ml_pipeline", {}))
@@ -198,8 +198,8 @@ async def model_evaluator_node(state: AgentState) -> dict[str, Any]:
             recommendation=report.recommendation,
             gate=gate_result,
         )
-        span.set_attribute("lightagent.ml.primary_score", report.primary_score)
-        span.set_attribute("lightagent.ml.recommendation", report.recommendation)
+        span.set_attribute("prismal.ml.primary_score", report.primary_score)
+        span.set_attribute("prismal.ml.recommendation", report.recommendation)
 
         return {
             "current_agent": "model_evaluator",

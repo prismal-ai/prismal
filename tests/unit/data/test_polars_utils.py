@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.data.polars_utils — T-141."""
+"""Unit tests for prismal.data.polars_utils — T-141."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 from prismal.data.polars_utils import (
     filter_rows,
     group_by_aggregate,
@@ -78,8 +78,8 @@ def test_filter_rows_greater_equal(sales_df: pl.DataFrame) -> None:
 
 
 def test_filter_rows_missing_column(sales_df: pl.DataFrame) -> None:
-    """filter_rows raises LightAgentError for missing column."""
-    with pytest.raises(LightAgentError, match="Column 'nonexistent'"):
+    """filter_rows raises PrismalError for missing column."""
+    with pytest.raises(PrismalError, match="Column 'nonexistent'"):
         filter_rows(sales_df, "nonexistent", ">", 0)
 
 
@@ -151,14 +151,14 @@ def test_group_by_result_is_sorted(sales_df: pl.DataFrame) -> None:
 
 
 def test_group_by_missing_group_col(sales_df: pl.DataFrame) -> None:
-    """group_by_aggregate raises LightAgentError for missing group_col."""
-    with pytest.raises(LightAgentError, match="Column 'bad_col'"):
+    """group_by_aggregate raises PrismalError for missing group_col."""
+    with pytest.raises(PrismalError, match="Column 'bad_col'"):
         group_by_aggregate(sales_df, "bad_col", "sales", "sum")
 
 
 def test_group_by_missing_agg_col(sales_df: pl.DataFrame) -> None:
-    """group_by_aggregate raises LightAgentError for missing agg_col."""
-    with pytest.raises(LightAgentError, match="Column 'bad_col'"):
+    """group_by_aggregate raises PrismalError for missing agg_col."""
+    with pytest.raises(PrismalError, match="Column 'bad_col'"):
         group_by_aggregate(sales_df, "region", "bad_col", "sum")
 
 
@@ -182,8 +182,8 @@ def test_sort_descending(sales_df: pl.DataFrame) -> None:
 
 
 def test_sort_missing_column(sales_df: pl.DataFrame) -> None:
-    """sort_by raises LightAgentError for missing column."""
-    with pytest.raises(LightAgentError, match="Column 'missing'"):
+    """sort_by raises PrismalError for missing column."""
+    with pytest.raises(PrismalError, match="Column 'missing'"):
         sort_by(sales_df, "missing")
 
 
@@ -206,8 +206,8 @@ def test_select_columns_single(sales_df: pl.DataFrame) -> None:
 
 
 def test_select_columns_missing(sales_df: pl.DataFrame) -> None:
-    """select_columns raises LightAgentError when a column is missing."""
-    with pytest.raises(LightAgentError, match="Columns not found"):
+    """select_columns raises PrismalError when a column is missing."""
+    with pytest.raises(PrismalError, match="Columns not found"):
         select_columns(sales_df, ["region", "nonexistent"])
 
 
@@ -294,8 +294,8 @@ def test_save_chart_creates_parent_dir(tmp_path: Path, sales_df: pl.DataFrame) -
 
 @_needs_matplotlib
 def test_save_chart_missing_column(tmp_path: Path, sales_df: pl.DataFrame) -> None:
-    """save_chart raises LightAgentError when a column is missing."""
-    with pytest.raises(LightAgentError, match="Column 'bad'"):
+    """save_chart raises PrismalError when a column is missing."""
+    with pytest.raises(PrismalError, match="Column 'bad'"):
         save_chart(sales_df, "bad", "sales", tmp_path / "c.png")
 
 

@@ -16,17 +16,17 @@ def test_otel_span_hierarchy_noop() -> None:
     s = MagicMock()
     s.otel_enabled = False
     with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings",
+        "prismal.monitoring._settings_proxy.get_monitoring_settings",
         return_value=s,
     ):
         otel = OTelManager()
 
-    with otel.start_span("agent.execute", {"lightagent.pattern": "SUPERVISOR"}) as parent:
+    with otel.start_span("agent.execute", {"prismal.pattern": "SUPERVISOR"}) as parent:
         assert isinstance(parent, _NoOpSpan)
-        with otel.start_span("llm.call", {"lightagent.model": "gpt-4o"}) as child:
+        with otel.start_span("llm.call", {"prismal.model": "gpt-4o"}) as child:
             assert isinstance(child, _NoOpSpan)
-            child.set_attribute("lightagent.tokens", 500)
-        parent.set_attribute("lightagent.agent", "supervisor")
+            child.set_attribute("prismal.tokens", 500)
+        parent.set_attribute("prismal.agent", "supervisor")
 
 
 def test_span_records_exception() -> None:
@@ -38,7 +38,7 @@ def test_span_records_exception() -> None:
     s = MagicMock()
     s.otel_enabled = False
     with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings",
+        "prismal.monitoring._settings_proxy.get_monitoring_settings",
         return_value=s,
     ):
         otel = OTelManager()
@@ -57,7 +57,7 @@ def test_counter_and_histogram_noop() -> None:
     s = MagicMock()
     s.otel_enabled = False
     with patch(
-        "lightagent.monitoring._settings_proxy.get_monitoring_settings",
+        "prismal.monitoring._settings_proxy.get_monitoring_settings",
         return_value=s,
     ):
         otel = OTelManager()

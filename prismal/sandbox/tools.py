@@ -11,7 +11,7 @@ from langchain_core.tools import BaseTool, tool
 
 from prismal.core.logging import get_logger
 
-logger = get_logger("lightagent.sandbox.tools")
+logger = get_logger("prismal.sandbox.tools")
 
 __all__ = [
     "SANDBOX_TOOLS",
@@ -32,7 +32,7 @@ def _check_shell_enabled() -> str | None:
     if not get_settings().shell_enabled:
         return (
             "Ejecución de código deshabilitada. "
-            "Establece LIGHTAGENT_SHELL_ENABLED=true en tu .env para habilitarla."
+            "Establece PRISMAL_SHELL_ENABLED=true en tu .env para habilitarla."
         )
     return None
 

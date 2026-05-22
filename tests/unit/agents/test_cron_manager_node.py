@@ -53,10 +53,10 @@ async def test_cron_manager_node_returns_correct_agent_name() -> None:
     state["messages"] = [HumanMessage(content="Schedule a daily report at 9 AM")]
 
     with (
-        patch("lightagent.agents.cron_manager.ProviderRegistry") as mock_reg,
-        patch("lightagent.agents.cron_manager.get_tools_for_agent", return_value=[]),
+        patch("prismal.agents.cron_manager.ProviderRegistry") as mock_reg,
+        patch("prismal.agents.cron_manager.get_tools_for_agent", return_value=[]),
         patch(
-            "lightagent.agents.cron_manager.react_loop",
+            "prismal.agents.cron_manager.react_loop",
             new_callable=AsyncMock,
             return_value=AIMessage(content="Scheduled"),
         ),
@@ -76,10 +76,10 @@ async def test_cron_manager_node_returns_messages() -> None:
     state["messages"] = [HumanMessage(content="List all scheduled jobs")]
 
     with (
-        patch("lightagent.agents.cron_manager.ProviderRegistry") as mock_reg,
-        patch("lightagent.agents.cron_manager.get_tools_for_agent", return_value=[]),
+        patch("prismal.agents.cron_manager.ProviderRegistry") as mock_reg,
+        patch("prismal.agents.cron_manager.get_tools_for_agent", return_value=[]),
         patch(
-            "lightagent.agents.cron_manager.react_loop",
+            "prismal.agents.cron_manager.react_loop",
             new_callable=AsyncMock,
             return_value=AIMessage(content="No jobs found"),
         ),
@@ -115,9 +115,9 @@ async def test_cron_manager_node_calls_react_loop_with_system_prompt() -> None:
         return AIMessage(content="Paused")
 
     with (
-        patch("lightagent.agents.cron_manager.ProviderRegistry") as mock_reg,
-        patch("lightagent.agents.cron_manager.get_tools_for_agent", return_value=[]),
-        patch("lightagent.agents.cron_manager.react_loop", side_effect=_fake_react_loop),
+        patch("prismal.agents.cron_manager.ProviderRegistry") as mock_reg,
+        patch("prismal.agents.cron_manager.get_tools_for_agent", return_value=[]),
+        patch("prismal.agents.cron_manager.react_loop", side_effect=_fake_react_loop),
     ):
         mock_reg.return_value.get_llm_with_fallback.return_value = _mock_llm()
         await cron_manager_node(state)
@@ -136,10 +136,10 @@ async def test_cron_manager_node_uses_cron_tools() -> None:
     state["messages"] = [HumanMessage(content="Remove job old_task")]
 
     with (
-        patch("lightagent.agents.cron_manager.ProviderRegistry") as mock_reg,
-        patch("lightagent.agents.cron_manager.get_tools_for_agent", return_value=[]) as mock_tools,
+        patch("prismal.agents.cron_manager.ProviderRegistry") as mock_reg,
+        patch("prismal.agents.cron_manager.get_tools_for_agent", return_value=[]) as mock_tools,
         patch(
-            "lightagent.agents.cron_manager.react_loop",
+            "prismal.agents.cron_manager.react_loop",
             new_callable=AsyncMock,
             return_value=AIMessage(content="Removed"),
         ),
@@ -174,9 +174,9 @@ async def test_cron_manager_node_passes_session_id() -> None:
         return AIMessage(content="Scheduled")
 
     with (
-        patch("lightagent.agents.cron_manager.ProviderRegistry") as mock_reg,
-        patch("lightagent.agents.cron_manager.get_tools_for_agent", return_value=[]),
-        patch("lightagent.agents.cron_manager.react_loop", side_effect=_fake_react_loop),
+        patch("prismal.agents.cron_manager.ProviderRegistry") as mock_reg,
+        patch("prismal.agents.cron_manager.get_tools_for_agent", return_value=[]),
+        patch("prismal.agents.cron_manager.react_loop", side_effect=_fake_react_loop),
     ):
         mock_reg.return_value.get_llm_with_fallback.return_value = _mock_llm()
         await cron_manager_node(state)

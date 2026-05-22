@@ -2,9 +2,9 @@
 
 These tests call the real PyPI JSON API (https://pypi.org/pypi/{name}/json)
 and the OSV API to provide a realistic full-update scenario.  They are
-network-gated behind ``LIGHTAGENT_TEST_NETWORK=1``:
+network-gated behind ``PRISMAL_TEST_NETWORK=1``:
 
-    LIGHTAGENT_TEST_NETWORK=1 pytest tests/integration/test_doctor_update_e2e.py -v
+    PRISMAL_TEST_NETWORK=1 pytest tests/integration/test_doctor_update_e2e.py -v
 
 All tests run with ``dry_run=True`` — nothing is installed or modified.
 """
@@ -16,12 +16,12 @@ from pathlib import Path
 
 import pytest
 
-_NETWORK = bool(os.environ.get("LIGHTAGENT_TEST_NETWORK"))
+_NETWORK = bool(os.environ.get("PRISMAL_TEST_NETWORK"))
 
 pytestmark = pytest.mark.skipif(
     not _NETWORK,
     reason=(
-        "Network integration test — set LIGHTAGENT_TEST_NETWORK=1 to enable. "
+        "Network integration test — set PRISMAL_TEST_NETWORK=1 to enable. "
         "Calls the real PyPI API (https://pypi.org) and OSV API."
     ),
 )

@@ -39,7 +39,7 @@ from prismal.security.prompt_builder import SecurePromptBuilder
 if TYPE_CHECKING:
     from prismal.core.config import Settings
 
-logger = get_logger("lightagent.agents.patterns.mixture_of_agents")
+logger = get_logger("prismal.agents.patterns.mixture_of_agents")
 
 _PROPOSER_PROMPT = (
     "You are one of several independent experts answering the user's query. "
@@ -83,8 +83,8 @@ class MixtureOfAgents:
             ``proposer_models[0]`` as a sensible default.
         n_aggregator_layers: Number of aggregator passes (each refines the
             previous). Must be ≥ 1.
-        settings: LightAgent settings. ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+        settings: Prismal settings. ``None`` resolves via
+            :func:`~prismal.core.config.get_settings`.
     """
 
     def __init__(
@@ -108,9 +108,9 @@ class MixtureOfAgents:
         del state  # reserved for future hooks
         otel = OTelManager()
         with otel.start_span("moa.generate") as span:
-            span.set_attribute("lightagent.moa.query_len", len(query))
-            span.set_attribute("lightagent.moa.n_proposers", len(self._proposer_models))
-            span.set_attribute("lightagent.moa.n_aggregator_layers", self._n_aggregator_layers)
+            span.set_attribute("prismal.moa.query_len", len(query))
+            span.set_attribute("prismal.moa.n_proposers", len(self._proposer_models))
+            span.set_attribute("prismal.moa.n_aggregator_layers", self._n_aggregator_layers)
 
             registry = ProviderRegistry(settings=self._settings)
             proposer_outputs, providers_used = await self._run_proposers(registry, query)
@@ -131,7 +131,7 @@ class MixtureOfAgents:
                 )
 
             final_answer = current[0]
-            span.set_attribute("lightagent.moa.answer_len", len(final_answer))
+            span.set_attribute("prismal.moa.answer_len", len(final_answer))
             logger.info(
                 "moa_generate_done",
                 n_proposers_success=len(providers_used),

@@ -27,7 +27,7 @@ async def test_po_agent_adds_user_story() -> None:
             '"acceptance_criteria": ["Given valid credentials, I can log in"], "priority": "MUST"}'
         )
     )
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await po_agent_node(_base_state())
 
@@ -57,7 +57,7 @@ async def test_architect_agent_adds_tech_spec() -> None:
             '"design_decisions": ["use bcrypt"], "technology_stack": ["fastapi", "jwt"]}'
         )
     )
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await architect_agent_node(state)
 
@@ -86,7 +86,7 @@ async def test_developer_agent_adds_code_artifact() -> None:
             '"content": "def login(): pass", "dependencies": []}'
         )
     )
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await developer_agent_node(state)
 
@@ -114,7 +114,7 @@ async def test_unit_test_agent_adds_test_report() -> None:
             '"failing_tests": [], "recommendations": []}'
         )
     )
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await unit_test_agent_node(state)
 
@@ -140,7 +140,7 @@ async def test_qa_agent_adds_qa_report() -> None:
             '"security_findings": [], "quality_score": 80.0, "approved": true}'
         )
     )
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await qa_agent_node(state)
 
@@ -175,7 +175,7 @@ async def test_reviewer_agent_adds_review_result() -> None:
             '"improvements": [], "blocking_issues": []}'
         )
     )
-    with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
+    with patch("prismal.providers.registry.ProviderRegistry.get_llm") as mock_llm:
         mock_llm.return_value.ainvoke = AsyncMock(return_value=mock_response)
         result = await reviewer_agent_node(state)
 

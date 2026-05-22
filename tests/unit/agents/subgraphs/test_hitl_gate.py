@@ -54,13 +54,13 @@ def test_hitl_gate_no_action_defaults_to_reject() -> None:
 
 
 def test_hitl_gate_bypass_when_hitl_disabled() -> None:
-    """LIGHTAGENT_HITL_ENABLED=false → gate routes directly to on_approve."""
+    """PRISMAL_HITL_ENABLED=false → gate routes directly to on_approve."""
     gate = hitl_gate("foo.bar", "approved", "rejected")
     state = {"metadata": {"_hitl_last_action": "reject"}}
 
     fake = type("S", (), {"hitl_enabled": False})()
     with patch(
-        "lightagent.agents.subgraphs.gates.get_settings",
+        "prismal.agents.subgraphs.gates.get_settings",
         return_value=fake,
     ):
         # Should bypass even though the recorded action was "reject".

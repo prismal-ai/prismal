@@ -1,4 +1,4 @@
-"""Coverage tests for lightagent.skills.manager — Phase 15 T-004.
+"""Coverage tests for prismal.skills.manager — Phase 15 T-004.
 
 Targets lines not reached by the original test_manager.py:
   72          : default skills_root=None uses Path(__file__).parent
@@ -207,7 +207,7 @@ class TestSkillsManagerCoverage:
     def test_default_skills_root_uses_package_dir(self) -> None:
         """SkillsManager() with no args sets _root to the skills package dir."""
         manager = SkillsManager()
-        expected = Path(__file__).parent.parent.parent.parent / "lightagent" / "skills"
+        expected = Path(__file__).parent.parent.parent.parent / "prismal" / "skills"
         # The actual _root may not equal the exact package dir in all installs,
         # but it must be an absolute path and point to an existing directory.
         assert manager._root.is_absolute()

@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 
 
 class Base(DeclarativeBase):
-    """Declarative base class for all LightAgent SQLAlchemy models.
+    """Declarative base class for all Prismal SQLAlchemy models.
 
     All ORM model classes must inherit from this ``Base``.
     Tables are created via ``init_db()`` or Alembic migrations.
@@ -54,7 +54,7 @@ def create_async_engine_from_url(db_url: str) -> AsyncEngine:
 
     Args:
         db_url: SQLAlchemy-compatible async database URL, e.g.:
-            - ``sqlite+aiosqlite:///data/db/lightagent.db``
+            - ``sqlite+aiosqlite:///data/db/prismal.db``
             - ``postgresql+asyncpg://user:pass@host/db``
 
     Returns:
@@ -192,7 +192,7 @@ def get_checkpointer() -> object:
     Raises:
         ImportError: If the required optional package is not installed.
             For SQLite: ``pip install langgraph-checkpoint-sqlite``.
-            For PostgreSQL: ``pip install 'lightagent[postgres]'``.
+            For PostgreSQL: ``pip install 'prismal[postgres]'``.
     """
     db_url = get_settings().db_url
     if db_url.startswith("sqlite"):
@@ -216,7 +216,7 @@ def get_checkpointer() -> object:
     except ImportError as exc:
         raise ImportError(
             "PostgreSQL checkpointing requires langgraph-checkpoint-postgres. "
-            "Install with: pip install 'lightagent[postgres]'"
+            "Install with: pip install 'prismal[postgres]'"
         ) from exc
     # Strip asyncpg/psycopg driver prefix — PostgresSaver uses psycopg directly.
     pg_url = db_url.replace("postgresql+asyncpg://", "postgresql://").replace(

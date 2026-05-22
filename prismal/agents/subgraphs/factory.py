@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
     from prismal.agents.subgraphs.registry import SubgraphDefinition
 
-logger = structlog.get_logger("lightagent.subgraphs.factory")
+logger = structlog.get_logger("prismal.subgraphs.factory")
 
 
 class SubgraphFactory:
@@ -72,7 +72,7 @@ class SubgraphFactory:
         every subgraph owns an isolated SQLite checkpoint file.
 
         When ``checkpointer_path`` is ``None`` the factory delegates to
-        :func:`lightagent.agents.graph.build_checkpointer` which selects
+        :func:`prismal.agents.graph.build_checkpointer` which selects
         the backend from ``settings.db_url`` (SQLite or PostgreSQL).
         This is required for production multi-worker deployments where
         HITL workflows must be resumable across processes (AC-038-3).

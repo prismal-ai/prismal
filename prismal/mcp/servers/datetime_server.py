@@ -1,5 +1,5 @@
 """
-lightagent-datetime MCP server — standalone, zero internal imports.
+prismal-datetime MCP server — standalone, zero internal imports.
 
 Provides six tools for timezone-aware datetime operations, cron expression
 validation, and timezone listing.  Agents call these tools via MCP instead
@@ -7,11 +7,11 @@ of implementing timezone logic directly.
 
 Launch (stdio transport)::
 
-    python -m lightagent.mcp.servers.datetime_server
+    python -m prismal.mcp.servers.datetime_server
 
 Environment variables read at runtime:
-    LIGHTAGENT_TIMEZONE      — override OS timezone (IANA name or "")
-    LIGHTAGENT_CRON_TIMEZONE — default cron timezone (IANA name or "")
+    PRISMAL_TIMEZONE      — override OS timezone (IANA name or "")
+    PRISMAL_CRON_TIMEZONE — default cron timezone (IANA name or "")
 
 Note:
     This module intentionally does NOT use ``from __future__ import annotations``.
@@ -32,12 +32,25 @@ from pydantic import BaseModel
 
 from mcp.server.fastmcp import FastMCP
 
+
+def _getenv_compat(name: str, default: str = "") -> str:
+    """Read a ``PRISMAL_*`` env var, falling back to the legacy ``LIGHTAGENT_*``.
+
+    Kept local so this module stays standalone (zero internal imports). The
+    legacy prefix is deprecated and will be removed in a future major release.
+    """
+    val = os.environ.get(name)
+    if val is None and name.startswith("PRISMAL_"):
+        val = os.environ.get("LIGHTAGENT_" + name[len("PRISMAL_") :])
+    return val if val is not None else default
+
+
 # ── FastMCP application ────────────────────────────────────────────────────────
 
 mcp = FastMCP(
-    "lightagent-datetime",
+    "prismal-datetime",
     instructions=(
-        "Timezone-aware datetime tools for LightAgent agents. "
+        "Timezone-aware datetime tools for Prismal agents. "
         "Use datetime_get_timezone_info() to inspect the current system timezone, "
         "datetime_cron_next_run() to preview cron schedules, and "
         "datetime_convert() to convert timestamps between timezones."
@@ -72,11 +85,11 @@ class TimezoneInfoResult(BaseModel):
     os_timezone: str
     """Timezone name reported by the OS (via tzlocal)."""
 
-    lightagent_timezone: str
-    """Value of LIGHTAGENT_TIMEZONE env var, or empty string if unset."""
+    prismal_timezone: str
+    """Value of PRISMAL_TIMEZONE env var, or empty string if unset."""
 
     cron_timezone: str
-    """Value of LIGHTAGENT_CRON_TIMEZONE env var, or empty string if unset."""
+    """Value of PRISMAL_CRON_TIMEZONE env var, or empty string if unset."""
 
     resolved_timezone: str
     """Effective IANA name after applying the resolution chain."""
@@ -157,8 +170,8 @@ def _resolve_tz(tz_str: str) -> ZoneInfo:
 
     Resolution order:
       1. Explicit ``tz_str`` if non-empty.
-      2. ``LIGHTAGENT_CRON_TIMEZONE`` env var.
-      3. ``LIGHTAGENT_TIMEZONE`` env var.
+      2. ``PRISMAL_CRON_TIMEZONE`` env var.
+      3. ``PRISMAL_TIMEZONE`` env var.
       4. OS local timezone via ``tzlocal``.
       5. UTC as final fallback.
 
@@ -172,8 +185,8 @@ def _resolve_tz(tz_str: str) -> ZoneInfo:
     """
     candidates = [
         tz_str,
-        os.environ.get("LIGHTAGENT_CRON_TIMEZONE", ""),
-        os.environ.get("LIGHTAGENT_TIMEZONE", ""),
+        _getenv_compat("PRISMAL_CRON_TIMEZONE", ""),
+        _getenv_compat("PRISMAL_TIMEZONE", ""),
     ]
     for candidate in candidates:
         if candidate:
@@ -348,7 +361,7 @@ def datetime_get_system_time(timezone: str = "") -> SystemTimeResult:
     Args:
         timezone: IANA timezone name (e.g. ``'America/Caracas'``).
             Empty string uses the resolution chain:
-            ``LIGHTAGENT_CRON_TIMEZONE`` → ``LIGHTAGENT_TIMEZONE`` → OS → UTC.
+            ``PRISMAL_CRON_TIMEZONE`` → ``PRISMAL_TIMEZONE`` → OS → UTC.
 
     Returns:
         :class:`SystemTimeResult` with ``iso8601``, ``unix_timestamp``,
@@ -370,14 +383,14 @@ def datetime_get_system_time(timezone: str = "") -> SystemTimeResult:
 def datetime_get_timezone_info() -> TimezoneInfoResult:
     """Return full timezone diagnostic information for the current process.
 
-    Includes the OS timezone, LightAgent environment overrides, the
+    Includes the OS timezone, Prismal environment overrides, the
     resolved effective timezone, and the current UTC offset.
 
     Returns:
         :class:`TimezoneInfoResult` with all timezone fields populated.
     """
-    lightagent_tz = os.environ.get("LIGHTAGENT_TIMEZONE", "")
-    cron_tz = os.environ.get("LIGHTAGENT_CRON_TIMEZONE", "")
+    prismal_tz = _getenv_compat("PRISMAL_TIMEZONE", "")
+    cron_tz = _getenv_compat("PRISMAL_CRON_TIMEZONE", "")
 
     # OS timezone
     try:
@@ -392,7 +405,7 @@ def datetime_get_timezone_info() -> TimezoneInfoResult:
 
     return TimezoneInfoResult(
         os_timezone=os_tz_name,
-        lightagent_timezone=lightagent_tz,
+        prismal_timezone=prismal_tz,
         cron_timezone=cron_tz,
         resolved_timezone=resolved_name,
         utc_offset=_utc_offset_str(resolved, now_utc),

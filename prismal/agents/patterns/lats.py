@@ -69,7 +69,7 @@ from prismal.monitoring.otel import OTelManager
 if TYPE_CHECKING:
     from prismal.core.config import Settings
 
-logger = get_logger("lightagent.agents.patterns.lats")
+logger = get_logger("prismal.agents.patterns.lats")
 
 
 @dataclass
@@ -155,8 +155,8 @@ class LATSAgent:
         timeout_seconds: Wall-clock budget; ``None`` means no timeout.
         terminal_reward: Reward threshold marking a node terminal
             (default 0.99).
-        settings: LightAgent settings. ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+        settings: Prismal settings. ``None`` resolves via
+            :func:`~prismal.core.config.get_settings`.
     """
 
     def __init__(
@@ -209,9 +209,9 @@ class LATSAgent:
         """
         otel = OTelManager()
         with otel.start_span("lats.search") as span:
-            span.set_attribute("lightagent.lats.max_simulations", self._max_simulations)
-            span.set_attribute("lightagent.lats.max_depth", self._max_depth)
-            span.set_attribute("lightagent.lats.exploration_constant", self._exploration_constant)
+            span.set_attribute("prismal.lats.max_simulations", self._max_simulations)
+            span.set_attribute("prismal.lats.max_depth", self._max_depth)
+            span.set_attribute("prismal.lats.exploration_constant", self._exploration_constant)
 
             root = LATSNode(state=initial_state, action=None)
             deadline = (
@@ -245,8 +245,8 @@ class LATSAgent:
                 best_reward=best_avg_reward,
                 tree_depth=tree_depth,
             )
-            span.set_attribute("lightagent.lats.total_simulations", total_simulations)
-            span.set_attribute("lightagent.lats.best_reward", best_avg_reward)
+            span.set_attribute("prismal.lats.total_simulations", total_simulations)
+            span.set_attribute("prismal.lats.best_reward", best_avg_reward)
 
             return LATSResult(
                 best_action_sequence=[n.action for n in best_path_nodes if n.action is not None],

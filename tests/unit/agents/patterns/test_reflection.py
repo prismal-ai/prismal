@@ -92,7 +92,7 @@ async def test_max_iterations_forced_exit() -> None:
 
 @pytest.mark.asyncio
 async def test_reflection_disabled_by_env() -> None:
-    """LIGHTAGENT_REFLECTION_ENABLED=false → returns first draft, no critique."""
+    """PRISMAL_REFLECTION_ENABLED=false → returns first draft, no critique."""
     crit_calls = {"n": 0}
 
     async def gen(state, previous_draft=None, critique=None):  # type: ignore[no-untyped-def]
@@ -105,7 +105,7 @@ async def test_reflection_disabled_by_env() -> None:
     fake_settings = type("S", (), {"reflection_enabled": False, "reflection_max_iterations": 3})()
 
     with patch(
-        "lightagent.agents.patterns.reflection.get_settings",
+        "prismal.agents.patterns.reflection.get_settings",
         return_value=fake_settings,
     ):
         draft, score = await reflection_loop(gen, crit, _state(), threshold=0.85, max_iterations=3)
@@ -153,7 +153,7 @@ async def test_global_max_iterations_cap() -> None:
     fake_settings = type("S", (), {"reflection_enabled": True, "reflection_max_iterations": 2})()
 
     with patch(
-        "lightagent.agents.patterns.reflection.get_settings",
+        "prismal.agents.patterns.reflection.get_settings",
         return_value=fake_settings,
     ):
         await reflection_loop(gen, crit, _state(), threshold=0.99, max_iterations=10)

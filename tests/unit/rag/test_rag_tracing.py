@@ -13,25 +13,25 @@ def test_otel_manager_is_available_for_rag() -> None:
 
     OTelManager._instance = None
     OTelManager._initialized = False
-    with patch("lightagent.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
+    with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
         s = MagicMock()
         s.otel_enabled = False
         mock_settings.return_value = s
         otel = OTelManager()
     with otel.start_span("rag.query") as span:
         assert isinstance(span, _NoOpSpan)
-        span.set_attribute("lightagent.query_len", 42)
-        span.set_attribute("lightagent.num_results", 5)
+        span.set_attribute("prismal.query_len", 42)
+        span.set_attribute("prismal.num_results", 5)
 
 
 def test_rag_query_span_attributes() -> None:
-    """RAG spans support standard lightagent attributes."""
+    """RAG spans support standard prismal attributes."""
     from prismal.monitoring.otel import _NoOpSpan
 
     span = _NoOpSpan()
-    span.set_attribute("lightagent.query_len", 25)
-    span.set_attribute("lightagent.num_docs", 3)
-    span.set_attribute("lightagent.latency_ms", 142.5)
+    span.set_attribute("prismal.query_len", 25)
+    span.set_attribute("prismal.num_docs", 3)
+    span.set_attribute("prismal.latency_ms", 142.5)
     # No exceptions = pass
 
 
@@ -55,8 +55,8 @@ def test_rag_engine_search_creates_otel_span() -> None:
     mock_store.similarity_search.return_value = []
 
     with (
-        patch("lightagent.rag.engine.ChromaVectorStore") as mock_store_cls,
-        patch("lightagent.rag.engine.OTelManager", return_value=mock_otel),
+        patch("prismal.rag.engine.ChromaVectorStore") as mock_store_cls,
+        patch("prismal.rag.engine.OTelManager", return_value=mock_otel),
     ):
         mock_store_cls.return_value = mock_store
         from prismal.rag.engine import RAGEngine
@@ -78,8 +78,8 @@ def test_rag_engine_search_increments_rag_queries_counter() -> None:
     mock_store.similarity_search.return_value = []
 
     with (
-        patch("lightagent.rag.engine.ChromaVectorStore") as mock_store_cls,
-        patch("lightagent.rag.engine.OTelManager", return_value=mock_otel),
+        patch("prismal.rag.engine.ChromaVectorStore") as mock_store_cls,
+        patch("prismal.rag.engine.OTelManager", return_value=mock_otel),
     ):
         mock_store_cls.return_value = mock_store
         from prismal.rag.engine import RAGEngine
@@ -106,9 +106,9 @@ async def test_rag_engine_query_creates_otel_span() -> None:
     mock_pipeline_instance.run = AsyncMock(return_value=mock_crag_result)
 
     with (
-        patch("lightagent.rag.engine.ChromaVectorStore") as mock_store_cls,
-        patch("lightagent.rag.engine.CRAGPipeline") as mock_pipeline_cls,
-        patch("lightagent.rag.engine.OTelManager", return_value=mock_otel),
+        patch("prismal.rag.engine.ChromaVectorStore") as mock_store_cls,
+        patch("prismal.rag.engine.CRAGPipeline") as mock_pipeline_cls,
+        patch("prismal.rag.engine.OTelManager", return_value=mock_otel),
     ):
         mock_store_cls.return_value = mock_store
         mock_pipeline_cls.return_value = mock_pipeline_instance

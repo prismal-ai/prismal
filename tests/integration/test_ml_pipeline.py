@@ -68,7 +68,7 @@ async def test_data_ingester_produces_profile(
         }
     )
     with patch(
-        "lightagent.agents.subgraphs.ml_pipeline.data_ingester.ProviderRegistry.get_llm",
+        "prismal.agents.subgraphs.ml_pipeline.data_ingester.ProviderRegistry.get_llm",
         return_value=type("LLM", (), {"ainvoke": _ai(profile_json)})(),
     ):
         result = await data_ingester_node(base_state)
@@ -185,7 +185,7 @@ async def test_full_pipeline_produces_all_artifacts(
         (model_exporter_node, "model_exporter", export_json),
     ]
     for node_fn, mod_name, resp in nodes:
-        mod_path = f"lightagent.agents.subgraphs.ml_pipeline.{mod_name}.ProviderRegistry.get_llm"
+        mod_path = f"prismal.agents.subgraphs.ml_pipeline.{mod_name}.ProviderRegistry.get_llm"
         with patch(mod_path, return_value=make_llm(resp)):
             update = await node_fn(state)  # type: ignore[arg-type]
         state.update(update)

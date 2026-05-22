@@ -16,7 +16,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
 
-logger = get_logger("lightagent.agents.spawner")
+logger = get_logger("prismal.agents.spawner")
 
 
 class SubAgentSpawner:

@@ -1,4 +1,4 @@
-"""Embeddings factory for the LightAgent RAG system.
+"""Embeddings factory for the Prismal RAG system.
 
 Provides ``EmbeddingsFactory``, which maps the ``settings.embeddings_model``
 configuration value to the appropriate LangChain embeddings implementation.
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
     from prismal.core.config import Settings
 
-logger = get_logger("lightagent.rag.embeddings")
+logger = get_logger("prismal.rag.embeddings")
 
 
 class EmbeddingsFactory:
@@ -53,10 +53,10 @@ class EmbeddingsFactory:
         """Instantiate and return the configured embeddings implementation.
 
         If *settings* is ``None``, the global application settings are loaded
-        via :func:`~lightagent.core.config.get_settings`.
+        via :func:`~prismal.core.config.get_settings`.
 
         Args:
-            settings: Optional :class:`~lightagent.core.config.Settings` instance
+            settings: Optional :class:`~prismal.core.config.Settings` instance
                 to use.  When ``None``, ``get_settings()`` is called automatically.
 
         Returns:

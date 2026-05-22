@@ -5,8 +5,8 @@ Only SELECT statements are permitted. Any query that modifies state
 
 Requires the following environment variable:
 
-* ``LIGHTAGENT_DB_PATH`` — Path to the DuckDB or SQLite database file
-  (default: ``data/db/lightagent.db``).
+* ``PRISMAL_DB_PATH`` — Path to the DuckDB or SQLite database file
+  (default: ``data/db/prismal.db``).
 
 If the database file is not found the tool returns a helpful error message
 without raising an exception (graceful degradation).
@@ -29,9 +29,9 @@ from langchain_core.tools import BaseTool, tool
 from prismal.core.logging import get_logger
 from prismal.skills.base import BaseSkill, SkillMetadata
 
-logger = get_logger("lightagent.skills.database_query")
+logger = get_logger("prismal.skills.database_query")
 
-_DEFAULT_DB = "data/db/lightagent.db"
+_DEFAULT_DB = "data/db/prismal.db"
 _MAX_ROWS = 100
 
 # Disallow anything that could mutate state
@@ -112,7 +112,7 @@ class DatabaseQuerySkill(BaseSkill):
             name="database_query",
             description="Run read-only SQL SELECT queries against a DuckDB database",
             version="1.0.0",
-            author="lightagent",
+            author="prismal",
             safe_to_auto_activate=False,
             requires_permissions=["filesystem.read"],
             tags=["utility", "database", "sql", "duckdb", "analytics"],
@@ -145,11 +145,11 @@ class DatabaseQuerySkill(BaseSkill):
                     "are not permitted."
                 )
 
-            db_path = Path(os.getenv("LIGHTAGENT_DB_PATH", _DEFAULT_DB))
+            db_path = Path(os.getenv("PRISMAL_DB_PATH", _DEFAULT_DB))
             if not db_path.exists():
                 return (
                     f"[database_query] Database file not found: {db_path}. "
-                    "Set LIGHTAGENT_DB_PATH to an existing database file."
+                    "Set PRISMAL_DB_PATH to an existing database file."
                 )
 
             logger.info("database_query_run", db=str(db_path), query=query[:100])

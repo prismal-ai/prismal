@@ -1,8 +1,8 @@
 """Web search skill — searches the web via DuckDuckGo (no API key required).
 
 Uses the free DuckDuckGo Instant Answer API by default.
-Set ``LIGHTAGENT_SEARCH_PROVIDER=google`` with ``LIGHTAGENT_GOOGLE_API_KEY`` and
-``LIGHTAGENT_GOOGLE_CSE_ID`` to switch to Google Custom Search.
+Set ``PRISMAL_SEARCH_PROVIDER=google`` with ``PRISMAL_GOOGLE_API_KEY`` and
+``PRISMAL_GOOGLE_CSE_ID`` to switch to Google Custom Search.
 
 Example::
 
@@ -22,7 +22,7 @@ from langchain_core.tools import BaseTool, tool
 from prismal.core.logging import get_logger
 from prismal.skills.base import BaseSkill, SkillMetadata
 
-logger = get_logger("lightagent.skills.web_search")
+logger = get_logger("prismal.skills.web_search")
 
 _DDG_URL = "https://api.duckduckgo.com/"
 _GOOGLE_URL = "https://www.googleapis.com/customsearch/v1"
@@ -129,7 +129,7 @@ class WebSearchSkill(BaseSkill):
             name="web_search",
             description="Search the web for current information via DuckDuckGo or Google",
             version="1.0.0",
-            author="lightagent",
+            author="prismal",
             safe_to_auto_activate=True,
             tags=["utility", "search", "web", "api"],
         )
@@ -152,9 +152,9 @@ class WebSearchSkill(BaseSkill):
             Returns:
                 Search results as a formatted string with titles, snippets, and URLs.
             """
-            provider = os.getenv("LIGHTAGENT_SEARCH_PROVIDER", "ddg").lower()
-            api_key = os.getenv("LIGHTAGENT_GOOGLE_API_KEY", "")
-            cse_id = os.getenv("LIGHTAGENT_GOOGLE_CSE_ID", "")
+            provider = os.getenv("PRISMAL_SEARCH_PROVIDER", "ddg").lower()
+            api_key = os.getenv("PRISMAL_GOOGLE_API_KEY", "")
+            cse_id = os.getenv("PRISMAL_GOOGLE_CSE_ID", "")
 
             if provider == "google" and api_key and cse_id:
                 return _search_google(query, max_results, api_key, cse_id)

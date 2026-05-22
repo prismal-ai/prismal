@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.memory.profile.ProfileManager."""
+"""Unit tests for prismal.memory.profile.ProfileManager."""
 
 from __future__ import annotations
 
@@ -71,17 +71,17 @@ def test_load_agent_name_returns_name_from_soul_md(tmp_path: Path) -> None:
 
 
 def test_load_agent_name_default_when_no_soul_md(tmp_path: Path) -> None:
-    """load_agent_name() returns 'LightAgent' when SOUL.md does not exist."""
+    """load_agent_name() returns 'Prismal' when SOUL.md does not exist."""
     pm = _manager(tmp_path)
-    assert pm.load_agent_name() == "LightAgent"
+    assert pm.load_agent_name() == "Prismal"
 
 
 def test_load_agent_name_default_when_no_h1(tmp_path: Path) -> None:
-    """load_agent_name() returns 'LightAgent' when SOUL.md has no H1 heading."""
+    """load_agent_name() returns 'Prismal' when SOUL.md has no H1 heading."""
     pm = _manager(tmp_path)
     pm._dir.mkdir(parents=True, exist_ok=True)
     pm._soul.write_text("No heading here.\n", encoding="utf-8")
-    assert pm.load_agent_name() == "LightAgent"
+    assert pm.load_agent_name() == "Prismal"
 
 
 def test_load_soul_returns_full_content(tmp_path: Path) -> None:

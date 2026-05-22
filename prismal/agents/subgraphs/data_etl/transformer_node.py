@@ -23,7 +23,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-logger = get_logger("lightagent.subgraphs.data_etl.transformer")
+logger = get_logger("prismal.subgraphs.data_etl.transformer")
 
 _FILTER_OPS: dict[str, Callable[[pl.Expr, Any], pl.Expr]] = {
     "==": lambda col, v: col == v,

@@ -3,7 +3,7 @@
 Risk and Sentiment Analyst agent node for the financial_analyst subgraph.
 
 Computes volatility, Sharpe ratio, max drawdown, VaR and market sentiment.
-Stores a :class:`~lightagent.agents.subgraphs.financial.artifacts.RiskSentimentReport`
+Stores a :class:`~prismal.agents.subgraphs.financial.artifacts.RiskSentimentReport`
 under ``state["metadata"]["financial_analyst"]["risk_sentiment_report"]``.
 
 Sentiment sources (LunarCrush, MT Newswires) are optional — the agent
@@ -25,7 +25,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.financial.risk_sentiment_analyst")
+logger = structlog.get_logger("prismal.subgraphs.financial.risk_sentiment_analyst")
 otel = OTelManager()
 
 _SYSTEM = """You are a Risk & Sentiment Analyst for the financial subgraph.
@@ -82,7 +82,7 @@ The `RiskSentimentReport` is acceptable when ALL of the following hold:
 
 ## Background
 - Artifact schema:
-  `lightagent/agents/subgraphs/financial/artifacts.py::RiskSentimentReport`.
+  `prismal/agents/subgraphs/financial/artifacts.py::RiskSentimentReport`.
 - Sentiment sources: NewsAPI, crypto news RSS, Reddit/Twitter (when
   available), on-chain metrics for crypto.
 - Phase 27 read-only rule: never execute trades.
@@ -138,8 +138,8 @@ async def risk_sentiment_analyst_node(state: AgentState) -> dict[str, Any]:
         ``metadata["financial_analyst"]["risk_sentiment_report"]``.
     """
     with otel.start_span("financial_analyst.risk_sentiment_analyst") as span:
-        span.set_attribute("lightagent.subgraph", "financial_analyst")
-        span.set_attribute("lightagent.agent", "risk_sentiment_analyst")
+        span.set_attribute("prismal.subgraph", "financial_analyst")
+        span.set_attribute("prismal.agent", "risk_sentiment_analyst")
 
         fin: dict[str, Any] = dict(state.get("metadata", {}).get("financial_analyst", {}))
         snapshot = fin.get("market_snapshot", {})
@@ -170,8 +170,8 @@ async def risk_sentiment_analyst_node(state: AgentState) -> dict[str, Any]:
             sentiment=report.sentiment_score,
             volatility=report.volatility_annual,
         )
-        span.set_attribute("lightagent.financial.risk_level", report.risk_level)
-        span.set_attribute("lightagent.financial.sentiment", report.sentiment_score)
+        span.set_attribute("prismal.financial.risk_level", report.risk_level)
+        span.set_attribute("prismal.financial.sentiment", report.sentiment_score)
 
         return {
             "current_agent": "risk_sentiment_analyst",

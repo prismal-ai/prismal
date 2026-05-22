@@ -1,10 +1,10 @@
-"""Stub LangChain tools for LightAgent sub-agents.
+"""Stub LangChain tools for Prismal sub-agents.
 
 Fallback tool implementations used when no live MCP or skill tool overrides them.
 
 Every tool here is a real implementation that connects to the actual backend:
 - ``web_search``          — Tavily (primary) / DuckDuckGo (fallback)
-- ``rag_search``          — ChromaDB via :class:`~lightagent.rag.engine.RAGEngine`
+- ``rag_search``          — ChromaDB via :class:`~prismal.rag.engine.RAGEngine`
 - ``vector_search``       — ChromaDB nearest-neighbour search
 - ``doc_index``           — RAGEngine file/directory indexer
 - ``read_file``           — Filesystem read (workspace-sandboxed)
@@ -12,10 +12,10 @@ Every tool here is a real implementation that connects to the actual backend:
 - ``code_executor``       — Sandboxed Python subprocess (requires ``shell_enabled``)
 - ``evaluate``            — LLM-based qualitative evaluation
 - ``score``               — LLM-based numeric scorer
-- ``duckdb_query``        — :class:`~lightagent.data.duckdb_engine.DuckDBEngine` SQL
+- ``duckdb_query``        — :class:`~prismal.data.duckdb_engine.DuckDBEngine` SQL
 - ``polars_transform``    — Polars DataFrame operations via ``polars_utils``
 - ``create_chart``        — Matplotlib chart via
-  :func:`~lightagent.data.polars_utils.save_chart`
+  :func:`~prismal.data.polars_utils.save_chart`
 - ``list_mcp_tools``      — Enumerates connected MCP server tools
 - ``remember_preference`` — Writes a user preference fact to ``PREFERENCES.md``
 """
@@ -37,7 +37,7 @@ def _resolve_channel_delivery(
     """Resolve final (channel, target, note) for a cron delivery.
 
     Auto-fills missing routing from the ambient
-    :data:`~lightagent.agents.context.channel_context_var` when both
+    :data:`~prismal.agents.context.channel_context_var` when both
     ``output_channel`` and ``output_target`` are empty, so a cron created
     from a Telegram / Slack / Discord conversation automatically delivers
     its output back to the originating chat.  Pass ``output_channel="none"``
@@ -79,7 +79,7 @@ def _get_fs_guard() -> FilesystemGuard:
     Otherwise ``fs_workspace_root`` is used when set.
 
     Returns:
-        A :class:`~lightagent.security.filesystem_guard.FilesystemGuard`
+        A :class:`~prismal.security.filesystem_guard.FilesystemGuard`
         instance configured according to current settings.
     """
     from prismal.core.config import get_settings
@@ -357,7 +357,7 @@ def move_path(src: str, dst: str) -> str:
 def delete_path(path: str) -> str:
     """Delete a file or directory tree.
 
-    Requires ``LIGHTAGENT_FS_DELETE_ENABLED=true`` in the environment.
+    Requires ``PRISMAL_FS_DELETE_ENABLED=true`` in the environment.
 
     Args:
         path: Absolute path to delete.
@@ -368,7 +368,7 @@ def delete_path(path: str) -> str:
     import shutil
 
     if not get_settings().fs_delete_enabled:
-        return "Error: delete_path is not enabled. Set LIGHTAGENT_FS_DELETE_ENABLED=true."
+        return "Error: delete_path is not enabled. Set PRISMAL_FS_DELETE_ENABLED=true."
 
     try:
         guard = _get_fs_guard()
@@ -391,7 +391,7 @@ def delete_path(path: str) -> str:
 def shell_exec(command: str, timeout: int = 30, workdir: str = "") -> str:
     """Execute a shell command and return its combined stdout+stderr output.
 
-    Requires ``LIGHTAGENT_SHELL_ENABLED=true``.
+    Requires ``PRISMAL_SHELL_ENABLED=true``.
     Timeout is clamped to 1-120 seconds.
 
     Args:
@@ -406,7 +406,7 @@ def shell_exec(command: str, timeout: int = 30, workdir: str = "") -> str:
 
     s = get_settings()
     if not s.shell_enabled:
-        return "Error: shell_exec is not enabled. Set LIGHTAGENT_SHELL_ENABLED=true."
+        return "Error: shell_exec is not enabled. Set PRISMAL_SHELL_ENABLED=true."
 
     cmd = command.strip()
     if not cmd:
@@ -437,7 +437,7 @@ def shell_exec(command: str, timeout: int = 30, workdir: str = "") -> str:
 def code_executor(code: str, language: str = "python") -> str:
     """Execute a code snippet in a sandboxed subprocess.
 
-    Requires ``LIGHTAGENT_SHELL_ENABLED=true`` in the environment.  Only
+    Requires ``PRISMAL_SHELL_ENABLED=true`` in the environment.  Only
     Python and Bash are supported.  Execution is capped at 30 seconds and
     output at 4 000 characters.
 
@@ -456,7 +456,7 @@ def code_executor(code: str, language: str = "python") -> str:
     settings = get_settings()
     if not settings.shell_enabled:
         return (
-            "Code execution is disabled. Set LIGHTAGENT_SHELL_ENABLED=true "
+            "Code execution is disabled. Set PRISMAL_SHELL_ENABLED=true "
             "in your .env file to enable it."
         )
 

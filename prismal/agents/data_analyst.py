@@ -17,7 +17,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.data_analyst")
+logger = get_logger("prismal.agents.data_analyst")
 
 _SYSTEM_PROMPT = """You are a data analysis specialist.
 

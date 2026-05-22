@@ -3,7 +3,7 @@
 Saves facts from agent conversations to a dual store:
 
 * **SQLite** — structured metadata (id, session_id, content, expiry).
-* **ChromaDB** (via :class:`~lightagent.rag.vector_store.ChromaVectorStore`) —
+* **ChromaDB** (via :class:`~prismal.rag.vector_store.ChromaVectorStore`) —
   semantic similarity search for recall.
 
 Sensitive data (API keys, secrets) is automatically redacted before any
@@ -20,7 +20,7 @@ Example::
     await mem.clear(session_id="sess-abc")
 
 AC-011-2: Across sessions, the agent can recall facts from long-term memory.
-AC-011-4: ``lightagent memory clear`` delegates to :meth:`clear`.
+AC-011-4: ``prismal memory clear`` delegates to :meth:`clear`.
 AC-011-5: Sensitive information is auto-redacted before persistence.
 AC-011-6: Entries expire after ``memory_retention_days`` days.
 """
@@ -47,7 +47,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from prismal.rag.vector_store import ChromaVectorStore
 
-logger = get_logger("lightagent.memory.long_term")
+logger = get_logger("prismal.memory.long_term")
 
 # ── Sensitive-data redaction ──────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ def _redact_sensitive(text: str) -> str:
 # ── SQLite schema ─────────────────────────────────────────────────────────────
 
 _DB_DEFAULT = Path(__file__).parent.parent.parent / "data" / "db" / "memory.db"
-_COLLECTION = "lightagent_memory"
+_COLLECTION = "prismal_memory"
 _DT_FMT = "%Y-%m-%dT%H:%M:%S"
 
 _SCHEMA = """
@@ -137,7 +137,7 @@ class LongTermMemory:
 
     Args:
         db_path: SQLite file path.  Defaults to ``data/db/memory.db``.
-        vector_store: Injected :class:`~lightagent.rag.vector_store.ChromaVectorStore`.
+        vector_store: Injected :class:`~prismal.rag.vector_store.ChromaVectorStore`.
             Defaults to a new instance pointing at the configured ChromaDB.
         retention_days: Days until entries expire.  Defaults to
             ``settings.memory_retention_days``.
@@ -322,7 +322,7 @@ class LongTermMemory:
         Returns:
             Number of entries deleted.
 
-        AC-011-4: ``lightagent memory clear`` uses this method.
+        AC-011-4: ``prismal memory clear`` uses this method.
         """
         with self._conn() as conn:
             if session_id is None:

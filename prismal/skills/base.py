@@ -1,6 +1,6 @@
-"""Base skill interface for LightAgent's three-tier skills system.
+"""Base skill interface for Prismal's three-tier skills system.
 
-All LightAgent skills must inherit from :class:`BaseSkill` and implement
+All Prismal skills must inherit from :class:`BaseSkill` and implement
 the :meth:`metadata` property and :meth:`get_tools` method.
 
 Example::
@@ -47,10 +47,10 @@ if TYPE_CHECKING:
 
 
 class SkillMetadata(BaseModel):
-    """Metadata describing a LightAgent skill.
+    """Metadata describing a Prismal skill.
 
-    Used by :class:`~lightagent.skills.manager.SkillsManager` for discovery,
-    validation, and display in ``lightagent skills list``.
+    Used by :class:`~prismal.skills.manager.SkillsManager` for discovery,
+    validation, and display in ``prismal skills list``.
     """
 
     name: str = Field(..., description="Unique identifier slug (snake_case)")
@@ -70,10 +70,10 @@ class SkillMetadata(BaseModel):
 
 
 class BaseSkill(ABC):
-    """Abstract base class for all LightAgent skills.
+    """Abstract base class for all Prismal skills.
 
     Subclass this in ``skill.py`` inside each skill directory.  The skill
-    is loaded and validated by :class:`~lightagent.skills.manager.SkillsManager`
+    is loaded and validated by :class:`~prismal.skills.manager.SkillsManager`
     before activation.
     """
 
@@ -326,7 +326,7 @@ def _make_subprocess_tool(
         from prismal.core.config import get_settings
 
         if not get_settings().shell_enabled:
-            return "Shell execution is disabled (LIGHTAGENT_SHELL_ENABLED=false)."
+            return "Shell execution is disabled (PRISMAL_SHELL_ENABLED=false)."
         cmd = [_sys.executable, _script_path] + (args.split() if args.strip() else [])
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)

@@ -1,4 +1,4 @@
-"""Unit tests for HybridSearchEngine (lightagent.rag.hybrid).
+"""Unit tests for HybridSearchEngine (prismal.rag.hybrid).
 
 Hybrid search combines BM25 lexical scoring with embedding semantic scoring
 via linear fusion: ``score = alpha * sem + (1-alpha) * bm25``.

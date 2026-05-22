@@ -2,8 +2,8 @@
 """Unit test agent node for the dev_pipeline subgraph.
 
 Generates pytest tests for a
-:class:`~lightagent.agents.subgraphs.artifacts.CodeArtifact`
-and produces a :class:`~lightagent.agents.subgraphs.artifacts.TestReport`.
+:class:`~prismal.agents.subgraphs.artifacts.CodeArtifact`
+and produces a :class:`~prismal.agents.subgraphs.artifacts.TestReport`.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.unit_tester")
+logger = structlog.get_logger("prismal.subgraphs.dev_pipeline.unit_tester")
 otel = OTelManager()
 
 _SYSTEM = """You are a Test Engineer for the dev_pipeline subgraph.
@@ -71,7 +71,7 @@ The `TestReport` is acceptable when ALL of the following hold:
 6. Emit JSON only.
 
 ## Background
-- Artifact schema: `lightagent/agents/subgraphs/artifacts.py::TestReport`.
+- Artifact schema: `prismal/agents/subgraphs/artifacts.py::TestReport`.
 - Parsed via `TestReport.model_validate`; parse failure stores an
   empty report with `failing_tests=["parse_error"]`.
 - Downstream: the QA agent uses `coverage_percent` as one input to its
@@ -120,8 +120,8 @@ async def unit_test_agent_node(state: AgentState) -> dict[str, Any]:
         Partial state update with TestReport in metadata.
     """
     with otel.start_span("dev_pipeline.unit_tester") as span:
-        span.set_attribute("lightagent.subgraph", "dev_pipeline")
-        span.set_attribute("lightagent.agent", "unit_tester")
+        span.set_attribute("prismal.subgraph", "dev_pipeline")
+        span.set_attribute("prismal.agent", "unit_tester")
 
         dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
         code_data = dp.get("code_artifact", {})

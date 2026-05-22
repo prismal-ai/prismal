@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.scheduler.executor (T-250).
+"""Unit tests for prismal.scheduler.executor (T-250).
 
 All tests mock APScheduler's scheduler and the LangGraph graph so that no
 real timing, LLM calls, or file I/O occur.
@@ -63,7 +63,7 @@ def executor(mock_manager: MagicMock, mock_scheduler: MagicMock) -> CronExecutor
 
 def test_init_default_manager() -> None:
     """CronExecutor creates a default CronManager when none is provided."""
-    with patch("lightagent.scheduler.executor.CronManager") as mock_cls:
+    with patch("prismal.scheduler.executor.CronManager") as mock_cls:
         mock_cls.return_value = MagicMock(spec=CronManager)
         ex = CronExecutor()
     mock_cls.assert_called_once_with()
@@ -273,7 +273,7 @@ async def test_run_job_calls_graph_and_updates_last_run(
     mock_graph.ainvoke = AsyncMock(return_value={"messages": []})
 
     with patch(
-        "lightagent.agents.graph.get_async_compiled_graph",
+        "prismal.agents.graph.get_async_compiled_graph",
         new=AsyncMock(return_value=mock_graph),
     ):
         await executor._run_job("daily-brief", "Summarise news")
@@ -313,7 +313,7 @@ async def test_run_job_uses_task_as_message(
     mock_graph.ainvoke = capturing_ainvoke
 
     with patch(
-        "lightagent.agents.graph.get_async_compiled_graph",
+        "prismal.agents.graph.get_async_compiled_graph",
         new=AsyncMock(return_value=mock_graph),
     ):
         await executor._run_job("job-x", "Fetch daily report")
@@ -332,7 +332,7 @@ async def test_run_job_does_not_raise_on_graph_error(
 ) -> None:
     """_run_job() swallows exceptions so APScheduler keeps running future ticks."""
     with patch(
-        "lightagent.agents.graph.get_async_compiled_graph",
+        "prismal.agents.graph.get_async_compiled_graph",
         new=AsyncMock(side_effect=RuntimeError("LLM unavailable")),
     ):
         # Must NOT raise
@@ -351,7 +351,7 @@ async def test_run_job_does_not_update_last_run_on_ainvoke_error(
     mock_graph.ainvoke = AsyncMock(side_effect=ValueError("Graph error"))
 
     with patch(
-        "lightagent.agents.graph.get_async_compiled_graph",
+        "prismal.agents.graph.get_async_compiled_graph",
         new=AsyncMock(return_value=mock_graph),
     ):
         await executor._run_job("broken-job", "Run task")
@@ -392,7 +392,7 @@ class TestRunJobHistory:
         mock_graph.ainvoke = AsyncMock(return_value={"messages": []})
 
         with patch(
-            "lightagent.agents.graph.get_async_compiled_graph",
+            "prismal.agents.graph.get_async_compiled_graph",
             new=AsyncMock(return_value=mock_graph),
         ):
             await executor._run_job("hist-test", "some task")
@@ -412,7 +412,7 @@ class TestRunJobHistory:
         manager.add("fail-hist", "* * * * *", "task")
 
         with patch(
-            "lightagent.agents.graph.get_async_compiled_graph",
+            "prismal.agents.graph.get_async_compiled_graph",
             new=AsyncMock(side_effect=RuntimeError("boom")),
         ):
             await executor._run_job("fail-hist", "task")
@@ -452,7 +452,7 @@ class TestCronExecutorNotifier:
         manager.add("notify-test", "* * * * *", "task")
 
         with patch(
-            "lightagent.agents.graph.get_async_compiled_graph",
+            "prismal.agents.graph.get_async_compiled_graph",
             new=AsyncMock(side_effect=RuntimeError("crash")),
         ):
             await executor._run_job("notify-test", "task")
@@ -485,7 +485,7 @@ class TestCronExecutorNotifier:
         mock_graph.ainvoke = AsyncMock(return_value={"messages": [AIMessage(content="done")]})
 
         with patch(
-            "lightagent.agents.graph.get_async_compiled_graph",
+            "prismal.agents.graph.get_async_compiled_graph",
             new=AsyncMock(return_value=mock_graph),
         ):
             await executor._run_job("success-notify", "task")
@@ -522,7 +522,7 @@ class TestRetryLogic:
         manager.add("retry-job", "* * * * *", "task", max_retries=2)
 
         with patch(
-            "lightagent.agents.graph.get_async_compiled_graph",
+            "prismal.agents.graph.get_async_compiled_graph",
             new=AsyncMock(side_effect=RuntimeError("fail")),
         ):
             await executor._run_job("retry-job", "task")
@@ -556,7 +556,7 @@ class TestRetryLogic:
         manager.set_retry_count("final-job", 1)
 
         with patch(
-            "lightagent.agents.graph.get_async_compiled_graph",
+            "prismal.agents.graph.get_async_compiled_graph",
             new=AsyncMock(side_effect=RuntimeError("final")),
         ):
             await executor._run_job("final-job", "task")
@@ -588,7 +588,7 @@ class TestRetryLogic:
         mock_graph = AsyncMock()
         mock_graph.ainvoke = AsyncMock(return_value={"messages": [AIMessage(content="done")]})
         with patch(
-            "lightagent.agents.graph.get_async_compiled_graph",
+            "prismal.agents.graph.get_async_compiled_graph",
             new=AsyncMock(return_value=mock_graph),
         ):
             await executor._run_job("success-job", "task")
@@ -623,9 +623,9 @@ async def test_successful_job_with_output_routing_calls_delivery(
     mock_delivery = AsyncMock()
 
     with (
-        patch("lightagent.agents.graph.get_async_compiled_graph") as mock_graph_fn,
+        patch("prismal.agents.graph.get_async_compiled_graph") as mock_graph_fn,
         patch(
-            "lightagent.scheduler.heartbeat_delivery.HeartbeatDelivery",
+            "prismal.scheduler.heartbeat_delivery.HeartbeatDelivery",
             return_value=mock_delivery,
         ),
     ):
@@ -655,9 +655,9 @@ async def test_job_without_output_routing_does_not_call_delivery(
     mock_delivery = AsyncMock()
 
     with (
-        patch("lightagent.agents.graph.get_async_compiled_graph") as mock_graph_fn,
+        patch("prismal.agents.graph.get_async_compiled_graph") as mock_graph_fn,
         patch(
-            "lightagent.scheduler.heartbeat_delivery.HeartbeatDelivery",
+            "prismal.scheduler.heartbeat_delivery.HeartbeatDelivery",
             return_value=mock_delivery,
         ),
     ):
@@ -680,7 +680,7 @@ def test_executor_scheduler_receives_timezone() -> None:
 
     from prismal.scheduler.executor import CronExecutor
 
-    with patch("lightagent.scheduler.executor.AsyncIOScheduler") as mock_scheduler_cls:
+    with patch("prismal.scheduler.executor.AsyncIOScheduler") as mock_scheduler_cls:
         mock_scheduler_cls.return_value = MagicMock()
         ex = CronExecutor()
         # AsyncIOScheduler must be called with a timezone kwarg
@@ -699,10 +699,10 @@ def test_executor_scheduler_timezone_is_utc_by_default() -> None:
     from prismal.scheduler.executor import CronExecutor
 
     DateTimeService._instance = None
-    env = {"LIGHTAGENT_TIMEZONE": "", "LIGHTAGENT_CRON_TIMEZONE": ""}
+    env = {"PRISMAL_TIMEZONE": "", "PRISMAL_CRON_TIMEZONE": ""}
     with (
         patch.dict(os.environ, env, clear=False),
-        patch("lightagent.scheduler.executor.AsyncIOScheduler") as mock_scheduler_cls,
+        patch("prismal.scheduler.executor.AsyncIOScheduler") as mock_scheduler_cls,
         patch("tzlocal.get_localzone", return_value=ZoneInfo("UTC")),
     ):
         mock_scheduler_cls.return_value = MagicMock()
@@ -728,7 +728,7 @@ def test_register_job_passes_timezone_to_cron_trigger(mock_manager: MagicMock) -
     # patched CronTrigger. (The bug was hidden previously because the
     # scheduler conftest was stubbing apscheduler wholesale.)
     with (
-        patch("lightagent.scheduler.executor.CronTrigger") as mock_trigger_cls,
+        patch("prismal.scheduler.executor.CronTrigger") as mock_trigger_cls,
         patch.object(ex._scheduler, "add_job"),
     ):
         mock_trigger_cls.from_crontab.return_value = MagicMock()
@@ -842,7 +842,7 @@ async def test_run_job_treats_rate_limit_output_as_failure(
     mock_manager.get_job.return_value = retry_job
 
     with patch(
-        "lightagent.agents.graph.get_async_compiled_graph",
+        "prismal.agents.graph.get_async_compiled_graph",
         new=AsyncMock(return_value=mock_graph),
     ):
         await executor._run_job("throttled-job", "Fetch news")
@@ -908,7 +908,7 @@ async def test_run_job_permanent_error_skips_retry_policy(
     executor._notifier.notify_failure = notify_mock  # type: ignore[method-assign]
 
     with patch(
-        "lightagent.agents.graph.get_async_compiled_graph",
+        "prismal.agents.graph.get_async_compiled_graph",
         new=AsyncMock(side_effect=billing_exc),
     ):
         await executor._run_job("billed_out", "do stuff")

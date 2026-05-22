@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.skills.manager (T-071)."""
+"""Unit tests for prismal.skills.manager (T-071)."""
 
 from __future__ import annotations
 

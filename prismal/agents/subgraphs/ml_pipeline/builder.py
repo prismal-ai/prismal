@@ -32,7 +32,7 @@ from prismal.agents.subgraphs.ml_pipeline.model_exporter import model_exporter_n
 from prismal.agents.subgraphs.ml_pipeline.model_trainer import model_trainer_node
 from prismal.agents.subgraphs.registry import SubgraphDefinition, SubgraphRegistry
 
-logger = structlog.get_logger("lightagent.subgraphs.ml_pipeline.builder")
+logger = structlog.get_logger("prismal.subgraphs.ml_pipeline.builder")
 
 _NAME = "ml_pipeline"
 _DESCRIPTION = (

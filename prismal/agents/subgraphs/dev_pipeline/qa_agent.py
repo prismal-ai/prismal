@@ -2,8 +2,8 @@
 """QA agent node for the dev_pipeline subgraph.
 
 Performs integration checks on a
-:class:`~lightagent.agents.subgraphs.artifacts.CodeArtifact`
-and produces a :class:`~lightagent.agents.subgraphs.artifacts.QAReport`.
+:class:`~prismal.agents.subgraphs.artifacts.CodeArtifact`
+and produces a :class:`~prismal.agents.subgraphs.artifacts.QAReport`.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.qa_agent")
+logger = structlog.get_logger("prismal.subgraphs.dev_pipeline.qa_agent")
 otel = OTelManager()
 
 _SYSTEM = """You are a QA Engineer for the dev_pipeline subgraph.
@@ -76,7 +76,7 @@ The `QAReport` is acceptable when ALL of the following hold:
 7. Emit JSON only.
 
 ## Background
-- Artifact schema: `lightagent/agents/subgraphs/artifacts.py::QAReport`.
+- Artifact schema: `prismal/agents/subgraphs/artifacts.py::QAReport`.
 - Parsed via `QAReport.model_validate`; parse failure stores
   `quality_score=0.0, approved=False`.
 - Downstream: feeds the reviewer agent as one of the inputs to the
@@ -125,8 +125,8 @@ async def qa_agent_node(state: AgentState) -> dict[str, Any]:
         Partial state update with QAReport in metadata.
     """
     with otel.start_span("dev_pipeline.qa_agent") as span:
-        span.set_attribute("lightagent.subgraph", "dev_pipeline")
-        span.set_attribute("lightagent.agent", "qa_agent")
+        span.set_attribute("prismal.subgraph", "dev_pipeline")
+        span.set_attribute("prismal.agent", "qa_agent")
 
         dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
         code_data = dp.get("code_artifact", {})

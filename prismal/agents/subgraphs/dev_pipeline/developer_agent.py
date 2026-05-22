@@ -1,8 +1,8 @@
 # ruff: noqa: E501  # Prompt constants contain long JSON example lines.
 """Developer agent node for the dev_pipeline subgraph.
 
-Produces a :class:`~lightagent.agents.subgraphs.artifacts.CodeArtifact` from
-a :class:`~lightagent.agents.subgraphs.artifacts.TechnicalSpec`.
+Produces a :class:`~prismal.agents.subgraphs.artifacts.CodeArtifact` from
+a :class:`~prismal.agents.subgraphs.artifacts.TechnicalSpec`.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.dev_pipeline.developer")
+logger = structlog.get_logger("prismal.subgraphs.dev_pipeline.developer")
 otel = OTelManager()
 
 _SYSTEM = """You are a Senior Software Developer for the dev_pipeline subgraph.
@@ -68,7 +68,7 @@ The `CodeArtifact` is production-ready when ALL of the following hold:
 5. Emit JSON only — no markdown fences, no commentary.
 
 ## Background
-- Artifact schema: `lightagent/agents/subgraphs/artifacts.py::CodeArtifact`.
+- Artifact schema: `prismal/agents/subgraphs/artifacts.py::CodeArtifact`.
 - Parsed via `CodeArtifact.model_validate`; on failure a fallback is
   stored with raw content at `generated/code.py`.
 - Downstream: unit-test agent writes tests against this file; reviewer
@@ -112,8 +112,8 @@ async def developer_agent_node(state: AgentState) -> dict[str, Any]:
         Partial state update with CodeArtifact in metadata.
     """
     with otel.start_span("dev_pipeline.developer") as span:
-        span.set_attribute("lightagent.subgraph", "dev_pipeline")
-        span.set_attribute("lightagent.agent", "developer")
+        span.set_attribute("prismal.subgraph", "dev_pipeline")
+        span.set_attribute("prismal.agent", "developer")
 
         dp: dict[str, Any] = dict(state.get("metadata", {}).get("dev_pipeline", {}))
         spec_data = dp.get("technical_spec", {})

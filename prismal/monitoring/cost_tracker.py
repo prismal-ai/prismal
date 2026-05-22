@@ -1,4 +1,4 @@
-"""Cost and token tracking for LightAgent sessions and users.
+"""Cost and token tracking for Prismal sessions and users.
 
 Persists LLM token usage and cost per session (and optionally per user) to
 a SQLite database.  Cost data comes from LiteLLM response metadata
@@ -51,7 +51,7 @@ from pydantic import BaseModel
 
 from prismal.core.logging import get_logger
 
-logger = get_logger("lightagent.monitoring.cost_tracker")
+logger = get_logger("prismal.monitoring.cost_tracker")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS cost_entries (

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import structlog
 
-logger = structlog.get_logger("lightagent.security.filesystem_guard")
+logger = structlog.get_logger("prismal.security.filesystem_guard")
 
 # NOTE: evaluated at import time — relies on HOME being set correctly at startup.
 # In a typical server process this is fine; the process imports once as the

@@ -44,7 +44,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from prismal.core.config import Settings
 
-logger = get_logger("lightagent.subgraphs.customer_service.builder")
+logger = get_logger("prismal.subgraphs.customer_service.builder")
 
 _NAME = "customer_service"
 _DESCRIPTION = (
@@ -67,7 +67,7 @@ def build_customer_service_subgraph(
             (ticket_creator).
         escalation_threshold: Confidence below which the gate escalates to
             ticket creation.
-        settings: LightAgent settings. Reserved for future use (e.g. LLM
+        settings: Prismal settings. Reserved for future use (e.g. LLM
             provider selection); not required for the in-memory wiring.
         llm: Pre-built LLM handle for classifier + response_generator. When
             ``None``, callers are expected to wire one before registration;

@@ -1,5 +1,5 @@
 """
-LightAgent providers package — LiteLLM-backed LLM registry.
+Prismal providers package — LiteLLM-backed LLM registry.
 
 Public API::
 

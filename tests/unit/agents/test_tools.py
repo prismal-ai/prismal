@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.agents.tools — stub tools and tool group constants."""
+"""Unit tests for prismal.agents.tools — stub tools and tool group constants."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def test_rag_search_stub_contains_query_and_collection() -> None:
         source="docs/test.pdf",
         content="machine learning concepts in docs collection",
     )
-    with patch("lightagent.rag.engine.RAGEngine") as mock_cls:
+    with patch("prismal.rag.engine.RAGEngine") as mock_cls:
         mock_cls.return_value.search.return_value = [chunk]
         result = rag_search.invoke({"query": "machine learning", "collection": "docs"})
     assert isinstance(result, str)
@@ -63,7 +63,7 @@ def test_rag_search_stub_contains_query_and_collection() -> None:
 
 def test_rag_search_default_collection() -> None:
     """rag_search uses 'default' collection when none specified — shows in no-results message."""
-    with patch("lightagent.rag.engine.RAGEngine") as mock_cls:
+    with patch("prismal.rag.engine.RAGEngine") as mock_cls:
         mock_cls.return_value.search.return_value = []
         result = rag_search.invoke({"query": "test"})
     assert isinstance(result, str)
@@ -90,7 +90,7 @@ def test_code_executor_stub_contains_language_and_length() -> None:
     """code_executor runs code and returns output when shell is enabled."""
     code = "print('hello')"
     with (
-        patch("lightagent.core.config.get_settings") as mock_gs,
+        patch("prismal.core.config.get_settings") as mock_gs,
         patch("subprocess.run") as mock_run,
     ):
         mock_gs.return_value.shell_enabled = True
@@ -103,7 +103,7 @@ def test_code_executor_stub_contains_language_and_length() -> None:
 def test_code_executor_default_language() -> None:
     """code_executor defaults to python when language is omitted."""
     with (
-        patch("lightagent.core.config.get_settings") as mock_gs,
+        patch("prismal.core.config.get_settings") as mock_gs,
         patch("subprocess.run") as mock_run,
     ):
         mock_gs.return_value.shell_enabled = True
@@ -119,7 +119,7 @@ def test_vector_search_stub_contains_all_params() -> None:
         source="kb/doc.txt",
         content="embeddings concept found in knowledge base",
     )
-    with patch("lightagent.rag.engine.RAGEngine") as mock_cls:
+    with patch("prismal.rag.engine.RAGEngine") as mock_cls:
         mock_cls.return_value.search.return_value = [chunk]
         result = vector_search.invoke({"query": "embeddings", "collection": "knowledge", "k": 10})
     assert isinstance(result, str)
@@ -133,7 +133,7 @@ def test_doc_index_stub_contains_path_and_collection() -> None:
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
         tmp_path = f.name
     try:
-        with patch("lightagent.rag.engine.RAGEngine") as mock_cls:
+        with patch("prismal.rag.engine.RAGEngine") as mock_cls:
             mock_cls.return_value.index_file.return_value = 5
             result = doc_index.invoke({"path": tmp_path, "collection": "reports"})
         assert isinstance(result, str)
@@ -146,7 +146,7 @@ def test_doc_index_stub_contains_path_and_collection() -> None:
 def test_evaluate_stub_contains_criteria() -> None:
     """evaluate passes criteria to the LLM and returns its response."""
     mock_response = MagicMock(content="Evaluation: clarity score is high")
-    with patch("lightagent.providers.registry.ProviderRegistry") as mock_cls:
+    with patch("prismal.providers.registry.ProviderRegistry") as mock_cls:
         mock_cls.return_value.get_llm_with_fallback.return_value.invoke.return_value = mock_response
         result = evaluate.invoke({"text": "some text", "criteria": "clarity"})
     assert isinstance(result, str)
@@ -156,7 +156,7 @@ def test_evaluate_stub_contains_criteria() -> None:
 def test_score_stub_returns_float() -> None:
     """score returns a float parsed from the LLM response."""
     mock_response = MagicMock(content="0.0")
-    with patch("lightagent.providers.registry.ProviderRegistry") as mock_cls:
+    with patch("prismal.providers.registry.ProviderRegistry") as mock_cls:
         mock_cls.return_value.get_llm_with_fallback.return_value.invoke.return_value = mock_response
         result = score.invoke({"text": "some text", "rubric": "accuracy"})
     assert isinstance(result, float)
@@ -170,7 +170,7 @@ def test_duckdb_query_stub_contains_sql_length() -> None:
     mock_engine = MagicMock()
     mock_engine.query.return_value = rows
     mock_engine._conn = MagicMock()
-    with patch("lightagent.data.duckdb_engine.DuckDBEngine") as mock_cls:
+    with patch("prismal.data.duckdb_engine.DuckDBEngine") as mock_cls:
         mock_cls.return_value.__enter__ = MagicMock(return_value=mock_engine)
         mock_cls.return_value.__exit__ = MagicMock(return_value=False)
         result = duckdb_query.invoke({"sql": sql, "source": "data.csv"})
@@ -194,7 +194,7 @@ def test_polars_transform_stub_contains_operation_and_source() -> None:
 def test_create_chart_stub_contains_chart_type_and_title() -> None:
     """create_chart saves a chart file and returns its path."""
     mock_saved = Path("/tmp/chart_Sales.png")
-    with patch("lightagent.data.polars_utils.save_chart", return_value=mock_saved):
+    with patch("prismal.data.polars_utils.save_chart", return_value=mock_saved):
         result = create_chart.invoke(
             {
                 "data": '[{"month": "Jan", "sales": 120}]',
@@ -356,7 +356,7 @@ def test_write_file_blocks_system_path() -> None:
 
 def test_cron_add_tool_accepts_output_channel() -> None:
     """cron_add tool passes output_channel and output_target to CronManager."""
-    with patch("lightagent.agents.tools.CronManager") as mock_cls:
+    with patch("prismal.agents.tools.CronManager") as mock_cls:
         mock_manager = MagicMock()
         mock_manager.add.return_value = MagicMock(
             name="hb",
@@ -395,7 +395,7 @@ def test_cron_add_auto_fills_from_channel_context() -> None:
     from prismal.agents.context import use_channel_context
     from prismal.agents.tools import cron_add
 
-    with patch("lightagent.agents.tools.CronManager") as mock_cls:
+    with patch("prismal.agents.tools.CronManager") as mock_cls:
         mock_manager = MagicMock()
         mock_manager.add.return_value = MagicMock(
             name="news",
@@ -430,7 +430,7 @@ def test_cron_add_honours_explicit_none_opt_out() -> None:
     from prismal.agents.context import use_channel_context
     from prismal.agents.tools import cron_add
 
-    with patch("lightagent.agents.tools.CronManager") as mock_cls:
+    with patch("prismal.agents.tools.CronManager") as mock_cls:
         mock_manager = MagicMock()
         mock_manager.add.return_value = MagicMock(next_run=None)
         mock_cls.return_value = mock_manager
@@ -460,7 +460,7 @@ def test_cron_add_no_context_no_auto_fill() -> None:
     """Without channel context, cron_add does not auto-fill any routing."""
     from prismal.agents.tools import cron_add
 
-    with patch("lightagent.agents.tools.CronManager") as mock_cls:
+    with patch("prismal.agents.tools.CronManager") as mock_cls:
         mock_manager = MagicMock()
         mock_manager.add.return_value = MagicMock(next_run=None)
         mock_cls.return_value = mock_manager
@@ -483,7 +483,7 @@ def test_cron_add_default_max_retries_is_two() -> None:
     from prismal.agents.tools import CRON_ADD_DEFAULT_MAX_RETRIES, cron_add
 
     assert CRON_ADD_DEFAULT_MAX_RETRIES == 2
-    with patch("lightagent.agents.tools.CronManager") as mock_cls:
+    with patch("prismal.agents.tools.CronManager") as mock_cls:
         mock_manager = MagicMock()
         mock_manager.add.return_value = MagicMock(next_run=None)
         mock_cls.return_value = mock_manager
@@ -615,7 +615,7 @@ def test_delete_path_removes_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     from prismal.core.config import Settings
 
     monkeypatch.setattr(
-        "lightagent.agents.tools.get_settings", lambda: Settings(fs_delete_enabled=True)
+        "prismal.agents.tools.get_settings", lambda: Settings(fs_delete_enabled=True)
     )
     f = tmp_path / "todelete.txt"
     f.write_text("bye")
@@ -630,7 +630,7 @@ def test_delete_path_blocked_when_disabled(tmp_path: Path, monkeypatch: pytest.M
     from prismal.core.config import Settings
 
     monkeypatch.setattr(
-        "lightagent.agents.tools.get_settings",
+        "prismal.agents.tools.get_settings",
         lambda: Settings(fs_delete_enabled=False),
     )
     f = tmp_path / "safe.txt"
@@ -651,7 +651,7 @@ def test_shell_exec_blocked_when_disabled(monkeypatch: pytest.MonkeyPatch) -> No
     from prismal.core.config import Settings
 
     monkeypatch.setattr(
-        "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=False)
+        "prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=False)
     )
     result = shell_exec.invoke({"command": "echo hello"})
     assert "not enabled" in result.lower() or "disabled" in result.lower()
@@ -663,7 +663,7 @@ def test_shell_exec_returns_output(monkeypatch: pytest.MonkeyPatch) -> None:
     from prismal.core.config import Settings
 
     monkeypatch.setattr(
-        "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
+        "prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
     )
     result = shell_exec.invoke({"command": "echo hello_world"})
     assert "hello_world" in result
@@ -675,7 +675,7 @@ def test_shell_exec_captures_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     from prismal.core.config import Settings
 
     monkeypatch.setattr(
-        "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
+        "prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
     )
     result = shell_exec.invoke({"command": "ls /nonexistent_path_xyz_abc_123"})
     assert isinstance(result, str)
@@ -688,7 +688,7 @@ def test_shell_exec_timeout_respected(monkeypatch: pytest.MonkeyPatch) -> None:
     from prismal.core.config import Settings
 
     monkeypatch.setattr(
-        "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
+        "prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
     )
     result = shell_exec.invoke({"command": "sleep 60", "timeout": 1})
     assert "timeout" in result.lower() or "timed out" in result.lower()
@@ -700,7 +700,7 @@ def test_shell_exec_rejects_empty_command(monkeypatch: pytest.MonkeyPatch) -> No
     from prismal.core.config import Settings
 
     monkeypatch.setattr(
-        "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
+        "prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
     )
     result = shell_exec.invoke({"command": "   "})
     assert "empty" in result.lower() or "error" in result.lower()

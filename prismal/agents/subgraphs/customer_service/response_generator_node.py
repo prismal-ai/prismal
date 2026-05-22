@@ -18,7 +18,7 @@ from prismal.security.prompt_builder import SecurePromptBuilder
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-logger = get_logger("lightagent.subgraphs.customer_service.response_generator")
+logger = get_logger("prismal.subgraphs.customer_service.response_generator")
 
 _SYSTEM_PROMPT = (
     "You are a customer-service agent. Answer the user's query in 2-4 "

@@ -1,4 +1,4 @@
-"""CRAG (Corrective RAG) pipeline for the LightAgent RAG system.
+"""CRAG (Corrective RAG) pipeline for the Prismal RAG system.
 
 Implements SPEC-005: a five-step pipeline that retrieves documents from
 ChromaDB, grades each chunk for relevance with an LLM, filters out low-quality
@@ -20,7 +20,7 @@ Example::
 
     store = ChromaVectorStore()
     pipeline = CRAGPipeline(vector_store=store)
-    result = await pipeline.run("What is LightAgent?")
+    result = await pipeline.run("What is Prismal?")
     print(result.answer)
 """
 
@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     from prismal.core.config import Settings
     from prismal.rag.vector_store import ChromaVectorStore
 
-logger = get_logger("lightagent.rag.crag")
+logger = get_logger("prismal.rag.crag")
 
 # Relevance threshold: chunks scoring below this are discarded.
 _RELEVANCE_THRESHOLD: float = 0.5
@@ -99,7 +99,7 @@ class CRAGPipeline:
     Args:
         vector_store: Initialised ``ChromaVectorStore`` to use for retrieval.
         settings: Application settings.  ``None`` resolves via
-            :func:`~lightagent.core.config.get_settings`.
+            :func:`~prismal.core.config.get_settings`.
     """
 
     def __init__(
@@ -111,7 +111,7 @@ class CRAGPipeline:
 
         Args:
             vector_store: ChromaDB wrapper used for similarity search.
-            settings: LightAgent settings.  ``None`` uses ``get_settings()``.
+            settings: Prismal settings.  ``None`` uses ``get_settings()``.
         """
         self._store = vector_store
         self._settings = settings if settings is not None else get_settings()
@@ -142,8 +142,8 @@ class CRAGPipeline:
         # ── Step 1: RETRIEVE ──────────────────────────────────────────────────
         with otel.start_span("crag.retrieve") as retrieve_span:
             raw_results: list[tuple[Document, float]] = self._store.similarity_search(query, k=5)
-            retrieve_span.set_attribute("lightagent.query_len", len(query))
-            retrieve_span.set_attribute("lightagent.retrieved_count", len(raw_results))
+            retrieve_span.set_attribute("prismal.query_len", len(query))
+            retrieve_span.set_attribute("prismal.retrieved_count", len(raw_results))
             logger.info(
                 "crag_retrieve",
                 retrieved_count=len(raw_results),
@@ -171,10 +171,10 @@ class CRAGPipeline:
                     chunk_id=chunk.chunk_id,
                     relevance_score=score,
                 )
-            grade_span.set_attribute("lightagent.graded_count", len(graded))
+            grade_span.set_attribute("prismal.graded_count", len(graded))
             if graded:
                 avg_score = sum(c.relevance_score for c in graded) / len(graded)
-                grade_span.set_attribute("lightagent.avg_relevance_score", avg_score)
+                grade_span.set_attribute("prismal.avg_relevance_score", avg_score)
 
         # ── Step 3: FILTER ────────────────────────────────────────────────────
         filtered = [c for c in graded if c.relevance_score >= _RELEVANCE_THRESHOLD]
@@ -194,11 +194,11 @@ class CRAGPipeline:
 
         # ── Step 5: GENERATE ──────────────────────────────────────────────────
         with otel.start_span("crag.generate") as generate_span:
-            generate_span.set_attribute("lightagent.context_chunks", len(filtered))
-            generate_span.set_attribute("lightagent.used_web_fallback", used_web_fallback)
+            generate_span.set_attribute("prismal.context_chunks", len(filtered))
+            generate_span.set_attribute("prismal.used_web_fallback", used_web_fallback)
             logger.info("crag_generate_start", context_chunks=len(filtered))
             answer = await self._generate(query=query, chunks=filtered)
-            generate_span.set_attribute("lightagent.answer_len", len(answer))
+            generate_span.set_attribute("prismal.answer_len", len(answer))
 
         return CRAGResult(
             answer=answer,

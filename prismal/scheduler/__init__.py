@@ -40,11 +40,11 @@ __all__ = [
 ]
 
 _LAZY: dict[str, str] = {
-    "CronExecutor": "lightagent.scheduler.executor",
-    "agent_run_flow": "lightagent.scheduler.prefect_flows",
-    "config_reload_flow": "lightagent.scheduler.prefect_flows",
-    "document_index_flow": "lightagent.scheduler.prefect_flows",
-    "skill_discovery_flow": "lightagent.scheduler.prefect_flows",
+    "CronExecutor": "prismal.scheduler.executor",
+    "agent_run_flow": "prismal.scheduler.prefect_flows",
+    "config_reload_flow": "prismal.scheduler.prefect_flows",
+    "document_index_flow": "prismal.scheduler.prefect_flows",
+    "skill_discovery_flow": "prismal.scheduler.prefect_flows",
 }
 
 

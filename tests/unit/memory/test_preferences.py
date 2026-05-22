@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.memory.preferences."""
+"""Unit tests for prismal.memory.preferences."""
 
 from __future__ import annotations
 
@@ -53,12 +53,12 @@ def test_preference_facts_accepts_values() -> None:
         communication_style=["Spanish"],
         tech_stack=["Python 3.13"],
         workflow=["Conventional commits"],
-        project_context=["LightAgent"],
+        project_context=["Prismal"],
     )
     assert "Spanish" in facts.communication_style
     assert "Python 3.13" in facts.tech_stack
     assert "Conventional commits" in facts.workflow
-    assert "LightAgent" in facts.project_context
+    assert "Prismal" in facts.project_context
 
 
 # ---------------------------------------------------------------------------
@@ -206,12 +206,12 @@ def test_set_fact_multiple_sections_independent(tmp_path: Path) -> None:
     mgr.set_fact("communication_style", "Spanish")
     mgr.set_fact("tech_stack", "Python 3.13")
     mgr.set_fact("workflow", "Conventional commits")
-    mgr.set_fact("project_context", "LightAgent project")
+    mgr.set_fact("project_context", "Prismal project")
 
     assert "Spanish" in mgr.load_section("communication_style")
     assert "Python 3.13" in mgr.load_section("tech_stack")
     assert "Conventional commits" in mgr.load_section("workflow")
-    assert "LightAgent project" in mgr.load_section("project_context")
+    assert "Prismal project" in mgr.load_section("project_context")
 
 
 def test_set_fact_strips_surrounding_whitespace(tmp_path: Path) -> None:
@@ -236,13 +236,13 @@ def test_merge_adds_all_facts(tmp_path: Path) -> None:
         communication_style=["Spanish"],
         tech_stack=["Python 3.13"],
         workflow=["Conventional commits"],
-        project_context=["LightAgent"],
+        project_context=["Prismal"],
     )
     mgr.merge(facts)
     assert "Spanish" in mgr.load_section("communication_style")
     assert "Python 3.13" in mgr.load_section("tech_stack")
     assert "Conventional commits" in mgr.load_section("workflow")
-    assert "LightAgent" in mgr.load_section("project_context")
+    assert "Prismal" in mgr.load_section("project_context")
 
 
 def test_merge_deduplicates_existing_facts(tmp_path: Path) -> None:
@@ -286,13 +286,13 @@ def test_parse_sections_extracts_bullets(tmp_path: Path) -> None:
         "## Estilo de Comunicacion\n- Spanish\n\n"
         "## Stack Tecnico\n- Python 3.13\n- uv\n\n"
         "## Flujo de Trabajo\n\n"
-        "## Contexto del Proyecto\n- LightAgent\n"
+        "## Contexto del Proyecto\n- Prismal\n"
     )
     result = mgr._parse_sections(content)
     assert result["communication_style"] == ["Spanish"]
     assert result["tech_stack"] == ["Python 3.13", "uv"]
     assert result["workflow"] == []
-    assert result["project_context"] == ["LightAgent"]
+    assert result["project_context"] == ["Prismal"]
 
 
 # ---------------------------------------------------------------------------
@@ -325,14 +325,14 @@ async def test_extractor_parses_llm_json_response() -> None:
             "communication_style": ["Spanish"],
             "tech_stack": ["Python 3.13", "Uses uv"],
             "workflow": ["Conventional commits"],
-            "project_context": ["LightAgent"],
+            "project_context": ["Prismal"],
         }
     )
 
     mock_llm = AsyncMock()
     mock_llm.ainvoke = AsyncMock(return_value=llm_response)
 
-    with patch("lightagent.providers.registry.ProviderRegistry") as mock_registry_cls:
+    with patch("prismal.providers.registry.ProviderRegistry") as mock_registry_cls:
         mock_registry = MagicMock()
         mock_registry.get_llm_with_fallback.return_value = mock_llm
         mock_registry_cls.return_value = mock_registry
@@ -344,7 +344,7 @@ async def test_extractor_parses_llm_json_response() -> None:
     assert "Python 3.13" in result.tech_stack
     assert "Uses uv" in result.tech_stack
     assert "Conventional commits" in result.workflow
-    assert "LightAgent" in result.project_context
+    assert "Prismal" in result.project_context
 
 
 @pytest.mark.asyncio
@@ -364,7 +364,7 @@ async def test_extractor_strips_markdown_fences() -> None:
     mock_llm = AsyncMock()
     mock_llm.ainvoke = AsyncMock(return_value=llm_response)
 
-    with patch("lightagent.providers.registry.ProviderRegistry") as mock_registry_cls:
+    with patch("prismal.providers.registry.ProviderRegistry") as mock_registry_cls:
         mock_registry = MagicMock()
         mock_registry.get_llm_with_fallback.return_value = mock_llm
         mock_registry_cls.return_value = mock_registry
@@ -378,7 +378,7 @@ async def test_extractor_strips_markdown_fences() -> None:
 @pytest.mark.asyncio
 async def test_extractor_returns_empty_on_llm_error() -> None:
     """PreferenceExtractor.extract() returns empty facts when the LLM fails."""
-    with patch("lightagent.providers.registry.ProviderRegistry") as mock_registry_cls:
+    with patch("prismal.providers.registry.ProviderRegistry") as mock_registry_cls:
         mock_registry = MagicMock()
         mock_registry.get_llm_with_fallback.side_effect = RuntimeError("LLM unavailable")
         mock_registry_cls.return_value = mock_registry
@@ -398,7 +398,7 @@ async def test_extractor_returns_empty_on_invalid_json() -> None:
     mock_llm = AsyncMock()
     mock_llm.ainvoke = AsyncMock(return_value=llm_response)
 
-    with patch("lightagent.providers.registry.ProviderRegistry") as mock_registry_cls:
+    with patch("prismal.providers.registry.ProviderRegistry") as mock_registry_cls:
         mock_registry = MagicMock()
         mock_registry.get_llm_with_fallback.return_value = mock_llm
         mock_registry_cls.return_value = mock_registry
@@ -422,7 +422,7 @@ def test_roundtrip_set_fact_and_load_section(tmp_path: Path) -> None:
         ("tech_stack", "Python 3.13"),
         ("tech_stack", "FastAPI"),
         ("workflow", "Uses uv run"),
-        ("project_context", "LightAgent"),
+        ("project_context", "Prismal"),
     ]
     for section, fact in facts_to_write:
         mgr.set_fact(section, fact)
@@ -432,7 +432,7 @@ def test_roundtrip_set_fact_and_load_section(tmp_path: Path) -> None:
     assert "Python 3.13" in tech
     assert "FastAPI" in tech
     assert "Uses uv run" in mgr.load_section("workflow")
-    assert "LightAgent" in mgr.load_section("project_context")
+    assert "Prismal" in mgr.load_section("project_context")
 
 
 def test_merge_then_load_section_roundtrip(tmp_path: Path) -> None:

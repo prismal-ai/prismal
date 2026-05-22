@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
 logger = structlog.get_logger(
-    "lightagent.subgraphs.dev_pipeline.parallel_unit_test",
+    "prismal.subgraphs.dev_pipeline.parallel_unit_test",
 )
 
 # Per-worker artifact tag — written into ``parallel_results`` so the

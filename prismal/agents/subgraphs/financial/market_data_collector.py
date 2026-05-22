@@ -3,7 +3,7 @@
 
 Fetches current price and OHLCV history for the requested symbol.
 Supports equity (via yfinance/OpenBB) and crypto (via CCXT + fallback).
-Stores a :class:`~lightagent.agents.subgraphs.financial.artifacts.MarketSnapshot`
+Stores a :class:`~prismal.agents.subgraphs.financial.artifacts.MarketSnapshot`
 under ``state["metadata"]["financial_analyst"]["market_snapshot"]``.
 """
 
@@ -22,7 +22,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.financial.market_data_collector")
+logger = structlog.get_logger("prismal.subgraphs.financial.market_data_collector")
 otel = OTelManager()
 
 # Phase 39 / SPEC-041 AC-041-1: the set of MarketSnapshot fields the
@@ -149,7 +149,7 @@ The `MarketSnapshot` is acceptable when ALL of the following hold:
 
 ## Background
 - Artifact schema:
-  `lightagent/agents/subgraphs/financial/artifacts.py::MarketSnapshot`.
+  `prismal/agents/subgraphs/financial/artifacts.py::MarketSnapshot`.
 - Rate-limit cache TTLs: ticker 30s, OHLCV 5 min, fundamentals 24 h.
 - Lazy-import `openbb`, `ccxt`, `pandas_ta` — never at module level.
 - Workspace path:
@@ -206,8 +206,8 @@ async def market_data_collector_node(state: AgentState) -> dict[str, Any]:
         ``metadata["financial_analyst"]["market_snapshot"]``.
     """
     with otel.start_span("financial_analyst.market_data_collector") as span:
-        span.set_attribute("lightagent.subgraph", "financial_analyst")
-        span.set_attribute("lightagent.agent", "market_data_collector")
+        span.set_attribute("prismal.subgraph", "financial_analyst")
+        span.set_attribute("prismal.agent", "market_data_collector")
 
         llm = ProviderRegistry().get_llm()
         messages = [SystemMessage(content=_SYSTEM), *list(state["messages"][-5:])]
@@ -244,8 +244,8 @@ async def market_data_collector_node(state: AgentState) -> dict[str, Any]:
             data_confidence=confidence,
             missing_fields=missing_fields,
         )
-        span.set_attribute("lightagent.financial.symbol", snapshot.symbol)
-        span.set_attribute("lightagent.financial.provider", snapshot.data_provider)
+        span.set_attribute("prismal.financial.symbol", snapshot.symbol)
+        span.set_attribute("prismal.financial.provider", snapshot.data_provider)
 
         return {
             "current_agent": "market_data_collector",

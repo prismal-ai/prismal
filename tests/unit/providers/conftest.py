@@ -2,7 +2,7 @@
 
 Isolates every provider test from the developer's local ``.env`` —
 Pydantic Settings reads ``os.environ`` regardless of ``_env_file=None``,
-so any ``LIGHTAGENT_LLM_PROVIDER=ollama`` in the dev environment would
+so any ``PRISMAL_LLM_PROVIDER=ollama`` in the dev environment would
 otherwise leak into tests and trigger the provider-resolver validator's
 conflict warning (which ``filterwarnings=["error", ...]`` turns into a
 test failure).
@@ -13,11 +13,11 @@ from __future__ import annotations
 import pytest
 
 _ENV_ISOLATION_KEYS: tuple[str, ...] = (
-    "LIGHTAGENT_LLM_PROVIDER",
-    "LIGHTAGENT_DEFAULT_MODEL",
-    "LIGHTAGENT_MODEL",
-    "LIGHTAGENT_FALLBACK_MODEL",
-    "LIGHTAGENT_OLLAMA_BASE_URL",
+    "PRISMAL_LLM_PROVIDER",
+    "PRISMAL_DEFAULT_MODEL",
+    "PRISMAL_MODEL",
+    "PRISMAL_FALLBACK_MODEL",
+    "PRISMAL_OLLAMA_BASE_URL",
     "OLLAMA_API_BASE",
 )
 

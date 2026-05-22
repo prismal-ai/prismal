@@ -49,7 +49,7 @@ from prismal.security.audit import AuditLogger
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.cua")
+logger = get_logger("prismal.agents.cua")
 
 
 # ---------------------------------------------------------------------------
@@ -225,13 +225,13 @@ HIGH_RISK (requires HUMAN APPROVAL before execution):
 
 
 _DISABLED_MESSAGE = (
-    "CUA agent is disabled. Set `LIGHTAGENT_CUA_ENABLED=true` and "
-    "configure `LIGHTAGENT_CUA_VISION_MODEL` with a vision-capable "
+    "CUA agent is disabled. Set `PRISMAL_CUA_ENABLED=true` and "
+    "configure `PRISMAL_CUA_VISION_MODEL` with a vision-capable "
     "model (e.g. `claude-opus-4-6`) to enable it."
 )
 _NO_VISION_MODEL_MESSAGE = (
     "CUA agent cannot run without a vision-capable model. Set "
-    "`LIGHTAGENT_CUA_VISION_MODEL` to a model string such as "
+    "`PRISMAL_CUA_VISION_MODEL` to a model string such as "
     "`claude-opus-4-6` and restart the process."
 )
 

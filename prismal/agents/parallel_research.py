@@ -1,7 +1,7 @@
 """Parallel research fan-out / fan-in pattern (Phase 34).
 
 Implements the map-reduce execution path for research tasks, using
-:func:`~lightagent.agents.patterns.parallel.make_parallel_dispatcher` to fan
+:func:`~prismal.agents.patterns.parallel.make_parallel_dispatcher` to fan
 out one ``Send`` per pending task to a worker node, then aggregate the
 partial results in :func:`research_aggregator_node`.
 
@@ -42,7 +42,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.parallel_research")
+logger = get_logger("prismal.agents.parallel_research")
 
 _PARALLEL_RESEARCH_SYSTEM = """You are a focused research worker.
 

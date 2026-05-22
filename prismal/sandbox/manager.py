@@ -22,7 +22,7 @@ from pathlib import Path
 
 from prismal.core.logging import get_logger
 
-logger = get_logger("lightagent.sandbox.manager")
+logger = get_logger("prismal.sandbox.manager")
 
 __all__ = ["SandboxManager"]
 
@@ -103,7 +103,7 @@ class SandboxManager:
             # Limpiar PYTHONPATH para evitar contaminación del venv del proyecto
             "PYTHONPATH": "",
             # Variables informativas
-            "LIGHTAGENT_SANDBOX_ROOT": str(self.root),
+            "PRISMAL_SANDBOX_ROOT": str(self.root),
         }
 
     # ── Validación de rutas ──────────────────────────────────────────

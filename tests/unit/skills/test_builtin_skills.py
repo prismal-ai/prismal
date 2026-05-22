@@ -3,7 +3,7 @@
 Tests cover:
 - weather     (wttr.in backend — HTTP mocked)
 - web_search  (DuckDuckGo backend — HTTP mocked)
-- code_executor (subprocess gated by LIGHTAGENT_SHELL_ENABLED)
+- code_executor (subprocess gated by PRISMAL_SHELL_ENABLED)
 - email_reader  (IMAP mocked; graceful degradation when no config)
 - calendar     (reads .ics files from tmp dir)
 - database_query (SELECT-only guard; DuckDB in-memory)
@@ -23,8 +23,8 @@ if TYPE_CHECKING:
 
 # ── Weather skill ─────────────────────────────────────────────────────────────
 
-_WEATHER_PATCH = "lightagent.skills.available.weather.skill.httpx.get"
-_SEARCH_PATCH = "lightagent.skills.available.web_search.skill.httpx.get"
+_WEATHER_PATCH = "prismal.skills.available.weather.skill.httpx.get"
+_SEARCH_PATCH = "prismal.skills.available.web_search.skill.httpx.get"
 
 
 class TestWeatherSkill:
@@ -86,8 +86,8 @@ class TestWeatherSkill:
         """OpenWeatherMap backend is used when env vars are set."""
         from prismal.skills.available.weather.skill import WeatherSkill
 
-        monkeypatch.setenv("LIGHTAGENT_WEATHER_PROVIDER", "openweathermap")
-        monkeypatch.setenv("LIGHTAGENT_WEATHER_API_KEY", "testkey")
+        monkeypatch.setenv("PRISMAL_WEATHER_PROVIDER", "openweathermap")
+        monkeypatch.setenv("PRISMAL_WEATHER_API_KEY", "testkey")
 
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -182,20 +182,20 @@ class TestCodeExecutorSkill:
         assert "shell.execute" in skill.metadata.requires_permissions
 
     def test_disabled_by_default(self) -> None:
-        """execute_python returns error when LIGHTAGENT_SHELL_ENABLED is not set."""
+        """execute_python returns error when PRISMAL_SHELL_ENABLED is not set."""
         from prismal.skills.available.code_executor.skill import CodeExecutorSkill
 
         with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("LIGHTAGENT_SHELL_ENABLED", None)
+            os.environ.pop("PRISMAL_SHELL_ENABLED", None)
             result = CodeExecutorSkill().get_tools()[0].invoke({"code": "print('hi')"})
 
         assert "disabled" in result.lower()
 
     def test_enabled_runs_code(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """execute_python runs code when LIGHTAGENT_SHELL_ENABLED=true."""
+        """execute_python runs code when PRISMAL_SHELL_ENABLED=true."""
         from prismal.skills.available.code_executor.skill import CodeExecutorSkill
 
-        monkeypatch.setenv("LIGHTAGENT_SHELL_ENABLED", "true")
+        monkeypatch.setenv("PRISMAL_SHELL_ENABLED", "true")
         tool = CodeExecutorSkill().get_tools()[0]
         result = tool.invoke({"code": "print('hello world')"})
         assert "hello world" in result
@@ -204,7 +204,7 @@ class TestCodeExecutorSkill:
         """Syntax errors in user code are captured in stderr, not raised."""
         from prismal.skills.available.code_executor.skill import CodeExecutorSkill
 
-        monkeypatch.setenv("LIGHTAGENT_SHELL_ENABLED", "true")
+        monkeypatch.setenv("PRISMAL_SHELL_ENABLED", "true")
         result = CodeExecutorSkill().get_tools()[0].invoke({"code": "def broken("})
         assert "SyntaxError" in result or "stderr" in result
 
@@ -212,7 +212,7 @@ class TestCodeExecutorSkill:
         """Code that exceeds the timeout returns a timeout error."""
         from prismal.skills.available.code_executor.skill import CodeExecutorSkill
 
-        monkeypatch.setenv("LIGHTAGENT_SHELL_ENABLED", "true")
+        monkeypatch.setenv("PRISMAL_SHELL_ENABLED", "true")
         result = (
             CodeExecutorSkill()
             .get_tools()[0]
@@ -224,9 +224,9 @@ class TestCodeExecutorSkill:
 # ── Email reader skill ────────────────────────────────────────────────────────
 
 _EMAIL_KEYS = (
-    "LIGHTAGENT_EMAIL_HOST",
-    "LIGHTAGENT_EMAIL_USER",
-    "LIGHTAGENT_EMAIL_PASSWORD",
+    "PRISMAL_EMAIL_HOST",
+    "PRISMAL_EMAIL_USER",
+    "PRISMAL_EMAIL_PASSWORD",
 )
 
 
@@ -254,9 +254,9 @@ class TestEmailReaderSkill:
         """validate() returns True when all IMAP env vars are present."""
         from prismal.skills.available.email_reader.skill import EmailReaderSkill
 
-        monkeypatch.setenv("LIGHTAGENT_EMAIL_HOST", "imap.example.com")
-        monkeypatch.setenv("LIGHTAGENT_EMAIL_USER", "user@example.com")
-        monkeypatch.setenv("LIGHTAGENT_EMAIL_PASSWORD", "secret")
+        monkeypatch.setenv("PRISMAL_EMAIL_HOST", "imap.example.com")
+        monkeypatch.setenv("PRISMAL_EMAIL_USER", "user@example.com")
+        monkeypatch.setenv("PRISMAL_EMAIL_PASSWORD", "secret")
         assert EmailReaderSkill().validate() is True
 
     def test_graceful_degradation_no_config(self) -> None:
@@ -268,7 +268,7 @@ class TestEmailReaderSkill:
                 os.environ.pop(key, None)
             result = EmailReaderSkill().get_tools()[0].invoke({"max_emails": 5})
 
-        assert "Missing configuration" in result or "LIGHTAGENT_EMAIL" in result
+        assert "Missing configuration" in result or "PRISMAL_EMAIL" in result
 
 
 # ── Calendar skill ────────────────────────────────────────────────────────────
@@ -301,9 +301,9 @@ class TestCalendarSkill:
         """list_events returns error when calendar dir does not exist."""
         from prismal.skills.available.calendar.skill import CalendarSkill
 
-        monkeypatch.setenv("LIGHTAGENT_CALENDAR_DIR", "/nonexistent/dir/abc123")
+        monkeypatch.setenv("PRISMAL_CALENDAR_DIR", "/nonexistent/dir/abc123")
         result = CalendarSkill().get_tools()[0].invoke({"days_ahead": 7})
-        assert "not found" in result.lower() or "LIGHTAGENT_CALENDAR_DIR" in result
+        assert "not found" in result.lower() or "PRISMAL_CALENDAR_DIR" in result
 
     def test_reads_ics_events(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """list_events returns events found in .ics files."""
@@ -312,7 +312,7 @@ class TestCalendarSkill:
         with tempfile.TemporaryDirectory() as tmpdir:
             ics_path = Path(tmpdir) / "test.ics"
             ics_path.write_text(_SAMPLE_ICS)
-            monkeypatch.setenv("LIGHTAGENT_CALENDAR_DIR", tmpdir)
+            monkeypatch.setenv("PRISMAL_CALENDAR_DIR", tmpdir)
             result = CalendarSkill().get_tools()[0].invoke({"days_ahead": 365})
 
         # Either returns the event or "No events" (date-dependent)
@@ -324,7 +324,7 @@ class TestCalendarSkill:
         from prismal.skills.available.calendar.skill import CalendarSkill
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            monkeypatch.setenv("LIGHTAGENT_CALENDAR_DIR", tmpdir)
+            monkeypatch.setenv("PRISMAL_CALENDAR_DIR", tmpdir)
             result = CalendarSkill().get_tools()[0].invoke({"days_ahead": 7})
 
         assert "No events" in result or "no events" in result.lower()
@@ -351,7 +351,7 @@ class TestDatabaseQuerySkill:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = str(Path(tmpdir) / "test.db")
-            with patch.dict(os.environ, {"LIGHTAGENT_DB_PATH": db_path}):
+            with patch.dict(os.environ, {"PRISMAL_DB_PATH": db_path}):
                 import duckdb
 
                 conn = duckdb.connect(db_path)
@@ -372,7 +372,7 @@ class TestDatabaseQuerySkill:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = str(Path(tmpdir) / "test.db")
-            with patch.dict(os.environ, {"LIGHTAGENT_DB_PATH": db_path}):
+            with patch.dict(os.environ, {"PRISMAL_DB_PATH": db_path}):
                 import duckdb
 
                 conn = duckdb.connect(db_path)
@@ -396,7 +396,7 @@ class TestDatabaseQuerySkill:
             conn.execute("INSERT INTO users VALUES (1, 'Alice'), (2, 'Bob')")
             conn.close()
 
-            with patch.dict(os.environ, {"LIGHTAGENT_DB_PATH": db_path}):
+            with patch.dict(os.environ, {"PRISMAL_DB_PATH": db_path}):
                 result = (
                     DatabaseQuerySkill()
                     .get_tools()[0]
@@ -410,7 +410,7 @@ class TestDatabaseQuerySkill:
         """Returns error message when database file does not exist."""
         from prismal.skills.available.database_query.skill import DatabaseQuerySkill
 
-        monkeypatch.setenv("LIGHTAGENT_DB_PATH", "/nonexistent/db.db")
+        monkeypatch.setenv("PRISMAL_DB_PATH", "/nonexistent/db.db")
         result = DatabaseQuerySkill().get_tools()[0].invoke({"query": "SELECT 1"})
         assert "not found" in result.lower()
 
@@ -427,7 +427,7 @@ class TestDatabaseQuerySkill:
             conn.execute("INSERT INTO nums VALUES (1), (2), (3)")
             conn.close()
 
-            with patch.dict(os.environ, {"LIGHTAGENT_DB_PATH": db_path}):
+            with patch.dict(os.environ, {"PRISMAL_DB_PATH": db_path}):
                 result = (
                     DatabaseQuerySkill()
                     .get_tools()[0]
@@ -807,9 +807,9 @@ class TestEmailReaderCoverage:
         mock_imap = _make_imap_mock(search_ids=b"1 2")
 
         env = {
-            "LIGHTAGENT_EMAIL_HOST": "imap.example.com",
-            "LIGHTAGENT_EMAIL_USER": "user@example.com",
-            "LIGHTAGENT_EMAIL_PASSWORD": "secret",
+            "PRISMAL_EMAIL_HOST": "imap.example.com",
+            "PRISMAL_EMAIL_USER": "user@example.com",
+            "PRISMAL_EMAIL_PASSWORD": "secret",
         }
         with (
             patch.dict("os.environ", env),
@@ -838,9 +838,9 @@ class TestEmailReaderCoverage:
         )
 
         env = {
-            "LIGHTAGENT_EMAIL_HOST": "imap.example.com",
-            "LIGHTAGENT_EMAIL_USER": "user@example.com",
-            "LIGHTAGENT_EMAIL_PASSWORD": "secret",
+            "PRISMAL_EMAIL_HOST": "imap.example.com",
+            "PRISMAL_EMAIL_USER": "user@example.com",
+            "PRISMAL_EMAIL_PASSWORD": "secret",
         }
         with (
             patch.dict("os.environ", env),
@@ -869,9 +869,9 @@ class TestEmailReaderCoverage:
         mock_imap.login.side_effect = imaplib.IMAP4.error("authentication failed")
 
         env = {
-            "LIGHTAGENT_EMAIL_HOST": "imap.example.com",
-            "LIGHTAGENT_EMAIL_USER": "user@example.com",
-            "LIGHTAGENT_EMAIL_PASSWORD": "wrong_password",
+            "PRISMAL_EMAIL_HOST": "imap.example.com",
+            "PRISMAL_EMAIL_USER": "user@example.com",
+            "PRISMAL_EMAIL_PASSWORD": "wrong_password",
         }
         with (
             patch.dict("os.environ", env),
@@ -898,9 +898,9 @@ class TestEmailReaderCoverage:
         mock_imap.login.side_effect = OSError("connection refused")
 
         env = {
-            "LIGHTAGENT_EMAIL_HOST": "imap.example.com",
-            "LIGHTAGENT_EMAIL_USER": "user@example.com",
-            "LIGHTAGENT_EMAIL_PASSWORD": "secret",
+            "PRISMAL_EMAIL_HOST": "imap.example.com",
+            "PRISMAL_EMAIL_USER": "user@example.com",
+            "PRISMAL_EMAIL_PASSWORD": "secret",
         }
         with (
             patch.dict("os.environ", env),
@@ -926,9 +926,9 @@ class TestEmailReaderCoverage:
 
         # Ensure none of the required env vars are set
         env_removals = {
-            "LIGHTAGENT_EMAIL_HOST": "",
-            "LIGHTAGENT_EMAIL_USER": "",
-            "LIGHTAGENT_EMAIL_PASSWORD": "",
+            "PRISMAL_EMAIL_HOST": "",
+            "PRISMAL_EMAIL_USER": "",
+            "PRISMAL_EMAIL_PASSWORD": "",
         }
         with patch.dict("os.environ", env_removals):
             # Blank values are treated as falsy — triggers config error path
@@ -936,7 +936,7 @@ class TestEmailReaderCoverage:
             result = tool.invoke({"max_emails": 3})
 
         assert "Missing configuration" in result
-        assert "LIGHTAGENT_EMAIL_HOST" in result
+        assert "PRISMAL_EMAIL_HOST" in result
 
 
 # ── Calendar — additional coverage tests ──────────────────────────────────────
@@ -1032,10 +1032,10 @@ class TestCalendarCoverage:
         does not block execution.
         """
         with tempfile.TemporaryDirectory() as tmpdir:
-            monkeypatch.setenv("LIGHTAGENT_CALENDAR_DIR", tmpdir)
+            monkeypatch.setenv("PRISMAL_CALENDAR_DIR", tmpdir)
 
             with patch(
-                "lightagent.skills.available.calendar.skill._read_events",
+                "prismal.skills.available.calendar.skill._read_events",
                 return_value=[],
             ):
                 from prismal.skills.available.calendar.skill import CalendarSkill
@@ -1068,10 +1068,10 @@ class TestCalendarCoverage:
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            monkeypatch.setenv("LIGHTAGENT_CALENDAR_DIR", tmpdir)
+            monkeypatch.setenv("PRISMAL_CALENDAR_DIR", tmpdir)
 
             with patch(
-                "lightagent.skills.available.calendar.skill._read_events",
+                "prismal.skills.available.calendar.skill._read_events",
                 return_value=mock_events,
             ):
                 from prismal.skills.available.calendar.skill import CalendarSkill
@@ -1104,10 +1104,10 @@ class TestCalendarCoverage:
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            monkeypatch.setenv("LIGHTAGENT_CALENDAR_DIR", tmpdir)
+            monkeypatch.setenv("PRISMAL_CALENDAR_DIR", tmpdir)
 
             with patch(
-                "lightagent.skills.available.calendar.skill._read_events",
+                "prismal.skills.available.calendar.skill._read_events",
                 return_value=mock_events,
             ):
                 from prismal.skills.available.calendar.skill import CalendarSkill

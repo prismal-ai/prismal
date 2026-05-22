@@ -6,10 +6,10 @@ created, paused, resumed, listed, and removed.
 
 CLI commands map 1-to-1 to ``CronManager`` methods::
 
-    lightagent cron add --name NAME --schedule "0 9 * * *" --task DESC
-    lightagent cron list
-    lightagent cron pause NAME
-    lightagent cron resume NAME
+    prismal cron add --name NAME --schedule "0 9 * * *" --task DESC
+    prismal cron list
+    prismal cron pause NAME
+    prismal cron resume NAME
 
 AC-007-1: cron add creates a Prefect deployment.
 AC-007-2: Jobs persist in SQLite across restarts.
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 from prismal.core.logging import get_logger
 
-logger = get_logger("lightagent.scheduler.cron_manager")
+logger = get_logger("prismal.scheduler.cron_manager")
 
 # ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -149,7 +149,7 @@ class CronJob(BaseModel):
 
 
 class CronManager:
-    """Manage LightAgent cron jobs with SQLite persistence.
+    """Manage Prismal cron jobs with SQLite persistence.
 
     All mutations are immediately written to the SQLite database so that
     jobs survive process restarts (AC-007-2).
@@ -425,7 +425,7 @@ class CronManager:
         Raises:
             KeyError: If the job does not exist.
 
-        AC-007-4: ``lightagent cron pause NAME`` works.
+        AC-007-4: ``prismal cron pause NAME`` works.
         """
         self._require_job(name)
         with self._conn() as conn:
@@ -441,7 +441,7 @@ class CronManager:
         Raises:
             KeyError: If the job does not exist.
 
-        AC-007-4: ``lightagent cron resume NAME`` works.
+        AC-007-4: ``prismal cron resume NAME`` works.
         """
         self._require_job(name)
         job = self.get_job(name)

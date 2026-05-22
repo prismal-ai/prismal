@@ -1,4 +1,4 @@
-"""Unit tests for CRAGPipeline (lightagent.rag.crag).
+"""Unit tests for CRAGPipeline (prismal.rag.crag).
 
 Tests follow the TDD spec from T-063.  ChromaVectorStore, ProviderRegistry,
 and the LLM are all mocked so no real API calls or vector DB connections are
@@ -30,7 +30,7 @@ from prismal.rag.crag import CRAGPipeline, CRAGResult, RetrievedChunk
 
 # ── Paths for patching ─────────────────────────────────────────────────────────
 
-PROVIDER_REGISTRY_PATH = "lightagent.rag.crag.ProviderRegistry"
+PROVIDER_REGISTRY_PATH = "prismal.rag.crag.ProviderRegistry"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -172,7 +172,7 @@ def test_init_uses_get_settings_when_none() -> None:
     fake_settings = _make_settings()
     with (
         patch(PROVIDER_REGISTRY_PATH),
-        patch("lightagent.rag.crag.get_settings", return_value=fake_settings) as mock_gs,
+        patch("prismal.rag.crag.get_settings", return_value=fake_settings) as mock_gs,
     ):
         CRAGPipeline(vector_store=mock_store, settings=None)
     mock_gs.assert_called_once()

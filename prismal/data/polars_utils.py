@@ -16,7 +16,7 @@ from typing import Literal
 
 import polars as pl
 
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
 # Supported comparison operators for filter_rows()
 FilterOp = Literal["==", "!=", ">", ">=", "<", "<="]
@@ -46,10 +46,10 @@ def _apply_filter(df: pl.DataFrame, column: str, op: FilterOp, value: object) ->
         Filtered DataFrame.
 
     Raises:
-        LightAgentError: If *column* does not exist or *op* is unsupported.
+        PrismalError: If *column* does not exist or *op* is unsupported.
     """
     if column not in df.columns:
-        raise LightAgentError(f"Column '{column}' not found. Available: {df.columns}")
+        raise PrismalError(f"Column '{column}' not found. Available: {df.columns}")
 
     col_expr = pl.col(column)
     mask: pl.Expr
@@ -67,7 +67,7 @@ def _apply_filter(df: pl.DataFrame, column: str, op: FilterOp, value: object) ->
         case "<=":
             mask = col_expr.le(value)
         case _:  # pragma: no cover
-            raise LightAgentError(f"Unsupported filter operator: '{op}'")
+            raise PrismalError(f"Unsupported filter operator: '{op}'")
 
     return df.filter(mask)
 
@@ -100,7 +100,7 @@ def filter_rows(
         New DataFrame containing only rows that satisfy the condition.
 
     Raises:
-        LightAgentError: If *column* is missing or *op* is unknown.
+        PrismalError: If *column* is missing or *op* is unknown.
     """
     return _apply_filter(df, column, op, value)
 
@@ -131,12 +131,12 @@ def group_by_aggregate(
         Aggregated DataFrame sorted by *group_col*.
 
     Raises:
-        LightAgentError: If *group_col* or *agg_col* is missing, or if
+        PrismalError: If *group_col* or *agg_col* is missing, or if
             *agg_fn* is unsupported.
     """
     for col in (group_col, agg_col):
         if col not in df.columns:
-            raise LightAgentError(f"Column '{col}' not found. Available: {df.columns}")
+            raise PrismalError(f"Column '{col}' not found. Available: {df.columns}")
 
     col_expr = pl.col(agg_col)
     match agg_fn:
@@ -153,7 +153,7 @@ def group_by_aggregate(
         case "median":
             agg_expr = col_expr.median()
         case _:  # pragma: no cover
-            raise LightAgentError(f"Unsupported aggregation function: '{agg_fn}'")
+            raise PrismalError(f"Unsupported aggregation function: '{agg_fn}'")
 
     return df.group_by(group_col).agg(agg_expr.alias(agg_col)).sort(group_col)
 
@@ -174,10 +174,10 @@ def sort_by(
         Sorted DataFrame.
 
     Raises:
-        LightAgentError: If *column* does not exist.
+        PrismalError: If *column* does not exist.
     """
     if column not in df.columns:
-        raise LightAgentError(f"Column '{column}' not found. Available: {df.columns}")
+        raise PrismalError(f"Column '{column}' not found. Available: {df.columns}")
 
     return df.sort(column, descending=not ascending)
 
@@ -193,11 +193,11 @@ def select_columns(df: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
         New DataFrame with the selected columns in the given order.
 
     Raises:
-        LightAgentError: If any column in *columns* is missing.
+        PrismalError: If any column in *columns* is missing.
     """
     missing = [c for c in columns if c not in df.columns]
     if missing:
-        raise LightAgentError(f"Columns not found: {missing}. Available: {df.columns}")
+        raise PrismalError(f"Columns not found: {missing}. Available: {df.columns}")
     return df.select(columns)
 
 
@@ -256,7 +256,7 @@ def save_chart(
         Resolved :class:`pathlib.Path` to the saved file.
 
     Raises:
-        LightAgentError: If required columns are missing or *kind* is
+        PrismalError: If required columns are missing or *kind* is
             unsupported.
     """
     import matplotlib as mpl
@@ -266,7 +266,7 @@ def save_chart(
 
     for col in (x_col, y_col) if kind != "hist" else (x_col,):
         if col not in df.columns:
-            raise LightAgentError(f"Column '{col}' not found. Available: {df.columns}")
+            raise PrismalError(f"Column '{col}' not found. Available: {df.columns}")
 
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -295,7 +295,7 @@ def save_chart(
             ax.set_ylabel("frequency")
         case _:  # pragma: no cover
             plt.close(fig)
-            raise LightAgentError(f"Unsupported chart kind: '{kind}'")
+            raise PrismalError(f"Unsupported chart kind: '{kind}'")
 
     if title:
         ax.set_title(title)

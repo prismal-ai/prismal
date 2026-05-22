@@ -1,4 +1,4 @@
-"""Unit tests for RAGEngine (lightagent.rag.engine).
+"""Unit tests for RAGEngine (prismal.rag.engine).
 
 Tests follow the TDD spec from T-064.  ChromaVectorStore, DocumentProcessorFactory,
 and CRAGPipeline are all mocked so no real ChromaDB instances, embedding models,
@@ -36,9 +36,9 @@ from prismal.rag.crag import CRAGResult, RetrievedChunk
 
 # ── Patch paths ───────────────────────────────────────────────────────────────
 
-CHROMA_VECTOR_STORE_PATH = "lightagent.rag.engine.ChromaVectorStore"
-DOCUMENT_PROCESSOR_FACTORY_PATH = "lightagent.rag.engine.DocumentProcessorFactory"
-CRAG_PIPELINE_PATH = "lightagent.rag.engine.CRAGPipeline"
+CHROMA_VECTOR_STORE_PATH = "prismal.rag.engine.ChromaVectorStore"
+DOCUMENT_PROCESSOR_FACTORY_PATH = "prismal.rag.engine.DocumentProcessorFactory"
+CRAG_PIPELINE_PATH = "prismal.rag.engine.CRAGPipeline"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -143,7 +143,7 @@ def test_init_calls_get_settings_when_none() -> None:
     """__init__(settings=None) must call get_settings() to resolve config."""
     fake_settings = _make_settings()
 
-    get_settings_path = "lightagent.rag.engine.get_settings"
+    get_settings_path = "prismal.rag.engine.get_settings"
     with (
         patch(get_settings_path, return_value=fake_settings) as mock_gs,
         patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,

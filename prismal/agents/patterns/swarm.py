@@ -42,7 +42,7 @@ from prismal.core.exceptions import SwarmError
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
 
-logger = get_logger("lightagent.agents.patterns.swarm")
+logger = get_logger("prismal.agents.patterns.swarm")
 
 
 @dataclass
@@ -123,8 +123,8 @@ async def swarm_handoff(
 
     otel = OTelManager()
     with otel.start_span("swarm.handoff") as span:
-        span.set_attribute("lightagent.swarm.from", current_agent)
-        span.set_attribute("lightagent.swarm.to", target_agent)
+        span.set_attribute("prismal.swarm.from", current_agent)
+        span.set_attribute("prismal.swarm.to", target_agent)
 
         snapshot = {k: state[k] for k in _SNAPSHOT_KEYS if k in state}
         # deepcopy mutable values we lifted out of `state` so later mutations

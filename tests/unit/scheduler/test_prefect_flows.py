@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.scheduler.prefect_flows (T-080)."""
+"""Unit tests for prismal.scheduler.prefect_flows (T-080)."""
 
 from __future__ import annotations
 
@@ -37,8 +37,8 @@ def test_discover_skills_task_calls_reload_all() -> None:
     from prismal.scheduler.prefect_flows import _discover_skills_task
 
     with (
-        patch("lightagent.scheduler.prefect_flows.SkillsManager") as mock_cls,
-        patch("lightagent.scheduler.prefect_flows.asyncio.run") as mock_run,
+        patch("prismal.scheduler.prefect_flows.SkillsManager") as mock_cls,
+        patch("prismal.scheduler.prefect_flows.asyncio.run") as mock_run,
     ):
         mock_mgr = MagicMock()
         mock_mgr.list_skills.return_value = []
@@ -60,8 +60,8 @@ def test_discover_skills_task_returns_skill_names() -> None:
     skill_b.name = "web_search"
 
     with (
-        patch("lightagent.scheduler.prefect_flows.SkillsManager") as mock_cls,
-        patch("lightagent.scheduler.prefect_flows.asyncio.run"),
+        patch("prismal.scheduler.prefect_flows.SkillsManager") as mock_cls,
+        patch("prismal.scheduler.prefect_flows.asyncio.run"),
     ):
         mock_mgr = MagicMock()
         mock_mgr.list_skills.return_value = [skill_a, skill_b]
@@ -81,7 +81,7 @@ def test_document_index_flow_delegates_to_task() -> None:
     from prismal.scheduler.prefect_flows import document_index_flow
 
     with patch(
-        "lightagent.scheduler.prefect_flows._index_document_task",
+        "prismal.scheduler.prefect_flows._index_document_task",
         return_value="indexed:report.txt",
     ) as mock_task:
         result = document_index_flow.fn("/data/documents/report.txt")
@@ -95,7 +95,7 @@ def test_skill_discovery_flow_delegates_to_task() -> None:
     from prismal.scheduler.prefect_flows import skill_discovery_flow
 
     with patch(
-        "lightagent.scheduler.prefect_flows._discover_skills_task",
+        "prismal.scheduler.prefect_flows._discover_skills_task",
         return_value=["weather", "web_search"],
     ) as mock_task:
         result = skill_discovery_flow.fn()
@@ -109,7 +109,7 @@ def test_config_reload_flow_delegates_to_task() -> None:
     from prismal.scheduler.prefect_flows import config_reload_flow
 
     with patch(
-        "lightagent.scheduler.prefect_flows._reload_config_task",
+        "prismal.scheduler.prefect_flows._reload_config_task",
         return_value=True,
     ) as mock_task:
         result = config_reload_flow.fn()
@@ -132,7 +132,7 @@ def test_agent_run_flow_returns_string() -> None:
         return "Agent response text"
 
     with patch(
-        "lightagent.scheduler.prefect_flows.asyncio.run", side_effect=fake_run_drain
+        "prismal.scheduler.prefect_flows.asyncio.run", side_effect=fake_run_drain
     ) as mock_run:
         result = agent_run_flow.fn("Summarise quarterly report")
 
@@ -174,9 +174,9 @@ def test_agent_run_flow_calls_graph() -> None:
             loop.close()
 
     with (
-        patch("lightagent.agents.graph.get_async_compiled_graph", mock_get_graph),
+        patch("prismal.agents.graph.get_async_compiled_graph", mock_get_graph),
         patch(
-            "lightagent.scheduler.prefect_flows.asyncio.run",
+            "prismal.scheduler.prefect_flows.asyncio.run",
             side_effect=fake_asyncio_run,
         ),
     ):
@@ -200,7 +200,7 @@ def test_agent_run_flow_returns_error_string_on_exception() -> None:
         raise RuntimeError("graph unavailable")
 
     with patch(
-        "lightagent.scheduler.prefect_flows.asyncio.run",
+        "prismal.scheduler.prefect_flows.asyncio.run",
         side_effect=fake_run_raise,
     ):
         result = agent_run_flow.fn("do something")

@@ -5,7 +5,7 @@ Data Ingester agent node for the ml_pipeline subgraph.
 Loads and profiles a dataset (CSV, Parquet, JSON, Excel), detects column types,
 counts nulls, identifies the target column, and infers the ML task type.
 
-Stores a :class:`~lightagent.agents.subgraphs.ml_pipeline.artifacts.DatasetProfile`
+Stores a :class:`~prismal.agents.subgraphs.ml_pipeline.artifacts.DatasetProfile`
 under ``state["metadata"]["ml_pipeline"]["dataset_profile"]``.
 """
 
@@ -24,7 +24,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.ml_pipeline.data_ingester")
+logger = structlog.get_logger("prismal.subgraphs.ml_pipeline.data_ingester")
 otel = OTelManager()
 
 _SYSTEM = """You are a Data Ingester for the ml_pipeline subgraph.
@@ -83,7 +83,7 @@ The `DatasetProfile` is acceptable when ALL of the following hold:
 
 ## Background
 - Artifact schema:
-  `lightagent/agents/subgraphs/ml_pipeline/artifacts.py::DatasetProfile`.
+  `prismal/agents/subgraphs/ml_pipeline/artifacts.py::DatasetProfile`.
 - ML libs (pandas/polars/flaml) must be lazy-imported — never at module
   top level.
 - Workspace root for ML artifacts:
@@ -145,8 +145,8 @@ async def data_ingester_node(state: AgentState) -> dict[str, Any]:
         ``metadata["ml_pipeline"]["dataset_profile"]``.
     """
     with otel.start_span("ml_pipeline.data_ingester") as span:
-        span.set_attribute("lightagent.subgraph", "ml_pipeline")
-        span.set_attribute("lightagent.agent", "data_ingester")
+        span.set_attribute("prismal.subgraph", "ml_pipeline")
+        span.set_attribute("prismal.agent", "data_ingester")
 
         llm = ProviderRegistry().get_llm()
         messages = [SystemMessage(content=_SYSTEM), *list(state["messages"][-5:])]
@@ -175,8 +175,8 @@ async def data_ingester_node(state: AgentState) -> dict[str, Any]:
             rows=profile.rows,
             task_type=profile.task_type,
         )
-        span.set_attribute("lightagent.ml.rows", profile.rows)
-        span.set_attribute("lightagent.ml.task_type", profile.task_type)
+        span.set_attribute("prismal.ml.rows", profile.rows)
+        span.set_attribute("prismal.ml.task_type", profile.task_type)
 
         return {
             "current_agent": "data_ingester",

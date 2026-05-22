@@ -61,37 +61,37 @@ REQUIRED_SECTIONS: tuple[str, ...] = (
 )
 
 BASE_AGENT_MODULES: tuple[str, ...] = (
-    "lightagent.agents.planner",
-    "lightagent.agents.researcher",
-    "lightagent.agents.coder",
-    "lightagent.agents.rag_agent",
-    "lightagent.agents.critic",
-    "lightagent.agents.data_analyst",
-    "lightagent.agents.file_manager",
-    "lightagent.agents.cron_manager",
-    "lightagent.agents.skill_manager",
+    "prismal.agents.planner",
+    "prismal.agents.researcher",
+    "prismal.agents.coder",
+    "prismal.agents.rag_agent",
+    "prismal.agents.critic",
+    "prismal.agents.data_analyst",
+    "prismal.agents.file_manager",
+    "prismal.agents.cron_manager",
+    "prismal.agents.skill_manager",
 )
 
 # Pipeline modules mapped to their target Pydantic artifact class.
 # The positive example in each prompt must validate against this schema.
 PIPELINE_AGENTS: dict[str, type[BaseModel]] = {
-    "lightagent.agents.subgraphs.dev_pipeline.po_agent": UserStory,
-    "lightagent.agents.subgraphs.dev_pipeline.architect_agent": TechnicalSpec,
-    "lightagent.agents.subgraphs.dev_pipeline.developer_agent": CodeArtifact,
-    "lightagent.agents.subgraphs.dev_pipeline.unit_test_agent": _TestReport,
-    "lightagent.agents.subgraphs.dev_pipeline.qa_agent": QAReport,
-    "lightagent.agents.subgraphs.dev_pipeline.reviewer_agent": ReviewResult,
-    "lightagent.agents.subgraphs.ml_pipeline.data_ingester": DatasetProfile,
-    "lightagent.agents.subgraphs.ml_pipeline.eda_analyst": EDAReport,
-    "lightagent.agents.subgraphs.ml_pipeline.feature_engineer": FeatureSet,
-    "lightagent.agents.subgraphs.ml_pipeline.model_trainer": TrainedModel,
-    "lightagent.agents.subgraphs.ml_pipeline.model_evaluator": EvaluationReport,
-    "lightagent.agents.subgraphs.ml_pipeline.model_exporter": ModelPackage,
-    "lightagent.agents.subgraphs.financial.market_data_collector": MarketSnapshot,
-    "lightagent.agents.subgraphs.financial.technical_analyst": TechnicalAnalysis,
-    "lightagent.agents.subgraphs.financial.fundamental_analyst": FundamentalAnalysis,
-    "lightagent.agents.subgraphs.financial.risk_sentiment_analyst": (RiskSentimentReport),
-    "lightagent.agents.subgraphs.financial.report_generator": FinancialReport,
+    "prismal.agents.subgraphs.dev_pipeline.po_agent": UserStory,
+    "prismal.agents.subgraphs.dev_pipeline.architect_agent": TechnicalSpec,
+    "prismal.agents.subgraphs.dev_pipeline.developer_agent": CodeArtifact,
+    "prismal.agents.subgraphs.dev_pipeline.unit_test_agent": _TestReport,
+    "prismal.agents.subgraphs.dev_pipeline.qa_agent": QAReport,
+    "prismal.agents.subgraphs.dev_pipeline.reviewer_agent": ReviewResult,
+    "prismal.agents.subgraphs.ml_pipeline.data_ingester": DatasetProfile,
+    "prismal.agents.subgraphs.ml_pipeline.eda_analyst": EDAReport,
+    "prismal.agents.subgraphs.ml_pipeline.feature_engineer": FeatureSet,
+    "prismal.agents.subgraphs.ml_pipeline.model_trainer": TrainedModel,
+    "prismal.agents.subgraphs.ml_pipeline.model_evaluator": EvaluationReport,
+    "prismal.agents.subgraphs.ml_pipeline.model_exporter": ModelPackage,
+    "prismal.agents.subgraphs.financial.market_data_collector": MarketSnapshot,
+    "prismal.agents.subgraphs.financial.technical_analyst": TechnicalAnalysis,
+    "prismal.agents.subgraphs.financial.fundamental_analyst": FundamentalAnalysis,
+    "prismal.agents.subgraphs.financial.risk_sentiment_analyst": (RiskSentimentReport),
+    "prismal.agents.subgraphs.financial.report_generator": FinancialReport,
 }
 
 
@@ -209,7 +209,7 @@ def test_reviewer_success_criteria_threshold_matches_score_gate() -> None:
     Enforces SPEC-034 AC-034-3: numeric thresholds in Success Criteria align
     with the gate constants used downstream.
     """
-    builder_src = Path("lightagent/agents/subgraphs/dev_pipeline/builder.py").read_text(
+    builder_src = Path("prismal/agents/subgraphs/dev_pipeline/builder.py").read_text(
         encoding="utf-8"
     )
     match = re.search(
@@ -220,7 +220,7 @@ def test_reviewer_success_criteria_threshold_matches_score_gate() -> None:
     assert match, "Could not locate _REVIEWER_GATE threshold in dev_pipeline builder"
     gate_threshold = float(match.group("t"))
 
-    prompt = _load_prompt("lightagent.agents.subgraphs.dev_pipeline.reviewer_agent")
+    prompt = _load_prompt("prismal.agents.subgraphs.dev_pipeline.reviewer_agent")
     # The reviewer prompt explicitly states `score >= 0.8`. The literal must
     # equal the gate threshold for the rubric to be coherent.
     literal = f"score >= {gate_threshold}"
@@ -235,7 +235,7 @@ def test_model_evaluator_threshold_mentions_settings_variable() -> None:
     ``settings.ml_quality_threshold`` rather than hard-coding a number, since
     the ml_pipeline gate reads that setting at runtime.
     """
-    prompt = _load_prompt("lightagent.agents.subgraphs.ml_pipeline.model_evaluator")
+    prompt = _load_prompt("prismal.agents.subgraphs.ml_pipeline.model_evaluator")
     assert "settings.ml_quality_threshold" in prompt, (
         "model_evaluator prompt must defer to settings.ml_quality_threshold "
         "so the Success Criteria stays in sync with the ml_pipeline gate"

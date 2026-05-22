@@ -1,17 +1,17 @@
 """Factory for domain sub-orchestrator nodes (SPEC-042 Phase 40).
 
 A **domain supervisor** is a mini version of
-:func:`lightagent.agents.supervisor.supervisor_node` scoped to a
+:func:`prismal.agents.supervisor.supervisor_node` scoped to a
 specific subset of leaf agents — e.g. a "research" orchestrator that
 only knows about ``researcher``, ``rag_agent`` and ``cua_agent``. In
-hierarchical mode (``LIGHTAGENT_HIERARCHICAL_MODE=true``) the root
+hierarchical mode (``PRISMAL_HIERARCHICAL_MODE=true``) the root
 supervisor routes to three such domain orchestrators instead of all
 12+ leaf agents directly, keeping each routing LLM prompt focused on
 ~3 targets and making routing accuracy much more predictable.
 
 This module only exposes the **factory**. The domain subgraphs that
 wrap the returned nodes live in
-``lightagent/agents/subgraphs/{research,engineering,analysis}_orchestrator/``
+``prismal/agents/subgraphs/{research,engineering,analysis}_orchestrator/``
 (created in T-336) and the conditional graph compilation that picks
 flat vs hierarchical mode lives in ``graph.py`` (T-337).
 
@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 
     from prismal.agents.state import AgentState
 
-logger = get_logger("lightagent.agents.domain_supervisor")
+logger = get_logger("prismal.agents.domain_supervisor")
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ def make_domain_supervisor(
         """Route one turn within the ``{domain_name}`` domain.
 
         Implements the same ReAct-style routing contract as
-        :func:`lightagent.agents.supervisor.supervisor_node` but
+        :func:`prismal.agents.supervisor.supervisor_node` but
         scoped to ``agents``. All state mutations are performed via a
         partial-dict return value so LangGraph's reducers handle the
         merge.
@@ -186,10 +186,10 @@ def make_domain_supervisor(
         with otel.start_span(
             f"agent.domain_supervisor.{domain_name}",
             attributes={
-                "lightagent.agent": supervisor_node_name,
-                "lightagent.domain": domain_name,
-                "lightagent.session_id": session_id,
-                "lightagent.domain_iteration": iteration,
+                "prismal.agent": supervisor_node_name,
+                "prismal.domain": domain_name,
+                "prismal.session_id": session_id,
+                "prismal.domain_iteration": iteration,
             },
         ) as span:
             # --------------------------------------------------------- #
@@ -202,7 +202,7 @@ def make_domain_supervisor(
                     cap=_MAX_DOMAIN_ITERATIONS,
                     session_id=session_id,
                 )
-                span.set_attribute("lightagent.routing_decision", "END")
+                span.set_attribute("prismal.routing_decision", "END")
                 return _update_state(
                     supervisor_node_name,
                     next_agent=None,
@@ -230,7 +230,7 @@ def make_domain_supervisor(
                         last_agent=last_agent,
                         session_id=session_id,
                     )
-                    span.set_attribute("lightagent.routing_decision", "END")
+                    span.set_attribute("prismal.routing_decision", "END")
                     return _update_state(
                         supervisor_node_name,
                         next_agent=None,
@@ -277,7 +277,7 @@ def make_domain_supervisor(
                 matched = "END"
 
             next_agent: str | None = None if matched == "END" else matched
-            span.set_attribute("lightagent.routing_decision", matched)
+            span.set_attribute("prismal.routing_decision", matched)
 
             logger.info(
                 "domain_supervisor_routing_decision",

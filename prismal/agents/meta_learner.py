@@ -18,7 +18,7 @@ Acceptance criteria (T-212):
 - Self-scores on task completion, accuracy, and efficiency.
 - Proposes system prompt edits or skill additions.
 - Proposed changes go through the human-review gate.
-- ``lightagent meta review`` triggers the cycle.
+- ``prismal meta review`` triggers the cycle.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from pydantic import BaseModel, Field
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
 
-logger = get_logger("lightagent.agents.meta_learner")
+logger = get_logger("prismal.agents.meta_learner")
 
 _DEFAULT_PROPOSALS_DIR = Path(__file__).parent.parent / "skills" / "custom" / "meta_proposals"
 

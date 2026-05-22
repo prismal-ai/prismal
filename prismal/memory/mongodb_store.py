@@ -1,6 +1,6 @@
 """MongoDB-backed long-term memory store using Motor and Beanie.
 
-Alternative to :class:`~lightagent.memory.long_term.LongTermMemory` for
+Alternative to :class:`~prismal.memory.long_term.LongTermMemory` for
 deployments that use MongoDB as the primary data store.
 
 Architecture
@@ -12,7 +12,7 @@ Architecture
   (``expireAfterSeconds=0``) so the database automatically purges expired
   documents without application-level cron jobs.
 * **ChromaDB** — semantic recall is provided via
-  :class:`~lightagent.rag.vector_store.ChromaVectorStore`, identical to the
+  :class:`~prismal.rag.vector_store.ChromaVectorStore`, identical to the
   SQLite-backed store.
 
 Usage::
@@ -50,9 +50,9 @@ if TYPE_CHECKING:
 
     from prismal.rag.vector_store import ChromaVectorStore
 
-logger = structlog.get_logger("lightagent.memory.mongodb_store")
+logger = structlog.get_logger("prismal.memory.mongodb_store")
 
-_COLLECTION_NAME = "lightagent_memory"
+_COLLECTION_NAME = "prismal_memory"
 
 
 class MongoDBMemoryStore:
@@ -61,7 +61,7 @@ class MongoDBMemoryStore:
     Uses Motor for non-blocking MongoDB access.  A TTL index on
     ``expires_at`` ensures automatic expiry at the database level.
     Semantic recall is provided by ChromaDB (same strategy as
-    :class:`~lightagent.memory.long_term.LongTermMemory`).
+    :class:`~prismal.memory.long_term.LongTermMemory`).
 
     Sensitive data (API keys, secrets) is redacted before any content is
     written to either store (AC-015-5).
@@ -69,9 +69,9 @@ class MongoDBMemoryStore:
     Args:
         mongodb_url: MongoDB connection URL.  Defaults to
             ``settings.mongodb_url``.  Must be non-empty to use this store.
-        db_name: MongoDB database name.  Defaults to ``"lightagent"``.
+        db_name: MongoDB database name.  Defaults to ``"prismal"``.
         vector_store: Injected
-            :class:`~lightagent.rag.vector_store.ChromaVectorStore`.
+            :class:`~prismal.rag.vector_store.ChromaVectorStore`.
             Defaults to a new instance pointing at the configured ChromaDB.
         retention_days: Days until entries expire.  Defaults to
             ``settings.memory_retention_days``.
@@ -80,7 +80,7 @@ class MongoDBMemoryStore:
     def __init__(
         self,
         mongodb_url: str | None = None,
-        db_name: str = "lightagent",
+        db_name: str = "prismal",
         vector_store: ChromaVectorStore | None = None,
         retention_days: int | None = None,
     ) -> None:
@@ -112,7 +112,7 @@ class MongoDBMemoryStore:
 
         Raises:
             ImportError: If ``motor`` is not installed.
-                Install with ``pip install 'lightagent[mongodb]'``.
+                Install with ``pip install 'prismal[mongodb]'``.
             ValueError: If ``mongodb_url`` is empty.
         """
         if self._initialized:
@@ -121,14 +121,14 @@ class MongoDBMemoryStore:
         if not self._mongodb_url:
             raise ValueError(
                 "MongoDBMemoryStore requires a non-empty mongodb_url. "
-                "Set LIGHTAGENT_MONGODB_URL or pass mongodb_url= explicitly."
+                "Set PRISMAL_MONGODB_URL or pass mongodb_url= explicitly."
             )
 
         try:
             import motor.motor_asyncio as _motor
         except ImportError as exc:
             raise ImportError(
-                "MongoDB support requires 'motor'. Install with: pip install 'lightagent[mongodb]'"
+                "MongoDB support requires 'motor'. Install with: pip install 'prismal[mongodb]'"
             ) from exc
 
         client = _motor.AsyncIOMotorClient(self._mongodb_url)
@@ -228,7 +228,7 @@ class MongoDBMemoryStore:
             k: Number of ChromaDB candidates to retrieve before filtering.
 
         Returns:
-            List of non-expired :class:`~lightagent.memory.long_term.MemoryEntry`
+            List of non-expired :class:`~prismal.memory.long_term.MemoryEntry`
             objects ordered by descending similarity score.
         """
         await self.initialize()

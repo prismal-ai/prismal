@@ -30,7 +30,7 @@ from prismal.agents.subgraphs.document_generation import (
 from prismal.agents.subgraphs.document_generation.builder import (
     build_document_generation_subgraph,
 )
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -54,8 +54,8 @@ def _llm_returning(*texts: str) -> MagicMock:
 # ── Exception / exports ──────────────────────────────────────────────────────
 
 
-def test_document_generation_error_inherits_from_lightagent_error() -> None:
-    assert issubclass(DocumentGenerationError, LightAgentError)
+def test_document_generation_error_inherits_from_prismal_error() -> None:
+    assert issubclass(DocumentGenerationError, PrismalError)
 
 
 # ── planner_node ─────────────────────────────────────────────────────────────

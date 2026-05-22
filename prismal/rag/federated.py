@@ -1,15 +1,15 @@
 """Federated Knowledge Base — multi-node RAG search (T-213).
 
-Queries RAG endpoints on multiple remote LightAgent nodes in parallel,
+Queries RAG endpoints on multiple remote Prismal nodes in parallel,
 merges results with local ChromaDB, and re-ranks by relevance score.
 
 Architecture
 ------------
 ``FederatedRAGEngine`` composes:
 
-* A local :class:`~lightagent.rag.engine.RAGEngine` for the local ChromaDB.
+* A local :class:`~prismal.rag.engine.RAGEngine` for the local ChromaDB.
 * A list of remote node URLs read from ``config/network_nodes.yaml`` (the
-  same registry as :mod:`lightagent.agents.network_supervisor`).
+  same registry as :mod:`prismal.agents.network_supervisor`).
 
 Each remote node must expose ``GET /api/v1/rag/search?query=...&k=...``
 with JWT bearer auth.  Failed nodes are skipped — partial results are
@@ -19,7 +19,7 @@ SPEC-021 / T-213 acceptance criteria:
 - ``FederatedRAGEngine`` queries remote nodes in parallel (``asyncio.gather``).
 - Results merged and re-ranked by ``relevance_score`` descending.
 - Failed node queries are skipped (partial results returned).
-- ``lightagent rag search --federated QUERY`` uses this engine.
+- ``prismal rag search --federated QUERY`` uses this engine.
 - Remote node auth via JWT (SPEC-018 RBAC).
 """
 
@@ -35,7 +35,7 @@ from prismal.rag.crag import RetrievedChunk
 if TYPE_CHECKING:
     from prismal.rag.engine import RAGEngine
 
-logger = get_logger("lightagent.rag.federated")
+logger = get_logger("prismal.rag.federated")
 
 try:
     import httpx
@@ -64,7 +64,7 @@ class FederatedRAGEngine:
     """Queries local + remote RAG nodes and merges results.
 
     Args:
-        local_engine: The local :class:`~lightagent.rag.engine.RAGEngine`.
+        local_engine: The local :class:`~prismal.rag.engine.RAGEngine`.
             If None, a default engine targeting ``"default"`` collection is used.
         remote_nodes: List of node dicts with ``url`` and ``name`` keys.
             If None, loaded from ``config/network_nodes.yaml`` nodes that
@@ -182,8 +182,8 @@ class FederatedRAGEngine:
 
         otel = OTelManager()
         with otel.start_span("federated_rag.search") as span:
-            span.set_attribute("lightagent.query_length", len(query))
-            span.set_attribute("lightagent.node_count", len(self._nodes) + 1)
+            span.set_attribute("prismal.query_length", len(query))
+            span.set_attribute("prismal.node_count", len(self._nodes) + 1)
 
             # Local search (synchronous RAGEngine.search)
             try:
@@ -214,7 +214,7 @@ class FederatedRAGEngine:
                     all_chunks.extend(result)
 
             merged = _merge_and_rerank(all_chunks)
-            span.set_attribute("lightagent.result_count", len(merged))
+            span.set_attribute("prismal.result_count", len(merged))
             logger.info(
                 "federated_rag_merged",
                 total_before=len(all_chunks),

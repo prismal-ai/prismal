@@ -101,16 +101,16 @@ class ProfileManager:
 
     def load_agent_name(self) -> str:
         """
-        Return the agent's name from SOUL.md, defaulting to ``'LightAgent'``.
+        Return the agent's name from SOUL.md, defaulting to ``'Prismal'``.
 
         Returns:
             Agent name extracted from the first H1 heading in SOUL.md.
         """
         if not self._soul.exists():
-            return "LightAgent"
+            return "Prismal"
         content = self._soul.read_text(encoding="utf-8")
         match = re.search(r"^#\s+(.+)$", content, re.MULTILINE)
-        return match.group(1).strip() if match else "LightAgent"
+        return match.group(1).strip() if match else "Prismal"
 
     def load_user_name(self) -> str:
         """
@@ -167,7 +167,7 @@ class ProfileManager:
 
         PREFERENCES.md contains learned user preferences (communication style,
         tech stack, workflow, project context).  It is written by
-        :class:`~lightagent.memory.preferences.PreferencesManager` and is also
+        :class:`~prismal.memory.preferences.PreferencesManager` and is also
         human-editable at any time.
 
         Returns:
@@ -229,7 +229,7 @@ class ProfileManager:
         """
         Update the Persona section of SOUL.md while preserving the agent name.
 
-        Reads the current H1 name from SOUL.md (or falls back to ``'LightAgent'``)
+        Reads the current H1 name from SOUL.md (or falls back to ``'Prismal'``)
         and rewrites the file with the new persona, keeping the user-defined name
         intact.  Use this instead of :meth:`save_soul` when only the persona
         description needs to change.

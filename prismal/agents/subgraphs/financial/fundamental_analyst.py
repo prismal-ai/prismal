@@ -3,7 +3,7 @@
 Fundamental Analyst agent node for the financial_analyst subgraph.
 
 Fetches valuation metrics, earnings data, and peer comparisons. Stores a
-:class:`~lightagent.agents.subgraphs.financial.artifacts.FundamentalAnalysis`
+:class:`~prismal.agents.subgraphs.financial.artifacts.FundamentalAnalysis`
 under ``state["metadata"]["financial_analyst"]["fundamental_analysis"]``.
 """
 
@@ -22,7 +22,7 @@ from prismal.providers.registry import ProviderRegistry
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
 
-logger = structlog.get_logger("lightagent.subgraphs.financial.fundamental_analyst")
+logger = structlog.get_logger("prismal.subgraphs.financial.fundamental_analyst")
 otel = OTelManager()
 
 _SYSTEM = """You are a Fundamental Analyst for the financial subgraph.
@@ -83,7 +83,7 @@ The `FundamentalAnalysis` is acceptable when ALL of the following hold:
 
 ## Background
 - Artifact schema:
-  `lightagent/agents/subgraphs/financial/artifacts.py::FundamentalAnalysis`.
+  `prismal/agents/subgraphs/financial/artifacts.py::FundamentalAnalysis`.
 - Lazy-import `openbb`, `yfinance`.
 - Fundamentals TTL cache: 24 h.
 
@@ -137,8 +137,8 @@ async def fundamental_analyst_node(state: AgentState) -> dict[str, Any]:
         ``metadata["financial_analyst"]["fundamental_analysis"]``.
     """
     with otel.start_span("financial_analyst.fundamental_analyst") as span:
-        span.set_attribute("lightagent.subgraph", "financial_analyst")
-        span.set_attribute("lightagent.agent", "fundamental_analyst")
+        span.set_attribute("prismal.subgraph", "financial_analyst")
+        span.set_attribute("prismal.agent", "fundamental_analyst")
 
         fin: dict[str, Any] = dict(state.get("metadata", {}).get("financial_analyst", {}))
         snapshot = fin.get("market_snapshot", {})
@@ -172,7 +172,7 @@ async def fundamental_analyst_node(state: AgentState) -> dict[str, Any]:
             score=analysis.fundamental_score,
             metrics_count=len(analysis.metrics),
         )
-        span.set_attribute("lightagent.financial.fundamental_score", analysis.fundamental_score)
+        span.set_attribute("prismal.financial.fundamental_score", analysis.fundamental_score)
 
         return {
             "current_agent": "fundamental_analyst",

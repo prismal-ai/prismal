@@ -1,4 +1,4 @@
-"""NeMo Guardrails Layer 3 integration for the LightAgent security pipeline.
+"""NeMo Guardrails Layer 3 integration for the Prismal security pipeline.
 
 Wraps ``nemoguardrails.LLMRails`` and provides async input/output rail
 checking with timeout protection.  Falls back gracefully when
@@ -50,7 +50,7 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from typing import Any
 
-logger = get_logger("lightagent.security.nemo_rails")
+logger = get_logger("prismal.security.nemo_rails")
 
 # Timeout budget for a single NeMo rail check.
 # Set below 500 ms to satisfy AC-019-6 (P99 ≤ 500 ms).
@@ -106,7 +106,7 @@ def _extract_response_text(result: object) -> str:
 
 
 class NemoRailsLayer:
-    """Layer 3 NeMo Guardrails wrapper for LightAgent.
+    """Layer 3 NeMo Guardrails wrapper for Prismal.
 
     Initialised once from the ``config/nemo_rails/`` directory.  When
     ``nemoguardrails`` is not installed the layer reports ``available=False``

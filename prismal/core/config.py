@@ -1,7 +1,7 @@
 """
 Core configuration module using Pydantic Settings.
 
-Loads from environment variables (prefix: LIGHTAGENT_) and optional .env file. All
+Loads from environment variables (prefix: PRISMAL_) and optional .env file. All
 configuration is validated at startup.
 """
 
@@ -17,12 +17,12 @@ class MaintenanceSettings(BaseSettings):
     """Package security and maintenance configuration (SPEC-031/032).
 
     All fields are readable from environment variables with the
-    ``LIGHTAGENT_MAINTENANCE_`` prefix (e.g.
-    ``LIGHTAGENT_MAINTENANCE_CONFIRM=false``).
+    ``PRISMAL_MAINTENANCE_`` prefix (e.g.
+    ``PRISMAL_MAINTENANCE_CONFIRM=false``).
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="LIGHTAGENT_MAINTENANCE_",
+        env_prefix="PRISMAL_MAINTENANCE_",
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
@@ -33,7 +33,7 @@ class MaintenanceSettings(BaseSettings):
         default=True,
         description=(
             "Require interactive confirmation before applying any package update. "
-            "Set to false for CI/CD pipelines (LIGHTAGENT_MAINTENANCE_CONFIRM=false)."
+            "Set to false for CI/CD pipelines (PRISMAL_MAINTENANCE_CONFIRM=false)."
         ),
     )
     backup_dir: str = Field(
@@ -69,20 +69,20 @@ class MaintenanceSettings(BaseSettings):
 
 class Settings(BaseSettings):
     """
-    LightAgent application settings.
+    Prismal application settings.
 
-    All fields can be overridden via environment variables using the LIGHTAGENT_ prefix
-    (e.g. LIGHTAGENT_DEFAULT_MODEL=gpt-4o).
+    All fields can be overridden via environment variables using the PRISMAL_ prefix
+    (e.g. PRISMAL_DEFAULT_MODEL=gpt-4o).
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="LIGHTAGENT_",
+        env_prefix="PRISMAL_",
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
         # Let tests and callers pass either the field name (``default_model``)
-        # or the declared alias (``LIGHTAGENT_DEFAULT_MODEL``) as init kwargs.
+        # or the declared alias (``PRISMAL_DEFAULT_MODEL``) as init kwargs.
         # Without this, adding a ``validation_alias`` silently breaks any
         # code that constructs ``Settings(default_model=...)`` directly.
         populate_by_name=True,
@@ -97,18 +97,18 @@ class Settings(BaseSettings):
             "the provider map unless the user also pinned a compatible "
             "explicit model.  Accepted values (case-insensitive): "
             "'' (legacy / no override), 'anthropic', 'openai', 'google', "
-            "'ollama'.  Set via LIGHTAGENT_LLM_PROVIDER."
+            "'ollama'.  Set via PRISMAL_LLM_PROVIDER."
         ),
     )
     default_model: str = Field(
         default="claude-sonnet-4-5",
         validation_alias=AliasChoices(
-            "LIGHTAGENT_DEFAULT_MODEL",
-            "LIGHTAGENT_MODEL",
+            "PRISMAL_DEFAULT_MODEL",
+            "PRISMAL_MODEL",
         ),
         description=(
             "Default LLM model (provider/model-id format for LiteLLM). "
-            "LIGHTAGENT_MODEL is accepted as an alias for convenience."
+            "PRISMAL_MODEL is accepted as an alias for convenience."
         ),
     )
     fallback_model: str = Field(
@@ -164,26 +164,26 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr = Field(
         default=SecretStr(""),
         validation_alias=AliasChoices(
-            "LIGHTAGENT_ANTHROPIC_API_KEY",
+            "PRISMAL_ANTHROPIC_API_KEY",
             "ANTHROPIC_API_KEY",
         ),
-        description=("Anthropic API key (LIGHTAGENT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY)"),
+        description=("Anthropic API key (PRISMAL_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY)"),
     )
     openai_api_key: SecretStr = Field(
         default=SecretStr(""),
         validation_alias=AliasChoices(
-            "LIGHTAGENT_OPENAI_API_KEY",
+            "PRISMAL_OPENAI_API_KEY",
             "OPENAI_API_KEY",
         ),
-        description="OpenAI API key (LIGHTAGENT_OPENAI_API_KEY or OPENAI_API_KEY)",
+        description="OpenAI API key (PRISMAL_OPENAI_API_KEY or OPENAI_API_KEY)",
     )
     google_api_key: SecretStr = Field(
         default=SecretStr(""),
         validation_alias=AliasChoices(
-            "LIGHTAGENT_GOOGLE_API_KEY",
+            "PRISMAL_GOOGLE_API_KEY",
             "GOOGLE_API_KEY",
         ),
-        description="Google AI API key (LIGHTAGENT_GOOGLE_API_KEY or GOOGLE_API_KEY)",
+        description="Google AI API key (PRISMAL_GOOGLE_API_KEY or GOOGLE_API_KEY)",
     )
 
     # ── Security ──────────────────────────────────────────────────────
@@ -202,7 +202,7 @@ class Settings(BaseSettings):
         description="Allow shell execution via ActionInterceptor (dangerous)",
     )
 
-    # ── Maintenance (read-only property — env prefix LIGHTAGENT_MAINTENANCE_) ──
+    # ── Maintenance (read-only property — env prefix PRISMAL_MAINTENANCE_) ──
     @property
     def maintenance(self) -> MaintenanceSettings:
         """Return the package maintenance sub-settings.
@@ -221,9 +221,9 @@ class Settings(BaseSettings):
         description=(
             "Additional directories to search for skills. "
             "Each entry is a filesystem path that contains skill subdirectories "
-            "(same layout as lightagent/skills/available/). "
+            "(same layout as prismal/skills/available/). "
             "Set via env var as a JSON array: "
-            "LIGHTAGENT_EXTERNAL_SKILLS_DIRS='[\"/home/user/.agents/skills\"]'"
+            "PRISMAL_EXTERNAL_SKILLS_DIRS='[\"/home/user/.agents/skills\"]'"
         ),
     )
 
@@ -259,7 +259,7 @@ class Settings(BaseSettings):
 
     # ── Database ──────────────────────────────────────────────────────
     db_url: str = Field(
-        default="sqlite+aiosqlite:///data/db/lightagent.db",
+        default="sqlite+aiosqlite:///data/db/prismal.db",
         description="SQLAlchemy async database URL",
     )
     chroma_path: str = Field(
@@ -270,7 +270,7 @@ class Settings(BaseSettings):
         default="",
         description=(
             "MongoDB connection URL (optional — enables MongoDBMemoryStore). "
-            "Example: mongodb://user:pass@localhost:27017/lightagent"
+            "Example: mongodb://user:pass@localhost:27017/prismal"
         ),
     )
 
@@ -309,7 +309,7 @@ class Settings(BaseSettings):
     langfuse_host: str = Field(
         default="https://cloud.langfuse.com",
         validation_alias=AliasChoices(
-            "LIGHTAGENT_LANGFUSE_HOST",
+            "PRISMAL_LANGFUSE_HOST",
             "LANGFUSE_HOST",
         ),
         description="Langfuse server URL",
@@ -317,7 +317,7 @@ class Settings(BaseSettings):
     langfuse_public_key: SecretStr = Field(
         default=SecretStr(""),
         validation_alias=AliasChoices(
-            "LIGHTAGENT_LANGFUSE_PUBLIC_KEY",
+            "PRISMAL_LANGFUSE_PUBLIC_KEY",
             "LANGFUSE_PUBLIC_KEY",
         ),
         description="Langfuse public key",
@@ -325,7 +325,7 @@ class Settings(BaseSettings):
     langfuse_secret_key: SecretStr = Field(
         default=SecretStr(""),
         validation_alias=AliasChoices(
-            "LIGHTAGENT_LANGFUSE_SECRET_KEY",
+            "PRISMAL_LANGFUSE_SECRET_KEY",
             "LANGFUSE_SECRET_KEY",
         ),
         description="Langfuse secret key",
@@ -342,7 +342,7 @@ class Settings(BaseSettings):
         default=False,
         description=(
             "Enable OpenTelemetry distributed tracing and metrics"
-            " (set LIGHTAGENT_OTEL_ENABLED=true in production)"
+            " (set PRISMAL_OTEL_ENABLED=true in production)"
         ),
     )
     otel_exporter: Literal["otlp", "jaeger", "zipkin", "console"] = Field(
@@ -362,7 +362,7 @@ class Settings(BaseSettings):
         ),
     )
     otel_service_name: str = Field(
-        default="lightagent",
+        default="prismal",
         description="Service name for OTEL resource attributes",
     )
 
@@ -376,7 +376,7 @@ class Settings(BaseSettings):
         description="Loguru file retention policy",
     )
     log_file_path: str = Field(
-        default="data/logs/lightagent.log",
+        default="data/logs/prismal.log",
         description="Log file path for Loguru file sink",
     )
 
@@ -486,9 +486,9 @@ class Settings(BaseSettings):
             "Production-deployment marker. When True, the sandbox "
             "isolation factory rejects the 'none' backend (CLAUDE.md "
             "Phase 43 rule #2) so that operators cannot accidentally "
-            "deploy LightAgent without real process isolation. "
+            "deploy Prismal without real process isolation. "
             "Defaults to False so dev / test environments are "
-            "unaffected. Flip via LIGHTAGENT_IS_PRODUCTION=true."
+            "unaffected. Flip via PRISMAL_IS_PRODUCTION=true."
         ),
     )
     sandbox_isolation_required: bool = Field(
@@ -579,7 +579,7 @@ class Settings(BaseSettings):
         default=False,
         description=(
             "Enable the Computer Use Agent. Requires a vision-capable "
-            "model configured via ``LIGHTAGENT_CUA_VISION_MODEL`` and "
+            "model configured via ``PRISMAL_CUA_VISION_MODEL`` and "
             "Playwright installed. Default is False because CUA "
             "executes UI actions in a real browser and HIGH_RISK "
             "actions require HITL approval."
@@ -905,11 +905,11 @@ class Settings(BaseSettings):
         default_factory=lambda: ["P001", "P002", "P003"],
         description=(
             "IDs of the principles enabled by default. The canonical set "
-            "lives in ``lightagent.agents.patterns.constitutional.DEFAULT_PRINCIPLES`` "
+            "lives in ``prismal.agents.patterns.constitutional.DEFAULT_PRINCIPLES`` "
             "(``P001 no_harmful_content``, ``P002 factual_accuracy``, "
             "``P003 no_pii_exposure``). Custom deployments may override with "
             "their own list via env var as a JSON array: "
-            '``LIGHTAGENT_CONSTITUTIONAL_PRINCIPLES=\'["P001","custom-P999"]\'``.'
+            '``PRISMAL_CONSTITUTIONAL_PRINCIPLES=\'["P001","custom-P999"]\'``.'
         ),
     )
 
@@ -1102,10 +1102,10 @@ class Settings(BaseSettings):
         """Validate webhook config when telegram_webhook_enabled is True."""
         if self.telegram_webhook_enabled:
             if not self.telegram_webhook_url.startswith("https://"):
-                raise ValueError("LIGHTAGENT_TELEGRAM_WEBHOOK_URL must be an HTTPS URL")
+                raise ValueError("PRISMAL_TELEGRAM_WEBHOOK_URL must be an HTTPS URL")
             if not self.telegram_webhook_secret.get_secret_value():
                 raise ValueError(
-                    "LIGHTAGENT_TELEGRAM_WEBHOOK_SECRET must be set when webhook is enabled"
+                    "PRISMAL_TELEGRAM_WEBHOOK_SECRET must be set when webhook is enabled"
                 )
         return self
 
@@ -1161,7 +1161,7 @@ class Settings(BaseSettings):
         entry = provider_map.get(provider)
         if entry is None:
             raise ValueError(
-                f"Unknown LIGHTAGENT_LLM_PROVIDER value: {self.llm_provider!r}."
+                f"Unknown PRISMAL_LLM_PROVIDER value: {self.llm_provider!r}."
                 f" Accepted: '', 'anthropic', 'openai', 'google', 'ollama'."
             )
 
@@ -1175,8 +1175,8 @@ class Settings(BaseSettings):
         if not self.default_model or not _matches(self.default_model):
             if self.default_model and not _matches(self.default_model):
                 warnings.warn(
-                    f"LIGHTAGENT_LLM_PROVIDER={provider!r} but "
-                    f"LIGHTAGENT_DEFAULT_MODEL={self.default_model!r} does "
+                    f"PRISMAL_LLM_PROVIDER={provider!r} but "
+                    f"PRISMAL_DEFAULT_MODEL={self.default_model!r} does "
                     f"not match that provider — overriding with "
                     f"{default_default!r}.  Remove one of the two env "
                     f"vars to silence this warning.",
@@ -1186,10 +1186,10 @@ class Settings(BaseSettings):
 
         if self.fallback_model and not _matches(self.fallback_model):
             warnings.warn(
-                f"LIGHTAGENT_LLM_PROVIDER={provider!r} but "
-                f"LIGHTAGENT_FALLBACK_MODEL={self.fallback_model!r} does "
+                f"PRISMAL_LLM_PROVIDER={provider!r} but "
+                f"PRISMAL_FALLBACK_MODEL={self.fallback_model!r} does "
                 f"not match that provider — overriding with "
-                f"{default_fallback!r}.  Set LIGHTAGENT_FALLBACK_MODEL= "
+                f"{default_fallback!r}.  Set PRISMAL_FALLBACK_MODEL= "
                 f"(empty) to disable the fallback wrapper entirely.",
                 stacklevel=2,
             )
@@ -1213,7 +1213,7 @@ class Settings(BaseSettings):
                 except (ZoneInfoNotFoundError, KeyError) as exc:
                     raise ValueError(
                         f"{value} is not a valid IANA timezone"
-                        f" (field: LIGHTAGENT_{field_name.upper()})"
+                        f" (field: PRISMAL_{field_name.upper()})"
                     ) from exc
         return self
 

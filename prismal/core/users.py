@@ -1,4 +1,4 @@
-"""User management for LightAgent multi-user RBAC.
+"""User management for Prismal multi-user RBAC.
 
 Provides:
 
@@ -16,7 +16,7 @@ SPEC-018 acceptance criteria implemented here
 * AC-018-8 — ``UserStore.create()`` used by the CLI ``users create`` command.
 * AC-018-9 — ``passlib[bcrypt]`` for password hashing.
 * AC-018-10 — Users persisted; token expiry configured in
-  :mod:`lightagent.api.routers.auth`.
+  :mod:`prismal.api.routers.auth`.
 
 Example::
 
@@ -43,7 +43,7 @@ from pydantic import BaseModel
 
 from prismal.core.logging import get_logger
 
-logger = get_logger("lightagent.core.users")
+logger = get_logger("prismal.core.users")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -60,7 +60,7 @@ _DT_FMT = "%Y-%m-%dT%H:%M:%S"
 
 
 class UserRole(StrEnum):
-    """Role levels for the LightAgent RBAC system.
+    """Role levels for the Prismal RBAC system.
 
     Attributes:
         admin: Full access — can manage users, config, MCP servers.
@@ -74,7 +74,7 @@ class UserRole(StrEnum):
 
 
 class User(BaseModel):
-    """A persisted LightAgent user.
+    """A persisted Prismal user.
 
     Attributes:
         id: UUID4 string identifier.

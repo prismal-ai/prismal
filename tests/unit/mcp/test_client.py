@@ -134,7 +134,7 @@ class TestLoadFromConfig:
 
         mock_conn = _make_connected_mock_conn()
         with patch(
-            "lightagent.mcp.client.MCPServerConnection",
+            "prismal.mcp.client.MCPServerConnection",
             return_value=mock_conn,
         ):
             await manager.load_from_config()
@@ -152,7 +152,7 @@ class TestLoadFromConfig:
 
         mock_conn = _make_connected_mock_conn()
         with patch(
-            "lightagent.mcp.client.MCPServerConnection",
+            "prismal.mcp.client.MCPServerConnection",
             return_value=mock_conn,
         ):
             await manager.load_from_config()
@@ -177,7 +177,7 @@ class TestLoadFromConfig:
             return disabled_mock
 
         with patch(
-            "lightagent.mcp.client.MCPServerConnection",
+            "prismal.mcp.client.MCPServerConnection",
             side_effect=_conn_factory,
         ):
             await manager.load_from_config()
@@ -217,7 +217,7 @@ class TestLoadFromConfig:
 
         mock_conn = _make_connected_mock_conn()
         with patch(
-            "lightagent.mcp.client.MCPServerConnection",
+            "prismal.mcp.client.MCPServerConnection",
             return_value=mock_conn,
         ):
             await manager.load_from_config(config_path=override_path)
@@ -236,7 +236,7 @@ class TestLoadFromConfig:
 
         mock_conn = _make_connected_mock_conn()
         with patch(
-            "lightagent.mcp.client.MCPServerConnection",
+            "prismal.mcp.client.MCPServerConnection",
             return_value=mock_conn,
         ):
             await manager.load_from_config()
@@ -272,7 +272,7 @@ class TestConnectDisconnect:
 
         mock_conn = _make_connected_mock_conn()
         with patch(
-            "lightagent.mcp.client.MCPServerConnection",
+            "prismal.mcp.client.MCPServerConnection",
             return_value=mock_conn,
         ):
             await manager.connect(cfg)
@@ -292,7 +292,7 @@ class TestConnectDisconnect:
         manager._connections["test-server"] = old_conn
 
         with patch(
-            "lightagent.mcp.client.MCPServerConnection",
+            "prismal.mcp.client.MCPServerConnection",
             return_value=new_conn,
         ):
             await manager.connect(cfg)
@@ -338,7 +338,7 @@ class TestReload:
 
         mock_conn = _make_connected_mock_conn()
         with patch(
-            "lightagent.mcp.client.MCPServerConnection",
+            "prismal.mcp.client.MCPServerConnection",
             return_value=mock_conn,
         ):
             await manager.reload()
@@ -358,7 +358,7 @@ class TestReload:
         manager._configs["test-server"] = MCPServerConfig.model_validate(_STDIO_ENTRY)
 
         with patch(
-            "lightagent.mcp.client.MCPServerConnection",
+            "prismal.mcp.client.MCPServerConnection",
             return_value=_make_connected_mock_conn(),
         ):
             await manager.reload()
@@ -441,7 +441,7 @@ class TestGetAllLangchainTools:
         mock_adapter_cls = MagicMock()
         with patch.dict(
             "sys.modules",
-            {"lightagent.mcp.adapter": MagicMock(MCPToolAdapter=mock_adapter_cls)},
+            {"prismal.mcp.adapter": MagicMock(MCPToolAdapter=mock_adapter_cls)},
         ):
             tools = manager.get_all_langchain_tools()
 
@@ -461,7 +461,7 @@ class TestGetAllLangchainTools:
 
         with patch.dict(
             "sys.modules",
-            {"lightagent.mcp.adapter": MagicMock(MCPToolAdapter=mock_adapter_cls)},
+            {"prismal.mcp.adapter": MagicMock(MCPToolAdapter=mock_adapter_cls)},
         ):
             tools = manager.get_all_langchain_tools()
 
@@ -476,7 +476,7 @@ class TestGetAllLangchainTools:
         conn = _make_connected_mock_conn(tool_count=1)
         manager._connections["test-server"] = conn
 
-        with patch.dict("sys.modules", {"lightagent.mcp.adapter": None}):
+        with patch.dict("sys.modules", {"prismal.mcp.adapter": None}):
             tools = manager.get_all_langchain_tools()
 
         assert tools == []
@@ -493,7 +493,7 @@ class TestGetAllLangchainTools:
 
         with patch.dict(
             "sys.modules",
-            {"lightagent.mcp.adapter": MagicMock(MCPToolAdapter=mock_adapter_cls)},
+            {"prismal.mcp.adapter": MagicMock(MCPToolAdapter=mock_adapter_cls)},
         ):
             tools = manager.get_all_langchain_tools()
 

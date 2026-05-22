@@ -86,7 +86,7 @@ def test_match_intent_is_case_insensitive() -> None:
 
 def test_match_intent_is_pure_function() -> None:
     """The matcher module must depend only on the stdlib (re, unicodedata)."""
-    module = importlib.import_module("lightagent.agents.intent_router")
+    module = importlib.import_module("prismal.agents.intent_router")
     referenced = {name.split(".")[0] for name in dir(module) if not name.startswith("_")}
     # Sanity: the module exposes only ``match_intent``.
     assert "match_intent" in referenced

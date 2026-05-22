@@ -46,7 +46,7 @@ from prismal.core.exceptions import ToTError
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
 
-logger = get_logger("lightagent.agents.patterns.tree_of_thoughts")
+logger = get_logger("prismal.agents.patterns.tree_of_thoughts")
 
 
 @dataclass
@@ -140,10 +140,10 @@ async def tree_of_thoughts(
 
     otel = OTelManager()
     with otel.start_span("tot.search") as span:
-        span.set_attribute("lightagent.tot.strategy", search_strategy)
-        span.set_attribute("lightagent.tot.breadth", breadth)
-        span.set_attribute("lightagent.tot.depth", depth)
-        span.set_attribute("lightagent.tot.beam_size", beam_size)
+        span.set_attribute("prismal.tot.strategy", search_strategy)
+        span.set_attribute("prismal.tot.breadth", breadth)
+        span.set_attribute("prismal.tot.depth", depth)
+        span.set_attribute("prismal.tot.beam_size", beam_size)
 
         root = Thought(
             content=problem,
@@ -206,8 +206,8 @@ async def tree_of_thoughts(
         best.is_terminal = True
         best_path = _path_from_root(best, parent_map)
 
-        span.set_attribute("lightagent.tot.best_score", best.score)
-        span.set_attribute("lightagent.tot.total_thoughts", len(non_root))
+        span.set_attribute("prismal.tot.best_score", best.score)
+        span.set_attribute("prismal.tot.total_thoughts", len(non_root))
 
         logger.info(
             "tot_search_done",
@@ -294,7 +294,7 @@ async def _beam_search(
         if not level_children:
             break
         with otel.start_span("tot.beam_select") as span:
-            span.set_attribute("lightagent.tot.candidates", len(level_children))
+            span.set_attribute("prismal.tot.candidates", len(level_children))
             best_at_level = max(level_children, key=lambda t: t.score)
             if best_at_level.score >= threshold:
                 return best_at_level

@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.monitoring.cost_tracker — CostTracker, models."""
+"""Unit tests for prismal.monitoring.cost_tracker — CostTracker, models."""
 
 from __future__ import annotations
 

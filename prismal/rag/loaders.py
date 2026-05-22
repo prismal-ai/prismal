@@ -1,4 +1,4 @@
-"""Document loaders for the LightAgent RAG system.
+"""Document loaders for the Prismal RAG system.
 
 Provides ``DocumentProcessorFactory``, which maps file extensions to the
 appropriate LangChain document loader and returns a normalised
@@ -31,18 +31,18 @@ from langchain_community.document_loaders import (
     TextLoader,
 )
 
-from prismal.core.exceptions import LightAgentError
+from prismal.core.exceptions import PrismalError
 from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
     from langchain_core.documents import Document
 
-logger = get_logger("lightagent.rag.loaders")
+logger = get_logger("prismal.rag.loaders")
 
 # ── Exceptions ────────────────────────────────────────────────────────────────
 
 
-class UnsupportedDocumentTypeError(LightAgentError):
+class UnsupportedDocumentTypeError(PrismalError):
     """Raised when a file has an extension not supported by DocumentProcessorFactory.
 
     Args:

@@ -1,4 +1,4 @@
-"""Unit tests for RAGFusionEngine (lightagent.rag.fusion).
+"""Unit tests for RAGFusionEngine (prismal.rag.fusion).
 
 RAG-Fusion: generate N query variants, run N searches in parallel, then
 re-rank the combined result set via Reciprocal Rank Fusion (RRF).
@@ -27,7 +27,7 @@ from prismal.rag.fusion import (
     reciprocal_rank_fusion,
 )
 
-PROVIDER_REGISTRY_PATH = "lightagent.rag.fusion.ProviderRegistry"
+PROVIDER_REGISTRY_PATH = "prismal.rag.fusion.ProviderRegistry"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

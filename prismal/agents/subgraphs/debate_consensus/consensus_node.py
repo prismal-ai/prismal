@@ -2,7 +2,7 @@
 
 Synthesises a single final consensus from all accumulated positions and
 computes the Jaccard-based agreement score (reused from
-:mod:`lightagent.agents.patterns.debate`). Appends an ``AIMessage`` with
+:mod:`prismal.agents.patterns.debate`). Appends an ``AIMessage`` with
 the consensus text so the caller sees the final answer.
 """
 
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from prismal.agents.patterns.debate import DebatePosition
 
-logger = get_logger("lightagent.subgraphs.debate_consensus.consensus")
+logger = get_logger("prismal.subgraphs.debate_consensus.consensus")
 
 _PROMPT = (
     "You are a neutral synthesiser. Given the positions of a debate, "

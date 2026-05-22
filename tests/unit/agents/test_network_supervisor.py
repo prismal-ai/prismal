@@ -1,4 +1,4 @@
-"""Unit tests for lightagent.agents.network_supervisor."""
+"""Unit tests for prismal.agents.network_supervisor."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ async def test_delegate_falls_back_to_local_when_no_nodes() -> None:
     agent = NetworkSupervisorAgent(nodes=[])
 
     mock_local_result = {"messages": [MagicMock(content="local result")]}
-    with patch("lightagent.agents.network_supervisor.get_compiled_graph") as mock_graph_fn:
+    with patch("prismal.agents.network_supervisor.get_compiled_graph") as mock_graph_fn:
         mock_graph = MagicMock()
         mock_graph.ainvoke = AsyncMock(return_value=mock_local_result)
         mock_graph_fn.return_value = mock_graph
@@ -88,8 +88,8 @@ async def test_delegate_falls_back_on_http_error() -> None:
     mock_local_result = {"messages": [MagicMock(content="local fallback")]}
 
     with (
-        patch("lightagent.agents.network_supervisor.httpx") as mock_httpx,
-        patch("lightagent.agents.network_supervisor.get_compiled_graph") as mock_graph_fn,
+        patch("prismal.agents.network_supervisor.httpx") as mock_httpx,
+        patch("prismal.agents.network_supervisor.get_compiled_graph") as mock_graph_fn,
     ):
         mock_httpx.AsyncClient.return_value.__aenter__.return_value.post = AsyncMock(
             side_effect=Exception("connection refused")
@@ -168,7 +168,7 @@ def test_make_a2a_jwt_returns_signed_token() -> None:
     mock_settings = MagicMock()
     mock_settings.jwt_secret_key.get_secret_value.return_value = "test-secret-key-long-enough"
 
-    with patch("lightagent.core.config.get_settings", return_value=mock_settings):
+    with patch("prismal.core.config.get_settings", return_value=mock_settings):
         result = _make_a2a_jwt("http://node:8000")
 
     assert isinstance(result, str)
@@ -192,8 +192,8 @@ async def test_delegate_succeeds_with_remote_node() -> None:
     mock_response.raise_for_status = MagicMock()
 
     with (
-        patch("lightagent.agents.network_supervisor.httpx") as mock_httpx,
-        patch("lightagent.agents.network_supervisor._make_a2a_jwt", return_value="tok"),
+        patch("prismal.agents.network_supervisor.httpx") as mock_httpx,
+        patch("prismal.agents.network_supervisor._make_a2a_jwt", return_value="tok"),
     ):
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(return_value=mock_response)

@@ -1,12 +1,12 @@
 """PII sanitizer — replaces personally identifiable information with tokens.
 
-Used by :class:`~lightagent.memory.long_term_store.LongTermMemoryStore` to
+Used by :class:`~prismal.memory.long_term_store.LongTermMemoryStore` to
 enforce SPEC-039 AC-039-2: *any* value written to the long-term store must
 be stripped of email addresses, phone numbers, SSNs, and credit card
 numbers BEFORE it touches persistent storage. Raw PII never reaches disk.
 
 The PII regex patterns mirror the ones declared in
-``lightagent/security/patterns/injection_patterns.yaml`` under the
+``prismal/security/patterns/injection_patterns.yaml`` under the
 ``output_patterns.pii`` group so the scanner and the sanitizer stay in
 sync.
 """
@@ -18,7 +18,7 @@ from re import Pattern
 
 from prismal.core.logging import get_logger
 
-logger = get_logger("lightagent.security.pii_sanitizer")
+logger = get_logger("prismal.security.pii_sanitizer")
 
 
 # PII detection patterns. Mirrors ``output_patterns.pii`` in

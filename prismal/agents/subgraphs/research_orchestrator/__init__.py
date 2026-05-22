@@ -5,7 +5,7 @@ sub-orchestrator — a compiled ``CompiledStateGraph`` that routes
 research-flavoured requests between a small, focused set of leaf
 agents (``researcher``, ``rag_agent``, and the future ``cua_agent``).
 The entry node is a domain supervisor produced by
-:func:`lightagent.agents.domain_supervisor.make_domain_supervisor`.
+:func:`prismal.agents.domain_supervisor.make_domain_supervisor`.
 """
 
 from __future__ import annotations
