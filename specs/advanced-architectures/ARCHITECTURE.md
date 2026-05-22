@@ -1,4 +1,4 @@
-# LightAgent Advanced Architectures — Technical Design Document
+# Prismal Advanced Architectures — Technical Design Document
 
 ## Metadata
 
@@ -15,7 +15,7 @@
 
 ## 1. Contexto
 
-LightAgent-agents es un namespace package Python (PEP 420) que implementa un framework de agentes IA sobre LangGraph. La arquitectura existente provee: Supervisor Hub-and-Spoke, CRAG, Federated RAG, Reflection Loop, Parallel Fan-out, HITL Gate, y 6 subgraph pipelines de dominio.
+Prismal-agents es un namespace package Python (PEP 420) que implementa un framework de agentes IA sobre LangGraph. La arquitectura existente provee: Supervisor Hub-and-Spoke, CRAG, Federated RAG, Reflection Loop, Parallel Fan-out, HITL Gate, y 6 subgraph pipelines de dominio.
 
 Este documento describe el diseño técnico para integrar 19 nuevas arquitecturas manteniendo coherencia con las convenciones existentes: namespace package, `SecurePromptBuilder` para prompts, providers vía `ProviderRegistry`, OTel spans via `OTelManager`, y `get_logger()` para logging estructurado.
 
@@ -38,7 +38,7 @@ El principio de diseño central es **composición sobre herencia**: las nuevas a
 ### 3.1 Diagrama de Alto Nivel — Módulos Nuevos
 
 ```
-lightagent/
+prismal/
 ├── rag/
 │   ├── [EXISTENTE] engine.py          ← RAGEngine (Standard RAG)
 │   ├── [EXISTENTE] crag.py            ← CRAGPipeline
@@ -309,7 +309,7 @@ Root State ──▶ [Selection: UCB1 = Q/N + C*sqrt(ln(N_parent)/N)]
 ## 5. Estructura del Código
 
 ```
-lightagent/
+prismal/
 │
 ├── rag/
 │   ├── __init__.py          ← exporta: HyDERetriever, RAGFusionEngine,
@@ -394,12 +394,12 @@ tests/
 
 ```python
 # Jerarquía de excepciones nuevas (en core/exceptions.py)
-class RAGError(LightAgentError): ...           # ya existe
+class RAGError(PrismalError): ...           # ya existe
 class HyDEError(RAGError): ...                 # fallo en generación hipotética
 class FusionError(RAGError): ...               # fallo en multi-query
 class GraphRAGError(RAGError): ...             # fallo en grafo de conocimiento
 
-class PatternError(LightAgentError): ...       # nuevo
+class PatternError(PrismalError): ...       # nuevo
 class ToTError(PatternError): ...              # fallo en tree of thoughts
 class DebateError(PatternError): ...           # fallo en debate
 class ConstitutionalError(PatternError): ...   # violación no resuelta

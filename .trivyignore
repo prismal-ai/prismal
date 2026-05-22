@@ -1,4 +1,4 @@
-# .trivyignore — LightAgent
+# .trivyignore — Prismal
 # ============================================================
 # CVEs/GHSAs en dependencias pineadas que NO se pueden actualizar sin
 # romper el stack (Reflex 0.7.x + sqlmodel<0.0.25 + pydantic<2.11).
@@ -6,7 +6,7 @@
 # Mismos IDs que `pip-audit --ignore-vuln` en `.gitlab-ci.yml` y en
 # `.pre-commit-config.yaml` -> hook `pip-audit`.
 #
-# Triage activo: `lightagent doctor security-check` (Phase 30 maintenance).
+# Triage activo: `prismal doctor security-check` (Phase 30 maintenance).
 # Cualquier nuevo ignore debe documentarse aqui Y en .gitlab-ci.yml/pip-audit.
 # ============================================================
 
@@ -45,7 +45,7 @@ CVE-2024-23342
 
 # ============================================================
 # TODO: TRIAGE — detectados por Trivy (mas reciente que pip-audit DB).
-# Pendientes de revisar via `lightagent doctor security-check` (Phase 30).
+# Pendientes de revisar via `prismal doctor security-check` (Phase 30).
 # Son upgrades minor con constraints abiertas, pero NO se auto-aplican
 # sin aprobacion explicita. Quitar de aqui en cuanto se actualice uv.lock.
 # ============================================================

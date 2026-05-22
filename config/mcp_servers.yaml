@@ -38,7 +38,7 @@ servers:
   - name: code_sandbox
     type: stdio
     enabled: false
-    command: ["python", "-m", "lightagent.mcp.servers.sandbox"]
+    command: ["python", "-m", "prismal.mcp.servers.sandbox"]
     description: Sandboxed Python / shell execution for code-review and dev.
     capabilities: ["code_execution", "code_review"]
     priority: 1

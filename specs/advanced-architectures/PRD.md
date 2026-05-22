@@ -1,4 +1,4 @@
-# LightAgent — Advanced Architectures Expansion
+# Prismal — Advanced Architectures Expansion
 
 ## Product Requirements Document (PRD)
 
@@ -15,11 +15,11 @@
 
 ## 1. Resumen Ejecutivo
 
-LightAgent v2.0.0 implementa un framework de agentes IA robusto con Supervisor/Hub-and-Spoke, CRAG, Reflection Loop, MapReduce y un conjunto de pipelines de producción. Sin embargo, el ecosistema de arquitecturas de agentes y RAG ha evolucionado significativamente: existen patrones probados en producción — Self-RAG, HyDE, RAG-Fusion, GraphRAG, Tree of Thoughts, LLM-Compiler, entre otros — que hoy no están disponibles en el sistema.
+Prismal v2.0.0 implementa un framework de agentes IA robusto con Supervisor/Hub-and-Spoke, CRAG, Reflection Loop, MapReduce y un conjunto de pipelines de producción. Sin embargo, el ecosistema de arquitecturas de agentes y RAG ha evolucionado significativamente: existen patrones probados en producción — Self-RAG, HyDE, RAG-Fusion, GraphRAG, Tree of Thoughts, LLM-Compiler, entre otros — que hoy no están disponibles en el sistema.
 
-Este PRD define los requisitos para implementar **16 nuevas arquitecturas** agrupadas en tres dominios: (A) RAG avanzado, (B) patrones de agente, y (C) subgraph pipelines de dominio. La implementación se realizará por fases iterativas sobre el código existente en `lightagent/`, reutilizando la infraestructura de seguridad, observabilidad y providers ya establecida.
+Este PRD define los requisitos para implementar **16 nuevas arquitecturas** agrupadas en tres dominios: (A) RAG avanzado, (B) patrones de agente, y (C) subgraph pipelines de dominio. La implementación se realizará por fases iterativas sobre el código existente en `prismal/`, reutilizando la infraestructura de seguridad, observabilidad y providers ya establecida.
 
-El resultado esperado es que LightAgent ofrezca paridad arquitectónica con el estado del arte (2024-2025), permitiendo a los equipos que lo usen acceder a estrategias de retrieval más precisas y patrones de razonamiento más sofisticados sin cambiar la interfaz pública del framework.
+El resultado esperado es que Prismal ofrezca paridad arquitectónica con el estado del arte (2024-2025), permitiendo a los equipos que lo usen acceder a estrategias de retrieval más precisas y patrones de razonamiento más sofisticados sin cambiar la interfaz pública del framework.
 
 ---
 
@@ -27,7 +27,7 @@ El resultado esperado es que LightAgent ofrezca paridad arquitectónica con el e
 
 ### 2.1 Situación Actual
 
-LightAgent-agents implementa:
+Prismal-agents implementa:
 - **RAG**: Standard RAG (ChromaDB), CRAG (5-step pipeline), Federated RAG (multi-nodo), RAG+Reflection.
 - **Agentes**: Supervisor, ReAct, Reflection, Parallel Fan-out, HITL, Plan-Execute, CodeAct, CUA, Meta-Learning.
 - **Pipelines**: dev_pipeline, ml_pipeline, financial, analysis/engineering/research orchestrators.
@@ -55,14 +55,14 @@ Las siguientes capacidades críticas no están disponibles:
 
 ### 2.3 Oportunidad
 
-La implementación de estas arquitecturas posiciona a LightAgent como framework de referencia para producción, con capacidades que hoy solo están disponibles en implementaciones de investigación o en frameworks propietarios. El costo de implementación es acotado dado que la infraestructura base (providers, security, monitoring, LangGraph) ya existe.
+La implementación de estas arquitecturas posiciona a Prismal como framework de referencia para producción, con capacidades que hoy solo están disponibles en implementaciones de investigación o en frameworks propietarios. El costo de implementación es acotado dado que la infraestructura base (providers, security, monitoring, LangGraph) ya existe.
 
 ---
 
 ## 3. Usuarios Objetivo
 
 ### Persona 1: AI/ML Engineer
-- **Descripción:** Ingeniero que integra LightAgent en productos de IA, construye pipelines de procesamiento de documentos o sistemas de Q&A.
+- **Descripción:** Ingeniero que integra Prismal en productos de IA, construye pipelines de procesamiento de documentos o sistemas de Q&A.
 - **Necesidad principal:** Acceder a estrategias RAG de alta precisión sin implementarlas desde cero; combinar estrategias según el tipo de query.
 - **Frecuencia de uso:** Diario.
 - **Nivel técnico:** Alto.
@@ -146,7 +146,7 @@ La implementación de estas arquitecturas posiciona a LightAgent como framework 
 - **ColBERT / PLAID** — requiere servidor de inferencia dedicado (ColBERT-live); se evalúa en Fase D.
 - **LongRAG** — depende de LLMs con contexto >100K tokens; se integra cuando el provider lo soporte nativamente.
 - **Neo4j en producción para GraphRAG** — la Fase A usa NetworkX (in-process); la integración Neo4j es Fase D.
-- **UI/Dashboard** — este PRD es exclusivo del framework layer (`lightagent-agents`).
+- **UI/Dashboard** — este PRD es exclusivo del framework layer (`prismal`).
 - **APIs REST públicas** — los módulos son bibliotecas Python, no servicios HTTP.
 
 ### 5.3 Futuras Consideraciones
@@ -314,7 +314,7 @@ La implementación de estas arquitecturas posiciona a LightAgent como framework 
 ### Seguridad
 - Todos los prompts de nuevas arquitecturas deben pasar por `SecurePromptBuilder`.
 - `ConstitutionalFilter` debe registrar revisiones en `AuditLogger`.
-- Ninguna nueva arquitectura puede importar providers directamente (solo vía `lightagent/providers/`).
+- Ninguna nueva arquitectura puede importar providers directamente (solo vía `prismal/providers/`).
 - `LLMCompiler` debe validar tool names contra `tool_registry` antes de ejecutar.
 
 ### Disponibilidad
@@ -342,7 +342,7 @@ La implementación de estas arquitecturas posiciona a LightAgent como framework 
 ### Restricciones Técnicas
 - Python 3.13+, uv como gestor de paquetes.
 - LangGraph `StateGraph` como motor de orquestación — no introducir frameworks de orquestación alternativos.
-- `lightagent/` es namespace package (sin `__init__.py`); no romper esta convención.
+- `prismal/` es namespace package (sin `__init__.py`); no romper esta convención.
 - `_MAX_TOTAL_TOOLS = 120` — los nuevos nodos no deben registrar herramientas excesivas.
 
 ### Dependencias Externas

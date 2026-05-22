@@ -1,8 +1,50 @@
-# Changelog — lightagent-agents
+# Changelog — prismal
 
-All notable changes to the `lightagent-agents` package are documented here.
+All notable changes to the `prismal` package are documented here.
+The project was published as `lightagent-agents` through v2.x; entries prior to
+v3.0.0 refer to that name and the `lightagent.*` import namespace.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [3.0.0] — 2026-05-22
+
+Rebrand of the framework from **LightAgent** to **Prismal**
+(`lightagent-agents` → `prismal`). See `propuesta.md` and `PLAN_MIGRACION.md`.
+
+### Changed
+- **Distribution renamed** `lightagent-agents` → `prismal`; project URLs now
+  point to `github.com/prismal-ai/prismal` and `prismal.dev`.
+- **Import namespace renamed** `lightagent` → `prismal` (PEP 420 namespace
+  package). All imports become `from prismal. …`.
+- Observability rebranded: logger names and OpenTelemetry span attributes
+  `lightagent.*` → `prismal.*`; OTEL `service_name` default `lightagent` →
+  `prismal`.
+
+### Added
+- Transitional **import shim** `lightagent` that redirects `lightagent.*` →
+  `prismal.*` (not shipped in the wheel; to be removed in a later release).
+- **Environment-variable fallback** (`prismal/core/env_compat.py`): legacy
+  `LIGHTAGENT_*` variables are mirrored onto `PRISMAL_*` on import with a
+  one-time `DeprecationWarning`, so existing deployments keep working.
+
+### Breaking
+- **Import paths**: `from lightagent. …` no longer resolve once the shim is
+  removed; migrate to `from prismal. …`.
+- **Exception base class** `LightAgentError` → `PrismalError` (and subclasses).
+- **Environment prefix** `LIGHTAGENT_` → `PRISMAL_` (legacy names still work via
+  the deprecated fallback above).
+- **Persisted data identities**: memory collection `lightagent_memory` →
+  `prismal_memory`; default DB paths `data/db/lightagent.db` →
+  `data/db/prismal.db`. Existing persisted memory/databases must be migrated or
+  reconfigured to the previous values.
+- Renaming the `lightagent` import namespace breaks the sibling app package that
+  shares the PEP 420 namespace; it must be coordinated/rebranded in tandem.
+
+### Deprecated
+- The `lightagent-agents` distribution (a thin shim depending on `prismal`) and
+  the `LIGHTAGENT_*` environment prefix.
 
 ---
 

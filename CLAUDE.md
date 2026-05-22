@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Package context
 
-`lightagent-agents` is the **agent framework layer** extracted from the larger `lightagent` monorepo (v2.0.0). It is a standalone, publishable PyPI package containing everything needed to build and run AI agents — no web server, dashboard, or CLI. The sibling `lightagent` app package depends on this one via `lightagent-agents>=2.0.0`.
+`prismal` is the **agent framework layer** extracted from the larger `lightagent` monorepo. It is a standalone, publishable PyPI package containing everything needed to build and run AI agents — no web server, dashboard, or CLI. It was published as `lightagent-agents` through v2.x and **rebranded to `prismal` in v3.0.0** (distribution name plus the `lightagent.*` → `prismal.*` import namespace; see `propuesta.md` / `PLAN_MIGRACION.md`). The sibling app package (still named `lightagent`) historically depended on this one and shared the import namespace — see the namespace note below.
 
 ## Common commands
 
@@ -22,7 +22,7 @@ uv run pytest tests/unit                             # one tier
 uv run pytest -m unit                                # by marker (unit|integration|security|slow|live_api)
 uv run pytest tests/unit/security/test_sanitizer.py::TestSanitizer::test_strip_controls  # single test
 uv run pytest -n auto                                # parallel (pytest-xdist)
-uv run pytest --cov=lightagent --cov-report=term-missing   # coverage (target fail_under=80)
+uv run pytest --cov=prismal --cov-report=term-missing   # coverage (target fail_under=80)
 
 # Lint + format (ruff is the only linter/formatter; line-length=100, target py313)
 uv run ruff check .
@@ -30,10 +30,10 @@ uv run ruff check --fix .
 uv run ruff format .
 
 # Type-check (mypy strict mode; namespace_packages=true)
-uv run mypy lightagent
+uv run mypy prismal
 
 # Security linting
-uv run bandit -r lightagent -c pyproject.toml
+uv run bandit -r prismal -c pyproject.toml
 
 # Build distribution
 uv run python -m build
@@ -45,11 +45,13 @@ uv run python -m build
 
 ### Namespace package
 
-`lightagent/` has **no `__init__.py`** — it is a PEP 420 implicit namespace package. Both `lightagent-agents` (this repo) and the separate `lightagent` app package contribute modules into the same `lightagent.*` namespace. Do not add `lightagent/__init__.py`; it would break the sibling package.
+`prismal/` has **no `__init__.py`** — it is a PEP 420 implicit namespace package (renamed from `lightagent/` in v3.0.0). Do not add `prismal/__init__.py`; it must stay an implicit namespace package.
+
+There is a **transitional shim** `lightagent/__init__.py` (a `meta_path` finder that redirects `lightagent.* → prismal.*`) so code/tests/examples not yet migrated keep working; it is **not** shipped in the wheel and is removed before release. The `lightagent.*` → `prismal.*` rename **breaks the sibling app package** that previously shared the namespace — it must be rebranded/coordinated in tandem (tracked as a post-migration step).
 
 ### LangGraph SUPERVISOR state machine
 
-The core is a LangGraph `StateGraph[AgentState]` assembled in `lightagent/agents/graph.py`. A central `supervisor_node` routes each turn to one of 26 specialist agent nodes (`coder`, `researcher`, `rag_agent`, `data_analyst`, `planner`, `critic`, `codeact_agent`, `cua_agent`, `file_manager`, `skill_manager`, `cron_manager`, `parallel_research`, `meta_learner`, `skill_creator`, `domain_supervisor`, `network_supervisor`, …), which each return control to the supervisor; the supervisor routes to `END` when done.
+The core is a LangGraph `StateGraph[AgentState]` assembled in `prismal/agents/graph.py`. A central `supervisor_node` routes each turn to one of 26 specialist agent nodes (`coder`, `researcher`, `rag_agent`, `data_analyst`, `planner`, `critic`, `codeact_agent`, `cua_agent`, `file_manager`, `skill_manager`, `cron_manager`, `parallel_research`, `meta_learner`, `skill_creator`, `domain_supervisor`, `network_supervisor`, …), which each return control to the supervisor; the supervisor routes to `END` when done.
 
 - **Entry points**: `get_compiled_graph()` (sync) and `get_async_compiled_graph()` (async, LRU-cached). Async contexts must use the async variant — it wires `AsyncSqliteSaver`.
 - **State**: `AgentState` is a `TypedDict`. Only `messages` has a custom reducer (`add_messages`); all other fields use plain merge semantics.
@@ -92,7 +94,7 @@ Each subgraph exports both `build_<name>_subgraph()` (returns `SubgraphDefinitio
 
 ### Security (5-layer defense-in-depth)
 
-All layers live in `lightagent/security/` and are re-exported from its `__init__.py`:
+All layers live in `prismal/security/` and are re-exported from its `__init__.py`:
 
 - **L1 `InputSanitizer`** — strip control chars, normalize unicode, enforce `MAX_INPUT_LENGTH`.
 - **L2 `GuardrailsEngine`** — regex + risk scoring; `nemo_rails.py` integrates NVIDIA NeMo Guardrails (L3).
@@ -104,7 +106,7 @@ All layers live in `lightagent/security/` and are re-exported from its `__init__
 
 ### Provider isolation
 
-All LLM calls go through `lightagent/providers/` (LiteLLM wrapper + per-provider configs). Provider-specific imports (`anthropic`, `openai`, `google.generativeai`, `ollama`, etc.) must live only inside this package — never import them from agents, memory, RAG, or elsewhere.
+All LLM calls go through `prismal/providers/` (LiteLLM wrapper + per-provider configs). Provider-specific imports (`anthropic`, `openai`, `google.generativeai`, `ollama`, etc.) must live only inside this package — never import them from agents, memory, RAG, or elsewhere.
 
 ### Other subsystems (one-liners)
 
@@ -123,13 +125,13 @@ All LLM calls go through `lightagent/providers/` (LiteLLM wrapper + per-provider
 1. **Never** concatenate user input into prompts — use `SecurePromptBuilder`.
 2. **Never** bypass `GuardrailsEngine` / `ActionInterceptor`; they are the gateway.
 3. **Always** use `get_async_compiled_graph()` in async contexts (the sync variant uses a non-async SQLite saver).
-4. **Never** add provider-specific imports outside `lightagent/providers/`.
+4. **Never** add provider-specific imports outside `prismal/providers/`.
 5. **Always** call `ActionInterceptor.check()` before tool calls that write files or execute code.
-6. **Never** add `__init__.py` to `lightagent/` — it must remain a PEP 420 namespace package.
+6. **Never** add `__init__.py` to `prismal/` — it must remain a PEP 420 namespace package. (The repo-local `lightagent/__init__.py` shim is a deliberate, temporary migration exception and is not shipped.)
 
 ## Testing notes
 
 - `pytest.ini_options` sets `filterwarnings = ["error", …]`, so new `DeprecationWarning`s from our own code will fail tests. Add specific ignores only for third-party warnings.
 - `tests/conftest.py` is minimal; most fixtures live in `tests/integration/conftest.py` and per-tier `conftest.py` files.
 - Integration tests under `tests/integration/` expect running services (sandbox backends, databases). They are tagged `@pytest.mark.integration`.
-- Ruff's per-file ignores relax rules for `tests/**` and `lightagent/skills/{available,custom}/**` — assume the strict rules everywhere else.
+- Ruff's per-file ignores relax rules for `tests/**` and `prismal/skills/{available,custom}/**` — assume the strict rules everywhere else.

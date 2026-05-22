@@ -1,5 +1,5 @@
 # .gitlab-ci.yml
-# lightagent-agents — Pipeline CI/CD optimizado
+# prismal — Pipeline CI/CD optimizado
 # ============================================================
 # Reglas por rama:
 #   • develop → lint + typecheck + complejidad + seguridad + tests completos
@@ -155,7 +155,7 @@ typecheck:mypy:
   stage: typecheck
   needs: [lint:ruff]
   script:
-    - uv run mypy lightagent
+    - uv run mypy prismal
 
 typecheck:ty:
   extends:
@@ -165,7 +165,7 @@ typecheck:ty:
   needs: [lint:ruff]
   allow_failure: true  # ty todavía en alpha — informativo
   script:
-    - uv run ty check --output-format=concise lightagent/
+    - uv run ty check --output-format=concise prismal/
 
 # ============================================================
 # 3. COMPLEJIDAD (solo develop)
@@ -181,9 +181,9 @@ complexity:radon:
   allow_failure: true
   script:
     # Reporte full (informativo)
-    - uv run radon cc lightagent/ -s -a
+    - uv run radon cc prismal/ -s -a
     # Falla si aparece alguna función de rango E/F (CC >= 21)
-    - uv run radon cc lightagent/ -n E -s --total-average | tee radon-ef.txt
+    - uv run radon cc prismal/ -n E -s --total-average | tee radon-ef.txt
     - '! grep -E "^\s+[MFC] " radon-ef.txt'
   artifacts:
     when: always
@@ -199,7 +199,7 @@ complexity:lizard:
   needs: [typecheck:mypy]
   script:
     # Umbrales alineados con pre-commit: CCN=40, args=15, length=350
-    - uv run lizard lightagent/ --CCN 40 --arguments 15 --length 350 -w
+    - uv run lizard prismal/ --CCN 40 --arguments 15 --length 350 -w
 
 complexity:cognitive:
   extends:
@@ -210,7 +210,7 @@ complexity:cognitive:
   script:
     # flake8 y flake8-cognitive-complexity están en dev deps (pyproject.toml)
     # — no se requiere instalación dinámica en CI.
-    - uv run flake8 --select=CCR001 --max-cognitive-complexity=100 lightagent/
+    - uv run flake8 --select=CCR001 --max-cognitive-complexity=100 prismal/
 
 # ============================================================
 # 4. SEGURIDAD (sólo develop y MRs hacia develop)
@@ -228,7 +228,7 @@ security:bandit:
     - job: lint:ruff
       optional: true
   script:
-    - uv run bandit -r lightagent -c pyproject.toml --severity-level=medium -f txt
+    - uv run bandit -r prismal -c pyproject.toml --severity-level=medium -f txt
 
 security:gitleaks:
   extends: .rules-security
@@ -369,7 +369,7 @@ test:unit:
   script:
     - uv run pytest tests/unit
         -m "not live_api"
-        --cov=lightagent
+        --cov=prismal
         --cov-branch
         --cov-report=term-missing
         --cov-report=xml:coverage.xml
@@ -479,4 +479,4 @@ publish:pypi:
     - uv run twine upload --verbose --non-interactive --skip-existing dist/*
   environment:
     name: pypi
-    url: https://pypi.org/project/lightagent-agents/
+    url: https://pypi.org/project/prismal/

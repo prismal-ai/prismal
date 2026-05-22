@@ -1,12 +1,12 @@
-# lightagent-agents
+# prismal
 
-[![PyPI version](https://badge.fury.io/py/lightagent-agents.svg)](https://pypi.org/project/lightagent-agents/)
+[![PyPI version](https://badge.fury.io/py/prismal.svg)](https://pypi.org/project/prismal/)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**LightAgent AI Agent Framework** — the core engine powering multi-agent orchestration, security guardrails, RAG, MCP integration, and observability.
+**Prismal AI Agent Framework** — the core engine powering multi-agent orchestration, security guardrails, RAG, MCP integration, and observability.
 
-This package is the **agent framework layer** extracted from the [LightAgent](https://github.com/your-org/lightagent) monorepo as a standalone, publishable PyPI package (v2.0.0). It provides everything needed to build and run AI agents without the web server, dashboard, or CLI. The sibling `lightagent` app package depends on this one via `lightagent-agents>=2.0.0`.
+This package is the **agent framework layer** extracted from the [Prismal](https://github.com/your-org/prismal) monorepo as a standalone, publishable PyPI package (v2.0.0). It provides everything needed to build and run AI agents without the web server, dashboard, or CLI. The sibling `prismal` app package depends on this one via `prismal>=2.0.0`.
 
 ---
 
@@ -15,7 +15,7 @@ This package is the **agent framework layer** extracted from the [LightAgent](ht
 - **26 specialized AI agents** built on [LangGraph](https://langchain-ai.github.io/langgraph/) — coder, researcher, planner, critic, data_analyst, rag_agent, codeact_agent, cua_agent, and more
 - **SUPERVISOR state machine** — central supervisor routes each turn to the right specialist, then back to `END`
 - **Security-first (5-layer defense)** — `InputSanitizer` → `GuardrailsEngine` (+ NeMo Guardrails L3) → `ActionInterceptor` → `AuditLogger` (hash-chained) + `SecurePromptBuilder` + `PermissionManager`
-- **Provider-agnostic** — Anthropic Claude, OpenAI GPT, Google Gemini, Ollama via LiteLLM (isolated in `lightagent/providers/`)
+- **Provider-agnostic** — Anthropic Claude, OpenAI GPT, Google Gemini, Ollama via LiteLLM (isolated in `prismal/providers/`)
 - **7 RAG engines** — standard + CRAG, HyDE, RAG-Fusion (RRF), Hybrid (BM25 + semantic), Self-RAG, Parent-Child hierarchical, Multi-Vector, and Adaptive facade
 - **7 agent reasoning patterns** — Tree of Thoughts, Debate, Constitutional AI, LATS (MCTS), LLM-Compiler (parallel DAG), Mixture of Agents, Swarm/Handoff
 - **5 domain subgraph pipelines** — Customer Service, Document Generation, Data ETL, Code Review, Debate/Consensus — on top of the existing dev/ml/financial pipelines
@@ -34,25 +34,25 @@ This package is the **agent framework layer** extracted from the [LightAgent](ht
 ## Installation
 
 ```bash
-pip install lightagent-agents
+pip install prismal
 # or with uv:
-uv pip install lightagent-agents
+uv pip install prismal
 ```
 
 ### Optional extras
 
 ```bash
-pip install "lightagent-agents[postgres]"          # PostgreSQL checkpointing
-pip install "lightagent-agents[mongodb]"           # MongoDB long-term memory
-pip install "lightagent-agents[ollama]"            # Local LLMs via Ollama
-pip install "lightagent-agents[local-embeddings]"  # HuggingFace embeddings
-pip install "lightagent-agents[ml]"                # ML/AutoML pipeline
-pip install "lightagent-agents[ml-dl]"             # ML + PyTorch Lightning
-pip install "lightagent-agents[finance]"           # yfinance + pandas-ta
-pip install "lightagent-agents[analytics]"         # matplotlib + plotly
-pip install "lightagent-agents[datetime]"          # tzdata + NTP
-pip install "lightagent-agents[maintenance]"       # pip-audit
-pip install "lightagent-agents[all]"               # Everything above
+pip install "prismal[postgres]"          # PostgreSQL checkpointing
+pip install "prismal[mongodb]"           # MongoDB long-term memory
+pip install "prismal[ollama]"            # Local LLMs via Ollama
+pip install "prismal[local-embeddings]"  # HuggingFace embeddings
+pip install "prismal[ml]"                # ML/AutoML pipeline
+pip install "prismal[ml-dl]"             # ML + PyTorch Lightning
+pip install "prismal[finance]"           # yfinance + pandas-ta
+pip install "prismal[analytics]"         # matplotlib + plotly
+pip install "prismal[datetime]"          # tzdata + NTP
+pip install "prismal[maintenance]"       # pip-audit
+pip install "prismal[all]"               # Everything above
 ```
 
 ---
@@ -60,9 +60,9 @@ pip install "lightagent-agents[all]"               # Everything above
 ## Quick Start
 
 ```python
-from lightagent.agents.graph import get_async_compiled_graph
-from lightagent.agents.state import create_initial_state
-from lightagent.core.config import get_settings
+from prismal.agents.graph import get_async_compiled_graph
+from prismal.agents.state import create_initial_state
+from prismal.core.config import get_settings
 
 async def main():
     settings = get_settings()
@@ -88,7 +88,7 @@ A synchronous `get_compiled_graph()` entry point is also available for non-async
 
 The package ships 19 composable architectures under `specs/advanced-architectures/` (Fases A/B/C, ≥82% coverage per module, 0 bandit issues). Every component follows a **callable-injection pattern** — business logic accepts `generate_fn`, `evaluate_fn`, `reward_fn`, `plan_fn`, `tool_executor`, … so tests run without LLM backends. Defaults wire `ProviderRegistry().get_llm()` lazily.
 
-### RAG engines (`lightagent/rag/`)
+### RAG engines (`prismal/rag/`)
 
 | Engine | Module | Purpose |
 |--------|--------|---------|
@@ -100,7 +100,7 @@ The package ships 19 composable architectures under `specs/advanced-architecture
 | **Multi-Vector** | `multi_vector.py` | Indexes each chunk plus a summary and N hypothetical questions per chunk |
 | **Adaptive RAG** | `adaptive.py` | Facade that classifies queries (`FACTUAL_SIMPLE` / `ABSTRACT` / `AMBIGUOUS` / `MULTI_HOP` / `TECHNICAL` / `CONVERSATIONAL`) and routes to the engine above |
 
-### Agent reasoning patterns (`lightagent/agents/patterns/`)
+### Agent reasoning patterns (`prismal/agents/patterns/`)
 
 | Pattern | Module | Purpose |
 |---------|--------|---------|
@@ -112,7 +112,7 @@ The package ships 19 composable architectures under `specs/advanced-architecture
 | **Mixture of Agents** | `mixture_of_agents.py` | Parallel proposers across multiple providers + aggregator synthesis layers |
 | **Swarm/Handoff** | `swarm.py` | Decentralised agent-to-agent handoff with `HandoffRecord` audit trail and allow-list validation |
 
-### Domain subgraph pipelines (`lightagent/agents/subgraphs/`)
+### Domain subgraph pipelines (`prismal/agents/subgraphs/`)
 
 | Pipeline | Directory | Flow |
 |----------|-----------|------|
@@ -148,7 +148,7 @@ uv run pytest tests/unit                           # one tier
 uv run pytest -m unit                              # by marker (unit|integration|security|slow|live_api)
 uv run pytest tests/unit/security/test_sanitizer.py::TestSanitizer::test_strip_controls  # single test
 uv run pytest -n auto                              # parallel (pytest-xdist)
-uv run pytest --cov=lightagent --cov-report=term-missing   # coverage (fail_under = 80)
+uv run pytest --cov=prismal --cov-report=term-missing   # coverage (fail_under = 80)
 
 # Lint + format (ruff, line-length=100, target py313)
 uv run ruff check .
@@ -156,10 +156,10 @@ uv run ruff check --fix .
 uv run ruff format .
 
 # Strict type-check (mypy strict mode, namespace_packages=true)
-uv run mypy lightagent
+uv run mypy prismal
 
 # Security linting
-uv run bandit -r lightagent -c pyproject.toml
+uv run bandit -r prismal -c pyproject.toml
 
 # Build the distribution
 uv run python -m build
@@ -171,10 +171,10 @@ uv run python -m build
 
 ## Architecture
 
-The core is a LangGraph `StateGraph[AgentState]` assembled in `lightagent/agents/graph.py` following the **SUPERVISOR pattern**: a central `supervisor_node` routes each turn to one of 26 specialist agent nodes, each of which returns control to the supervisor; the supervisor routes to `END` when the task is complete. Checkpointing is handled by `AsyncSqliteSaver` (or PostgreSQL via the `[postgres]` extra).
+The core is a LangGraph `StateGraph[AgentState]` assembled in `prismal/agents/graph.py` following the **SUPERVISOR pattern**: a central `supervisor_node` routes each turn to one of 26 specialist agent nodes, each of which returns control to the supervisor; the supervisor routes to `END` when the task is complete. Checkpointing is handled by `AsyncSqliteSaver` (or PostgreSQL via the `[postgres]` extra).
 
 ```
-lightagent/                ← PEP 420 namespace package (NO __init__.py at root)
+prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 ├── agents/                ← LangGraph state machine + 26 agent nodes
 │   ├── graph.py           ← get_compiled_graph() / get_async_compiled_graph()
 │   ├── supervisor.py      ← Central router
@@ -234,7 +234,7 @@ lightagent/                ← PEP 420 namespace package (NO __init__.py at root
 
 ### Namespace package
 
-`lightagent/` has **no `__init__.py`** — it is a PEP 420 implicit namespace package. Both `lightagent-agents` and the separate `lightagent` app package contribute modules into the same `lightagent.*` namespace. Do not add `lightagent/__init__.py`; it would break the sibling package.
+`prismal/` has **no `__init__.py`** — it is a PEP 420 implicit namespace package. Both `prismal` and the separate `prismal` app package contribute modules into the same `prismal.*` namespace. Do not add `prismal/__init__.py`; it would break the sibling package.
 
 ### Security stack (5 layers)
 
@@ -256,9 +256,9 @@ lightagent/                ← PEP 420 namespace package (NO __init__.py at root
 1. **Never** concatenate user input into prompts — use `SecurePromptBuilder`.
 2. **Never** bypass `GuardrailsEngine` / `ActionInterceptor`.
 3. **Always** use `get_async_compiled_graph()` in async contexts (the sync variant wires a non-async SQLite saver).
-4. **Never** add provider-specific imports (`anthropic`, `openai`, `google.generativeai`, `ollama`, …) outside `lightagent/providers/`.
+4. **Never** add provider-specific imports (`anthropic`, `openai`, `google.generativeai`, `ollama`, …) outside `prismal/providers/`.
 5. **Always** call `ActionInterceptor.check()` before tool calls that write files or execute code.
-6. **Never** add `__init__.py` to `lightagent/` — it must remain a PEP 420 namespace package.
+6. **Never** add `__init__.py` to `prismal/` — it must remain a PEP 420 namespace package.
 
 See [CLAUDE.md](./CLAUDE.md) for the full working guide (commands, testing notes, architectural context for contributors and AI assistants).
 
@@ -267,10 +267,10 @@ See [CLAUDE.md](./CLAUDE.md) for the full working guide (commands, testing notes
 ## Versioning
 
 This package follows [Semantic Versioning](https://semver.org/).
-Tag format for releases: `lightagent-agents/vMAJOR.MINOR.PATCH`
+Tag format for releases: `prismal/vMAJOR.MINOR.PATCH`
 
 ```bash
-git tag lightagent-agents/v2.1.0
+git tag prismal/v2.1.0
 git push --tags
 ```
 

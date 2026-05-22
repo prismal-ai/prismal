@@ -1,8 +1,8 @@
 # .gitleaks.toml
-# LightAgent — Gitleaks configuration
+# Prismal — Gitleaks configuration
 # ============================================================
 
-title = "LightAgent Gitleaks Config"
+title = "Prismal Gitleaks Config"
 
 [extend]
 # Hereda todas las reglas por defecto de gitleaks

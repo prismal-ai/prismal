@@ -60,8 +60,8 @@ data/documents/
 data/backups/
 
 # Skills (AI-generated, not committed)
-lightagent/skills/custom/
-lightagent/skills/active/
+prismal/skills/custom/
+prismal/skills/active/
 
 # Secrets
 .env

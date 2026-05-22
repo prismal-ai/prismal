@@ -71,7 +71,7 @@ repos:
         # file_manager.py docstring lists the PEM header literally as a pattern
         # the agent must refuse to write -- excluded as false positive.
         # Exclude both old path (monolith) and new path (extracted package).
-        exclude: ^(lightagent/agents/file_manager\.py|packages/lightagent-agents/lightagent/agents/file_manager\.py)$
+        exclude: ^(prismal/agents/file_manager\.py|packages/prismal/prismal/agents/file_manager\.py)$
       - id: debug-statements
         name: "python: sin breakpoint() / pdb / set_trace()"
       - id: check-ast
@@ -123,10 +123,10 @@ repos:
         # (ver CLAUDE.md > "Before Every Commit"). Migrar a `ty` cuando estabilice.
         # Se invoca por path al venv para no depender de `uv` ni del PATH del IDE.
         entry: .venv/bin/ty
-        args: [check, --exit-zero, --output-format=concise, lightagent/]
+        args: [check, --exit-zero, --output-format=concise, prismal/]
         pass_filenames: false
         types: [python]
-        files: ^lightagent/
+        files: ^prismal/
 
   # ----------------------------------------------------------
   # 6. COMPLEJIDAD COGNITIVA — flake8 + CCR001
@@ -146,7 +146,7 @@ repos:
           # TODO: bajar progresivamente a 12 conforme se refactoren
           #   supervisor_node, _repl_async, react_loop, skill_manager_node.
           - --max-cognitive-complexity=100
-        files: ^lightagent/
+        files: ^prismal/
         exclude: ^tests/
 
   # ----------------------------------------------------------
@@ -161,9 +161,9 @@ repos:
         language: system
         # Path al venv en vez de `uv run ...` para no depender de `uv` en el PATH del IDE.
         entry: .venv/bin/radon
-        args: [cc, lightagent/, -s, -n, C]
+        args: [cc, prismal/, -s, -n, C]
         pass_filenames: false
-        files: ^lightagent/
+        files: ^prismal/
         verbose: true
 
   # ----------------------------------------------------------
@@ -181,9 +181,9 @@ repos:
         #   react_loop, skill_manager_node, cua_node, codeact _validate_imports.
         # Path al venv en vez de `uv run ...` para no depender de `uv` en el PATH del IDE.
         entry: .venv/bin/lizard
-        args: [lightagent/, --CCN, "40", --arguments, "15", --length, "350", -w]
+        args: [prismal/, --CCN, "40", --arguments, "15", --length, "350", -w]
         pass_filenames: false
-        files: ^lightagent/
+        files: ^prismal/
         exclude: ^tests/
 
   # ----------------------------------------------------------
@@ -199,13 +199,13 @@ repos:
         additional_dependencies: ["bandit[toml]"]
         args:
           - -r
-          - lightagent/
+          - prismal/
           - -c
           - pyproject.toml
           - --severity-level=medium
           - -q
         pass_filenames: false
-        files: ^lightagent/
+        files: ^prismal/
         exclude: ^tests/
 
   # ----------------------------------------------------------
@@ -233,7 +233,7 @@ repos:
       - id: pip-audit
         name: "sca: pip-audit (CVEs en deps)"
         language: system
-        # Triage activo de CVEs en `lightagent doctor security-check` (Phase 30).
+        # Triage activo de CVEs en `prismal doctor security-check` (Phase 30).
         # Las CVEs en paquetes pineados aqui no se pueden actualizar sin romper
         # el stack Reflex 0.7.x + sqlmodel<0.0.25 + pydantic<2.11. Se ignoran
         # explicitamente en pre-commit y se revisan manualmente.

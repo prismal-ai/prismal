@@ -30,9 +30,9 @@ invalid-type-arguments = "ignore"
 # Constructores de StateGraph(AgentState) y add_conditional_edges con dict[str, …]
 # — derivado del mismo bound Protocol que arriba.
 include = [
-  "lightagent/agents/factory.py",
-  "lightagent/agents/graph.py",
-  "lightagent/agents/subgraphs/factory.py",
+  "prismal/agents/factory.py",
+  "prismal/agents/graph.py",
+  "prismal/agents/subgraphs/factory.py",
 ]
 [overrides.rules]
 invalid-argument-type = "ignore"
@@ -42,8 +42,8 @@ invalid-argument-type = "ignore"
 # `SupportsFloat/SupportsIndex` al pasar a `float()` / `int()` / Series ctor.
 # Reglas polars Expr similares para aritmética sobre columnas.
 include = [
-  "lightagent/agents/subgraphs/ml_pipeline/tools_ml.py",
-  "lightagent/data/polars_utils.py",
+  "prismal/agents/subgraphs/ml_pipeline/tools_ml.py",
+  "prismal/data/polars_utils.py",
 ]
 [overrides.rules]
 invalid-argument-type = "ignore"
@@ -54,7 +54,7 @@ unsupported-operator = "ignore"
 # datetime_server._is_wildcard/_is_single_int: firmas que reciben tramos de
 # cron ya parseados (`list[int | Literal["*", "l"]]`). Compatibles con
 # `list[int | str]` en runtime — ty no tolera la varianza de List.
-include = ["lightagent/mcp/servers/datetime_server.py"]
+include = ["prismal/mcp/servers/datetime_server.py"]
 [overrides.rules]
 invalid-argument-type = "ignore"
 
@@ -62,7 +62,7 @@ invalid-argument-type = "ignore"
 # ``subprocess.run(cmd, …)`` con `cmd: list[str]` construido a partir de
 # LiteralString + paths — ty eleva el tipo a `list[LiteralString]` y no lo
 # ensancha a `list[str]` al cruzar el límite de función.
-include = ["lightagent/sandbox/isolation.py"]
+include = ["prismal/sandbox/isolation.py"]
 [overrides.rules]
 invalid-argument-type = "ignore"
 
@@ -70,17 +70,17 @@ invalid-argument-type = "ignore"
 # Mocks de módulos opcionales (httpx / motor / langfuse / pg connection):
 # shims `None` o `object` con gating en runtime; ty los ve como incompatibles.
 include = [
-  "lightagent/rag/federated.py",
-  "lightagent/agents/network_supervisor.py",
-  "lightagent/memory/mongodb_store.py",
-  "lightagent/agents/meta_learner.py",
-  "lightagent/core/database.py",
-  "lightagent/monitoring/otel.py",
-  "lightagent/agents/tool_registry.py",
-  "lightagent/security/nemo_rails.py",
-  "lightagent/scheduler/prefect_flows.py",
-  "lightagent/scheduler/executor.py",
-  "lightagent/sandbox/installer.py",
+  "prismal/rag/federated.py",
+  "prismal/agents/network_supervisor.py",
+  "prismal/memory/mongodb_store.py",
+  "prismal/agents/meta_learner.py",
+  "prismal/core/database.py",
+  "prismal/monitoring/otel.py",
+  "prismal/agents/tool_registry.py",
+  "prismal/security/nemo_rails.py",
+  "prismal/scheduler/prefect_flows.py",
+  "prismal/scheduler/executor.py",
+  "prismal/sandbox/installer.py",
 ]
 [overrides.rules]
 invalid-assignment = "ignore"
@@ -94,14 +94,14 @@ not-subscriptable = "ignore"
 [[overrides]]
 # watchdog Observer es una variable con tipo (`cast(..., BaseObserver)`),
 # lo cual ty aún no acepta en anotaciones de parámetros.
-include = ["lightagent/events/file_watcher.py"]
+include = ["prismal/events/file_watcher.py"]
 [overrides.rules]
 invalid-type-form = "ignore"
 
 [[overrides]]
 # Meta-programación sobre SubgraphRegistry: tipos genéricos devueltos por
 # métodos descriptor que ty no sabe subscriptar en runtime.
-include = ["lightagent/agents/subgraphs/registry.py"]
+include = ["prismal/agents/subgraphs/registry.py"]
 [overrides.rules]
 invalid-type-form = "ignore"
 
@@ -109,14 +109,14 @@ invalid-type-form = "ignore"
 # Narrowing de `dict.get()` sobre payloads heterogéneos (nemoguardrails,
 # skill_creator gates, supervisor literal routing, subgraphs/gates narrowing).
 include = [
-  "lightagent/agents/skill_creator.py",
-  "lightagent/agents/tools.py",
-  "lightagent/agents/supervisor.py",
-  "lightagent/agents/subgraphs/gates.py",
-  "lightagent/sandbox/tools.py",
-  "lightagent/skills/base.py",
-  "lightagent/skills/manager.py",
-  "lightagent/agents/patterns/parallel.py",
+  "prismal/agents/skill_creator.py",
+  "prismal/agents/tools.py",
+  "prismal/agents/supervisor.py",
+  "prismal/agents/subgraphs/gates.py",
+  "prismal/sandbox/tools.py",
+  "prismal/skills/base.py",
+  "prismal/skills/manager.py",
+  "prismal/agents/patterns/parallel.py",
 ]
 [overrides.rules]
 invalid-argument-type = "ignore"

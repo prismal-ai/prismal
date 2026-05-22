@@ -1,4 +1,4 @@
-# LightAgent Advanced Architectures — Implementation Plan
+# Prismal Advanced Architectures — Implementation Plan
 
 ## Metadata
 
@@ -50,16 +50,16 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 ### FASE A — RAG Avanzado
 
 **Duración:** 3 semanas (semanas 1-3)
-**Objetivo:** Implementar 7 nuevas estrategias de retrieval que expanden las capacidades de `lightagent/rag/` sin modificar el comportamiento de los engines existentes.
+**Objetivo:** Implementar 7 nuevas estrategias de retrieval que expanden las capacidades de `prismal/rag/` sin modificar el comportamiento de los engines existentes.
 
 ---
 
 #### A1 — HyDE (Hypothetical Document Embeddings) ✅ DONE
-**Estimación:** 3 días | **Archivo:** `lightagent/rag/hyde.py`
+**Estimación:** 3 días | **Archivo:** `prismal/rag/hyde.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| A1-01 | Crear `lightagent/rag/hyde.py` con `HyDERetriever` y `HyDEResult` | 1d | — | ✅ |
+| A1-01 | Crear `prismal/rag/hyde.py` con `HyDERetriever` y `HyDEResult` | 1d | — | ✅ |
 | A1-02 | Implementar `_generate_hypothesis()` con `SecurePromptBuilder` | 0.5d | A1-01 | ✅ |
 | A1-03 | Implementar `_embed_hypothesis()` vía `EmbeddingsFactory` | 0.5d | A1-01 | ✅ |
 | A1-04 | Implementar `search()` con OTel spans y logging estructurado | 0.5d | A1-02, A1-03 | ✅ |
@@ -70,17 +70,17 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ `HyDERetriever.search(query, k)` retorna `HyDEResult` con chunks y hipótesis.
 - ✅ Tests pasan: generar hipótesis → embeber → buscar (mock LLM + mock VectorStore).
 - ✅ `ruff check` y `mypy --strict` pasan.
-- ✅ Coverage: **100%** en `lightagent/rag/hyde.py` (12 tests).
-- ✅ `HyDEError` agregado a `lightagent/core/exceptions.py` (anticipa D1-04).
+- ✅ Coverage: **100%** en `prismal/rag/hyde.py` (12 tests).
+- ✅ `HyDEError` agregado a `prismal/core/exceptions.py` (anticipa D1-04).
 
 ---
 
 #### A2 — RAG-Fusion (Multi-Query + RRF) ✅ DONE
-**Estimación:** 3 días | **Archivo:** `lightagent/rag/fusion.py`
+**Estimación:** 3 días | **Archivo:** `prismal/rag/fusion.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| A2-01 | Crear `lightagent/rag/fusion.py` con `RAGFusionEngine` y `FusionResult` | 1d | — | ✅ |
+| A2-01 | Crear `prismal/rag/fusion.py` con `RAGFusionEngine` y `FusionResult` | 1d | — | ✅ |
 | A2-02 | Implementar `reciprocal_rank_fusion()` como función pública y testeable | 0.5d | A2-01 | ✅ |
 | A2-03 | Implementar `_generate_query_variants()` con LLM | 0.5d | A2-01 | ✅ |
 | A2-04 | Implementar `search()` con `asyncio.gather` para búsquedas paralelas | 1d | A2-02, A2-03 | ✅ |
@@ -91,18 +91,18 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ `reciprocal_rank_fusion()` verificado matemáticamente (formula del paper, empates, dedup por `(source, chunk_id)`, efecto de `k`).
 - ✅ `RAGFusionEngine.search()` ejecuta N búsquedas en paralelo (`asyncio.gather` + `asyncio.to_thread`) y retorna chunks fusionados.
 - ✅ Tests demuestran dedup + ranking correcto (16 tests, 93% coverage en `fusion.py`).
-- ✅ `FusionError` agregado a `lightagent/core/exceptions.py` (anticipa D1-04).
+- ✅ `FusionError` agregado a `prismal/core/exceptions.py` (anticipa D1-04).
 - ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
 #### A3 — Hybrid Search (BM25 + Embeddings) ✅ DONE
-**Estimación:** 3 días | **Archivo:** `lightagent/rag/hybrid.py`
+**Estimación:** 3 días | **Archivo:** `prismal/rag/hybrid.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
 | A3-01 | Añadir `rank_bm25` a `pyproject.toml` y verificar instalación | 0.2d | — | ✅ |
-| A3-02 | Crear `lightagent/rag/hybrid.py` con `HybridSearchEngine` | 1d | A3-01 | ✅ |
+| A3-02 | Crear `prismal/rag/hybrid.py` con `HybridSearchEngine` | 1d | A3-01 | ✅ |
 | A3-03 | Implementar `build_index()` con BM25Okapi | 0.5d | A3-02 | ✅ |
 | A3-04 | Implementar score fusion: `alpha * sem + (1-alpha) * bm25_norm` | 0.5d | A3-02 | ✅ |
 | A3-05 | Implementar `search()` con deduplicación y ordenamiento | 0.5d | A3-03, A3-04 | ✅ |
@@ -113,19 +113,19 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ `alpha=0.0` equivale a búsqueda BM25 pura; `alpha=1.0` equivale a búsqueda semántica pura.
 - ✅ `alpha` overrideable por llamada; validación `[0.0, 1.0]`.
 - ✅ BM25 opcional (sin índice → degrada a semántico puro).
-- ✅ `HybridSearchError` agregado a `lightagent/core/exceptions.py`.
-- ✅ Coverage: **94%** en `lightagent/rag/hybrid.py` (12 tests).
+- ✅ `HybridSearchError` agregado a `prismal/core/exceptions.py`.
+- ✅ Coverage: **94%** en `prismal/rag/hybrid.py` (12 tests).
 - ✅ `ruff check` y `mypy --strict` pasan (con override `rank_bm25.*` en `pyproject.toml`).
 - ⚠️ Benchmark <500ms para 10K docs: no ejecutado (diferido a Fase D / D1-07).
 
 ---
 
 #### A4 — Self-RAG ✅ DONE
-**Estimación:** 4 días | **Archivo:** `lightagent/rag/self_rag.py`
+**Estimación:** 4 días | **Archivo:** `prismal/rag/self_rag.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| A4-01 | Crear `lightagent/rag/self_rag.py` con dataclasses `SelfRAGResult`, enums `RetrievalDecision`, `SupportedDecision` | 0.5d | — | ✅ |
+| A4-01 | Crear `prismal/rag/self_rag.py` con dataclasses `SelfRAGResult`, enums `RetrievalDecision`, `SupportedDecision` | 0.5d | — | ✅ |
 | A4-02 | Implementar `_decide_retrieval()` — prompt de decisión con fallback robusto | 1d | A4-01 | ✅ |
 | A4-03 | Implementar `_evaluate_support()` — tokens Supported/Unsupported/Utility | 1d | A4-01 | ✅ (renombrado internamente a `_assess_support()` por conflicto con hook de seguridad; comportamiento idéntico al SPEC) |
 | A4-04 | Implementar `run()` orquestando decisión → CRAG → asesoramiento | 1d | A4-02, A4-03 | ✅ |
@@ -137,18 +137,18 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ Logging estructurado (`self_rag_decision`, `self_rag_decision_unparseable`, etc.) + OTel span `self_rag.run` con atributos de decisión, soporte y utility.
 - ✅ Pesimismo seguro en auto-asesoramiento: token no parseable → `(UNSUPPORTED, utility=1)`.
 - ✅ Utility clampado a `[1, 5]`.
-- ✅ `SelfRAGError` agregado a `lightagent/core/exceptions.py`.
-- ✅ Coverage: **94%** en `lightagent/rag/self_rag.py` (19 tests).
+- ✅ `SelfRAGError` agregado a `prismal/core/exceptions.py`.
+- ✅ Coverage: **94%** en `prismal/rag/self_rag.py` (19 tests).
 - ✅ `ruff check` y `mypy --strict` pasan (`StrEnum` modernizado).
 
 ---
 
 #### A5 — Parent-Child RAG (Hierarchical) ✅ DONE
-**Estimación:** 3 días | **Archivo:** `lightagent/rag/hierarchical.py`
+**Estimación:** 3 días | **Archivo:** `prismal/rag/hierarchical.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| A5-01 | Crear `lightagent/rag/hierarchical.py` con `HierarchicalRAGEngine`, `ParentChunk`, `HierarchicalSearchResult` | 1d | — | ✅ |
+| A5-01 | Crear `prismal/rag/hierarchical.py` con `HierarchicalRAGEngine`, `ParentChunk`, `HierarchicalSearchResult` | 1d | — | ✅ |
 | A5-02 | Implementar `index_document()`: split padre → split hijo → almacenar relación parent_id en metadata ChromaDB | 1d | A5-01 | ✅ |
 | A5-03 | Implementar `search()`: buscar en hijo → expandir a padre | 0.5d | A5-01 | ✅ |
 | A5-04 | Tests: verificar que child search + parent expansion retorna contexto mayor | 1d | A5-02, A5-03 | ✅ |
@@ -158,19 +158,19 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ Agrupación por `parent_id`; ordenamiento por mejor score entre sus hijos.
 - ✅ `index_document()` llama `delete_by_source(source)` antes de reindexar (AC-005-7 compatible).
 - ✅ Validación en constructor: `child_size < parent_size` y `overlap < child_size`.
-- ✅ `HierarchicalRAGError` agregado a `lightagent/core/exceptions.py`.
-- ✅ Coverage: **93%** en `lightagent/rag/hierarchical.py` (14 tests).
+- ✅ `HierarchicalRAGError` agregado a `prismal/core/exceptions.py`.
+- ✅ Coverage: **93%** en `prismal/rag/hierarchical.py` (14 tests).
 - ✅ `ruff check` y `mypy --strict` pasan.
 - ✅ Over-fetch `k*4` hijos para garantizar *k* padres distintos tras la agrupación.
 
 ---
 
 #### A6 — Multi-Vector RAG ✅ DONE
-**Estimación:** 3 días | **Archivo:** `lightagent/rag/multi_vector.py`
+**Estimación:** 3 días | **Archivo:** `prismal/rag/multi_vector.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| A6-01 | Crear `lightagent/rag/multi_vector.py` con `MultiVectorRAGEngine` | 1d | — | ✅ |
+| A6-01 | Crear `prismal/rag/multi_vector.py` con `MultiVectorRAGEngine` | 1d | — | ✅ |
 | A6-02 | Implementar indexación multi-vector: summary + chunks + hypothetical questions (LLM generadas) | 1d | A6-01 | ✅ |
 | A6-03 | Implementar `search()`: buscar en todos los vectores, dedup, merge | 0.5d | A6-01 | ✅ |
 | A6-04 | Tests: verificar que búsqueda por pregunta encuentra documentos que no encontraría chunk directo | 1d | A6-02, A6-03 | ✅ |
@@ -182,19 +182,19 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ Test `test_search_finds_docs_via_hypothetical_question_only` valida que un hit solo en `question` es suficiente.
 - ✅ Best-effort indexing: fallo de summary o questions no bloquea el chunk original.
 - ✅ `delete_by_source` previene duplicados al reindexar (AC-005-7).
-- ✅ `MultiVectorError` agregado a `lightagent/core/exceptions.py`.
-- ✅ Coverage: **92%** en `lightagent/rag/multi_vector.py` (12 tests).
+- ✅ `MultiVectorError` agregado a `prismal/core/exceptions.py`.
+- ✅ Coverage: **92%** en `prismal/rag/multi_vector.py` (12 tests).
 - ✅ `ruff check` y `mypy --strict` pasan.
 - ✅ Over-fetch `k*4` hits para asegurar *k* docs únicos tras dedup.
 
 ---
 
 #### A7 — Adaptive RAG (Facade) ✅ DONE
-**Estimación:** 2 días | **Archivo:** `lightagent/rag/adaptive.py`
+**Estimación:** 2 días | **Archivo:** `prismal/rag/adaptive.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| A7-01 | Crear `lightagent/rag/adaptive.py` con `AdaptiveRAGEngine`, `QueryType`, `AdaptiveResult` | 0.5d | A1-A6 completos | ✅ |
+| A7-01 | Crear `prismal/rag/adaptive.py` con `AdaptiveRAGEngine`, `QueryType`, `AdaptiveResult` | 0.5d | A1-A6 completos | ✅ |
 | A7-02 | Implementar `classify_query()` con heurísticas regex (default) y opción LLM | 1d | A7-01 | ✅ |
 | A7-03 | Implementar `search()` con routing por `QueryType` y fallback a CRAG | 0.5d | A7-01, A7-02 | ✅ |
 | A7-04 | Tests: clasificación correcta de queries tipo factual/abstract/ambiguous/technical | 1d | A7-03 | ✅ |
@@ -205,14 +205,14 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ Routing: ABSTRACT→HyDE, AMBIGUOUS→Fusion, TECHNICAL→Hybrid, resto→CRAG; fallback automático a CRAG si el engine preferido no está inyectado.
 - ✅ `force_strategy` acepta `crag|hyde|fusion|hybrid|hierarchical`; `ValueError` si nombre inválido, `AdaptiveRAGError` si engine no configurado.
 - ✅ Sync engines (Hybrid, Hierarchical) dispatched via `asyncio.to_thread` per SPEC.
-- ✅ `AdaptiveRAGError` agregado a `lightagent/core/exceptions.py`.
-- ✅ Coverage: **88%** en `lightagent/rag/adaptive.py` (24 tests).
+- ✅ `AdaptiveRAGError` agregado a `prismal/core/exceptions.py`.
+- ✅ Coverage: **88%** en `prismal/rag/adaptive.py` (24 tests).
 
 **Criterios de Done Fase A (global):** ✅ CUMPLIDOS
 - ✅ Los 7 engines RAG nuevos están en `rag/__init__.py` (HyDE, Fusion, Hybrid, SelfRAG, Hierarchical, MultiVector, Adaptive).
 - ✅ `pytest tests/unit/rag/` → **268 passed** (0 failures, 0 errors).
-- ✅ Coverage agregado sobre `lightagent/rag/` = **95%** (target ≥80%).
-- ✅ `ruff check lightagent/rag/ tests/unit/rag/` → All checks passed!
+- ✅ Coverage agregado sobre `prismal/rag/` = **95%** (target ≥80%).
+- ✅ `ruff check prismal/rag/ tests/unit/rag/` → All checks passed!
 - ✅ `mypy --strict` pasa en cada módulo nuevo.
 - ✅ 7 excepciones añadidas a `core/exceptions.py`: `HyDEError`, `FusionError`, `HybridSearchError`, `SelfRAGError`, `HierarchicalRAGError`, `MultiVectorError`, `AdaptiveRAGError` (anticipa D1-04).
 - ✅ Dependencia `rank-bm25>=0.2.2` añadida a `pyproject.toml` (A3-01 pre-requisito).
@@ -222,12 +222,12 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 ### FASE B — Patrones de Agente
 
 **Duración:** 3 semanas (semanas 4-6)
-**Objetivo:** Implementar 7 nuevos patrones de razonamiento en `lightagent/agents/patterns/`.
+**Objetivo:** Implementar 7 nuevos patrones de razonamiento en `prismal/agents/patterns/`.
 
 ---
 
 #### B1 — Tree of Thoughts ✅ DONE
-**Estimación:** 4 días | **Archivo:** `lightagent/agents/patterns/tree_of_thoughts.py`
+**Estimación:** 4 días | **Archivo:** `prismal/agents/patterns/tree_of_thoughts.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
@@ -244,14 +244,14 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ 3 modos de búsqueda: `beam` (default), `bfs`, `dfs`.
 - ✅ Early-exit por `threshold`; DFS descends highest-score branch con backtrack.
 - ✅ Validación `breadth≥1`, `depth≥1`, `beam_size≥1`; `ValueError` en constructor.
-- ✅ `ToTError` en `core/exceptions.py` via `LightAgentError`.
+- ✅ `ToTError` en `core/exceptions.py` via `PrismalError`.
 - ✅ Coverage: **90%** en `tree_of_thoughts.py` (15 tests).
 - ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
 #### B2 — Debate / Society of Mind ✅ DONE
-**Estimación:** 3 días | **Archivo:** `lightagent/agents/patterns/debate.py`
+**Estimación:** 3 días | **Archivo:** `prismal/agents/patterns/debate.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
@@ -269,14 +269,14 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ `agreement_score` = promedio Jaccard sobre pares de posiciones finales, en `[0, 1]`.
 - ✅ Roles por defecto `[proponent, opponent, neutral]`; overflow → `analyst_N`; custom roles validados.
 - ✅ Per-agent errors son best-effort: si al menos 1 posición tuvo éxito, el debate continúa; si todos fallan → `DebateError`.
-- ✅ `DebateError` hereda de `LightAgentError`.
+- ✅ `DebateError` hereda de `PrismalError`.
 - ✅ Coverage: **91%** en `debate.py` (14 tests).
 - ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
 #### B3 — Constitutional AI ✅ DONE
-**Estimación:** 3 días | **Archivo:** `lightagent/agents/patterns/constitutional.py`
+**Estimación:** 3 días | **Archivo:** `prismal/agents/patterns/constitutional.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
@@ -293,14 +293,14 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ Cada revisión emite evento estructurado `constitutional_revision_applied` con `principle_id`, `attempt`, `severity` (test `test_apply_logs_each_revision`).
 - ✅ Parseo estricto del prefijo `VIOLATION:` en critique — unparseable → no-violation (evita over-blocking).
 - ✅ Context opcional propagado al critique prompt.
-- ✅ `ConstitutionalError` en `core/exceptions.py` (via `LightAgentError`).
+- ✅ `ConstitutionalError` en `core/exceptions.py` (via `PrismalError`).
 - ✅ Coverage: **94%** en `constitutional.py` (16 tests).
 - ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
 #### B4 — LATS (Language Agent Tree Search / MCTS) ✅ DONE
-**Estimación:** 5 días | **Archivo:** `lightagent/agents/patterns/lats.py`
+**Estimación:** 5 días | **Archivo:** `prismal/agents/patterns/lats.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
@@ -327,7 +327,7 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 ---
 
 #### B5 — LLM-Compiler ✅ DONE
-**Estimación:** 5 días | **Archivo:** `lightagent/agents/patterns/llm_compiler.py`
+**Estimación:** 5 días | **Archivo:** `prismal/agents/patterns/llm_compiler.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
@@ -347,14 +347,14 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ Execution waves calculadas por topological sort estable.
 - ✅ Replanning on failure: se pasa `previous_results` como contexto al re-planner (test `test_replan_triggered_on_task_failure`).
 - ✅ `max_replanning` cap hard stop con `CompilerError("replanning")` (test `test_max_replanning_cap_aborts_with_compiler_error`).
-- ✅ `CompilerError` hereda de `LightAgentError`.
+- ✅ `CompilerError` hereda de `PrismalError`.
 - ✅ Coverage: **95%** en `llm_compiler.py` (18 tests).
 - ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
 #### B6 — Mixture of Agents (MoA) ✅ DONE
-**Estimación:** 3 días | **Archivo:** `lightagent/agents/patterns/mixture_of_agents.py`
+**Estimación:** 3 días | **Archivo:** `prismal/agents/patterns/mixture_of_agents.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
@@ -372,7 +372,7 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ `aggregator_model=None` defaultea al primer proposer (test `test_generate_uses_default_aggregator_when_none`).
 - ✅ `providers_used` refleja solo los proposers exitosos.
 - ✅ Validaciones constructor: `proposer_models` no vacío, `n_aggregator_layers ≥ 1`.
-- ✅ `MoAError` hereda de `LightAgentError`.
+- ✅ `MoAError` hereda de `PrismalError`.
 - ✅ `SecurePromptBuilder` envuelve todas las llamadas LLM.
 - ✅ Coverage: **100%** en `mixture_of_agents.py` (11 tests).
 - ✅ `ruff check` y `mypy --strict` pasan.
@@ -380,7 +380,7 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 ---
 
 #### B7 — Swarm / Handoff Descentralizado ✅ DONE
-**Estimación:** 2 días | **Archivo:** `lightagent/agents/patterns/swarm.py`
+**Estimación:** 2 días | **Archivo:** `prismal/agents/patterns/swarm.py`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
@@ -414,8 +414,8 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
   - `llm_compiler.py`: **95%**
   - `mixture_of_agents.py`: **100%**
   - `swarm.py`: **100%**
-- ✅ `ruff check lightagent/agents/patterns/` → All checks passed!
-- ✅ `mypy --strict lightagent/agents/patterns/<module>.py` → Success en cada módulo nuevo.
+- ✅ `ruff check prismal/agents/patterns/` → All checks passed!
+- ✅ `mypy --strict prismal/agents/patterns/<module>.py` → Success en cada módulo nuevo.
 
 ---
 
@@ -427,7 +427,7 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 ---
 
 #### C1 — Customer Service Pipeline ✅ DONE
-**Estimación:** 4 días | **Directorio:** `lightagent/agents/subgraphs/customer_service/`
+**Estimación:** 4 días | **Directorio:** `prismal/agents/subgraphs/customer_service/`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
@@ -449,7 +449,7 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ `classifier_node` handle empty messages y LLM errors con fallback a `other`.
 - ✅ `faq_retrieval_node` handle `rag_engine=None`, excepciones de RAG, hits vacíos.
 - ✅ `response_generator` handle retrieved vacío (prompt pide reconocer la falta en vez de inventar).
-- ✅ `CustomerServiceError` hereda de `LightAgentError`.
+- ✅ `CustomerServiceError` hereda de `PrismalError`.
 - ✅ Coverage por módulo: builder 87%, classifier 90%, escalation 100%, faq_retrieval 85%, response_generator 83%, ticket_creator 96% (22 tests).
 - ✅ `ruff check` y `mypy --strict` pasan.
 - ⚠️ Registro en `SubgraphRegistry` (patrón `register_customer_service()`) queda diferido — el builder devuelve `SubgraphDefinition` listo para registrar; wiring global va en D1.
@@ -457,7 +457,7 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 ---
 
 #### C2 — Document Generation Pipeline ✅ DONE
-**Estimación:** 3 días | **Directorio:** `lightagent/agents/subgraphs/document_generation/`
+**Estimación:** 3 días | **Directorio:** `prismal/agents/subgraphs/document_generation/`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
@@ -475,14 +475,14 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ Writer: compose draft desde outline + research; prompt incluye ambas (test verificado).
 - ✅ Editor: polish con fallback graceful a draft crudo si LLM falla.
 - ✅ Formatter: 3 formatos (`markdown`, `plain`, `html`), `ValueError` si formato desconocido; `AIMessage` final con el documento. Fallback a `draft` si no hubo editor.
-- ✅ `DocumentGenerationError` hereda de `LightAgentError`.
+- ✅ `DocumentGenerationError` hereda de `PrismalError`.
 - ✅ Coverage por módulo: builder 89%, editor 89%, formatter 100%, planner 87%, researcher 88%, writer 84% (21 tests).
 - ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
 #### C3 — Data ETL Pipeline ✅ DONE
-**Estimación:** 3 días | **Directorio:** `lightagent/agents/subgraphs/data_etl/`
+**Estimación:** 3 días | **Directorio:** `prismal/agents/subgraphs/data_etl/`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
@@ -500,14 +500,14 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ Transformer: ops declarativas `select` / `filter` (6 operators) / `rename`; `transform_log` lista operaciones aplicadas; `transformer_fn` inyectable.
 - ✅ Loader: CSV/Parquet via polars; `loader_fn` inyectable; `ValueError` para destino desconocido.
 - ✅ Auditor: summary con row counts, transforms, errors; `AIMessage` con digest legible (pass/fail).
-- ✅ `DataETLError` hereda de `LightAgentError`.
+- ✅ `DataETLError` hereda de `PrismalError`.
 - ✅ Coverage por módulo: auditor 100%, builder 100%, extractor 92%, loader 100%, transformer 90%, validator 92% (31 tests).
 - ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
 #### C4 — Code Review Pipeline ✅ DONE
-**Estimación:** 4 días | **Directorio:** `lightagent/agents/subgraphs/code_review/`
+**Estimación:** 4 días | **Directorio:** `prismal/agents/subgraphs/code_review/`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
@@ -529,14 +529,14 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ Suggester preserva orden de issues; empty issues → empty suggestions.
 - ✅ Per-analyzer errors swallowed (logged) — graph no crashea por fallo de un analyzer.
 - ✅ Report_generator emite `AIMessage` con digest APPROVED/REJECTED + breakdown por severidad.
-- ✅ `CodeReviewError` hereda de `LightAgentError`.
+- ✅ `CodeReviewError` hereda de `PrismalError`.
 - ✅ Coverage por módulo: types 100%, builder 100%, report_generator 95%, logic_reviewer 94%, security_scanner 94%, linter 82%, suggester 82% (24 tests).
 - ✅ `ruff check` y `mypy --strict` pasan.
 
 ---
 
 #### C5 — Debate/Consensus Subgraph ✅ DONE
-**Estimación:** 2 días | **Directorio:** `lightagent/agents/subgraphs/debate_consensus/`
+**Estimación:** 2 días | **Directorio:** `prismal/agents/subgraphs/debate_consensus/`
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
@@ -552,7 +552,7 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ Identical positions → agreement cerca de 1.0 (test matemático).
 - ✅ Helper `make_role_node()` compartido entre los 3 roles — prompts son el único delta.
 - ✅ Degradación graceful: error per-role loguea + inserta placeholder position; consenso LLM falla → usa primera position como fallback.
-- ✅ `DebateConsensusError` hereda de `LightAgentError`.
+- ✅ `DebateConsensusError` hereda de `PrismalError`.
 - ✅ Coverage por módulo: proponent/opponent/moderator 100%, _helpers 92%, consensus 91%, builder 88% (13 tests).
 - ✅ `ruff check` y `mypy --strict` pasan.
 
@@ -561,7 +561,7 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 - ✅ Cada builder retorna un `SubgraphDefinition` registrable en `SubgraphRegistry` (wiring global a `graph.py` queda diferido a D1-01).
 - ✅ Tests unitarios por nodo y builder pasan al 100% (112 tests Fase C).
 - ✅ Coverage ≥ 80% en todos los módulos Fase C.
-- ✅ `ruff check lightagent/agents/subgraphs/` y `mypy --strict` pasan.
+- ✅ `ruff check prismal/agents/subgraphs/` y `mypy --strict` pasan.
 - ✅ Patrón consistente: cada nodo es un `make_*_node(deps)` async callable; metadata namespaced per subgraph; degradación graceful en cada step.
 
 ---
@@ -580,14 +580,14 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 | D1-05 | Añadir `constitutional_principles` a `core/config.py` Settings con valores por defecto | 0.3d | — | ✅ DONE (agregados `constitutional_enabled`, `constitutional_max_revisions`, `constitutional_principles: list[str]` con IDs default `["P001","P002","P003"]`) |
 | D1-06 | Tests de integración end-to-end: RAG Adaptive + Constitutional AI + graph supervisor | 2d | D1-01, D1-02 | ✅ DONE (tests/integration/test_adaptive_rag_constitutional.py con 2 tests: flujo clean y flujo con revisión — cobertura del SPEC sin requerir graph.py integration) |
 | D1-07 | Coverage audit: verificar ≥ 80% en todos los módulos nuevos; añadir tests faltantes | 1d | D1-06 | ✅ DONE (todos los módulos Fase A+B+C con ≥ 82% coverage; la mayoría ≥ 90%) |
-| D1-08 | Security audit: `uv run bandit -r lightagent -c pyproject.toml` sin HIGH/CRITICAL | 0.5d | D1-07 | ✅ DONE (**0 issues** en 7034 LoC nuevas: High=0, Medium=0, Low=0) |
+| D1-08 | Security audit: `uv run bandit -r prismal -c pyproject.toml` sin HIGH/CRITICAL | 0.5d | D1-07 | ✅ DONE (**0 issues** en 7034 LoC nuevas: High=0, Medium=0, Low=0) |
 | D1-09 | Actualizar `CLAUDE.md` con las nuevas secciones de arquitectura | 0.5d | D1-06 | ✅ DONE (sección "Advanced architectures" con 19 arquitecturas enumeradas; nota del factory-injection pattern) |
-| D1-10 | Actualizar nota en Obsidian `Documentacion/LightAgent/LightAgent - Arquitecturas Agentes - Analisis y Gaps.md` marcando arquitecturas como implementadas | 0.2d | D1-09 | ⚠️ SKIP (Obsidian vault externo fuera del repo; actualización manual por el usuario) |
+| D1-10 | Actualizar nota en Obsidian `Documentacion/Prismal/Prismal - Arquitecturas Agentes - Analisis y Gaps.md` marcando arquitecturas como implementadas | 0.2d | D1-09 | ⚠️ SKIP (Obsidian vault externo fuera del repo; actualización manual por el usuario) |
 
 **Criterios de Done Fase D (global):** ✅ CUMPLIDOS (con las notas de diferimiento en D1-01/02/03)
 - ✅ `pytest tests/unit/agents/subgraphs/ tests/unit/agents/patterns/ tests/unit/rag/ tests/integration/test_adaptive_rag_constitutional.py` → **507 passed** (0 fallos, 0 errors).
 - ✅ Coverage de nuevos módulos ≥ 80%: 82–100% por módulo.
-- ✅ `ruff check lightagent/` sin errores (scope Fase A/B/C/D).
+- ✅ `ruff check prismal/` sin errores (scope Fase A/B/C/D).
 - ✅ `mypy --strict` sin errores en scope nuevo.
 - ✅ `bandit -r` sobre módulos nuevos: **0 issues High/Medium/Low**.
 - ✅ `CLAUDE.md` actualizado con sección de advanced architectures.
@@ -653,13 +653,13 @@ Para cerrar el proyecto de expansión como COMPLETED:
 
 - [ ] Las 19 arquitecturas implementadas y registradas.
 - [ ] `uv run pytest -m "not live_api"` pasa al 100% (0 failures, 0 errors).
-- [ ] Coverage global ≥ 80% (`uv run pytest --cov=lightagent --cov-fail-under=80`).
+- [ ] Coverage global ≥ 80% (`uv run pytest --cov=prismal --cov-fail-under=80`).
 - [ ] `uv run ruff check .` sin errores.
-- [ ] `uv run mypy lightagent` sin errores (strict mode).
-- [ ] `uv run bandit -r lightagent -c pyproject.toml` sin HIGH o CRITICAL findings.
+- [ ] `uv run mypy prismal` sin errores (strict mode).
+- [ ] `uv run bandit -r prismal -c pyproject.toml` sin HIGH o CRITICAL findings.
 - [ ] Todos los módulos nuevos con docstrings públicos (clases y métodos públicos).
 - [ ] `CLAUDE.md` actualizado con las nuevas secciones.
-- [ ] Nota en Obsidian `LightAgent - Arquitecturas Agentes - Analisis y Gaps.md` actualizada.
+- [ ] Nota en Obsidian `Prismal - Arquitecturas Agentes - Analisis y Gaps.md` actualizada.
 - [ ] `pyproject.toml` incluye `rank_bm25` y `networkx` en dependencias.
 - [ ] PR mergeado a `main` con code review aprobado.
 
@@ -701,17 +701,17 @@ Para cerrar el proyecto de expansión como COMPLETED:
 - ✅ `get_tools_for_agent()` firma retro-compatible — agentes legacy (researcher, coder, …) siguen recibiendo pool completo.
 - ✅ **Tests: 13 pasan** — cubren los 6 casos del prompt + mapping de E4 + legacy path + universal capability.
 - ✅ Regresión: **688 tests totales pasan** (10 nuevos + 678 previos), 0 fallos.
-- ✅ `ruff check lightagent/agents/tool_registry.py lightagent/mcp/client.py tests/unit/mcp/test_capability_routing.py` → All checks passed!
-- ✅ `mypy --strict` → Success en `lightagent/mcp/client.py` + `lightagent/agents/tool_registry.py` (2 source files checked).
-- ✅ `bandit -r lightagent/mcp/client.py lightagent/agents/tool_registry.py -c pyproject.toml` → High=0, Medium=0.
-- ✅ Coverage `lightagent/mcp/client.py`: **83%**; las líneas nuevas de E2 (filtrado) cubiertas al 100% por test_capability_routing.
+- ✅ `ruff check prismal/agents/tool_registry.py prismal/mcp/client.py tests/unit/mcp/test_capability_routing.py` → All checks passed!
+- ✅ `mypy --strict` → Success en `prismal/mcp/client.py` + `prismal/agents/tool_registry.py` (2 source files checked).
+- ✅ `bandit -r prismal/mcp/client.py prismal/agents/tool_registry.py -c pyproject.toml` → High=0, Medium=0.
+- ✅ Coverage `prismal/mcp/client.py`: **83%**; las líneas nuevas de E2 (filtrado) cubiertas al 100% por test_capability_routing.
 
 **Archivos modificados (4) + creados (2):**
 - **Creado**: `config/mcp_servers.yaml` — nuevo catálogo con capabilities.
 - **Creado**: `tests/unit/mcp/test_capability_routing.py` — 13 tests.
-- **Modificado**: `lightagent/mcp/connection.py` — añadido `capabilities` a `MCPServerConfig`.
-- **Modificado**: `lightagent/mcp/client.py` — firma `get_all_langchain_tools(capabilities=None)` + filtrado.
-- **Modificado**: `lightagent/agents/tool_registry.py` — firma `get_tools_for_agent(..., required_capabilities=None)`, `get_mcp_tools(capabilities=None)`, `DEFAULT_CAPABILITY_MAP`, `get_recommended_capabilities()`.
+- **Modificado**: `prismal/mcp/connection.py` — añadido `capabilities` a `MCPServerConfig`.
+- **Modificado**: `prismal/mcp/client.py` — firma `get_all_langchain_tools(capabilities=None)` + filtrado.
+- **Modificado**: `prismal/agents/tool_registry.py` — firma `get_tools_for_agent(..., required_capabilities=None)`, `get_mcp_tools(capabilities=None)`, `DEFAULT_CAPABILITY_MAP`, `get_recommended_capabilities()`.
 
 **Mapping canónico (según prompt)** expuesto como `DEFAULT_CAPABILITY_MAP` público en `tool_registry.py`:
 

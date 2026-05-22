@@ -1,6 +1,6 @@
-# Contributing to lightagent-agents
+# Contributing to prismal
 
-Thank you for your interest in improving **lightagent-agents**! This document explains how to propose changes, set up your environment, and get your contribution merged smoothly.
+Thank you for your interest in improving **prismal**! This document explains how to propose changes, set up your environment, and get your contribution merged smoothly.
 
 ---
 
@@ -31,7 +31,7 @@ This project follows the [Contributor Covenant](https://www.contributor-covenant
 
 | What | Where |
 |---|---|
-| Bug reports | [GitHub Issues](https://github.com/your-org/lightagent/issues) — use the **bug** template |
+| Bug reports | [GitHub Issues](https://github.com/your-org/prismal/issues) — use the **bug** template |
 | Feature requests | GitHub Issues — use the **enhancement** template |
 | Documentation fixes | PR against `README.md`, `CHANGELOG.md`, or docstrings |
 | New agent nodes | See [Adding an Agent Node](#adding-an-agent-node) below |
@@ -42,7 +42,7 @@ This project follows the [Contributor Covenant](https://www.contributor-covenant
 
 ## Before You Start
 
-- Search existing [issues](https://github.com/your-org/lightagent/issues) and [pull requests](https://github.com/your-org/lightagent/pulls) to avoid duplicating work.
+- Search existing [issues](https://github.com/your-org/prismal/issues) and [pull requests](https://github.com/your-org/prismal/pulls) to avoid duplicating work.
 - For non-trivial changes (new agents, new subgraphs, architectural decisions), open an **issue first** and discuss the approach before writing code.
 - All contributions must be licensed under MIT and you must have the right to submit the code.
 
@@ -54,16 +54,16 @@ This project follows the [Contributor Covenant](https://www.contributor-covenant
 
 ```bash
 # 1. Fork and clone
-git clone https://github.com/<your-fork>/lightagent.git
-cd lightagent/lightagent-agents
+git clone https://github.com/<your-fork>/prismal.git
+cd prismal/prismal
 
 # 2. Install with all dev extras
 uv pip install -e ".[dev,all]"
 
 # 3. Verify the environment
 uv run pytest tests/unit -q
-uv run ruff check lightagent/
-uv run mypy lightagent
+uv run ruff check prismal/
+uv run mypy prismal
 ```
 
 Optional service dependencies for integration tests (Docker recommended):
@@ -83,8 +83,8 @@ Integration tests that need live services are tagged `@pytest.mark.integration` 
 ## Project Layout
 
 ```
-lightagent-agents/
-├── lightagent/               # PEP 420 namespace package — NO __init__.py at root
+prismal/
+├── prismal/               # PEP 420 namespace package — NO __init__.py at root
 │   ├── agents/               # Agent nodes, graph, intent router, tool registry
 │   │   ├── graph.py          # LangGraph StateGraph assembly
 │   │   ├── patterns/         # Composable reasoning primitives
@@ -108,8 +108,8 @@ lightagent-agents/
 
 **Critical constraints:**
 
-- `lightagent/__init__.py` must **never** be created — it would break the sibling `lightagent` app package (PEP 420 namespace).
-- Provider-specific imports (`anthropic`, `openai`, `google.generativeai`, `ollama`, …) must **only** appear inside `lightagent/providers/`.
+- `prismal/__init__.py` must **never** be created — it would break the sibling `prismal` app package (PEP 420 namespace).
+- Provider-specific imports (`anthropic`, `openai`, `google.generativeai`, `ollama`, …) must **only** appear inside `prismal/providers/`.
 - User input must **never** be f-string-concatenated into prompts — always use `SecurePromptBuilder`.
 
 ---
@@ -145,22 +145,22 @@ Scope examples: `agents`, `rag`, `security`, `providers`, `memory`, `graph`.
 
 ### Adding an Agent Node
 
-1. Create `lightagent/agents/<name>_agent.py` following the pattern in existing nodes.
-2. Register the node in `lightagent/agents/graph.py` (add to `StateGraph` and to the supervisor routing table).
+1. Create `prismal/agents/<name>_agent.py` following the pattern in existing nodes.
+2. Register the node in `prismal/agents/graph.py` (add to `StateGraph` and to the supervisor routing table).
 3. Add any new tools to `tool_registry.py` — the global cap is **120 tools** (`_MAX_TOTAL_TOOLS`).
 4. Write unit tests in `tests/unit/agents/test_<name>_agent.py`.
 5. Update the agent count in `README.md` and document the new node in `CHANGELOG.md`.
 
 ### Adding a RAG Engine
 
-1. Create `lightagent/rag/<name>.py` following the interface of existing engines (e.g., `hyde.py`, `fusion.py`).
-2. Register the engine in `lightagent/rag/adaptive.py` (the routing facade).
+1. Create `prismal/rag/<name>.py` following the interface of existing engines (e.g., `hyde.py`, `fusion.py`).
+2. Register the engine in `prismal/rag/adaptive.py` (the routing facade).
 3. Business logic must accept callables (`generate_fn`, `retrieve_fn`, …) so tests run without LLM backends.
 4. Write unit tests using stub callables, not real LLMs.
 
 ### Adding a Subgraph Pipeline
 
-1. Create `lightagent/agents/subgraphs/<domain>/` with `__init__.py`.
+1. Create `prismal/agents/subgraphs/<domain>/` with `__init__.py`.
 2. Export both `build_<name>_subgraph()` (returns `SubgraphDefinition`) and `register_<name>()` (idempotent registry install).
 3. Mirror the pattern of existing pipelines (e.g., `ml_pipeline`, `financial`).
 4. Add the subgraph to `SubgraphRegistry` and document in `CHANGELOG.md`.
@@ -173,14 +173,14 @@ All code is checked automatically in CI. Run these locally before pushing:
 
 ```bash
 # Format and lint (line-length=100, target py313)
-uv run ruff format lightagent/ tests/
-uv run ruff check --fix lightagent/ tests/
+uv run ruff format prismal/ tests/
+uv run ruff check --fix prismal/ tests/
 
 # Type checking (strict mypy, namespace_packages=true)
-uv run mypy lightagent
+uv run mypy prismal
 
 # Security linting
-uv run bandit -r lightagent -c pyproject.toml
+uv run bandit -r prismal -c pyproject.toml
 ```
 
 Key style rules:
@@ -224,7 +224,7 @@ uv run pytest
 uv run pytest -n auto
 
 # Coverage report (target: 80% minimum, enforced in CI)
-uv run pytest --cov=lightagent --cov-report=term-missing
+uv run pytest --cov=prismal --cov-report=term-missing
 
 # Skip tests that call real LLM APIs
 uv run pytest -m "not live_api"
@@ -263,7 +263,7 @@ Releases are managed by the maintainers:
 1. Update `version` in `pyproject.toml` following [Semantic Versioning](https://semver.org/).
 2. Move `## [Unreleased]` entries to a new `## [X.Y.Z] — YYYY-MM-DD` section in `CHANGELOG.md`.
 3. Commit: `chore(release): bump version to X.Y.Z`.
-4. Tag: `git tag lightagent-agents/vX.Y.Z && git push --tags`.
+4. Tag: `git tag prismal/vX.Y.Z && git push --tags`.
 5. GitHub Actions publishes automatically to PyPI via Trusted Publisher (OIDC) and creates a GitHub Release.
 
 Contributors do not need to manage releases.
@@ -272,8 +272,8 @@ Contributors do not need to manage releases.
 
 ## Getting Help
 
-- **Discussions:** Open a [GitHub Discussion](https://github.com/your-org/lightagent/discussions) for questions about usage or architecture.
-- **Issues:** Open a [GitHub Issue](https://github.com/your-org/lightagent/issues) for bugs or feature requests.
+- **Discussions:** Open a [GitHub Discussion](https://github.com/your-org/prismal/discussions) for questions about usage or architecture.
+- **Issues:** Open a [GitHub Issue](https://github.com/your-org/prismal/issues) for bugs or feature requests.
 - **Email:** ecrespo@gmail.com for security reports or private matters.
 
-We appreciate every contribution, no matter how small. Thank you for helping make lightagent-agents better!
+We appreciate every contribution, no matter how small. Thank you for helping make prismal better!

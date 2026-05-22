@@ -1,4 +1,4 @@
-# LightAgent Advanced Architectures — Interface Specification
+# Prismal Advanced Architectures — Interface Specification
 
 ## Metadata
 
@@ -15,17 +15,17 @@
 
 | SPEC | Archivo | Tests | Coverage | Estado |
 |---|---|---|---|---|
-| SPEC-RAG-001 (HyDE) | `lightagent/rag/hyde.py` | 12 | 100% | ✅ DONE |
-| SPEC-RAG-002 (RAG-Fusion) | `lightagent/rag/fusion.py` | 16 | 93% | ✅ DONE |
-| SPEC-RAG-003 (Hybrid Search) | `lightagent/rag/hybrid.py` | 12 | 94% | ✅ DONE |
-| SPEC-RAG-004 (Self-RAG) | `lightagent/rag/self_rag.py` | 19 | 94% | ✅ DONE |
-| SPEC-RAG-005 (Parent-Child) | `lightagent/rag/hierarchical.py` | 14 | 93% | ✅ DONE |
-| A6 (Multi-Vector) | `lightagent/rag/multi_vector.py` | 12 | 92% | ✅ DONE |
-| SPEC-RAG-006 (Adaptive) | `lightagent/rag/adaptive.py` | 24 | 88% | ✅ DONE |
+| SPEC-RAG-001 (HyDE) | `prismal/rag/hyde.py` | 12 | 100% | ✅ DONE |
+| SPEC-RAG-002 (RAG-Fusion) | `prismal/rag/fusion.py` | 16 | 93% | ✅ DONE |
+| SPEC-RAG-003 (Hybrid Search) | `prismal/rag/hybrid.py` | 12 | 94% | ✅ DONE |
+| SPEC-RAG-004 (Self-RAG) | `prismal/rag/self_rag.py` | 19 | 94% | ✅ DONE |
+| SPEC-RAG-005 (Parent-Child) | `prismal/rag/hierarchical.py` | 14 | 93% | ✅ DONE |
+| A6 (Multi-Vector) | `prismal/rag/multi_vector.py` | 12 | 92% | ✅ DONE |
+| SPEC-RAG-006 (Adaptive) | `prismal/rag/adaptive.py` | 24 | 88% | ✅ DONE |
 
-**Totales Fase A**: 7 módulos nuevos, 109 tests nuevos, 268 tests totales en `tests/unit/rag/` (0 fallos), coverage agregado 95% sobre `lightagent/rag/`.
+**Totales Fase A**: 7 módulos nuevos, 109 tests nuevos, 268 tests totales en `tests/unit/rag/` (0 fallos), coverage agregado 95% sobre `prismal/rag/`.
 
-**Excepciones agregadas a `lightagent/core/exceptions.py`** (anticipan D1-04): `HyDEError`, `FusionError`, `HybridSearchError`, `SelfRAGError`, `HierarchicalRAGError`, `MultiVectorError`, `AdaptiveRAGError` — todas heredan de `RAGError`.
+**Excepciones agregadas a `prismal/core/exceptions.py`** (anticipan D1-04): `HyDEError`, `FusionError`, `HybridSearchError`, `SelfRAGError`, `HierarchicalRAGError`, `MultiVectorError`, `AdaptiveRAGError` — todas heredan de `RAGError`.
 
 **Dependencia agregada a `pyproject.toml`**: `rank-bm25>=0.2.2` (con override mypy para `rank_bm25.*`).
 
@@ -36,17 +36,17 @@
 
 | SPEC | Archivo | Tests | Coverage | Estado |
 |---|---|---|---|---|
-| SPEC-PAT-001 (Tree of Thoughts) | `lightagent/agents/patterns/tree_of_thoughts.py` | 15 | 90% | ✅ DONE |
-| SPEC-PAT-002 (Debate) | `lightagent/agents/patterns/debate.py` | 14 | 91% | ✅ DONE |
-| SPEC-PAT-003 (Constitutional AI) | `lightagent/agents/patterns/constitutional.py` | 16 | 94% | ✅ DONE |
-| SPEC-PAT-004 (LATS / MCTS) | `lightagent/agents/patterns/lats.py` | 15 | 98% | ✅ DONE |
-| SPEC-PAT-005 (LLM-Compiler) | `lightagent/agents/patterns/llm_compiler.py` | 18 | 95% | ✅ DONE |
-| SPEC-PAT-006 (Mixture of Agents) | `lightagent/agents/patterns/mixture_of_agents.py` | 11 | 100% | ✅ DONE |
-| SPEC-PAT-007 (Swarm/Handoff) | `lightagent/agents/patterns/swarm.py` | 13 | 100% | ✅ DONE |
+| SPEC-PAT-001 (Tree of Thoughts) | `prismal/agents/patterns/tree_of_thoughts.py` | 15 | 90% | ✅ DONE |
+| SPEC-PAT-002 (Debate) | `prismal/agents/patterns/debate.py` | 14 | 91% | ✅ DONE |
+| SPEC-PAT-003 (Constitutional AI) | `prismal/agents/patterns/constitutional.py` | 16 | 94% | ✅ DONE |
+| SPEC-PAT-004 (LATS / MCTS) | `prismal/agents/patterns/lats.py` | 15 | 98% | ✅ DONE |
+| SPEC-PAT-005 (LLM-Compiler) | `prismal/agents/patterns/llm_compiler.py` | 18 | 95% | ✅ DONE |
+| SPEC-PAT-006 (Mixture of Agents) | `prismal/agents/patterns/mixture_of_agents.py` | 11 | 100% | ✅ DONE |
+| SPEC-PAT-007 (Swarm/Handoff) | `prismal/agents/patterns/swarm.py` | 13 | 100% | ✅ DONE |
 
 **Totales Fase B**: 7 módulos nuevos, 102 tests nuevos, 394 tests totales (Fase A+B, 0 fallos). Coverage por módulo ≥ 90% en toda Fase B.
 
-**Nuevas excepciones en `core/exceptions.py`** (todas heredan de `LightAgentError`): `ToTError`, `DebateError`, `ConstitutionalError`, `LATSError`, `CompilerError`, `MoAError`, `SwarmError` — anticipan D1-04.
+**Nuevas excepciones en `core/exceptions.py`** (todas heredan de `PrismalError`): `ToTError`, `DebateError`, `ConstitutionalError`, `LATSError`, `CompilerError`, `MoAError`, `SwarmError` — anticipan D1-04.
 
 **Principio de diseño común en Fase B**: cada patrón acepta callables inyectables (`generate_fn`, `evaluate_fn`, `reward_fn`, `plan_fn`, `action_generator`, etc.) en vez de acoplarse a `ProviderRegistry` o `BaseTool`. Esto permite testing sin infraestructura LLM y facilita composición con cualquier backend. El patrón Mixture of Agents es la única excepción — por diseño consulta `ProviderRegistry.get_llm(model)` ya que la esencia de MoA es multi-provider.
 
@@ -59,11 +59,11 @@
 
 | SPEC | Directorio | Tests | Coverage | Estado |
 |---|---|---|---|---|
-| SPEC-SUBGRAPH-001 (Customer Service) | `lightagent/agents/subgraphs/customer_service/` | 22 | 83–100% | ✅ DONE |
-| C2 (Document Generation) | `lightagent/agents/subgraphs/document_generation/` | 21 | 84–100% | ✅ DONE |
-| C3 (Data ETL) | `lightagent/agents/subgraphs/data_etl/` | 31 | 90–100% | ✅ DONE |
-| SPEC-SUBGRAPH-002 (Code Review) | `lightagent/agents/subgraphs/code_review/` | 24 | 82–100% | ✅ DONE |
-| C5 (Debate/Consensus) | `lightagent/agents/subgraphs/debate_consensus/` | 13 | 88–100% | ✅ DONE |
+| SPEC-SUBGRAPH-001 (Customer Service) | `prismal/agents/subgraphs/customer_service/` | 22 | 83–100% | ✅ DONE |
+| C2 (Document Generation) | `prismal/agents/subgraphs/document_generation/` | 21 | 84–100% | ✅ DONE |
+| C3 (Data ETL) | `prismal/agents/subgraphs/data_etl/` | 31 | 90–100% | ✅ DONE |
+| SPEC-SUBGRAPH-002 (Code Review) | `prismal/agents/subgraphs/code_review/` | 24 | 82–100% | ✅ DONE |
+| C5 (Debate/Consensus) | `prismal/agents/subgraphs/debate_consensus/` | 13 | 88–100% | ✅ DONE |
 
 **Totales Fase C**: 5 subgraph pipelines, 111 tests nuevos, **505 tests totales (Fase A+B+C, 0 fallos)**. Coverage por módulo ≥ 82% en toda Fase C.
 
@@ -75,7 +75,7 @@
 - Callables inyectables (analyzers, LLMs, RAG engines, extractors) en todas las factories — tests sin fixtures pesadas.
 - Degradación graceful en cada step: fallos individuales se loguean y el pipeline continúa con datos parciales donde sea posible.
 
-**Nuevas excepciones en `core/exceptions.py`** (todas heredan de `LightAgentError`): `CustomerServiceError`, `DocumentGenerationError`, `DataETLError`, `CodeReviewError`, `DebateConsensusError`.
+**Nuevas excepciones en `core/exceptions.py`** (todas heredan de `PrismalError`): `CustomerServiceError`, `DocumentGenerationError`, `DataETLError`, `CodeReviewError`, `DebateConsensusError`.
 
 **Nota sobre desviaciones menores del SPEC Fase C**:
 - C3 (Data ETL) añadió un **conditional edge** en `validator` que rutea a `auditor` al fallar — evita transform+load inútiles. El SPEC no lo mencionaba pero mejora la semántica.
@@ -98,7 +98,7 @@
 
 ## SPEC-RAG-001: HyDE — Hypothetical Document Embeddings
 
-**Archivo:** `lightagent/rag/hyde.py`
+**Archivo:** `prismal/rag/hyde.py`
 
 ### Dataclasses
 
@@ -128,14 +128,14 @@ class HyDERetriever:
 
     Args:
         vector_store: ChromaVectorStore inicializado.
-        settings: Settings de LightAgent. None usa get_settings().
+        settings: Settings de Prismal. None usa get_settings().
         hypothesis_prompt: Prompt para generar el documento hipotético.
             None usa el prompt por defecto.
 
     Example::
 
         retriever = HyDERetriever(vector_store=store)
-        result = await retriever.search("¿Qué es LightAgent?", k=5)
+        result = await retriever.search("¿Qué es Prismal?", k=5)
         print(result.hypothesis)   # documento hipotético generado
         print(result.chunks)       # chunks recuperados
     """
@@ -179,7 +179,7 @@ class HyDERetriever:
 
 ## SPEC-RAG-002: RAG-Fusion — Multi-Query con Reciprocal Rank Fusion
 
-**Archivo:** `lightagent/rag/fusion.py`
+**Archivo:** `prismal/rag/fusion.py`
 
 ### Dataclasses
 
@@ -234,7 +234,7 @@ class RAGFusionEngine:
         vector_store: ChromaVectorStore inicializado.
         n_queries: Número de variantes de query a generar (default 4).
         rrf_k: Constante de suavizado RRF (default 60).
-        settings: Settings de LightAgent.
+        settings: Settings de Prismal.
 
     Example::
 
@@ -277,7 +277,7 @@ class RAGFusionEngine:
 
 ## SPEC-RAG-003: Hybrid Search — BM25 + Embeddings
 
-**Archivo:** `lightagent/rag/hybrid.py`
+**Archivo:** `prismal/rag/hybrid.py`
 
 ### Clase Principal
 
@@ -294,7 +294,7 @@ class HybridSearchEngine:
             alpha=1.0 → solo semántico.
             alpha=0.0 → solo BM25.
             alpha=0.5 → balance igual (default).
-        settings: Settings de LightAgent.
+        settings: Settings de Prismal.
 
     Note:
         El índice BM25 se construye llamando a build_index() con el corpus.
@@ -354,7 +354,7 @@ class HybridSearchEngine:
 
 ## SPEC-RAG-004: Self-RAG — Recuperación Condicional
 
-**Archivo:** `lightagent/rag/self_rag.py`
+**Archivo:** `prismal/rag/self_rag.py`
 
 ### Tipos
 
@@ -402,7 +402,7 @@ class SelfRAGPipeline:
     Args:
         vector_store: ChromaVectorStore inicializado.
         crag_pipeline: CRAGPipeline opcional. None crea uno internamente.
-        settings: Settings de LightAgent.
+        settings: Settings de Prismal.
 
     Example::
 
@@ -410,7 +410,7 @@ class SelfRAGPipeline:
         result = await pipeline.run("¿Cuánto es 2+2?")
         assert result.retrieval_decision == RetrievalDecision.NO_RETRIEVE
 
-        result = await pipeline.run("¿Qué hace el supervisor de LightAgent?")
+        result = await pipeline.run("¿Qué hace el supervisor de Prismal?")
         assert result.retrieval_decision == RetrievalDecision.RETRIEVE
         assert len(result.sources) > 0
     """
@@ -444,7 +444,7 @@ class SelfRAGPipeline:
 
 ## SPEC-RAG-005: Parent-Child RAG — Indexación Jerárquica
 
-**Archivo:** `lightagent/rag/hierarchical.py`
+**Archivo:** `prismal/rag/hierarchical.py`
 
 ### Dataclasses
 
@@ -490,7 +490,7 @@ class HierarchicalRAGEngine:
         parent_chunk_size: Tamaño en tokens del chunk padre (default 500).
         child_chunk_size: Tamaño en tokens del chunk hijo (default 100).
         child_overlap: Overlap entre chunks hijo (default 20).
-        settings: Settings de LightAgent.
+        settings: Settings de Prismal.
     """
 
     def __init__(
@@ -534,7 +534,7 @@ class HierarchicalRAGEngine:
 
 ## SPEC-RAG-006: Adaptive RAG — Selección Dinámica
 
-**Archivo:** `lightagent/rag/adaptive.py`
+**Archivo:** `prismal/rag/adaptive.py`
 
 ### Tipos
 
@@ -569,7 +569,7 @@ class AdaptiveRAGEngine:
         hierarchical_engine: HierarchicalRAGEngine opcional.
         use_llm_classifier: Si True, usa LLM para clasificar (más preciso,
             más lento). Si False, usa heurísticas regex (default False).
-        settings: Settings de LightAgent.
+        settings: Settings de Prismal.
 
     Example::
 
@@ -630,7 +630,7 @@ class AdaptiveRAGEngine:
 
 ## SPEC-PAT-001: Tree of Thoughts
 
-**Archivo:** `lightagent/agents/patterns/tree_of_thoughts.py`
+**Archivo:** `prismal/agents/patterns/tree_of_thoughts.py`
 
 ### Tipos
 
@@ -725,7 +725,7 @@ async def tree_of_thoughts(
 
 ## SPEC-PAT-002: Debate / Society of Mind
 
-**Archivo:** `lightagent/agents/patterns/debate.py`
+**Archivo:** `prismal/agents/patterns/debate.py`
 
 ### Tipos
 
@@ -789,7 +789,7 @@ async def debate_round(
             - "moderator": Un LLM moderador sintetiza todas las posiciones.
             - "majority_vote": La posición más repetida gana.
             - "weighted": Las posiciones con mayor score tienen más peso.
-        settings: Settings de LightAgent.
+        settings: Settings de Prismal.
 
     Returns:
         DebateResult con consenso, scores y posiciones completas.
@@ -804,7 +804,7 @@ async def debate_round(
 
 ## SPEC-PAT-003: Constitutional AI
 
-**Archivo:** `lightagent/agents/patterns/constitutional.py`
+**Archivo:** `prismal/agents/patterns/constitutional.py`
 
 ### Tipos
 
@@ -905,7 +905,7 @@ class ConstitutionalFilter:
         principles: Lista de principios constitucionales a aplicar.
             None usa DEFAULT_PRINCIPLES.
         max_revisions: Número máximo de revisiones por principio (default 3).
-        settings: Settings de LightAgent.
+        settings: Settings de Prismal.
 
     Example::
 
@@ -960,7 +960,7 @@ class ConstitutionalFilter:
 
 ## SPEC-PAT-004: LATS — Language Agent Tree Search
 
-**Archivo:** `lightagent/agents/patterns/lats.py`
+**Archivo:** `prismal/agents/patterns/lats.py`
 
 ### Tipos
 
@@ -1030,7 +1030,7 @@ class LATSAgent:
         max_simulations: Presupuesto total de simulaciones (default 50).
         exploration_constant: Constante C del UCB1 (default 1.41 = sqrt(2)).
         max_depth: Profundidad máxima del árbol (default 10).
-        settings: Settings de LightAgent.
+        settings: Settings de Prismal.
 
     Example::
 
@@ -1076,7 +1076,7 @@ class LATSAgent:
 
 ## SPEC-PAT-005: LLM-Compiler
 
-**Archivo:** `lightagent/agents/patterns/llm_compiler.py`
+**Archivo:** `prismal/agents/patterns/llm_compiler.py`
 
 ### Tipos
 
@@ -1151,7 +1151,7 @@ class LLMCompiler:
     Args:
         tools: Herramientas disponibles para el planner.
         max_replanning: Número máximo de replanificaciones (default 2).
-        settings: Settings de LightAgent.
+        settings: Settings de Prismal.
 
     Example::
 
@@ -1224,7 +1224,7 @@ class LLMCompiler:
 
 ## SPEC-PAT-006: Mixture of Agents (MoA)
 
-**Archivo:** `lightagent/agents/patterns/mixture_of_agents.py`
+**Archivo:** `prismal/agents/patterns/mixture_of_agents.py`
 
 ### Clase Principal
 
@@ -1254,7 +1254,7 @@ class MixtureOfAgents:
             (ej: ["gpt-4o", "claude-sonnet-4-6", "gemini-pro"]).
         aggregator_model: Model ID para la capa de síntesis (default usa settings.default_model).
         n_aggregator_layers: Número de capas de agregación (default 1).
-        settings: Settings de LightAgent.
+        settings: Settings de Prismal.
     """
 
     def __init__(
@@ -1286,7 +1286,7 @@ class MixtureOfAgents:
 
 ## SPEC-PAT-007: Swarm / Handoff Descentralizado
 
-**Archivo:** `lightagent/agents/patterns/swarm.py`
+**Archivo:** `prismal/agents/patterns/swarm.py`
 
 ### Tipos
 
@@ -1351,7 +1351,7 @@ async def swarm_handoff(
 
 ## SPEC-SUBGRAPH-001: Customer Service Pipeline
 
-**Archivo:** `lightagent/agents/subgraphs/customer_service/__init__.py`
+**Archivo:** `prismal/agents/subgraphs/customer_service/__init__.py`
 
 ### Interfaz del Subgraph
 
@@ -1373,7 +1373,7 @@ def build_customer_service_subgraph(
     Args:
         rag_engine: Engine RAG para FAQ retrieval. None crea RAGEngine default.
         escalation_threshold: Score mínimo de confianza para responder sin escalar.
-        settings: Settings de LightAgent.
+        settings: Settings de Prismal.
 
     Returns:
         CompiledStateGraph listo para registrar en SubgraphRegistry.
@@ -1385,7 +1385,7 @@ def build_customer_service_subgraph(
 
 ## SPEC-SUBGRAPH-002: Code Review Pipeline
 
-**Archivo:** `lightagent/agents/subgraphs/code_review/__init__.py`
+**Archivo:** `prismal/agents/subgraphs/code_review/__init__.py`
 
 ### Tipos
 
