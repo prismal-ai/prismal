@@ -6,9 +6,9 @@ build-backend = "hatchling.build"
 # PROJECT METADATA
 # ============================================================
 [project]
-name = "lightagent-agents"
-version = "2.0.0"
-description = "LightAgent AI Agent Framework — LangGraph multi-agent orchestration, security, RAG, MCP, and observability"
+name = "prismal"
+version = "3.0.0"
+description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
@@ -26,6 +26,10 @@ keywords = [
   "guardrails",
   "security",
   "multi-agent",
+  "prismal",
+  "supervisor-pattern",
+  "agentic-ai",
+  "agent-framework",
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -167,7 +171,7 @@ ml = [
 
 # ML + Deep Learning (Phase 26)
 ml-dl = [
-  "lightagent-agents[ml]",
+  "prismal[ml]",
   "torch>=2.5.1",
   "lightning>=2.4.0",
 ]
@@ -192,7 +196,7 @@ maintenance = [
 
 # All optional extras combined
 all = [
-  "lightagent-agents[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance]",
+  "prismal[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance]",
 ]
 
 # Development tools
@@ -232,11 +236,11 @@ dev = [
 # ENTRY POINTS
 # ============================================================
 [project.urls]
-Homepage = "https://github.com/your-org/lightagent"
-Documentation = "https://lightagent.readthedocs.io/agents/"
-Repository = "https://github.com/your-org/lightagent"
-"Bug Tracker" = "https://github.com/your-org/lightagent/issues"
-Changelog = "https://github.com/your-org/lightagent/blob/main/packages/lightagent-agents/CHANGELOG.md"
+Homepage = "https://github.com/prismal-ai/prismal"
+Documentation = "https://prismal.dev"
+Repository = "https://github.com/prismal-ai/prismal"
+"Bug Tracker" = "https://github.com/prismal-ai/prismal/issues"
+Changelog = "https://github.com/prismal-ai/prismal/blob/main/CHANGELOG.md"
 
 # ============================================================
 # HATCH BUILD CONFIG — namespace package (PEP 420)
