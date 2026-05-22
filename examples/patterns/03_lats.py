@@ -1,7 +1,7 @@
 """
 LATS — Language Agent Tree Search (MCTS sobre acciones de agente)
 =================================================================
-Patrón: SPEC-PAT-004 / lightagent.agents.patterns.lats
+Patrón: SPEC-PAT-004 / prismal.agents.patterns.lats
 
 Dataset: WebArena / tareas de planificación de texto
   • Conjunto de tareas de navegación y planificación basado en texto.
@@ -33,7 +33,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from lightagent.agents.patterns.lats import LATSAgent, LATSResult
+from prismal.agents.patterns.lats import LATSAgent, LATSResult
 
 # ── Dataset: tareas de planificación de texto ─────────────────────────────────
 # Tareas sintéticas que simulan WebArena / ALFWorld style:

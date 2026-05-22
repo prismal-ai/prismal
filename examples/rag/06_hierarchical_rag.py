@@ -1,7 +1,7 @@
 """
 Hierarchical (Parent-Child) RAG — Documentos largos con contexto enriquecido
 =============================================================================
-Arquitectura: SPEC-RAG-005 / lightagent.rag.hierarchical
+Arquitectura: SPEC-RAG-005 / prismal.rag.hierarchical
 
 Dataset: CUAD (Contract Understanding Atticus Dataset)
   • 510 contratos comerciales con 13 000 anotaciones de cláusulas legales.
@@ -35,8 +35,8 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from lightagent.rag.hierarchical import HierarchicalRAGEngine, HierarchicalSearchResult
-from lightagent.rag.vector_store import ChromaVectorStore
+from prismal.rag.hierarchical import HierarchicalRAGEngine, HierarchicalSearchResult
+from prismal.rag.vector_store import ChromaVectorStore
 
 # ── Dataset: extractos de contratos CUAD ─────────────────────────────────────
 # Cláusulas reales de contratos comerciales anotadas en CUAD.

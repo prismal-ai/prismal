@@ -1,7 +1,7 @@
 """
 ML Pipeline Subgraph — Pipeline completo de Machine Learning
 =============================================================
-Subgraph: lightagent.agents.subgraphs.ml_pipeline
+Subgraph: prismal.agents.subgraphs.ml_pipeline
 
 Dataset: UCI Heart Disease / Iris / Breast Cancer (scikit-learn datasets)
   • Heart Disease: 303 registros, 14 características, predicción binaria.
@@ -33,8 +33,8 @@ from __future__ import annotations
 
 import asyncio
 
-from lightagent.agents.state import initial_state
-from lightagent.agents.subgraphs.ml_pipeline.builder import (
+from prismal.agents.state import initial_state
+from prismal.agents.subgraphs.ml_pipeline.builder import (
     build_ml_pipeline_subgraph,
     register_ml_pipeline,
 )
@@ -155,7 +155,7 @@ async def main() -> None:
 
     # Demostrar uso directo de nodos individuales
     print("\n[Uso alternativo: nodos individuales]")
-    print("  from lightagent.agents.subgraphs.ml_pipeline import (")
+    print("  from prismal.agents.subgraphs.ml_pipeline import (")
     print("      data_ingester_node,")
     print("      eda_analyst_node,")
     print("      feature_engineer_node,")

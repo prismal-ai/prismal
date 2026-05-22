@@ -1,7 +1,7 @@
 """
 Customer Service Subgraph — Atención al cliente con RAG y escalación
 =====================================================================
-Subgraph: lightagent.agents.subgraphs.customer_service
+Subgraph: prismal.agents.subgraphs.customer_service
 
 Dataset: ATIS + Amazon Customer Reviews (soporte simulado)
   • ATIS (Airline Travel Information System): 5 000+ queries de usuarios
@@ -40,7 +40,7 @@ import random
 
 # Importar con manejo de error
 try:
-    from lightagent.agents.subgraphs.customer_service.builder import (
+    from prismal.agents.subgraphs.customer_service.builder import (
         build_customer_service_subgraph,
         register_customer_service,
     )
@@ -358,7 +358,7 @@ async def run_customer_service(query_data: dict, escalation_threshold: float = 0
     # Modo real con subgraph LangGraph
     from langchain_core.messages import HumanMessage
 
-    from lightagent.agents.state import initial_state
+    from prismal.agents.state import initial_state
 
     await register_customer_service(escalation_threshold=escalation_threshold)
     subgraph = build_customer_service_subgraph(

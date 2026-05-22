@@ -1,7 +1,7 @@
 """
 HyDE — Hypothetical Document Embeddings para búsqueda abstracta
 ================================================================
-Arquitectura: SPEC-RAG-003 / lightagent.rag.hyde
+Arquitectura: SPEC-RAG-003 / prismal.rag.hyde
 
 Dataset: MS MARCO (Microsoft MAchine Reading COmprehension)
   • 1 millón de preguntas reales de usuarios de Bing con pasajes de respuesta.
@@ -35,9 +35,9 @@ import asyncio
 
 from langchain_core.documents import Document
 
-from lightagent.rag.crag import CRAGPipeline
-from lightagent.rag.hyde import HyDEResult, HyDERetriever
-from lightagent.rag.vector_store import ChromaVectorStore
+from prismal.rag.crag import CRAGPipeline
+from prismal.rag.hyde import HyDEResult, HyDERetriever
+from prismal.rag.vector_store import ChromaVectorStore
 
 # ── Dataset: pasajes MS MARCO sobre IA y tecnología ──────────────────────────
 MSMARCO_PASSAGES = [

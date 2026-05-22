@@ -1,7 +1,7 @@
 """
 Tree of Thoughts (ToT) — Resolución de problemas matemáticos GSM8K
 ====================================================================
-Patrón: SPEC-PAT-001 / lightagent.agents.patterns.tree_of_thoughts
+Patrón: SPEC-PAT-001 / prismal.agents.patterns.tree_of_thoughts
 
 Dataset: GSM8K (Grade School Math 8K)
   • 8 500 problemas de matemáticas de nivel primaria/secundaria con solución paso a paso.
@@ -26,9 +26,9 @@ import re
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from lightagent.agents.patterns.tree_of_thoughts import ToTResult, tree_of_thoughts
-from lightagent.core.config import get_settings
-from lightagent.providers.registry import ProviderRegistry
+from prismal.agents.patterns.tree_of_thoughts import ToTResult, tree_of_thoughts
+from prismal.core.config import get_settings
+from prismal.providers.registry import ProviderRegistry
 
 # ── Dataset: subconjunto fijo de GSM8K (sin dependencia de red) ───────────────
 # Muestra representativa extraída de openai/gsm8k (train split).

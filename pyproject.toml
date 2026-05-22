@@ -245,9 +245,7 @@ Changelog = "https://github.com/prismal-ai/prismal/blob/main/CHANGELOG.md"
 # ============================================================
 # HATCH BUILD CONFIG — namespace package (PEP 420)
 # prismal/ has NO __init__.py → implicit namespace package.
-# Renamed from 'lightagent' in v3.0.0 (Estrategia B). The repo-local
-# 'lightagent/' shim (transitional, removed before release) is intentionally
-# NOT packaged here.
+# Renamed from 'lightagent' in v3.0.0 (Estrategia B).
 # ============================================================
 [tool.hatch.build.targets.wheel]
 packages = ["prismal"]
@@ -367,8 +365,6 @@ markers = [
 ]
 filterwarnings = [
   "error",
-  # Transitional 'lightagent' -> 'prismal' namespace shim (removed in Fase 6).
-  "ignore:The 'lightagent' import namespace is deprecated:DeprecationWarning",
   # Transitional 'LIGHTAGENT_' -> 'PRISMAL_' env-prefix fallback (env_compat).
   "ignore:The 'LIGHTAGENT_' environment-variable prefix is deprecated:DeprecationWarning",
   "ignore::DeprecationWarning:pydantic.*",

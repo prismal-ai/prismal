@@ -1,7 +1,7 @@
 """
 Swarm / Handoff Descentralizado — Enrutamiento de soporte al cliente
 =====================================================================
-Patrón: SPEC-PAT-007 / lightagent.agents.patterns.swarm
+Patrón: SPEC-PAT-007 / prismal.agents.patterns.swarm
 
 Dataset: ATIS (Airline Travel Information System) + Ticket de Soporte
   • ATIS: ~5 871 utterances clasificadas en 26 intenciones de viaje/soporte.
@@ -33,7 +33,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from lightagent.agents.patterns.swarm import (
+from prismal.agents.patterns.swarm import (
     VALID_HANDOFF_TARGETS,
     swarm_handoff,
 )

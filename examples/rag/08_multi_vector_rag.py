@@ -1,7 +1,7 @@
 """
 Multi-Vector RAG — Tres representaciones por documento
 ======================================================
-Arquitectura: SPEC-RAG-007 / lightagent.rag.multi_vector
+Arquitectura: SPEC-RAG-007 / prismal.rag.multi_vector
 
 Dataset: ArXiv Papers (Machine Learning & AI)
   • 2.2+ millones de papers científicos de ArXiv en múltiples dominios.
@@ -39,8 +39,8 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from lightagent.rag.multi_vector import MultiVectorRAGEngine, MultiVectorResult
-from lightagent.rag.vector_store import ChromaVectorStore
+from prismal.rag.multi_vector import MultiVectorRAGEngine, MultiVectorResult
+from prismal.rag.vector_store import ChromaVectorStore
 
 # ── Dataset: abstracts y fragmentos de papers de ArXiv ───────────────────────
 # Papers representativos de ML/AI de ArXiv (2023-2024).

@@ -1,7 +1,7 @@
 """
 Code Review Subgraph — Revisión automatizada de código Python
 =============================================================
-Subgraph: lightagent.agents.subgraphs.code_review
+Subgraph: prismal.agents.subgraphs.code_review
 
 Dataset: CodeSearchNet (Python) — fragmentos de código real de GitHub
   • 2.3M funciones Python etiquetadas con docstrings (CodeSearchNet corpus).
@@ -36,11 +36,11 @@ from __future__ import annotations
 import asyncio
 import re
 
-from lightagent.agents.subgraphs.code_review.types import CodeIssue
+from prismal.agents.subgraphs.code_review.types import CodeIssue
 
 # Importar con manejo de error por si el subgraph no está registrado
 try:
-    from lightagent.agents.subgraphs.code_review.builder import (
+    from prismal.agents.subgraphs.code_review.builder import (
         build_code_review_subgraph,
         register_code_review,
     )
@@ -580,7 +580,7 @@ async def run_code_review(snippet: dict, approval_threshold: float = 0.8) -> dic
     # Modo real con subgraph
     from langchain_core.messages import HumanMessage
 
-    from lightagent.agents.state import initial_state
+    from prismal.agents.state import initial_state
 
     await register_code_review(approval_threshold=approval_threshold)
     subgraph_def = build_code_review_subgraph(
@@ -744,7 +744,7 @@ async def main() -> None:
 
     # ── Uso con callables personalizados ─────────────────────────────────────
     print("\n[Uso con callables inyectables]")
-    print("  from lightagent.agents.subgraphs.code_review.builder import (")
+    print("  from prismal.agents.subgraphs.code_review.builder import (")
     print("      build_code_review_subgraph,")
     print("  )")
     print("  subgraph = build_code_review_subgraph(")

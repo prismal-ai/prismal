@@ -1,7 +1,7 @@
 """
 Mixture of Agents (MoA) — QA Médica con múltiples modelos
 ==========================================================
-Patrón: SPEC-PAT-006 / lightagent.agents.patterns.mixture_of_agents
+Patrón: SPEC-PAT-006 / prismal.agents.patterns.mixture_of_agents
 
 Dataset: MedQA (USMLE Medical Board Questions)
   • 12 723 preguntas del examen USMLE estilo opción múltiple.
@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import asyncio
 
-from lightagent.agents.patterns.mixture_of_agents import MixtureOfAgents, MoAResult
+from prismal.agents.patterns.mixture_of_agents import MixtureOfAgents, MoAResult
 
 # ── Dataset: preguntas MedQA USMLE ───────────────────────────────────────────
 # Muestra representativa de preguntas de nivel USMLE Step 1/2.

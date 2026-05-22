@@ -1,7 +1,7 @@
 """
 Self-RAG — Recuperación selectiva con auto-evaluación
 ======================================================
-Arquitectura: SPEC-RAG-005 / lightagent.rag.self_rag
+Arquitectura: SPEC-RAG-005 / prismal.rag.self_rag
 
 Dataset: PubMedQA (Preguntas sobre artículos científicos biomédicos)
   • 273 518 QA pares sobre abstracts de PubMed.
@@ -34,8 +34,8 @@ import asyncio
 
 from langchain_core.documents import Document
 
-from lightagent.rag.self_rag import SelfRAGPipeline, SelfRAGResult
-from lightagent.rag.vector_store import ChromaVectorStore
+from prismal.rag.self_rag import SelfRAGPipeline, SelfRAGResult
+from prismal.rag.vector_store import ChromaVectorStore
 
 # ── Dataset: abstracts de PubMedQA ───────────────────────────────────────────
 # Abstracts reales de PubMed sobre temas de medicina y biología.

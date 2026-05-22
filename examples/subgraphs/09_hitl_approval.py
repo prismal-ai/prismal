@@ -80,7 +80,7 @@ PROPOSALS: list[Proposal] = [
     Proposal(
         id="PROP-003",
         title="Desplegar agente autónomo de revisión de PRs",
-        description="Integrar lightagent code_review subgraph con GitHub Actions para "
+        description="Integrar prismal code_review subgraph con GitHub Actions para "
         "revisar PRs automáticamente y hacer merge si score >= 0.95.",
         risk_level="MEDIUM",
         risk_reasons=[
@@ -531,7 +531,7 @@ async def demo_real_langgraph() -> None:
     """
     Grafo LangGraph real usando MemorySaver y el interrupt() nativo.
 
-    Muestra el patrón exacto que usa lightagent en producción:
+    Muestra el patrón exacto que usa prismal en producción:
       graph.invoke(state, config)           → suspende en interrupt()
       graph.invoke(Command(resume=...), config) → reanuda con decisión humana
     """
@@ -541,7 +541,7 @@ async def demo_real_langgraph() -> None:
         from langgraph.graph.message import MessagesState
         from langgraph.types import Command, interrupt
 
-        from lightagent.agents.subgraphs.gates import (
+        from prismal.agents.subgraphs.gates import (
             hitl_gate,
             human_approval_node,
             seed_hitl_metadata,
@@ -716,7 +716,7 @@ def print_pattern_explanation() -> None:
 
   {BOLD}API del framework:{RESET}
 
-    from lightagent.agents.subgraphs.gates import (
+    from prismal.agents.subgraphs.gates import (
         seed_hitl_metadata,    # nodo que siembra _hitl_artifact_field
         human_approval_node,   # nodo async con interrupt()
         hitl_gate,             # conditional edge (approve/reject/changes)
@@ -744,7 +744,7 @@ def print_pattern_explanation() -> None:
   {BOLD}Bypass CI/CD:{RESET}
 
     # En .env o settings:
-    LIGHTAGENT_HITL_ENABLED=false   # → aprobación automática
+    PRISMAL_HITL_ENABLED=false   # → aprobación automática
 
     # O por código (tests):
     hitl_gate(..., bypass_condition=lambda _: True)
@@ -762,7 +762,7 @@ async def main() -> None:
 {"═" * 64}
   {BOLD}HITL Approval — Patrones de Revisión Humana en Agentes IA{RESET}
   Dataset: AI Governance Decisions (5 propuestas de despliegue)
-  Framework: lightagent-agents / LangGraph interrupt()
+  Framework: prismal / LangGraph interrupt()
 {"═" * 64}
   Modos disponibles:
     1. Interactivo  — tú eres el revisor (consola)

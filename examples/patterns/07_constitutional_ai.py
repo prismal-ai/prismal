@@ -1,7 +1,7 @@
 """
 Constitutional AI — Filtrado y revisión por principios de seguridad
 ====================================================================
-Patrón: SPEC-PAT-003 / lightagent.agents.patterns.constitutional
+Patrón: SPEC-PAT-003 / prismal.agents.patterns.constitutional
 
 Dataset: SafeNLP / AdvBench (prompts adversariales y texto a revisar)
   • AdvBench: 520 instrucciones adversariales.
@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import asyncio
 
-from lightagent.agents.patterns.constitutional import (
+from prismal.agents.patterns.constitutional import (
     ConstitutionalFilter,
     ConstitutionalPrinciple,
     ConstitutionalResult,
@@ -41,7 +41,7 @@ from lightagent.agents.patterns.constitutional import (
 
 # Importar principios por defecto si están disponibles
 try:
-    from lightagent.agents.patterns.constitutional import DEFAULT_PRINCIPLES
+    from prismal.agents.patterns.constitutional import DEFAULT_PRINCIPLES
 except ImportError:
     DEFAULT_PRINCIPLES = None  # se definen abajo
 

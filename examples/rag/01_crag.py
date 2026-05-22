@@ -1,7 +1,7 @@
 """
 CRAG — Corrective RAG con calificación LLM de relevancia
 =========================================================
-Arquitectura: SPEC-005 / lightagent.rag.crag
+Arquitectura: SPEC-005 / prismal.rag.crag
 
 Dataset: SQuAD 2.0 (Stanford Question Answering Dataset)
   • 150 000 pares pregunta-respuesta sobre artículos de Wikipedia.
@@ -33,8 +33,8 @@ import asyncio
 
 from langchain_core.documents import Document
 
-from lightagent.rag.crag import CRAGPipeline, CRAGResult
-from lightagent.rag.vector_store import ChromaVectorStore
+from prismal.rag.crag import CRAGPipeline, CRAGResult
+from prismal.rag.vector_store import ChromaVectorStore
 
 # ── Dataset: fragmentos de SQuAD 2.0 (Wikipedia contexts) ────────────────────
 # Contextos reales de Wikipedia usados en SQuAD 2.0.

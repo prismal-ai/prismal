@@ -1,7 +1,7 @@
 """
 Debate Consensus Subgraph — Síntesis de posiciones mediante debate estructurado
 ===============================================================================
-Subgraph: lightagent.agents.subgraphs.debate_consensus
+Subgraph: prismal.agents.subgraphs.debate_consensus
 
 Dataset: AI Policy & Tech Ethics (debates de política tecnológica)
   • Temas: Regulación de IA, modelos de lenguaje open-source, privacidad vs
@@ -23,7 +23,7 @@ Descripción del subgraph Debate Consensus:
   3. moderator — evalúa ambas posiciones, identifica puntos de acuerdo y tensión
   4. consensus — sintetiza una posición equilibrada con score de acuerdo Jaccard
 
-  Reutiliza primitivas de lightagent.agents.patterns.debate:
+  Reutiliza primitivas de prismal.agents.patterns.debate:
     DebatePosition, pairwise_jaccard()
 
 Uso:
@@ -36,7 +36,7 @@ import asyncio
 
 # Importar primitivas del patrón debate
 try:
-    from lightagent.agents.patterns.debate import DebatePosition, pairwise_jaccard
+    from prismal.agents.patterns.debate import DebatePosition, pairwise_jaccard
 
     DEBATE_PRIMITIVES_AVAILABLE = True
 except ImportError:
@@ -44,7 +44,7 @@ except ImportError:
 
 # Importar el subgraph
 try:
-    from lightagent.agents.subgraphs.debate_consensus.builder import (
+    from prismal.agents.subgraphs.debate_consensus.builder import (
         build_debate_consensus_subgraph,
         register_debate_consensus,
     )
@@ -326,7 +326,7 @@ async def run_debate(topic: dict) -> dict:
     # Modo real con subgraph LangGraph
     from langchain_core.messages import HumanMessage
 
-    from lightagent.agents.state import initial_state
+    from prismal.agents.state import initial_state
 
     await register_debate_consensus()
     subgraph = build_debate_consensus_subgraph()
@@ -376,7 +376,7 @@ async def main() -> None:
     print("       ↓")
     print("  consensus  → sintetiza posición balanceada con score de acuerdo")
     print()
-    print("  Basado en: lightagent.agents.patterns.debate")
+    print("  Basado en: prismal.agents.patterns.debate")
     print("  Score: pairwise_jaccard(pro_args, con_args) ∈ [0, 1]")
     print("    → 0.0 = posiciones totalmente opuestas")
     print("    → 1.0 = posiciones idénticas")
@@ -438,7 +438,7 @@ async def main() -> None:
 
     print("\n[Integración con el patrón Debate completo]")
     print("  # Para debates más complejos con N agentes y M rondas:")
-    print("  from lightagent.agents.patterns.debate import debate_round")
+    print("  from prismal.agents.patterns.debate import debate_round")
     print("  result = await debate_round(")
     print("      query=thesis,")
     print("      state=state,")

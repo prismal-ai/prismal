@@ -1,7 +1,7 @@
 """
 Reflection Loop — Mejora iterativa de artículos técnicos
 =========================================================
-Patrón: SPEC-035 / lightagent.agents.patterns.reflection
+Patrón: SPEC-035 / prismal.agents.patterns.reflection
 
 Dataset: Writing Prompts + prompts de documentación técnica
   • FairytaleQA / Writing Prompts de Reddit (r/WritingPrompts).
@@ -30,10 +30,10 @@ import asyncio
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from lightagent.agents.patterns.reflection import reflection_loop
-from lightagent.agents.state import AgentState, initial_state
-from lightagent.core.config import get_settings
-from lightagent.providers.registry import ProviderRegistry
+from prismal.agents.patterns.reflection import reflection_loop
+from prismal.agents.state import AgentState, initial_state
+from prismal.core.config import get_settings
+from prismal.providers.registry import ProviderRegistry
 
 # ── Dataset: prompts de escritura técnica ────────────────────────────────────
 WRITING_PROMPTS = [
@@ -250,7 +250,7 @@ async def main() -> None:
     # Demostración del decorador @with_reflection
     print("\n[Decorador @with_reflection para nodos LangGraph]")
     print("  Uso:")
-    print("    from lightagent.agents.patterns.reflection import with_reflection")
+    print("    from prismal.agents.patterns.reflection import with_reflection")
     print()
     print("    @with_reflection(threshold=0.85, max_iterations=2, critique_fn=my_critic)")
     print("    async def writer_node(state: AgentState) -> str:")

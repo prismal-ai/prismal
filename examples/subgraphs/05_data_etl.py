@@ -1,7 +1,7 @@
 """
 Data ETL Subgraph — Pipeline de Datos con Análisis Exploratorio (EDA)
 ======================================================================
-Subgraph: lightagent.agents.subgraphs.data_etl
+Subgraph: prismal.agents.subgraphs.data_etl
 
 Dataset: Titanic (Kaggle / OpenML)
   • 887 pasajeros con 12 variables: clase, nombre, sexo, edad, SibSp,
@@ -45,7 +45,7 @@ import polars as pl
 
 # Importar con manejo de error
 try:
-    from lightagent.agents.subgraphs.data_etl.builder import (
+    from prismal.agents.subgraphs.data_etl.builder import (
         build_data_etl_subgraph,
         register_data_etl,
     )
@@ -216,7 +216,7 @@ async def titanic_transformer(
     current = df
 
     # ── Paso 1: Aplicar transforms declarativos (select / filter / rename) ──
-    from lightagent.agents.subgraphs.data_etl.transformer_node import _default_transformer
+    from prismal.agents.subgraphs.data_etl.transformer_node import _default_transformer
 
     current, base_log = _default_transformer(current, transforms)
     log.extend(base_log)
@@ -472,7 +472,7 @@ async def run_etl_pipeline() -> None:
     # Modo real con subgraph LangGraph
     from langchain_core.messages import HumanMessage
 
-    from lightagent.agents.state import initial_state
+    from prismal.agents.state import initial_state
 
     await register_data_etl()
     subgraph = build_data_etl_subgraph(

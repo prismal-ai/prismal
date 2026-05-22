@@ -1,7 +1,7 @@
 """
 Adaptive RAG — Enrutamiento inteligente de queries a motores RAG especializados
 ================================================================================
-Arquitectura: SPEC-RAG-006 / lightagent.rag.adaptive
+Arquitectura: SPEC-RAG-006 / prismal.rag.adaptive
 
 Dataset: Natural Questions (NQ) + TriviaQA
   • NQ: 307 373 preguntas de Google Search sobre artículos de Wikipedia.
@@ -36,12 +36,12 @@ import asyncio
 
 from langchain_core.documents import Document
 
-from lightagent.rag.adaptive import AdaptiveRAGEngine, AdaptiveResult, QueryType
-from lightagent.rag.crag import CRAGPipeline
-from lightagent.rag.fusion import RAGFusionEngine
-from lightagent.rag.hybrid import HybridSearchEngine
-from lightagent.rag.hyde import HyDERetriever
-from lightagent.rag.vector_store import ChromaVectorStore
+from prismal.rag.adaptive import AdaptiveRAGEngine, AdaptiveResult, QueryType
+from prismal.rag.crag import CRAGPipeline
+from prismal.rag.fusion import RAGFusionEngine
+from prismal.rag.hybrid import HybridSearchEngine
+from prismal.rag.hyde import HyDERetriever
+from prismal.rag.vector_store import ChromaVectorStore
 
 # ── Dataset: queries de NQ + TriviaQA clasificadas por tipo ──────────────────
 ADAPTIVE_QUERIES = [
@@ -173,7 +173,7 @@ BASE_DOCUMENTS = [
             "In 2024, Python is 33 years old. It has become the most popular "
             "programming language for data science and machine learning. "
             "The best AI tools in 2024 include LangChain, LlamaIndex, AutoGen, "
-            "CrewAI, and the lightagent-agents framework."
+            "CrewAI, and the prismal framework."
         ),
         metadata={"source": "python_wiki", "chunk_id": "4", "topic": "python"},
     ),

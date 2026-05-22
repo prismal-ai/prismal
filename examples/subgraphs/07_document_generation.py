@@ -1,7 +1,7 @@
 """
 Document Generation Subgraph — Generación de documentos técnicos
 ================================================================
-Subgraph: lightagent.agents.subgraphs.document_generation
+Subgraph: prismal.agents.subgraphs.document_generation
 
 Dataset: Wikipedia Technical Docs + OpenAPI Specifications
   • Temas: API REST Design, Machine Learning Explainability, Zero-Trust Security
@@ -33,7 +33,7 @@ import asyncio
 
 # Importar con manejo de error
 try:
-    from lightagent.agents.subgraphs.document_generation.builder import (
+    from prismal.agents.subgraphs.document_generation.builder import (
         build_document_generation_subgraph,
         register_document_generation,
     )
@@ -279,7 +279,7 @@ def simulate_formatter(document: str, format_type: str) -> str:
     """Simula el nodo formatter: aplica formato final."""
     if format_type == "markdown":
         # Ya está en Markdown, añadir metadatos YAML frontmatter
-        frontmatter = "---\nformat: markdown\ngenerator: lightagent-document-generation\n---\n\n"
+        frontmatter = "---\nformat: markdown\ngenerator: prismal-document-generation\n---\n\n"
         return frontmatter + document
     if format_type == "html":
         # Conversión básica a HTML
@@ -369,7 +369,7 @@ async def run_document_generation(request: dict) -> dict:
     # Modo real con subgraph LangGraph
     from langchain_core.messages import HumanMessage
 
-    from lightagent.agents.state import initial_state
+    from prismal.agents.state import initial_state
 
     await register_document_generation(format=request["format"])
     subgraph = build_document_generation_subgraph(format=request["format"])

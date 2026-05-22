@@ -1,7 +1,7 @@
-# Ejemplos de lightagent-agents
+# Ejemplos de prismal
 
 Colección completa de ejemplos que cubre todas las arquitecturas de agentes IA
-y sistemas RAG disponibles en el framework `lightagent-agents`.
+y sistemas RAG disponibles en el framework `prismal`.
 
 ## Prerrequisitos
 
@@ -114,7 +114,7 @@ uv run python examples/rag/08_multi_vector_rag.py
 |---|---------|---------|---------|-------------|
 | 1 | `01_ml_pipeline.py` | ML Pipeline | **UCI Heart Disease** | data_ingester → EDA → features → train → eval → [quality gate ≥0.7] → export |
 | 2 | `02_financial_analyst.py` | Financial Analyst | **Yahoo Finance** (NVDA, MSFT) | market_data → technical → fundamental → risk → [3 gates] → report BUY/HOLD/SELL |
-| 3 | `03_dev_pipeline.py` | Dev Pipeline | **GitHub Issues** (lightagent-agents) | PO → Architect → Developer → unit tests [paralelo] → QA → Reviewer → [4 gates] |
+| 3 | `03_dev_pipeline.py` | Dev Pipeline | **GitHub Issues** (prismal) | PO → Architect → Developer → unit tests [paralelo] → QA → Reviewer → [4 gates] |
 | 4 | `04_code_review.py` | Code Review | **CodeSearchNet** (Python/GitHub) | linter → security_scanner → logic_reviewer → suggester → report [score ponderado] |
 | 5 | `05_data_etl.py` | Data ETL + EDA | **Titanic** (Kaggle/OpenML) | extractor → validator [EDA] → [gate] → transformer [feature eng.] → loader → auditor |
 | 6 | `06_customer_service.py` | Customer Service | **ATIS + Amazon Reviews** | classifier → faq_retrieval [RAG] → escalation_gate → response_generator \| ticket_creator |
@@ -221,7 +221,7 @@ if __name__ == "__main__":
 ## Arquitectura del framework
 
 ```
-lightagent/
+prismal/
 ├── agents/
 │   ├── patterns/          ← Patrones de agentes (ToT, Debate, LATS, etc.)
 │   ├── subgraphs/         ← Pipelines completos (ML, Financial, Dev, etc.)

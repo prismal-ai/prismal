@@ -1,7 +1,7 @@
 """
 Dev Pipeline Subgraph — Pipeline completo de desarrollo de software ágil
 =========================================================================
-Subgraph: lightagent.agents.subgraphs.dev_pipeline
+Subgraph: prismal.agents.subgraphs.dev_pipeline
 
 Dataset: GitHub Issues + Feature Requests (proyectos open-source reales)
   • Referencia inspirada en GitHub REST API issues:
@@ -46,11 +46,11 @@ import asyncio
 
 from langchain_core.messages import HumanMessage
 
-from lightagent.agents.state import initial_state
+from prismal.agents.state import initial_state
 
 # Importar el subgraph con manejo de dependencias opcionales
 try:
-    from lightagent.agents.subgraphs.dev_pipeline.builder import (
+    from prismal.agents.subgraphs.dev_pipeline.builder import (
         build_dev_pipeline_subgraph,
         register_dev_pipeline,
     )
@@ -64,7 +64,7 @@ except ImportError:
 GITHUB_ISSUES = [
     {
         "id": "GH-001",
-        "repo": "lightagent-agents",
+        "repo": "prismal",
         "title": "Add rate limiting middleware for LLM provider calls",
         "labels": ["enhancement", "providers", "good-first-issue"],
         "priority": "high",
@@ -89,7 +89,7 @@ GITHUB_ISSUES = [
     },
     {
         "id": "GH-002",
-        "repo": "lightagent-agents",
+        "repo": "prismal",
         "title": "Implement async context manager for AgentState checkpointing",
         "labels": ["enhancement", "core", "async"],
         "priority": "medium",
@@ -113,18 +113,18 @@ GITHUB_ISSUES = [
     },
     {
         "id": "GH-003",
-        "repo": "lightagent-agents",
+        "repo": "prismal",
         "title": "Create CLI tool for testing agent pipelines interactively",
         "labels": ["enhancement", "cli", "dx"],
         "priority": "low",
         "description": (
             "Developers need a way to test agent pipelines from the terminal "
-            "without writing Python scripts. Implement a `lightagent run` CLI "
+            "without writing Python scripts. Implement a `prismal run` CLI "
             "command using Typer.\n\n"
             "Features:\n"
-            "- `lightagent run <pipeline> --input 'user message'`\n"
-            "- `lightagent run --stream` for token-by-token output\n"
-            "- `lightagent list-pipelines` to enumerate registered subgraphs\n"
+            "- `prismal run <pipeline> --input 'user message'`\n"
+            "- `prismal run --stream` for token-by-token output\n"
+            "- `prismal list-pipelines` to enumerate registered subgraphs\n"
             "- JSON output mode: `--format json`\n"
             "- Thread ID support: `--thread-id my-session`\n\n"
             "Tech stack: Typer + Rich for beautiful output\n\n"
@@ -165,7 +165,7 @@ async def run_dev_pipeline_real(issue: dict) -> dict:
     await register_dev_pipeline()
     subgraph_def = build_dev_pipeline_subgraph()
 
-    from lightagent.agents.subgraphs.factory import SubgraphFactory
+    from prismal.agents.subgraphs.factory import SubgraphFactory
 
     compiled = SubgraphFactory.compile(subgraph_def)
 
@@ -267,7 +267,7 @@ def simulate_dev_pipeline(issue: dict) -> None:
 
 async def main() -> None:
     print("=" * 70)
-    print("  Dev Pipeline Subgraph — Dataset: GitHub Issues (lightagent-agents)")
+    print("  Dev Pipeline Subgraph — Dataset: GitHub Issues (prismal)")
     print("=" * 70)
 
     # Mostrar arquitectura del subgraph

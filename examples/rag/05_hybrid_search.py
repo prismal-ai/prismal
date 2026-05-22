@@ -1,7 +1,7 @@
 """
 Hybrid Search — BM25 léxico + semántico con fusión ponderada
 =============================================================
-Arquitectura: SPEC-RAG-004 / lightagent.rag.hybrid
+Arquitectura: SPEC-RAG-004 / prismal.rag.hybrid
 
 Dataset: AG News (News Topic Classification)
   • 127 600 artículos de noticias de 4 categorías: World, Sports, Business, Science/Tech.
@@ -37,11 +37,11 @@ from typing import TYPE_CHECKING
 
 from langchain_core.documents import Document
 
-from lightagent.rag.hybrid import HybridSearchEngine
-from lightagent.rag.vector_store import ChromaVectorStore
+from prismal.rag.hybrid import HybridSearchEngine
+from prismal.rag.vector_store import ChromaVectorStore
 
 if TYPE_CHECKING:
-    from lightagent.rag.crag import RetrievedChunk
+    from prismal.rag.crag import RetrievedChunk
 
 # ── Dataset: artículos AG News ────────────────────────────────────────────────
 # Muestra representativa de 4 categorías de AG News.

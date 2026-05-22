@@ -1,7 +1,7 @@
 """
 LLM-Compiler — Generación de informes de investigación como DAG paralelo
 =========================================================================
-Patrón: SPEC-PAT-005 / lightagent.agents.patterns.llm_compiler
+Patrón: SPEC-PAT-005 / prismal.agents.patterns.llm_compiler
 
 Dataset: HotpotQA (preguntas de razonamiento multi-salto)
   • 113 000 preguntas que requieren razonar sobre múltiples documentos.
@@ -30,7 +30,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from lightagent.agents.patterns.llm_compiler import (
+from prismal.agents.patterns.llm_compiler import (
     CompilerResult,
     LLMCompiler,
     TaskNode,
@@ -342,7 +342,7 @@ async def main() -> None:
         TaskNode(id="C", description="task C", tool="search", args={}, depends_on=["A"]),
         TaskNode(id="D", description="task D", tool="aggregate", args={}, depends_on=["B", "C"]),
     ]
-    from lightagent.agents.patterns.llm_compiler import CompilerPlan
+    from prismal.agents.patterns.llm_compiler import CompilerPlan
 
     plan = CompilerPlan(tasks=valid_plan_tasks, goal="test", is_valid=False, execution_waves=[])
     is_valid = compiler.validate_dag(plan)

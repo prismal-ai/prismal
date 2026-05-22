@@ -1,7 +1,7 @@
 """
 Parallel Dispatcher (Map-Reduce) — Investigación paralela de temas
 ===================================================================
-Patrón: SPEC / lightagent.agents.patterns.parallel
+Patrón: SPEC / prismal.agents.patterns.parallel
 
 Dataset: FEVER (Fact Extraction and VERification)
   • 185 445 afirmaciones sobre Wikipedia para verificar.
@@ -32,9 +32,9 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from lightagent.agents.patterns.parallel import make_parallel_dispatcher
-from lightagent.core.config import get_settings
-from lightagent.providers.registry import ProviderRegistry
+from prismal.agents.patterns.parallel import make_parallel_dispatcher
+from prismal.core.config import get_settings
+from prismal.providers.registry import ProviderRegistry
 
 # ── Dataset: afirmaciones FEVER para verificación ─────────────────────────────
 # Muestra de afirmaciones FEVER (SUPPORTS / REFUTES / NOT ENOUGH INFO)

@@ -1,7 +1,7 @@
 """
 Financial Analyst Subgraph — Análisis completo de acciones bursátiles
 ======================================================================
-Subgraph: lightagent.agents.subgraphs.financial
+Subgraph: prismal.agents.subgraphs.financial
 
 Dataset: Yahoo Finance / Alpha Vantage (datos bursátiles reales)
   • Ticker symbols: NVDA, MSFT, AAPL, GOOGL (2023-2024)
@@ -36,11 +36,11 @@ import asyncio
 
 from langchain_core.messages import HumanMessage
 
-from lightagent.agents.state import initial_state
+from prismal.agents.state import initial_state
 
 # Importar con manejo de error por si el subgraph no está registrado
 try:
-    from lightagent.agents.subgraphs.financial.builder import (
+    from prismal.agents.subgraphs.financial.builder import (
         build_financial_subgraph,
         register_financial_analyst,
     )

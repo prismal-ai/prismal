@@ -1,7 +1,7 @@
 """
 RAG-Fusion — Múltiples queries + Reciprocal Rank Fusion (RRF)
 =============================================================
-Arquitectura: SPEC-RAG-002 / lightagent.rag.fusion
+Arquitectura: SPEC-RAG-002 / prismal.rag.fusion
 
 Dataset: BEIR (Benchmark for Evaluating IR Models)
   • 18 datasets de IR heterogéneos (TREC-COVID, HotpotQA, ArguAna, etc.)
@@ -32,8 +32,8 @@ import asyncio
 
 from langchain_core.documents import Document
 
-from lightagent.rag.fusion import FusionResult, RAGFusionEngine, reciprocal_rank_fusion
-from lightagent.rag.vector_store import ChromaVectorStore
+from prismal.rag.fusion import FusionResult, RAGFusionEngine, reciprocal_rank_fusion
+from prismal.rag.vector_store import ChromaVectorStore
 
 # ── Dataset: documentos BEIR (TREC-COVID + ArguAna style) ────────────────────
 # Documentos científicos y argumentativos representativos de BEIR.
@@ -264,7 +264,7 @@ def demo_rrf_formula() -> None:
     print("  doc_C con rango 2 en Q3 supera a doc_D con rango 3 en Q2.")
 
     # Demostrar la función reciprocal_rank_fusion directamente
-    from lightagent.rag.crag import RetrievedChunk
+    from prismal.rag.crag import RetrievedChunk
 
     sample_lists = [
         [RetrievedChunk("s1", "0", 0.9, "text1"), RetrievedChunk("s2", "1", 0.8, "text2")],

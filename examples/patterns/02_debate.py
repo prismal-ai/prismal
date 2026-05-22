@@ -1,7 +1,7 @@
 """
 Debate / Society of Mind — Ética en IA y decisiones empresariales
 ==================================================================
-Patrón: SPEC-PAT-002 / lightagent.agents.patterns.debate
+Patrón: SPEC-PAT-002 / prismal.agents.patterns.debate
 
 Dataset: BoolQ + preguntas éticas personalizadas
   • BoolQ: 15 942 preguntas de sí/no extraídas de Wikipedia.
@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import asyncio
 
-from lightagent.agents.patterns.debate import DebateResult, debate_round
+from prismal.agents.patterns.debate import DebateResult, debate_round
 
 # ── Dataset: temas de debate seleccionados ────────────────────────────────────
 # Combinamos preguntas de BoolQ (controvertidas) con dilemas éticos de IA.

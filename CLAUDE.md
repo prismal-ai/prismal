@@ -47,7 +47,7 @@ uv run python -m build
 
 `prismal/` has **no `__init__.py`** — it is a PEP 420 implicit namespace package (renamed from `lightagent/` in v3.0.0). Do not add `prismal/__init__.py`; it must stay an implicit namespace package.
 
-There is a **transitional shim** `lightagent/__init__.py` (a `meta_path` finder that redirects `lightagent.* → prismal.*`) so code/tests/examples not yet migrated keep working; it is **not** shipped in the wheel and is removed before release. The `lightagent.*` → `prismal.*` rename **breaks the sibling app package** that previously shared the namespace — it must be rebranded/coordinated in tandem (tracked as a post-migration step).
+During the migration a transitional shim `lightagent/__init__.py` redirected `lightagent.* → prismal.*`; it was **removed in v3.0.0** once all code, tests, and examples were migrated, so `from lightagent. …` no longer resolves in this repo. End-user backward compatibility is instead provided by the deprecated `lightagent-agents` distribution (a thin package that depends on `prismal`). The `lightagent.*` → `prismal.*` rename **breaks the sibling app package** that previously shared the namespace — it must be rebranded/coordinated in tandem (tracked as a post-migration step).
 
 ### LangGraph SUPERVISOR state machine
 

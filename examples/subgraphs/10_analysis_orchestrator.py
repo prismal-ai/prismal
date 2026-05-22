@@ -9,7 +9,7 @@ Dataset:  Business Intelligence Center (custom)
 
 Patrón:   Orquestador jerárquico de dominio (SPEC-042 Phase 40)
           ┌─────────────────────────────────────────────────────┐
-          │  Jerarquía completa (LIGHTAGENT_HIERARCHICAL_MODE)  │
+          │  Jerarquía completa (PRISMAL_HIERARCHICAL_MODE)  │
           │                                                     │
           │  root_supervisor                                    │
           │       │                                             │
@@ -530,7 +530,7 @@ def demo_comparison() -> None:
     print(f"{'═' * 64}")
 
     print(f"""
-  {BOLD}Modo PLANO{RESET} (LIGHTAGENT_HIERARCHICAL_MODE=false):
+  {BOLD}Modo PLANO{RESET} (PRISMAL_HIERARCHICAL_MODE=false):
 
     root_supervisor conoce 12+ agentes:
     ┌────────────────────────────────────────────────┐
@@ -541,7 +541,7 @@ def demo_comparison() -> None:
     └────────────────────────────────────────────────┘
     Problema: contexto de routing muy largo → menor precisión
 
-  {BOLD}Modo JERÁRQUICO{RESET} (LIGHTAGENT_HIERARCHICAL_MODE=true):
+  {BOLD}Modo JERÁRQUICO{RESET} (PRISMAL_HIERARCHICAL_MODE=true):
 
     root_supervisor conoce sólo 3 orquestadores:
     ┌─────────────────────────────────────────────┐
@@ -583,7 +583,7 @@ def demo_comparison() -> None:
 
   Overhead: +1 llamada LLM para el routing intermedio
   Beneficio: root_supervisor con contexto mínimo → mejor precisión
-  Configuración: LIGHTAGENT_HIERARCHICAL_MODE=true en .env
+  Configuración: PRISMAL_HIERARCHICAL_MODE=true en .env
 """)
     print(f"{'═' * 64}")
 
@@ -610,13 +610,13 @@ async def demo_real_langgraph() -> None:
         from langgraph.graph import END, StateGraph
         from langgraph.graph.message import add_messages
 
-        from lightagent.agents.domain_supervisor import make_domain_supervisor
-        from lightagent.agents.subgraphs.analysis_orchestrator.builder import (
+        from prismal.agents.domain_supervisor import make_domain_supervisor
+        from prismal.agents.subgraphs.analysis_orchestrator.builder import (
             ANALYSIS_AGENTS,
             _analysis_router,
         )
-        from lightagent.agents.subgraphs.factory import SubgraphFactory
-        from lightagent.agents.subgraphs.registry import SubgraphDefinition
+        from prismal.agents.subgraphs.factory import SubgraphFactory
+        from prismal.agents.subgraphs.registry import SubgraphDefinition
     except ImportError as e:
         print(f"\n  ⚠  Dependencia no disponible: {e}")
         print("     Instala con: uv pip install -e '.[dev,all]'")
@@ -764,7 +764,7 @@ def demo_hierarchy() -> None:
     """Visualiza la jerarquía completa de 3 niveles del framework."""
     print(f"\n{'═' * 64}")
     print(f"  {BOLD}DEMO 4 — Jerarquía completa de 3 niveles{RESET}")
-    print("  LIGHTAGENT_HIERARCHICAL_MODE=true")
+    print("  PRISMAL_HIERARCHICAL_MODE=true")
     print(f"{'═' * 64}")
 
     print(f"""
@@ -797,12 +797,12 @@ def demo_hierarchy() -> None:
     • Condicional:     _analysis_router(state) → str
     • Agentes hoja:    {ANALYSIS_AGENTS_STR}
     • Edges de retorno: cada hoja → analysis_supervisor
-    • Bypass plano:    LIGHTAGENT_HIERARCHICAL_MODE=false
+    • Bypass plano:    PRISMAL_HIERARCHICAL_MODE=false
     • Checkpointer:    SQLite aislado por orquestador
     • Registro:        SubgraphRegistry (idempotente)
 
   {BOLD}API pública:{RESET}
-    from lightagent.agents.subgraphs.analysis_orchestrator import (
+    from prismal.agents.subgraphs.analysis_orchestrator import (
         get_compiled_analysis_orchestrator,   # retorna CompiledStateGraph
         register_analysis_orchestrator,       # registra en SubgraphRegistry
     )
@@ -873,9 +873,9 @@ async def main() -> None:
 
     print(f"""
   {DIM}Configuración en producción:
-    LIGHTAGENT_HIERARCHICAL_MODE=true   → activa los 3 orquestadores
-    LIGHTAGENT_HIERARCHICAL_MODE=false  → modo plano (default)
-    LIGHTAGENT_HITL_ENABLED=true        → aprobación humana en dev_pipeline{RESET}
+    PRISMAL_HIERARCHICAL_MODE=true   → activa los 3 orquestadores
+    PRISMAL_HIERARCHICAL_MODE=false  → modo plano (default)
+    PRISMAL_HITL_ENABLED=true        → aprobación humana en dev_pipeline{RESET}
 """)
 
 
