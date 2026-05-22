@@ -218,6 +218,7 @@ dev = [
   "bandit[toml]>=1.8.0",
   "radon>=6.0.1",
   "lizard>=1.17.0",
+  "mutmut>=3.2.0",
   "flake8>=7.2.0",
   "flake8-cognitive-complexity>=0.1.0",
   "pip-audit>=2.7.0",
@@ -361,6 +362,7 @@ markers = [
   "unit: Unit tests (no external services)",
   "integration: Integration tests (requires running services)",
   "security: Security-specific tests",
+  "e2e: End-to-end tests through the compiled graph (deterministic, mocked LLM)",
   "slow: Tests that take > 5 seconds",
   "live_api: Tests that call real LLM APIs (require API keys)",
 ]
@@ -417,6 +419,22 @@ exclude_dirs = ["tests", "prismal/skills/custom"]
 skips = ["B101", "B104", "B608"]
 severity_level = "medium"
 confidence_level = "medium"
+
+# ============================================================
+# MUTMUT — MUTATION TESTING
+# Scoped to the security layer (critical, well-tested, deterministic) so a
+# full run completes in minutes rather than hours. Each surviving mutant is a
+# gap in the security tests. Run on demand:
+#   uv run mutmut run        # generate + test mutants
+#   uv run mutmut results    # list survivors
+#   uv run mutmut html       # browsable report
+# ============================================================
+[tool.mutmut]
+paths_to_mutate = ["prismal/security/"]
+tests_dir = ["tests/unit/security/", "tests/security/"]
+# Only mutate lines exercised by the test suite (per coverage) — skips dead
+# branches and speeds the run up considerably.
+mutate_only_covered_lines = true
 
 [dependency-groups]
 dev = [

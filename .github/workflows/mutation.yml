@@ -1,0 +1,46 @@
+# GitHub Actions Mutation Testing — prismal
+# ============================================================
+# Runs mutmut against prismal/security/ (scoped in [tool.mutmut] of
+# pyproject.toml). Mutation testing is slow, so it does NOT run on every
+# PR/push: it is triggered manually (workflow_dispatch) or on a weekly
+# schedule. The run is informational (non-blocking) — surviving mutants are
+# reported as gaps in the security tests, not hard CI failures.
+# ============================================================
+name: Mutation testing
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1" # Mondays 04:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  mutmut:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+
+      # mutate_only_covered_lines = true needs a coverage map of the security
+      # tests so mutmut skips lines no test exercises.
+      - name: Coverage map (security tests)
+        run: uv run pytest tests/unit/security tests/security -m "not live_api" --cov=prismal/security --cov-report= -q
+
+      - name: Run mutmut (non-blocking)
+        run: uv run mutmut run || true
+
+      - name: Results summary
+        run: uv run mutmut results
+
+      - name: HTML report
+        run: uv run mutmut html || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutmut-report
+          path: html/
+          if-no-files-found: ignore
+          retention-days: 14

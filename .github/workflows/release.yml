@@ -17,7 +17,8 @@ name: Release
 
 on:
   push:
-    tags: ["prismal/v*"]
+    branches: [main] # build + publish on every push to main (skip-existing = no-op if version unchanged)
+    tags: ["prismal/v*"] # and on release tags
   workflow_dispatch:
     inputs:
       target:

@@ -14,6 +14,10 @@
 default_language_version:
   python: python3.13
 
+# e2e runs on `git push` (pre-push), mutmut only on demand (manual). Install
+# the extra hook type once:  uv run pre-commit install --install-hooks
+default_install_hook_types: [pre-commit, pre-push, commit-msg]
+
 # Excluye globalmente: venv, migraciones, tests de hooks pesados,
 # plantillas Helm (Jinja, no YAML puro), datos y artefactos runtime.
 exclude: |
@@ -289,3 +293,36 @@ repos:
 #           - ci
 #           - perf
 #           - revert
+
+  # ----------------------------------------------------------
+  # 13. E2E TESTS — runs on `git push` (pre-push stage)
+  # Deterministic end-to-end run of the compiled graph with a mocked LLM.
+  # Kept off the per-commit path (tests live in CI) but gates pushes.
+  # ----------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: pytest-e2e
+        name: "tests: e2e (compiled graph, mocked LLM)"
+        language: system
+        entry: .venv/bin/pytest
+        args: [tests/e2e, -m, e2e, -q]
+        pass_filenames: false
+        stages: [pre-push]
+        types: [python]
+
+  # ----------------------------------------------------------
+  # 14. MUTATION TESTING — mutmut, scoped to prismal/security/
+  # Manual stage only (slow). Run on demand:
+  #   uv run pre-commit run mutmut --hook-stage manual
+  #   (or directly: uv run mutmut run && uv run mutmut results)
+  # ----------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: mutmut
+        name: "mutation: mutmut (prismal/security)"
+        language: system
+        entry: .venv/bin/mutmut
+        args: [run]
+        pass_filenames: false
+        stages: [manual]
+        types: [python]
