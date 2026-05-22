@@ -62,9 +62,9 @@ async def test_update_dry_run_returns_valid_report(
     - dry_run is True and applied list is empty.
     - A report file was written to disk.
     """
-    from lightagent.maintenance.doctor_service import DoctorService
-    from lightagent.maintenance.package_updater import PackageUpdater
-    from lightagent.maintenance.vulnerability_scanner import VulnerabilityScanner
+    from prismal.maintenance.doctor_service import DoctorService
+    from prismal.maintenance.package_updater import PackageUpdater
+    from prismal.maintenance.vulnerability_scanner import VulnerabilityScanner
 
     scanner = VulnerabilityScanner()
     updater = PackageUpdater(pypi_timeout=15.0)
@@ -97,9 +97,9 @@ async def test_update_security_only_dry_run_returns_security_mode(
     tmp_path: Path,
 ) -> None:
     """update(dry_run=True, security_only=True) uses security mode and skips PyPI."""
-    from lightagent.maintenance.doctor_service import DoctorService
-    from lightagent.maintenance.package_updater import PackageUpdater
-    from lightagent.maintenance.vulnerability_scanner import VulnerabilityScanner
+    from prismal.maintenance.doctor_service import DoctorService
+    from prismal.maintenance.package_updater import PackageUpdater
+    from prismal.maintenance.vulnerability_scanner import VulnerabilityScanner
 
     scanner = VulnerabilityScanner()
     updater = PackageUpdater(pypi_timeout=15.0)
@@ -130,9 +130,9 @@ async def test_update_fetch_latest_detects_outdated_packages(
     is non-zero and no exceptions are raised.  We do not assert on specific packages
     being outdated because the test environment may already have the latest versions.
     """
-    from lightagent.maintenance.doctor_service import DoctorService
-    from lightagent.maintenance.package_updater import PackageUpdater
-    from lightagent.maintenance.vulnerability_scanner import VulnerabilityScanner
+    from prismal.maintenance.doctor_service import DoctorService
+    from prismal.maintenance.package_updater import PackageUpdater
+    from prismal.maintenance.vulnerability_scanner import VulnerabilityScanner
 
     scanner = VulnerabilityScanner()
     updater = PackageUpdater(pypi_timeout=15.0)
@@ -163,9 +163,9 @@ async def test_update_packages_filter_limits_scope(
     tmp_path: Path,
 ) -> None:
     """update(dry_run=True, packages=[...]) only resolves the named packages."""
-    from lightagent.maintenance.doctor_service import DoctorService
-    from lightagent.maintenance.package_updater import PackageUpdater
-    from lightagent.maintenance.vulnerability_scanner import VulnerabilityScanner
+    from prismal.maintenance.doctor_service import DoctorService
+    from prismal.maintenance.package_updater import PackageUpdater
+    from prismal.maintenance.vulnerability_scanner import VulnerabilityScanner
 
     scanner = VulnerabilityScanner()
     updater = PackageUpdater(pypi_timeout=15.0)

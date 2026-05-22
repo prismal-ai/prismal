@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.security.guardrails import GuardrailResult, GuardrailsEngine
+from prismal.security.guardrails import GuardrailResult, GuardrailsEngine
 
 
 def _make_nemo_layer(

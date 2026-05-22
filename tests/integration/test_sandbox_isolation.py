@@ -48,7 +48,7 @@ requires_docker = pytest.mark.skipif(
 
 
 async def _run_via_docker(code: str, timeout: int = 30):
-    from lightagent.sandbox.isolation import DockerBackend
+    from prismal.sandbox.isolation import DockerBackend
 
     return await DockerBackend().run(code, "python", timeout=timeout)
 

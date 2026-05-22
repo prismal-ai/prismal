@@ -9,7 +9,7 @@ import pytest
 
 def test_otel_span_hierarchy_noop() -> None:
     """Nested spans are safe no-ops when OTEL is disabled."""
-    from lightagent.monitoring.otel import OTelManager, _NoOpSpan
+    from prismal.monitoring.otel import OTelManager, _NoOpSpan
 
     OTelManager._instance = None
     OTelManager._initialized = False
@@ -31,7 +31,7 @@ def test_otel_span_hierarchy_noop() -> None:
 
 def test_span_records_exception() -> None:
     """Exceptions within a span are recorded without suppression."""
-    from lightagent.monitoring.otel import OTelManager
+    from prismal.monitoring.otel import OTelManager
 
     OTelManager._instance = None
     OTelManager._initialized = False
@@ -50,7 +50,7 @@ def test_span_records_exception() -> None:
 
 def test_counter_and_histogram_noop() -> None:
     """Counters and histograms are safe no-ops when disabled."""
-    from lightagent.monitoring.otel import OTelManager
+    from prismal.monitoring.otel import OTelManager
 
     OTelManager._instance = None
     OTelManager._initialized = False

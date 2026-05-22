@@ -46,7 +46,7 @@ async def test_data_ingester_produces_profile(
     """data_ingester node stores DatasetProfile in metadata."""
     import json
 
-    from lightagent.agents.subgraphs.ml_pipeline.data_ingester import (
+    from prismal.agents.subgraphs.ml_pipeline.data_ingester import (
         data_ingester_node,
     )
 
@@ -85,22 +85,22 @@ async def test_full_pipeline_produces_all_artifacts(
     """Full 6-agent pipeline produces all 6 artifacts in metadata."""
     import json
 
-    from lightagent.agents.subgraphs.ml_pipeline.data_ingester import (
+    from prismal.agents.subgraphs.ml_pipeline.data_ingester import (
         data_ingester_node,
     )
-    from lightagent.agents.subgraphs.ml_pipeline.eda_analyst import (
+    from prismal.agents.subgraphs.ml_pipeline.eda_analyst import (
         eda_analyst_node,
     )
-    from lightagent.agents.subgraphs.ml_pipeline.feature_engineer import (
+    from prismal.agents.subgraphs.ml_pipeline.feature_engineer import (
         feature_engineer_node,
     )
-    from lightagent.agents.subgraphs.ml_pipeline.model_evaluator import (
+    from prismal.agents.subgraphs.ml_pipeline.model_evaluator import (
         model_evaluator_node,
     )
-    from lightagent.agents.subgraphs.ml_pipeline.model_exporter import (
+    from prismal.agents.subgraphs.ml_pipeline.model_exporter import (
         model_exporter_node,
     )
-    from lightagent.agents.subgraphs.ml_pipeline.model_trainer import (
+    from prismal.agents.subgraphs.ml_pipeline.model_trainer import (
         model_trainer_node,
     )
 

@@ -38,19 +38,19 @@ if "langchain_litellm" not in sys.modules:
     sys.modules["langchain_litellm"] = _llm_stub
 
 # ── Agent graph stub ──────────────────────────────────────────────────────────
-# executor._run_job lazily imports lightagent.agents.graph.get_async_compiled_graph.
+# executor._run_job lazily imports prismal.agents.graph.get_async_compiled_graph.
 # Stub the graph module to avoid the langchain_litellm dependency chain.
-_agents_real = Path(__file__).parent.parent.parent / "lightagent" / "agents"
+_agents_real = Path(__file__).parent.parent.parent / "prismal" / "agents"
 
-if "lightagent.agents" not in sys.modules:
-    _agents_pkg = types.ModuleType("lightagent.agents")
+if "prismal.agents" not in sys.modules:
+    _agents_pkg = types.ModuleType("prismal.agents")
     _agents_pkg.__path__ = [str(_agents_real)]  # type: ignore[attr-defined]
-    _agents_pkg.__package__ = "lightagent.agents"
-    sys.modules["lightagent.agents"] = _agents_pkg
+    _agents_pkg.__package__ = "prismal.agents"
+    sys.modules["prismal.agents"] = _agents_pkg
 
-if "lightagent.agents.graph" not in sys.modules:
-    _agents_graph = types.ModuleType("lightagent.agents.graph")
+if "prismal.agents.graph" not in sys.modules:
+    _agents_graph = types.ModuleType("prismal.agents.graph")
     _agents_graph.get_async_compiled_graph = AsyncMock()  # type: ignore[attr-defined]
     _agents_graph.get_compiled_graph = MagicMock()  # type: ignore[attr-defined]
     _agents_graph.list_session_ids = MagicMock(return_value=[])  # type: ignore[attr-defined]
-    sys.modules["lightagent.agents.graph"] = _agents_graph
+    sys.modules["prismal.agents.graph"] = _agents_graph

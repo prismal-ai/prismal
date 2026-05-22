@@ -41,9 +41,9 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture
 def doctor_service(tmp_path: Path):  # type: ignore[return]
     """Return a DoctorService with low concurrency and tmp reports_dir."""
-    from lightagent.maintenance.doctor_service import DoctorService
-    from lightagent.maintenance.package_updater import PackageUpdater
-    from lightagent.maintenance.vulnerability_scanner import VulnerabilityScanner
+    from prismal.maintenance.doctor_service import DoctorService
+    from prismal.maintenance.package_updater import PackageUpdater
+    from prismal.maintenance.vulnerability_scanner import VulnerabilityScanner
 
     scanner = VulnerabilityScanner()
     updater = PackageUpdater(pypi_timeout=15.0)
@@ -83,9 +83,9 @@ async def test_security_check_dry_run_returns_valid_report(
     - The report has the correct mode and dry_run flag.
     - A report file was written to disk.
     """
-    from lightagent.maintenance.doctor_service import DoctorService
-    from lightagent.maintenance.package_updater import PackageUpdater
-    from lightagent.maintenance.vulnerability_scanner import VulnerabilityScanner
+    from prismal.maintenance.doctor_service import DoctorService
+    from prismal.maintenance.package_updater import PackageUpdater
+    from prismal.maintenance.vulnerability_scanner import VulnerabilityScanner
 
     scanner = VulnerabilityScanner()
     updater = PackageUpdater(pypi_timeout=15.0)
@@ -120,9 +120,9 @@ async def test_security_check_report_only_returns_report(
     tmp_path: Path,
 ) -> None:
     """security_check(report_only=True) returns a report and never calls apply."""
-    from lightagent.maintenance.doctor_service import DoctorService
-    from lightagent.maintenance.package_updater import PackageUpdater
-    from lightagent.maintenance.vulnerability_scanner import VulnerabilityScanner
+    from prismal.maintenance.doctor_service import DoctorService
+    from prismal.maintenance.package_updater import PackageUpdater
+    from prismal.maintenance.vulnerability_scanner import VulnerabilityScanner
 
     scanner = VulnerabilityScanner()
     updater = PackageUpdater(pypi_timeout=15.0)
@@ -148,9 +148,9 @@ async def test_security_check_totals_are_consistent(
     tmp_path: Path,
 ) -> None:
     """Verify totals fields are internally consistent with report details."""
-    from lightagent.maintenance.doctor_service import DoctorService
-    from lightagent.maintenance.package_updater import PackageUpdater
-    from lightagent.maintenance.vulnerability_scanner import VulnerabilityScanner
+    from prismal.maintenance.doctor_service import DoctorService
+    from prismal.maintenance.package_updater import PackageUpdater
+    from prismal.maintenance.vulnerability_scanner import VulnerabilityScanner
 
     scanner = VulnerabilityScanner()
     updater = PackageUpdater(pypi_timeout=15.0)

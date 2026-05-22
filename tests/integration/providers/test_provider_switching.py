@@ -17,7 +17,7 @@ import os
 import pytest
 from langchain_core.messages import HumanMessage
 
-from lightagent.providers.registry import ProviderRegistry
+from prismal.providers.registry import ProviderRegistry
 
 
 def _has_env(var: str) -> bool:

@@ -35,19 +35,19 @@ def _ai(content: str) -> AsyncMock:
 @pytest.mark.asyncio
 async def test_full_pipeline_produces_all_artifacts(base_state: dict[str, Any]) -> None:
     """Full 5-agent pipeline produces all 5 artifacts in metadata."""
-    from lightagent.agents.subgraphs.financial.fundamental_analyst import (
+    from prismal.agents.subgraphs.financial.fundamental_analyst import (
         fundamental_analyst_node,
     )
-    from lightagent.agents.subgraphs.financial.market_data_collector import (
+    from prismal.agents.subgraphs.financial.market_data_collector import (
         market_data_collector_node,
     )
-    from lightagent.agents.subgraphs.financial.report_generator import (
+    from prismal.agents.subgraphs.financial.report_generator import (
         report_generator_node,
     )
-    from lightagent.agents.subgraphs.financial.risk_sentiment_analyst import (
+    from prismal.agents.subgraphs.financial.risk_sentiment_analyst import (
         risk_sentiment_analyst_node,
     )
-    from lightagent.agents.subgraphs.financial.technical_analyst import (
+    from prismal.agents.subgraphs.financial.technical_analyst import (
         technical_analyst_node,
     )
 

@@ -17,7 +17,7 @@ def _disabled_settings() -> MagicMock:
 
 def test_langfuse_manager_disabled_no_crash() -> None:
     """LangfuseManager with all monitoring off does not crash on any method."""
-    from lightagent.monitoring.langfuse_client import LangfuseManager
+    from prismal.monitoring.langfuse_client import LangfuseManager
 
     LangfuseManager._instance = None
     LangfuseManager._initialized = False
@@ -43,7 +43,7 @@ def test_langfuse_manager_disabled_no_crash() -> None:
 
 def test_otel_manager_disabled_no_crash() -> None:
     """OTelManager with OTEL disabled does not crash on any method."""
-    from lightagent.monitoring.otel import OTelManager, _NoOpSpan
+    from prismal.monitoring.otel import OTelManager, _NoOpSpan
 
     OTelManager._instance = None
     OTelManager._initialized = False
@@ -68,8 +68,8 @@ def test_otel_manager_disabled_no_crash() -> None:
 
 def test_both_managers_disabled_coexist() -> None:
     """Both LangfuseManager and OTelManager can be disabled simultaneously."""
-    from lightagent.monitoring.langfuse_client import LangfuseManager
-    from lightagent.monitoring.otel import OTelManager
+    from prismal.monitoring.langfuse_client import LangfuseManager
+    from prismal.monitoring.otel import OTelManager
 
     LangfuseManager._instance = None
     LangfuseManager._initialized = False
@@ -98,7 +98,7 @@ def test_both_managers_disabled_coexist() -> None:
 
 def test_monitoring_import_without_env() -> None:
     """The monitoring package imports cleanly without any env vars set."""
-    import lightagent.monitoring as monitoring
+    import prismal.monitoring as monitoring
 
     assert hasattr(monitoring, "LangfuseManager")
     assert hasattr(monitoring, "OTelManager")

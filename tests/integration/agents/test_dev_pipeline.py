@@ -8,8 +8,8 @@ from unittest.mock import patch
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from lightagent.agents.state import create_initial_state
-from lightagent.agents.subgraphs.dev_pipeline.builder import get_compiled_dev_pipeline
+from prismal.agents.state import create_initial_state
+from prismal.agents.subgraphs.dev_pipeline.builder import get_compiled_dev_pipeline
 
 
 def _mock_llm_sequence() -> list[AIMessage]:

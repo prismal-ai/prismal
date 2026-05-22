@@ -15,12 +15,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.agents.patterns.constitutional import (
+from prismal.agents.patterns.constitutional import (
     ConstitutionalFilter,
     ConstitutionalPrinciple,
 )
-from lightagent.rag.adaptive import AdaptiveRAGEngine, QueryType
-from lightagent.rag.crag import CRAGResult, RetrievedChunk
+from prismal.rag.adaptive import AdaptiveRAGEngine, QueryType
+from prismal.rag.crag import CRAGResult, RetrievedChunk
 
 
 def _response(text: str) -> MagicMock:

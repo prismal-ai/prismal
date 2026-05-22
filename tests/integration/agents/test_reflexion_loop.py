@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING
 
 from langgraph.graph.state import CompiledStateGraph
 
-from lightagent.agents.factory import AgentFactory
-from lightagent.agents.patterns import AgentPattern
-from lightagent.agents.state import create_initial_state
+from prismal.agents.factory import AgentFactory
+from prismal.agents.patterns import AgentPattern
+from prismal.agents.state import create_initial_state
 
 if TYPE_CHECKING:
     from pathlib import Path

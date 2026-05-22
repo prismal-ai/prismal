@@ -8,7 +8,7 @@ import pathlib
 
 def test_json_log_format_is_valid(tmp_path: pathlib.Path) -> None:
     """JSON log output is valid JSON with expected keys."""
-    from lightagent.core.logging import get_logger, setup_logging
+    from prismal.core.logging import get_logger, setup_logging
 
     log_file = tmp_path / "test.log"
     setup_logging(log_level="DEBUG", log_format="json", log_file=str(log_file))
@@ -35,7 +35,7 @@ def test_json_log_format_is_valid(tmp_path: pathlib.Path) -> None:
 
 def test_console_format_does_not_write_to_file(tmp_path: pathlib.Path) -> None:
     """Console (pretty) format uses stderr, not the log file (unless configured)."""
-    from lightagent.core.logging import get_logger, setup_logging
+    from prismal.core.logging import get_logger, setup_logging
 
     setup_logging(log_level="INFO", log_format="pretty", log_file=None)
     logger = get_logger("integration.console")
@@ -44,7 +44,7 @@ def test_console_format_does_not_write_to_file(tmp_path: pathlib.Path) -> None:
 
 def test_log_file_is_created(tmp_path: pathlib.Path) -> None:
     """Log file is created on first log call."""
-    from lightagent.core.logging import get_logger, setup_logging
+    from prismal.core.logging import get_logger, setup_logging
 
     log_file = tmp_path / "subdir" / "app.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -61,7 +61,7 @@ def test_log_file_is_created(tmp_path: pathlib.Path) -> None:
 
 def test_multiple_setup_logging_calls_are_idempotent(tmp_path: pathlib.Path) -> None:
     """Calling setup_logging() multiple times does not accumulate duplicate sinks."""
-    from lightagent.core.logging import setup_logging
+    from prismal.core.logging import setup_logging
 
     log_file = tmp_path / "idempotent.log"
     for _ in range(3):

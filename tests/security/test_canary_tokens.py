@@ -11,8 +11,8 @@ import uuid
 
 import pytest
 
-from lightagent.security.guardrails import GuardrailsEngine
-from lightagent.security.prompt_builder import SecurePromptBuilder
+from prismal.security.guardrails import GuardrailsEngine
+from prismal.security.prompt_builder import SecurePromptBuilder
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -17,7 +17,7 @@ def _enabled_settings(pub: str = "pk-test", sec: str = "sk-test") -> MagicMock:
 
 def test_langfuse_create_trace_noop_without_keys() -> None:
     """create_trace returns _NoOpTrace when keys are missing."""
-    from lightagent.monitoring.langfuse_client import LangfuseManager, _NoOpTrace
+    from prismal.monitoring.langfuse_client import LangfuseManager, _NoOpTrace
 
     LangfuseManager._instance = None
     LangfuseManager._initialized = False
@@ -41,7 +41,7 @@ def test_langfuse_create_trace_noop_without_keys() -> None:
 
 def test_langfuse_score_trace_noop_when_disabled() -> None:
     """score_trace is a safe no-op when disabled."""
-    from lightagent.monitoring.langfuse_client import LangfuseManager
+    from prismal.monitoring.langfuse_client import LangfuseManager
 
     LangfuseManager._instance = None
     LangfuseManager._initialized = False
@@ -60,7 +60,7 @@ def test_langfuse_score_trace_noop_when_disabled() -> None:
 
 def test_langfuse_callback_handler_with_mock_client() -> None:
     """get_callback_handler delegates to real Langfuse when enabled."""
-    from lightagent.monitoring.langfuse_client import LangfuseManager
+    from prismal.monitoring.langfuse_client import LangfuseManager
 
     LangfuseManager._instance = None
     LangfuseManager._initialized = False
@@ -85,7 +85,7 @@ def test_langfuse_callback_handler_with_mock_client() -> None:
 
 def test_langfuse_singleton_identity() -> None:
     """LangfuseManager always returns the exact same instance."""
-    from lightagent.monitoring.langfuse_client import LangfuseManager
+    from prismal.monitoring.langfuse_client import LangfuseManager
 
     LangfuseManager._instance = None
     LangfuseManager._initialized = False

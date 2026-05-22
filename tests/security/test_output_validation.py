@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lightagent.security.guardrails import GuardrailsEngine
+from prismal.security.guardrails import GuardrailsEngine
 
 _PII_SAMPLES = [
     ("email", "Please reply to john.doe@company.org for assistance."),

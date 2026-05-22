@@ -30,8 +30,8 @@ def _make_executor(tmp_path: Path) -> tuple[object, MagicMock, MagicMock]:
     job persistence (add / list_jobs) is exercised end-to-end.
     The APScheduler is mocked so no real scheduling occurs.
     """
-    from lightagent.scheduler.cron_manager import CronManager
-    from lightagent.scheduler.executor import CronExecutor
+    from prismal.scheduler.cron_manager import CronManager
+    from prismal.scheduler.executor import CronExecutor
 
     db_path = tmp_path / "cron_tz_e2e.db"
     manager = CronManager(db_path=db_path)
