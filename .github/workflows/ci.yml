@@ -1,0 +1,263 @@
+# GitHub Actions CI — prismal
+# ============================================================
+# Translated from the former .gitlab-ci.yml. Same pipeline shape:
+#   lint -> typecheck -> complexity -> security -> test
+# Jobs are wired with `needs:` to reproduce the GitLab DAG.
+#
+# Triggers: pull requests (validate before merge) and pushes to the main
+# integration branches. Build + PyPI publish live in release.yml (on tags).
+# ============================================================
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. LINT ────────────────────────────────────────────────
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  # ── 2. TYPE CHECKING ───────────────────────────────────────
+  mypy:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - run: uv run mypy prismal
+
+  ty:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    continue-on-error: true # ty still alpha — informational
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - run: uv run ty check --output-format=concise prismal/
+
+  # ── 3. COMPLEXITY ──────────────────────────────────────────
+  complexity-radon:
+    runs-on: ubuntu-latest
+    needs: [mypy]
+    continue-on-error: true # informational gate, non-blocking
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - run: uv run radon cc prismal/ -s -a
+      - name: Fail on rank E/F functions (CC >= 21)
+        run: |
+          uv run radon cc prismal/ -n E -s --total-average | tee radon-ef.txt
+          ! grep -E "^\s+[MFC] " radon-ef.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: radon-ef
+          path: radon-ef.txt
+          retention-days: 7
+
+  complexity-lizard:
+    runs-on: ubuntu-latest
+    needs: [mypy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - run: uv run lizard prismal/ --CCN 40 --arguments 15 --length 350 -w
+
+  complexity-cognitive:
+    runs-on: ubuntu-latest
+    needs: [mypy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - run: uv run flake8 --select=CCR001 --max-cognitive-complexity=100 prismal/
+
+  # ── 4. SECURITY ────────────────────────────────────────────
+  security-bandit:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - run: uv run bandit -r prismal -c pyproject.toml --severity-level=medium -f txt
+
+  security-gitleaks:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+          # For private repos a GITLEAKS_LICENSE secret is required; public repos are free.
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  security-pip-audit:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    env:
+      # Pinned packages with known CVEs but no safe upgrade path.
+      # Keep in sync with .trivyignore and .pre-commit-config.yaml.
+      PIP_AUDIT_IGNORES: >-
+        --ignore-vuln=GHSA-r7w7-9xr2-qq2r
+        --ignore-vuln=GHSA-fv5p-p927-qmxr
+        --ignore-vuln=GHSA-rr7j-v2q5-chgv
+        --ignore-vuln=CVE-2025-66416
+        --ignore-vuln=CVE-2026-25990
+        --ignore-vuln=CVE-2026-40192
+        --ignore-vuln=GHSA-jj6c-8h6c-hppx
+        --ignore-vuln=GHSA-4pxv-j86v-mhcw
+        --ignore-vuln=GHSA-7gw9-cf7v-778f
+        --ignore-vuln=GHSA-x284-j5p8-9c5p
+        --ignore-vuln=CVE-2025-62379
+        --ignore-vuln=GHSA-wj6h-64fc-37mp
+        --ignore-vuln=CVE-2026-42203
+        --ignore-vuln=CVE-2026-42208
+        --ignore-vuln=CVE-2026-42271
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - run: uv run pip-audit ${PIP_AUDIT_IGNORES} --skip-editable
+      - name: pip-audit JSON report
+        if: always()
+        run: uv run pip-audit ${PIP_AUDIT_IGNORES} --skip-editable --format=json > pip-audit-report.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+          retention-days: 7
+
+  security-semgrep:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    container:
+      image: returntocorp/semgrep:latest
+    env:
+      SEMGREP_SEND_METRICS: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - name: semgrep scan
+        run: |
+          semgrep --version
+          semgrep scan \
+            --config=p/python \
+            --config=p/secrets \
+            --config=p/owasp-top-ten \
+            --error \
+            --exclude=tests \
+            --exclude=examples \
+            --exclude=.venv \
+            --exclude=dist \
+            --exclude=docs \
+            --sarif --output=semgrep.sarif \
+            --metrics=off
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
+          retention-days: 7
+
+  security-trivy:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy fs (JSON report)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln,misconfig,secret
+          trivyignores: .trivyignore
+          format: json
+          output: trivy-fs.json
+          exit-code: "0"
+      - name: Trivy fs (gate — HIGH,CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln,misconfig,secret
+          severity: HIGH,CRITICAL
+          trivyignores: .trivyignore
+          format: table
+          exit-code: "1"
+          skip-setup-trivy: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-fs
+          path: trivy-fs.json
+          retention-days: 7
+
+  # ── 5. TESTS ───────────────────────────────────────────────
+  test-unit:
+    runs-on: ubuntu-latest
+    needs: [complexity-lizard, complexity-cognitive]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - run: >-
+          uv run pytest tests/unit
+          -m "not live_api"
+          --cov=prismal
+          --cov-branch
+          --cov-report=term-missing
+          --cov-report=xml:coverage.xml
+          --cov-report=html:htmlcov
+          --junitxml=report-unit.xml
+          -n auto
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-unit
+          path: |
+            htmlcov/
+            coverage.xml
+            report-unit.xml
+          retention-days: 7
+
+  test-security:
+    runs-on: ubuntu-latest
+    needs: [complexity-lizard, complexity-cognitive]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - run: uv run pytest tests/security -m security --junitxml=report-security.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-security
+          path: report-security.xml
+          retention-days: 7
+
+  test-integration:
+    runs-on: ubuntu-latest
+    needs: [complexity-lizard, complexity-cognitive]
+    continue-on-error: true # optional external services (sandbox, DBs)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - run: uv run pytest tests/integration -m "integration and not live_api" --junitxml=report-integration.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-integration
+          path: report-integration.xml
+          retention-days: 7

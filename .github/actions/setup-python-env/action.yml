@@ -1,0 +1,24 @@
+name: "Setup uv + project env"
+description: >-
+  Install uv with Python 3.13, the C/C++ build toolchain (needed to compile
+  sdists like annoy via nemoguardrails — no cp313 wheel), and sync dev deps
+  from the frozen lockfile. Mirrors the `.python-base` template of the former
+  GitLab CI.
+
+runs:
+  using: composite
+  steps:
+    - name: Install uv (Python 3.13, cached)
+      uses: astral-sh/setup-uv@v6
+      with:
+        python-version: "3.13"
+        enable-cache: true
+        cache-dependency-glob: "uv.lock"
+
+    - name: Install build toolchain
+      shell: bash
+      run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends build-essential
+
+    - name: Sync dev dependencies (frozen)
+      shell: bash
+      run: uv sync --extra dev --frozen

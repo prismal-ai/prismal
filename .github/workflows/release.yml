@@ -1,0 +1,87 @@
+# GitHub Actions Release — prismal
+# ============================================================
+# Build + publish the prismal distribution to PyPI. Replaces the build +
+# publish stages of the former .gitlab-ci.yml.
+#
+# Triggered by pushing a release tag `prismal/vX.Y.Z`, or manually
+# (workflow_dispatch) — the manual run can target TestPyPI for a dry run.
+#
+# Publishing uses PyPI Trusted Publishing (OIDC) — no API token stored as a
+# secret. Configure a Trusted Publisher for the `prismal` project at
+# https://pypi.org/manage/account/publishing/ pointing at this repo, workflow
+# `release.yml`, and environment `pypi` (and `testpypi` for the test target).
+# To use an API token instead, replace the OIDC publish steps with
+# `password: ${{ secrets.PYPI_API_TOKEN }}` and drop the `id-token` permission.
+# ============================================================
+name: Release
+
+on:
+  push:
+    tags: ["prismal/v*"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Publish target"
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - name: Build + check
+        run: |
+          rm -rf dist/
+          uv run python -m build
+          uv run twine check dist/*
+          ls -la dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 30
+
+  # Publish to TestPyPI (manual dry runs only).
+  publish-testpypi:
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    needs: [build]
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/prismal/
+    permissions:
+      id-token: write # OIDC for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  # Publish to PyPI on a release tag (or manual run targeting pypi).
+  publish-pypi:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
+    needs: [build]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/prismal/
+    permissions:
+      id-token: write # OIDC for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
