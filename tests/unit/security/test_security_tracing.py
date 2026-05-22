@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lightagent.security.guardrails import GuardrailsEngine
+from prismal.security.guardrails import GuardrailsEngine
 
 
 @pytest.mark.asyncio

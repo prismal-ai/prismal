@@ -19,8 +19,8 @@ from pydantic import ValidationError
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-from lightagent.core.exceptions import MCPConnectionError, MCPToolError
-from lightagent.mcp.connection import (
+from prismal.core.exceptions import MCPConnectionError, MCPToolError
+from prismal.mcp.connection import (
     MCPAuthConfig,
     MCPServerConfig,
     MCPServerConnection,

@@ -16,8 +16,8 @@ from unittest.mock import patch
 
 import pytest
 
-from lightagent.sandbox import isolation
-from lightagent.sandbox.isolation import (
+from prismal.sandbox import isolation
+from prismal.sandbox.isolation import (
     BACKEND_PRIORITY,
     BACKENDS_BY_NAME,
     BwrapBackend,

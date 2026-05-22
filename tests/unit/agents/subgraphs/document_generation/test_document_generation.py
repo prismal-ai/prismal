@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from lightagent.agents.subgraphs.document_generation import (
+from prismal.agents.subgraphs.document_generation import (
     DocumentGenerationError,
     make_editor_node,
     make_formatter_node,
@@ -27,10 +27,10 @@ from lightagent.agents.subgraphs.document_generation import (
     make_researcher_node,
     make_writer_node,
 )
-from lightagent.agents.subgraphs.document_generation.builder import (
+from prismal.agents.subgraphs.document_generation.builder import (
     build_document_generation_subgraph,
 )
-from lightagent.core.exceptions import LightAgentError
+from prismal.core.exceptions import LightAgentError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

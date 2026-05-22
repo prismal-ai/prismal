@@ -69,7 +69,7 @@ def captured_audit():
 )
 async def test_container_backend_emits_audit(captured_audit, backend_cls, backend_name) -> None:
     """Container backends call AuditLogger.log_tool_call with sandbox.run."""
-    from lightagent.sandbox import isolation
+    from prismal.sandbox import isolation
 
     cls = getattr(isolation, backend_cls)
     backend = cls()
@@ -103,7 +103,7 @@ async def test_container_backend_emits_audit(captured_audit, backend_cls, backen
 )
 async def test_namespace_backend_emits_audit(captured_audit, backend_cls, backend_name) -> None:
     """Namespace backends emit a single sandbox.run audit row."""
-    from lightagent.sandbox import isolation
+    from prismal.sandbox import isolation
 
     cls = getattr(isolation, backend_cls)
     backend = cls()
@@ -127,9 +127,9 @@ async def test_namespace_backend_emits_audit(captured_audit, backend_cls, backen
 
 async def test_none_backend_logs_degraded_warning(captured_audit) -> None:
     """NoneBackend.run() logs sandbox_isolation_degraded and audits the call."""
-    from lightagent.sandbox import isolation as isolation_mod
-    from lightagent.sandbox.executor import ExecutionResult
-    from lightagent.sandbox.isolation import NoneBackend
+    from prismal.sandbox import isolation as isolation_mod
+    from prismal.sandbox.executor import ExecutionResult
+    from prismal.sandbox.isolation import NoneBackend
 
     backend = NoneBackend()
     fake_result = ExecutionResult(

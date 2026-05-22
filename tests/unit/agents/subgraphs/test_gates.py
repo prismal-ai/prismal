@@ -1,7 +1,7 @@
 """Unit tests for approval gate functions."""
 
-from lightagent.agents.state import create_initial_state
-from lightagent.agents.subgraphs.gates import failure_gate, score_gate
+from prismal.agents.state import create_initial_state
+from prismal.agents.subgraphs.gates import failure_gate, score_gate
 
 
 def _state_with_meta(meta: dict) -> dict:

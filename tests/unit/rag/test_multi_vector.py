@@ -15,8 +15,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.core.exceptions import MultiVectorError, RAGError
-from lightagent.rag.multi_vector import MultiVectorRAGEngine, MultiVectorResult
+from prismal.core.exceptions import MultiVectorError, RAGError
+from prismal.rag.multi_vector import MultiVectorRAGEngine, MultiVectorResult
 
 PROVIDER_REGISTRY_PATH = "lightagent.rag.multi_vector.ProviderRegistry"
 LOADER_PATH = "lightagent.rag.multi_vector.DocumentProcessorFactory"

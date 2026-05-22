@@ -6,12 +6,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lightagent.core.exceptions import PermissionDeniedError
-from lightagent.security.action_interceptor import (
+from prismal.core.exceptions import PermissionDeniedError
+from prismal.security.action_interceptor import (
     _TOOL_PERMISSION_MAP,
     ActionInterceptor,
 )
-from lightagent.security.permissions import PermissionType
+from prismal.security.permissions import PermissionType
 
 
 @pytest.fixture

@@ -7,8 +7,8 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from lightagent.core.exceptions import LightAgentError
-from lightagent.data.polars_utils import (
+from prismal.core.exceptions import LightAgentError
+from prismal.data.polars_utils import (
     filter_rows,
     group_by_aggregate,
     save_chart,

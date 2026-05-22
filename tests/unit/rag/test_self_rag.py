@@ -19,9 +19,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.core.exceptions import RAGError, SelfRAGError
-from lightagent.rag.crag import CRAGResult, RetrievedChunk
-from lightagent.rag.self_rag import (
+from prismal.core.exceptions import RAGError, SelfRAGError
+from prismal.rag.crag import CRAGResult, RetrievedChunk
+from prismal.rag.self_rag import (
     RetrievalDecision,
     SelfRAGPipeline,
     SelfRAGResult,

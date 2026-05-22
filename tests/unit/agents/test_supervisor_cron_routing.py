@@ -14,8 +14,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from lightagent.agents.state import AgentState
-from lightagent.agents.supervisor import (
+from prismal.agents.state import AgentState
+from prismal.agents.supervisor import (
     _HIERARCHICAL_SYSTEM_PROMPT,
     _SYSTEM_PROMPT,
     MEMBERS,

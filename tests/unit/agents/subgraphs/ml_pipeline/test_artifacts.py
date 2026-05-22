@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from lightagent.agents.subgraphs.ml_pipeline.artifacts import (
+from prismal.agents.subgraphs.ml_pipeline.artifacts import (
     DatasetProfile,
     EDAReport,
     EvaluationReport,

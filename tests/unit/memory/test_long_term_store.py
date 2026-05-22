@@ -16,14 +16,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.memory.long_term_store import (
+from prismal.memory.long_term_store import (
     LongTermMemoryStore,
     agent_feedback_namespace,
     learned_facts_namespace,
     preferences_namespace,
     project_context_namespace,
 )
-from lightagent.security.pii_sanitizer import PIISanitizer
+from prismal.security.pii_sanitizer import PIISanitizer
 
 # ---------------------------------------------------------------------------
 # PIISanitizer (paired spec: SPEC-039 AC-039-2 guarantees this never breaks)

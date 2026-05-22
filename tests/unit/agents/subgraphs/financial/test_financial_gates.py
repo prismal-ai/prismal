@@ -18,11 +18,11 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import patch
 
-from lightagent.agents.subgraphs.financial.artifacts import (
+from prismal.agents.subgraphs.financial.artifacts import (
     MarketSnapshot,
     TechnicalAnalysis,
 )
-from lightagent.agents.subgraphs.financial.builder import (
+from prismal.agents.subgraphs.financial.builder import (
     _FINANCIAL_METADATA_KEY,
     _insufficient_data_report_node,
     _limited_technical_disclaimer_node,
@@ -30,11 +30,11 @@ from lightagent.agents.subgraphs.financial.builder import (
     _market_data_availability_gate,
     _technical_confidence_gate,
 )
-from lightagent.agents.subgraphs.financial.market_data_collector import (
+from prismal.agents.subgraphs.financial.market_data_collector import (
     _EXPECTED_MARKET_FIELDS,
     _score_market_snapshot,
 )
-from lightagent.agents.subgraphs.financial.technical_analyst import (
+from prismal.agents.subgraphs.financial.technical_analyst import (
     _score_technical_indicators,
 )
 

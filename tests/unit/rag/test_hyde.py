@@ -14,9 +14,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.core.exceptions import HyDEError
-from lightagent.rag.crag import RetrievedChunk
-from lightagent.rag.hyde import HyDEResult, HyDERetriever
+from prismal.core.exceptions import HyDEError
+from prismal.rag.crag import RetrievedChunk
+from prismal.rag.hyde import HyDEResult, HyDERetriever
 
 # ── Paths for patching ─────────────────────────────────────────────────────────
 
@@ -85,7 +85,7 @@ def test_hyde_result_is_instantiable() -> None:
 
 def test_hyde_error_is_ragerror_subclass() -> None:
     """HyDEError must inherit from RAGError for hierarchical catching."""
-    from lightagent.core.exceptions import RAGError
+    from prismal.core.exceptions import RAGError
 
     assert issubclass(HyDEError, RAGError)
 

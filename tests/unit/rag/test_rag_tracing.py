@@ -9,7 +9,7 @@ import pytest
 
 def test_otel_manager_is_available_for_rag() -> None:
     """OTelManager can be instantiated for RAG instrumentation."""
-    from lightagent.monitoring.otel import OTelManager, _NoOpSpan
+    from prismal.monitoring.otel import OTelManager, _NoOpSpan
 
     OTelManager._instance = None
     OTelManager._initialized = False
@@ -26,7 +26,7 @@ def test_otel_manager_is_available_for_rag() -> None:
 
 def test_rag_query_span_attributes() -> None:
     """RAG spans support standard lightagent attributes."""
-    from lightagent.monitoring.otel import _NoOpSpan
+    from prismal.monitoring.otel import _NoOpSpan
 
     span = _NoOpSpan()
     span.set_attribute("lightagent.query_len", 25)
@@ -39,7 +39,7 @@ def test_rag_query_span_attributes() -> None:
 async def test_rag_engine_imports_correctly() -> None:
     """RAG engine module imports without error."""
     try:
-        import lightagent.rag.engine as _  # noqa: F401
+        import prismal.rag.engine as _  # noqa: F401
     except ImportError:
         pytest.skip("RAG engine dependencies not available")
 
@@ -59,7 +59,7 @@ def test_rag_engine_search_creates_otel_span() -> None:
         patch("lightagent.rag.engine.OTelManager", return_value=mock_otel),
     ):
         mock_store_cls.return_value = mock_store
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=MagicMock())
         engine.search("test query", k=3)
@@ -82,7 +82,7 @@ def test_rag_engine_search_increments_rag_queries_counter() -> None:
         patch("lightagent.rag.engine.OTelManager", return_value=mock_otel),
     ):
         mock_store_cls.return_value = mock_store
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=MagicMock())
         engine.search("some query")
@@ -93,7 +93,7 @@ def test_rag_engine_search_increments_rag_queries_counter() -> None:
 @pytest.mark.asyncio
 async def test_rag_engine_query_creates_otel_span() -> None:
     """RAGEngine.query() creates an OTEL span for the full CRAG pipeline."""
-    from lightagent.rag.crag import CRAGResult
+    from prismal.rag.crag import CRAGResult
 
     mock_otel = MagicMock()
     mock_span = MagicMock()
@@ -113,7 +113,7 @@ async def test_rag_engine_query_creates_otel_span() -> None:
         mock_store_cls.return_value = mock_store
         mock_pipeline_cls.return_value = mock_pipeline_instance
 
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=MagicMock())
         result = await engine.query("what is RAG?")
@@ -123,14 +123,14 @@ async def test_rag_engine_query_creates_otel_span() -> None:
 
 
 def test_crag_pipeline_imports_otel_manager() -> None:
-    """crag module imports OTelManager from lightagent.monitoring.otel."""
-    import lightagent.rag.crag as crag_module
+    """crag module imports OTelManager from prismal.monitoring.otel."""
+    import prismal.rag.crag as crag_module
 
     assert hasattr(crag_module, "OTelManager")
 
 
 def test_rag_engine_imports_otel_manager() -> None:
-    """engine module imports OTelManager from lightagent.monitoring.otel."""
-    import lightagent.rag.engine as engine_module
+    """engine module imports OTelManager from prismal.monitoring.otel."""
+    import prismal.rag.engine as engine_module
 
     assert hasattr(engine_module, "OTelManager")

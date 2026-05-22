@@ -32,7 +32,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.rag.crag import CRAGResult, RetrievedChunk
+from prismal.rag.crag import CRAGResult, RetrievedChunk
 
 # ── Patch paths ───────────────────────────────────────────────────────────────
 
@@ -76,7 +76,7 @@ def _build_engine(
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = mock_store_instance
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name=collection_name, settings=settings)
 
@@ -92,7 +92,7 @@ def test_init_creates_chroma_vector_store_with_collection_name() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = MagicMock()
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         RAGEngine(collection_name="my_col", settings=settings)
 
@@ -105,7 +105,7 @@ def test_init_creates_chroma_vector_store_with_settings() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = MagicMock()
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         RAGEngine(collection_name="col", settings=settings)
 
@@ -119,7 +119,7 @@ def test_init_default_collection_name_is_default() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = MagicMock()
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
 
@@ -132,7 +132,7 @@ def test_init_stores_settings_when_provided() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = MagicMock()
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name="col", settings=settings)
 
@@ -149,7 +149,7 @@ def test_init_calls_get_settings_when_none() -> None:
         patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
     ):
         mock_store_cls.return_value = MagicMock()
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         RAGEngine(settings=None)
 
@@ -193,7 +193,7 @@ def test_index_file_calls_delete_by_source_before_adding() -> None:
         mock_factory_instance.load.return_value = docs
         mock_factory_cls.return_value = mock_factory_instance
 
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         path = Path("/some/file.txt")
@@ -221,7 +221,7 @@ def test_index_file_delete_by_source_called_before_add_documents() -> None:
         mock_factory_instance.load.return_value = docs
         mock_factory_cls.return_value = mock_factory_instance
 
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         engine.index_file(Path("/file.txt"))
@@ -245,7 +245,7 @@ def test_index_file_calls_factory_load_with_path() -> None:
         mock_factory_instance.load.return_value = docs
         mock_factory_cls.return_value = mock_factory_instance
 
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         path = Path("/data/report.txt")
@@ -270,7 +270,7 @@ def test_index_file_calls_store_add_documents() -> None:
         mock_factory_instance.load.return_value = docs
         mock_factory_cls.return_value = mock_factory_instance
 
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         engine.index_file(Path("/data/doc.txt"))
@@ -294,7 +294,7 @@ def test_index_file_returns_chunk_count() -> None:
         mock_factory_instance.load.return_value = docs
         mock_factory_cls.return_value = mock_factory_instance
 
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         result = engine.index_file(Path("/data/doc.txt"))
@@ -304,7 +304,7 @@ def test_index_file_returns_chunk_count() -> None:
 
 def test_index_file_propagates_unsupported_document_type_error() -> None:
     """index_file() must propagate UnsupportedDocumentTypeError for bad extensions."""
-    from lightagent.rag.loaders import UnsupportedDocumentTypeError
+    from prismal.rag.loaders import UnsupportedDocumentTypeError
 
     settings = _make_settings()
     mock_store = MagicMock()
@@ -318,7 +318,7 @@ def test_index_file_propagates_unsupported_document_type_error() -> None:
         mock_factory_instance.load.side_effect = UnsupportedDocumentTypeError(".xlsx")
         mock_factory_cls.return_value = mock_factory_instance
 
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         with pytest.raises(UnsupportedDocumentTypeError):
@@ -355,7 +355,7 @@ def test_index_directory_indexes_supported_files_recursively() -> None:
             mock_store_cls.return_value = mock_store
             mock_factory_cls.return_value = mock_factory_instance
 
-            from lightagent.rag.engine import RAGEngine
+            from prismal.rag.engine import RAGEngine
 
             engine = RAGEngine(settings=settings)
             engine.index_directory(tmp)
@@ -389,7 +389,7 @@ def test_index_directory_skips_unsupported_files() -> None:
             mock_store_cls.return_value = mock_store
             mock_factory_cls.return_value = mock_factory_instance
 
-            from lightagent.rag.engine import RAGEngine
+            from prismal.rag.engine import RAGEngine
 
             engine = RAGEngine(settings=settings)
             engine.index_directory(tmp)
@@ -426,7 +426,7 @@ def test_index_directory_returns_total_chunk_count() -> None:
             mock_store_cls.return_value = mock_store
             mock_factory_cls.return_value = mock_factory_instance
 
-            from lightagent.rag.engine import RAGEngine
+            from prismal.rag.engine import RAGEngine
 
             engine = RAGEngine(settings=settings)
             total = engine.index_directory(tmp)
@@ -459,7 +459,7 @@ def test_index_directory_catches_per_file_errors_without_crashing() -> None:
             mock_store_cls.return_value = mock_store
             mock_factory_cls.return_value = mock_factory_instance
 
-            from lightagent.rag.engine import RAGEngine
+            from prismal.rag.engine import RAGEngine
 
             engine = RAGEngine(settings=settings)
             # Should not raise even though one file failed
@@ -487,7 +487,7 @@ def test_index_directory_returns_zero_for_empty_directory() -> None:
             mock_factory_instance = MagicMock()
             mock_factory_cls.return_value = mock_factory_instance
 
-            from lightagent.rag.engine import RAGEngine
+            from prismal.rag.engine import RAGEngine
 
             engine = RAGEngine(settings=settings)
             total = engine.index_directory(tmp)
@@ -507,7 +507,7 @@ def test_search_calls_store_similarity_search() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = mock_store
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         engine.search("my query", k=3)
@@ -523,7 +523,7 @@ def test_search_uses_default_k_of_5() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = mock_store
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         engine.search("query")
@@ -540,7 +540,7 @@ def test_search_returns_list_of_retrieved_chunks() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = mock_store
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         results = engine.search("query")
@@ -558,7 +558,7 @@ def test_search_converts_document_float_tuples_to_retrieved_chunks() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = mock_store
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         results = engine.search("test query")
@@ -582,7 +582,7 @@ def test_search_source_falls_back_to_unknown_when_missing() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = mock_store
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         results = engine.search("query")
@@ -601,7 +601,7 @@ def test_search_chunk_id_falls_back_to_index_when_missing() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = mock_store
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         results = engine.search("query")
@@ -620,7 +620,7 @@ def test_search_returns_multiple_chunks_in_order() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = mock_store
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         results = engine.search("query", k=3)
@@ -650,7 +650,7 @@ async def test_query_creates_crag_pipeline_with_store_and_settings() -> None:
         mock_pipeline_instance.run = AsyncMock(return_value=mock_crag_result)
         mock_pipeline_cls.return_value = mock_pipeline_instance
 
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         await engine.query("test question")
@@ -674,7 +674,7 @@ async def test_query_calls_pipeline_run_with_query() -> None:
         mock_pipeline_instance.run = AsyncMock(return_value=mock_crag_result)
         mock_pipeline_cls.return_value = mock_pipeline_instance
 
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         await engine.query("what is RAG?")
@@ -698,7 +698,7 @@ async def test_query_returns_crag_result() -> None:
         mock_pipeline_instance.run = AsyncMock(return_value=expected_result)
         mock_pipeline_cls.return_value = mock_pipeline_instance
 
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         result = await engine.query("any query")
@@ -715,7 +715,7 @@ def test_create_collection_returns_new_rag_engine() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = MagicMock()
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name="old_col", settings=settings)
         new_engine = engine.create_collection("new_col")
@@ -730,7 +730,7 @@ def test_create_collection_new_engine_has_correct_collection_name() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = MagicMock()
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name="original", settings=settings)
         new_engine = engine.create_collection("brand_new")
@@ -744,7 +744,7 @@ def test_create_collection_new_engine_reuses_settings() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = MagicMock()
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name="original", settings=settings)
         new_engine = engine.create_collection("another")
@@ -758,7 +758,7 @@ def test_create_collection_does_not_mutate_original() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = MagicMock()
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name="original", settings=settings)
         engine.create_collection("new_name")
@@ -776,7 +776,7 @@ def test_delete_collection_calls_store_delete_collection() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = mock_store
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         engine.delete_collection()
@@ -792,7 +792,7 @@ def test_delete_collection_returns_none() -> None:
 
     with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
         mock_store_cls.return_value = mock_store
-        from lightagent.rag.engine import RAGEngine
+        from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
         result = engine.delete_collection()

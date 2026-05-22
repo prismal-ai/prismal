@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lightagent.rag.embeddings import EmbeddingsFactory
+from prismal.rag.embeddings import EmbeddingsFactory
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -222,7 +222,7 @@ def test_create_logs_ollama_provider() -> None:
 
 def test_create_accepts_settings_object_directly() -> None:
     """create(settings=<Settings>) uses it directly; get_settings() not called."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     # Build a real Settings object with embeddings_model='huggingface'
     real_settings = Settings(embeddings_model="huggingface")

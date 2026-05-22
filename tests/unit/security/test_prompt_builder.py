@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from lightagent.security.prompt_builder import SecurePromptBuilder
+from prismal.security.prompt_builder import SecurePromptBuilder
 
 
 @pytest.fixture

@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lightagent.core.users import User, UserRole, UserStore
+from prismal.core.users import User, UserRole, UserStore
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

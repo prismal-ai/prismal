@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.scheduler.cron_manager import CronJob, CronManager
-from lightagent.scheduler.executor import CronExecutor
+from prismal.scheduler.cron_manager import CronJob, CronManager
+from prismal.scheduler.executor import CronExecutor
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -608,8 +608,8 @@ async def test_successful_job_with_output_routing_calls_delivery(
     tmp_path: Path,
 ) -> None:
     """When a job has output_channel set, HeartbeatDelivery.send() is called."""
-    from lightagent.scheduler.cron_manager import CronManager
-    from lightagent.scheduler.executor import CronExecutor
+    from prismal.scheduler.cron_manager import CronManager
+    from prismal.scheduler.executor import CronExecutor
 
     manager = CronManager(db_path=tmp_path / "test.db")
     manager.add(
@@ -646,8 +646,8 @@ async def test_job_without_output_routing_does_not_call_delivery(
     tmp_path: Path,
 ) -> None:
     """When a job has no output_channel, HeartbeatDelivery.send() is NOT called."""
-    from lightagent.scheduler.cron_manager import CronManager
-    from lightagent.scheduler.executor import CronExecutor
+    from prismal.scheduler.cron_manager import CronManager
+    from prismal.scheduler.executor import CronExecutor
 
     manager = CronManager(db_path=tmp_path / "test.db")
     manager.add("silent-job", "* * * * *", "Silent task")
@@ -678,7 +678,7 @@ def test_executor_scheduler_receives_timezone() -> None:
     """CronExecutor passes a timezone to AsyncIOScheduler on construction."""
     from zoneinfo import ZoneInfo
 
-    from lightagent.scheduler.executor import CronExecutor
+    from prismal.scheduler.executor import CronExecutor
 
     with patch("lightagent.scheduler.executor.AsyncIOScheduler") as mock_scheduler_cls:
         mock_scheduler_cls.return_value = MagicMock()
@@ -695,8 +695,8 @@ def test_executor_scheduler_timezone_is_utc_by_default() -> None:
     import os
     from zoneinfo import ZoneInfo
 
-    from lightagent.scheduler.datetime_service import DateTimeService
-    from lightagent.scheduler.executor import CronExecutor
+    from prismal.scheduler.datetime_service import DateTimeService
+    from prismal.scheduler.executor import CronExecutor
 
     DateTimeService._instance = None
     env = {"LIGHTAGENT_TIMEZONE": "", "LIGHTAGENT_CRON_TIMEZONE": ""}
@@ -718,7 +718,7 @@ def test_executor_scheduler_timezone_is_utc_by_default() -> None:
 
 def test_register_job_passes_timezone_to_cron_trigger(mock_manager: MagicMock) -> None:
     """_register_job passes the job's timezone to CronTrigger.from_crontab."""
-    from lightagent.scheduler.executor import CronExecutor
+    from prismal.scheduler.executor import CronExecutor
 
     job = CronJob(name="tz-job", schedule="0 9 * * *", task="t", timezone="America/Caracas")
     ex = CronExecutor(manager=mock_manager)
@@ -746,7 +746,7 @@ def test_register_once_job_with_future_date_uses_aware_run_date(
     from datetime import datetime, timedelta
     from zoneinfo import ZoneInfo
 
-    from lightagent.scheduler.executor import CronExecutor
+    from prismal.scheduler.executor import CronExecutor
 
     future = datetime.now() + timedelta(hours=1)  # noqa: DTZ005
     schedule = f"once:{future.strftime('%Y-%m-%dT%H:%M:%S')}"
@@ -773,7 +773,7 @@ def test_register_expired_once_job_is_skipped_and_removed(
     """Expired 'once:' jobs are skipped and removed from the DB (BUG-001 fix)."""
     from datetime import datetime, timedelta
 
-    from lightagent.scheduler.executor import CronExecutor
+    from prismal.scheduler.executor import CronExecutor
 
     past = datetime.now() - timedelta(hours=1)  # noqa: DTZ005
     schedule = f"once:{past.strftime('%Y-%m-%dT%H:%M:%S')}"
@@ -795,7 +795,7 @@ def test_register_expired_once_job_is_skipped_and_removed(
 
 def test_looks_like_soft_failure_matches_rate_limit_apology() -> None:
     """The detector recognises the exact string returned by throttled runs."""
-    from lightagent.scheduler.executor import _looks_like_soft_failure
+    from prismal.scheduler.executor import _looks_like_soft_failure
 
     msg = (
         "I'm sorry, the AI service is temporarily rate-limited "
@@ -806,7 +806,7 @@ def test_looks_like_soft_failure_matches_rate_limit_apology() -> None:
 
 def test_looks_like_soft_failure_ignores_normal_output() -> None:
     """Legitimate agent output never matches the soft-failure signatures."""
-    from lightagent.scheduler.executor import _looks_like_soft_failure
+    from prismal.scheduler.executor import _looks_like_soft_failure
 
     assert _looks_like_soft_failure("Here are the top 5 Linux news items...") is None
     assert _looks_like_soft_failure("") is None
@@ -865,7 +865,7 @@ async def test_run_job_treats_rate_limit_output_as_failure(
 
 def test_is_permanent_error_matches_billing() -> None:
     """_is_permanent_error catches credit-balance and auth errors."""
-    from lightagent.scheduler.executor import _is_permanent_error
+    from prismal.scheduler.executor import _is_permanent_error
 
     msg = (
         'litellm.BadRequestError: AnthropicException - {"type":"error",'
@@ -878,7 +878,7 @@ def test_is_permanent_error_matches_billing() -> None:
 
 def test_is_permanent_error_skips_transient() -> None:
     """_is_permanent_error returns False for rate-limits and connection errors."""
-    from lightagent.scheduler.executor import _is_permanent_error
+    from prismal.scheduler.executor import _is_permanent_error
 
     assert _is_permanent_error("429 Too Many Requests rate_limit_error") is False
     assert _is_permanent_error("connection reset by peer") is False

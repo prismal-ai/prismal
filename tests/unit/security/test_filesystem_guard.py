@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lightagent.security.filesystem_guard import FilesystemGuard, PathViolation
+from prismal.security.filesystem_guard import FilesystemGuard, PathViolation
 
 
 def test_blocked_system_path_raises() -> None:

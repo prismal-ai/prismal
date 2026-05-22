@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from lightagent.monitoring.otel import OTelManager, _NoOpSpan
+from prismal.monitoring.otel import OTelManager, _NoOpSpan
 
 
 def test_otel_manager_start_span_context_manager() -> None:
@@ -23,7 +23,7 @@ def test_otel_manager_start_span_context_manager() -> None:
 
 def test_langfuse_manager_callback_none_when_disabled() -> None:
     """get_callback_handler returns None when Langfuse disabled."""
-    from lightagent.monitoring.langfuse_client import LangfuseManager
+    from prismal.monitoring.langfuse_client import LangfuseManager
 
     LangfuseManager._instance = None
     LangfuseManager._initialized = False

@@ -11,7 +11,7 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
-from lightagent.memory.preferences import (
+from prismal.memory.preferences import (
     _PREFS_TEMPLATE,
     PreferenceExtractor,
     PreferenceFacts,
@@ -456,7 +456,7 @@ def test_merge_then_load_section_roundtrip(tmp_path: Path) -> None:
 
 def test_module_exports() -> None:
     """preferences module exports the expected public symbols."""
-    import lightagent.memory.preferences as mod
+    import prismal.memory.preferences as mod
 
     assert "PreferenceFacts" in mod.__all__
     assert "PreferencesManager" in mod.__all__

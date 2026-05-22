@@ -14,13 +14,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.agents.patterns.debate import (
+from prismal.agents.patterns.debate import (
     DebateError,
     DebatePosition,
     DebateResult,
     debate_round,
 )
-from lightagent.core.exceptions import LightAgentError
+from prismal.core.exceptions import LightAgentError
 
 PROVIDER_REGISTRY_PATH = "lightagent.agents.patterns.debate.ProviderRegistry"
 

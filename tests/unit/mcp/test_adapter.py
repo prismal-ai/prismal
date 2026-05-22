@@ -16,9 +16,9 @@ from unittest.mock import AsyncMock, MagicMock
 import mcp.types
 import pytest
 
-from lightagent.core.exceptions import MCPToolError, PermissionDeniedError
-from lightagent.mcp.adapter import MCPToolAdapter
-from lightagent.mcp.connection import MCPServerConfig, MCPServerConnection
+from prismal.core.exceptions import MCPToolError, PermissionDeniedError
+from prismal.mcp.adapter import MCPToolAdapter
+from prismal.mcp.connection import MCPServerConfig, MCPServerConnection
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures

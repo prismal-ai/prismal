@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lightagent.monitoring.cost_tracker import CostEntry, CostTracker, UsageSummary
+from prismal.monitoring.cost_tracker import CostEntry, CostTracker, UsageSummary
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 

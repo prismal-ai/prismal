@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from lightagent.core.database import create_async_engine_from_url, init_db
-from lightagent.security.permissions import PermissionManager, PermissionType
+from prismal.core.database import create_async_engine_from_url, init_db
+from prismal.security.permissions import PermissionManager, PermissionType
 
 
 @pytest.fixture

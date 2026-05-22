@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from lightagent.monitoring.otel import OTelManager, _NoOpSpan
+from prismal.monitoring.otel import OTelManager, _NoOpSpan
 
 
 def _reset_singleton() -> None:

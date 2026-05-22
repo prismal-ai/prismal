@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lightagent.agents.subgraphs.financial.artifacts import (
+from prismal.agents.subgraphs.financial.artifacts import (
     FinancialReport,
     FundamentalAnalysis,
     MarketSnapshot,
@@ -69,7 +69,7 @@ def test_financial_report_default_disclaimer_present() -> None:
 
 def test_all_5_artifacts_importable() -> None:
     """Test all 5 artifact classes are importable from the financial package."""
-    from lightagent.agents.subgraphs.financial.artifacts import (
+    from prismal.agents.subgraphs.financial.artifacts import (
         FinancialReport,
         FundamentalAnalysis,
         MarketSnapshot,

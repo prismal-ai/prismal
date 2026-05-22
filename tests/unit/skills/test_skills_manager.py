@@ -22,8 +22,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lightagent.core.exceptions import SkillLoadError
-from lightagent.skills.manager import SkillsManager
+from prismal.core.exceptions import SkillLoadError
+from prismal.skills.manager import SkillsManager
 
 # ---------------------------------------------------------------------------
 # Skill source stubs
@@ -31,7 +31,7 @@ from lightagent.skills.manager import SkillsManager
 
 _SAFE_SKILL_PY = """\
 from langchain_core.tools import BaseTool, tool
-from lightagent.skills.base import BaseSkill, SkillMetadata
+from prismal.skills.base import BaseSkill, SkillMetadata
 
 
 class _SafeSkill(BaseSkill):
@@ -68,7 +68,7 @@ class _SafeSkill(BaseSkill):
 
 _SAFE_SKILL_PY_DUPLICATE_TOOL = """\
 from langchain_core.tools import BaseTool, tool
-from lightagent.skills.base import BaseSkill, SkillMetadata
+from prismal.skills.base import BaseSkill, SkillMetadata
 
 
 class _DupSkill(BaseSkill):
@@ -105,7 +105,7 @@ class _DupSkill(BaseSkill):
 
 _TEARDOWN_ERROR_SKILL_PY = """\
 from langchain_core.tools import BaseTool
-from lightagent.skills.base import BaseSkill, SkillMetadata
+from prismal.skills.base import BaseSkill, SkillMetadata
 
 
 class _TeardownErrorSkill(BaseSkill):
@@ -133,7 +133,7 @@ class _TeardownErrorSkill(BaseSkill):
 
 _TOOLS_ERROR_SKILL_PY = """\
 from langchain_core.tools import BaseTool
-from lightagent.skills.base import BaseSkill, SkillMetadata
+from prismal.skills.base import BaseSkill, SkillMetadata
 
 
 class _ToolsErrorSkill(BaseSkill):

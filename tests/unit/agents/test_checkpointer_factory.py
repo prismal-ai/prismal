@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from lightagent.agents.graph import (
+from prismal.agents.graph import (
     _extract_sqlite_path,
     build_checkpointer,
 )
@@ -62,7 +62,7 @@ def fake_postgres_module() -> Any:
     """Provide a fake Postgres saver module; clean up ``sys.modules`` on exit."""
     aio_mod, saver_cls, saver_instance = _install_fake_postgres_module()
     # Also reset the module-level CM list so assertions are deterministic
-    from lightagent.agents import graph as graph_module
+    from prismal.agents import graph as graph_module
 
     original_cms = list(graph_module._checkpointer_cms)
     graph_module._checkpointer_cms.clear()
@@ -184,7 +184,7 @@ class TestBuildCheckpointerPostgres:
         """The ``from_conn_string`` context manager must be kept alive so
         the underlying connection does not close after the factory returns.
         """
-        from lightagent.agents import graph as graph_module
+        from prismal.agents import graph as graph_module
 
         assert graph_module._checkpointer_cms == []
         await build_checkpointer("postgresql://user@host/db")
@@ -209,8 +209,8 @@ class TestSubgraphFactoryUsesBuildCheckpointer:
     """
 
     async def test_none_path_delegates_to_build_checkpointer(self) -> None:
-        from lightagent.agents.subgraphs.factory import SubgraphFactory
-        from lightagent.agents.subgraphs.registry import SubgraphDefinition
+        from prismal.agents.subgraphs.factory import SubgraphFactory
+        from prismal.agents.subgraphs.registry import SubgraphDefinition
 
         async def _noop(state: Any) -> dict[str, Any]:
             return {}
@@ -248,8 +248,8 @@ class TestSubgraphFactoryUsesBuildCheckpointer:
         """Passing a string path still uses an isolated ``AsyncSqliteSaver``
         and does NOT invoke ``build_checkpointer``.
         """
-        from lightagent.agents.subgraphs.factory import SubgraphFactory
-        from lightagent.agents.subgraphs.registry import SubgraphDefinition
+        from prismal.agents.subgraphs.factory import SubgraphFactory
+        from prismal.agents.subgraphs.registry import SubgraphDefinition
 
         async def _noop(state: Any) -> dict[str, Any]:
             return {}

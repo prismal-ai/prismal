@@ -19,9 +19,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.core.exceptions import FusionError
-from lightagent.rag.crag import RetrievedChunk
-from lightagent.rag.fusion import (
+from prismal.core.exceptions import FusionError
+from prismal.rag.crag import RetrievedChunk
+from prismal.rag.fusion import (
     FusionResult,
     RAGFusionEngine,
     reciprocal_rank_fusion,
@@ -75,7 +75,7 @@ def test_fusion_result_is_instantiable() -> None:
 
 
 def test_fusion_error_is_ragerror_subclass() -> None:
-    from lightagent.core.exceptions import RAGError
+    from prismal.core.exceptions import RAGError
 
     assert issubclass(FusionError, RAGError)
 

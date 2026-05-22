@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-from lightagent.mcp.servers.datetime_server import (
+from prismal.mcp.servers.datetime_server import (
     CronNextRunResult,
     CronValidateResult,
     SystemTimeResult,
@@ -418,7 +418,7 @@ def test_is_dst_returns_false_when_dst_none() -> None:
     """When dst() returns None _is_dst returns False."""
     from unittest.mock import MagicMock
 
-    from lightagent.mcp.servers.datetime_server import _is_dst
+    from prismal.mcp.servers.datetime_server import _is_dst
 
     tz = ZoneInfo("UTC")
 

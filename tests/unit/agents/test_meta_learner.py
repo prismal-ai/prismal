@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.agents.meta_learner import MetaLearner, TraceScore
+from prismal.agents.meta_learner import MetaLearner, TraceScore
 
 
 def test_trace_score_model() -> None:

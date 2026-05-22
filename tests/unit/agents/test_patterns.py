@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lightagent.agents.patterns import AgentPattern
+from prismal.agents.patterns import AgentPattern
 
 
 def test_agent_pattern_is_str_enum() -> None:

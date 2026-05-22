@@ -12,13 +12,13 @@ from unittest.mock import patch
 
 import pytest
 
-from lightagent.agents.patterns.swarm import (
+from prismal.agents.patterns.swarm import (
     VALID_HANDOFF_TARGETS,
     HandoffRecord,
     SwarmError,
     swarm_handoff,
 )
-from lightagent.core.exceptions import LightAgentError
+from prismal.core.exceptions import LightAgentError
 
 
 def _state(**overrides: Any) -> dict[str, Any]:

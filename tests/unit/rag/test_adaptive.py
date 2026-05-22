@@ -11,11 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.core.exceptions import AdaptiveRAGError, RAGError
-from lightagent.rag.adaptive import AdaptiveRAGEngine, AdaptiveResult, QueryType
-from lightagent.rag.crag import CRAGResult, RetrievedChunk
-from lightagent.rag.fusion import FusionResult
-from lightagent.rag.hyde import HyDEResult
+from prismal.core.exceptions import AdaptiveRAGError, RAGError
+from prismal.rag.adaptive import AdaptiveRAGEngine, AdaptiveResult, QueryType
+from prismal.rag.crag import CRAGResult, RetrievedChunk
+from prismal.rag.fusion import FusionResult
+from prismal.rag.hyde import HyDEResult
 
 
 def _chunk(source: str = "f.txt", cid: str = "0", content: str = "c") -> RetrievedChunk:

@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from langchain_core.messages import HumanMessage
 
-from lightagent.agents.cua_agent import (
+from prismal.agents.cua_agent import (
     CUA_SYSTEM_PROMPT,
     HIGH_RISK_ACTIONS,
     MODERATE_ACTIONS,

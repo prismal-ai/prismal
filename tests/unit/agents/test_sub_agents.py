@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from lightagent.agents.state import create_initial_state
+from prismal.agents.state import create_initial_state
 
 # ---------------------------------------------------------------------------
 # Helper
@@ -49,7 +49,7 @@ def _mock_llm(response: str = "Test response") -> MagicMock:
 @pytest.mark.asyncio
 async def test_researcher_node_returns_current_agent() -> None:
     """researcher_node must set current_agent to 'researcher'."""
-    from lightagent.agents.researcher import researcher_node
+    from prismal.agents.researcher import researcher_node
 
     state = create_initial_state(session_id="sess-researcher")
     state["messages"] = [HumanMessage(content="Find info about LangGraph")]
@@ -70,7 +70,7 @@ async def test_researcher_node_returns_current_agent() -> None:
 @pytest.mark.asyncio
 async def test_coder_node_returns_current_agent() -> None:
     """coder_node must set current_agent to 'coder'."""
-    from lightagent.agents.coder import coder_node
+    from prismal.agents.coder import coder_node
 
     state = create_initial_state(session_id="sess-coder")
     state["messages"] = [HumanMessage(content="Write a Python hello world script")]
@@ -91,7 +91,7 @@ async def test_coder_node_returns_current_agent() -> None:
 @pytest.mark.asyncio
 async def test_rag_agent_node_returns_current_agent() -> None:
     """rag_agent_node must set current_agent to 'rag_agent'."""
-    from lightagent.agents.rag_agent import rag_agent_node
+    from prismal.agents.rag_agent import rag_agent_node
 
     state = create_initial_state(session_id="sess-rag")
     state["messages"] = [HumanMessage(content="What does our onboarding doc say?")]
@@ -118,7 +118,7 @@ async def test_rag_agent_node_returns_current_agent() -> None:
 @pytest.mark.asyncio
 async def test_planner_node_returns_current_agent() -> None:
     """planner_node must set current_agent to 'planner'."""
-    from lightagent.agents.planner import planner_node
+    from prismal.agents.planner import planner_node
 
     state = create_initial_state(session_id="sess-planner")
     state["messages"] = [HumanMessage(content="Build a data pipeline")]
@@ -150,7 +150,7 @@ async def test_planner_node_returns_current_agent() -> None:
 @pytest.mark.asyncio
 async def test_critic_node_returns_current_agent() -> None:
     """critic_node must set current_agent to 'critic'."""
-    from lightagent.agents.critic import critic_node
+    from prismal.agents.critic import critic_node
 
     state = create_initial_state(session_id="sess-critic")
     state["messages"] = [HumanMessage(content="Review this answer")]
@@ -166,7 +166,7 @@ async def test_critic_node_returns_current_agent() -> None:
 @pytest.mark.asyncio
 async def test_critic_node_increments_iteration_count() -> None:
     """critic_node must increment iteration_count by 1 from the initial value of 0."""
-    from lightagent.agents.critic import critic_node
+    from prismal.agents.critic import critic_node
 
     state = create_initial_state(session_id="sess-critic-iter")
     state["messages"] = [HumanMessage(content="Review this")]
@@ -181,7 +181,7 @@ async def test_critic_node_increments_iteration_count() -> None:
 
 def test_critic_router_always_returns_supervisor() -> None:
     """critic_router must always return 'supervisor' regardless of state."""
-    from lightagent.agents.critic import critic_router
+    from prismal.agents.critic import critic_router
 
     state = create_initial_state(session_id="sess-critic-router")
     assert critic_router(state) == "supervisor"
@@ -195,7 +195,7 @@ def test_critic_router_always_returns_supervisor() -> None:
 @pytest.mark.asyncio
 async def test_data_analyst_node_returns_current_agent() -> None:
     """data_analyst_node must set current_agent to 'data_analyst'."""
-    from lightagent.agents.data_analyst import data_analyst_node
+    from prismal.agents.data_analyst import data_analyst_node
 
     state = create_initial_state(session_id="sess-data-analyst")
     state["messages"] = [HumanMessage(content="Show me total sales by region")]
@@ -216,7 +216,7 @@ async def test_data_analyst_node_returns_current_agent() -> None:
 @pytest.mark.asyncio
 async def test_file_manager_node_returns_current_agent() -> None:
     """file_manager_node must set current_agent to 'file_manager'."""
-    from lightagent.agents.file_manager import file_manager_node
+    from prismal.agents.file_manager import file_manager_node
 
     state = create_initial_state(session_id="sess-file-manager")
     state["messages"] = [HumanMessage(content="Save this text to output.txt")]

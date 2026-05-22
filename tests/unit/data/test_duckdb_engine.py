@@ -8,8 +8,8 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from lightagent.core.exceptions import LightAgentError
-from lightagent.data.duckdb_engine import DuckDBEngine, SQLValidator
+from prismal.core.exceptions import LightAgentError
+from prismal.data.duckdb_engine import DuckDBEngine, SQLValidator
 
 # ── SQLValidator ─────────────────────────────────────────────────────────────
 

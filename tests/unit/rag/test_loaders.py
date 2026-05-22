@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from langchain_core.documents import Document
 
-from lightagent.rag.loaders import (
+from prismal.rag.loaders import (
     DocumentProcessorFactory,
     UnsupportedDocumentTypeError,
 )
@@ -411,7 +411,7 @@ def test_unsupported_extension_no_extension(tmp_path: Path) -> None:
 
 def test_unsupported_document_type_error_is_lightagent_error() -> None:
     """UnsupportedDocumentTypeError must be a subclass of LightAgentError."""
-    from lightagent.core.exceptions import LightAgentError
+    from prismal.core.exceptions import LightAgentError
 
     assert issubclass(UnsupportedDocumentTypeError, LightAgentError)
 

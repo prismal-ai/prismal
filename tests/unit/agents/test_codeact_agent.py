@@ -29,7 +29,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from langchain_core.messages import HumanMessage
 
-from lightagent.agents.codeact_agent import (
+from prismal.agents.codeact_agent import (
     _CODE_BLOCK_RE,
     _RESULT_MARKER,
     _extract_code_block,
@@ -214,7 +214,7 @@ class TestValidateImports:
 
     def test_blocks_lightagent_imports(self) -> None:
         """CodeAct must never reach into project internals."""
-        ok, reason = _validate_imports("from lightagent.memory import x")
+        ok, reason = _validate_imports("from prismal.memory import x")
         assert not ok
         assert "lightagent" in reason
 
@@ -613,7 +613,7 @@ class TestGetImportAllowlist:
 class TestCodeactEnabledDefault:
     def test_codeact_enabled_default_is_false(self) -> None:
         """SPEC-044 AC-044-6: ``codeact_enabled`` default is False."""
-        from lightagent.core.config import Settings
+        from prismal.core.config import Settings
 
         assert Settings().codeact_enabled is False
 

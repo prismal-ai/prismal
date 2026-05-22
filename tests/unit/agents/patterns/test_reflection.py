@@ -7,11 +7,11 @@ from unittest.mock import patch
 
 import pytest
 
-from lightagent.agents.patterns.reflection import reflection_loop, with_reflection
-from lightagent.agents.state import create_initial_state
+from prismal.agents.patterns.reflection import reflection_loop, with_reflection
+from prismal.agents.state import create_initial_state
 
 if TYPE_CHECKING:
-    from lightagent.agents.state import AgentState
+    from prismal.agents.state import AgentState
 
 
 def _state() -> AgentState:

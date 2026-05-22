@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import SecretStr, ValidationError
 
-from lightagent.core.config import Settings
+from prismal.core.config import Settings
 
 # ── Default values ─────────────────────────────────────────────────────────────
 

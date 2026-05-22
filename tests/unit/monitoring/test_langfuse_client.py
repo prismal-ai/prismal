@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from lightagent.monitoring.langfuse_client import LangfuseManager, _NoOpTrace
+from prismal.monitoring.langfuse_client import LangfuseManager, _NoOpTrace
 
 
 def _reset_singleton() -> None:

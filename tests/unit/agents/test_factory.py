@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 from langgraph.graph.state import CompiledStateGraph
 
-from lightagent.agents.factory import AgentFactory
-from lightagent.agents.patterns import AgentPattern
+from prismal.agents.factory import AgentFactory
+from prismal.agents.patterns import AgentPattern
 
 
 def test_factory_build_supervisor_pattern(tmp_path: Path) -> None:

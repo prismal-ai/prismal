@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lightagent.scheduler.cron_manager import (
+from prismal.scheduler.cron_manager import (
     CronJob,
     CronManager,
 )

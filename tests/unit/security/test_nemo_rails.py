@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.security.nemo_rails import (
+from prismal.security.nemo_rails import (
     NemoRailsLayer,
     _extract_response_text,
     _parse_block_response,

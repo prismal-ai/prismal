@@ -1,6 +1,6 @@
 """Tests for ML pipeline configuration settings."""
 
-from lightagent.core.config import Settings
+from prismal.core.config import Settings
 
 
 def test_ml_settings_defaults() -> None:

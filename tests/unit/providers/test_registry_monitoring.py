@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from lightagent.providers.registry import ProviderRegistry
+from prismal.providers.registry import ProviderRegistry
 
 
 def test_get_llm_increments_otel_counter() -> None:

@@ -21,8 +21,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lightagent.core.exceptions import HybridSearchError
-from lightagent.rag.hybrid import HybridSearchEngine
+from prismal.core.exceptions import HybridSearchError
+from prismal.rag.hybrid import HybridSearchEngine
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ def _fake_store(results: list[tuple[MagicMock, float]] | None = None) -> MagicMo
 
 
 def test_hybrid_search_error_is_ragerror_subclass() -> None:
-    from lightagent.core.exceptions import RAGError
+    from prismal.core.exceptions import RAGError
 
     assert issubclass(HybridSearchError, RAGError)
 

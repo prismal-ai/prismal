@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from lightagent.memory.chat_session_store import ChatSessionStore
+from prismal.memory.chat_session_store import ChatSessionStore
 
 if TYPE_CHECKING:
     from pathlib import Path

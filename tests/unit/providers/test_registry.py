@@ -7,8 +7,8 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.runnables.fallbacks import RunnableWithFallbacks
 from pydantic import SecretStr
 
-from lightagent.core.config import Settings
-from lightagent.providers.registry import ModelInfo, ProviderRegistry, TokenUsage
+from prismal.core.config import Settings
+from prismal.providers.registry import ModelInfo, ProviderRegistry, TokenUsage
 
 
 def test_model_info_has_id_and_provider() -> None:

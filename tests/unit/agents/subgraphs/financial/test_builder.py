@@ -10,11 +10,11 @@ import pytest
 @pytest.mark.asyncio
 async def test_register_financial_analyst_creates_registry_entry() -> None:
     """register_financial_analyst populates the SubgraphRegistry."""
-    import lightagent.agents.subgraphs.financial.builder as builder_mod
+    import prismal.agents.subgraphs.financial.builder as builder_mod
 
     builder_mod._COMPILED_GRAPHS.clear()
 
-    from lightagent.agents.subgraphs.financial.builder import register_financial_analyst
+    from prismal.agents.subgraphs.financial.builder import register_financial_analyst
 
     mock_compiled = MagicMock()
     mock_factory = AsyncMock()
@@ -43,7 +43,7 @@ async def test_register_financial_analyst_creates_registry_entry() -> None:
 @pytest.mark.asyncio
 async def test_register_financial_analyst_idempotent() -> None:
     """Calling register twice does not re-register."""
-    from lightagent.agents.subgraphs.financial.builder import register_financial_analyst
+    from prismal.agents.subgraphs.financial.builder import register_financial_analyst
 
     mock_registry = MagicMock()
     mock_registry.get = MagicMock(return_value=MagicMock())  # already registered
@@ -61,7 +61,7 @@ async def test_register_financial_analyst_idempotent() -> None:
 @pytest.mark.asyncio
 async def test_get_compiled_financial_analyst_returns_graph() -> None:
     """get_compiled_financial_analyst builds and returns a compiled graph."""
-    import lightagent.agents.subgraphs.financial.builder as builder_mod
+    import prismal.agents.subgraphs.financial.builder as builder_mod
 
     builder_mod._COMPILED_GRAPHS.clear()
 
@@ -80,7 +80,7 @@ async def test_get_compiled_financial_analyst_returns_graph() -> None:
 
 def test_builder_exports() -> None:
     """Builder exports the two required callables."""
-    from lightagent.agents.subgraphs.financial.builder import (
+    from prismal.agents.subgraphs.financial.builder import (
         get_compiled_financial_analyst,
         register_financial_analyst,
     )

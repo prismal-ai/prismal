@@ -17,8 +17,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.mcp.client import MCPClientManager
-from lightagent.mcp.connection import MCPServerConfig, MCPServerStatus
+from prismal.mcp.client import MCPClientManager
+from prismal.mcp.connection import MCPServerConfig, MCPServerStatus
 
 # ---------------------------------------------------------------------------
 # Helpers

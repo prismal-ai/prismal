@@ -5,7 +5,7 @@ from __future__ import annotations
 
 def test_trade_execution_disabled_by_default() -> None:
     """AC-027-1: Trade execution is always disabled by default."""
-    from lightagent.core.config import get_settings
+    from prismal.core.config import get_settings
 
     assert get_settings().financial_trade_execution_enabled is False
 
@@ -44,7 +44,7 @@ def test_no_ccxt_import_at_module_level_in_supervisor() -> None:
 
 def test_financial_report_default_disclaimer_present() -> None:
     """FinancialReport default disclaimer is always the legal text."""
-    from lightagent.agents.subgraphs.financial.artifacts import FinancialReport
+    from prismal.agents.subgraphs.financial.artifacts import FinancialReport
 
     report = FinancialReport(symbol="TEST", report_mode="single_asset")
     assert "informational purposes only" in report.disclaimer

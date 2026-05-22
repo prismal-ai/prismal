@@ -32,7 +32,7 @@ def _isolate_llm_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in _ENV_ISOLATION_KEYS:
         monkeypatch.delenv(key, raising=False)
 
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     new_config = dict(Settings.model_config)
     new_config["env_file"] = None
@@ -42,8 +42,8 @@ def _isolate_llm_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture(autouse=True)
 def clear_lru_caches() -> Iterator[None]:
     """Clear lru_cache singletons between tests to prevent state leakage."""
-    from lightagent.core.config import get_settings
-    from lightagent.core.database import _get_engine
+    from prismal.core.config import get_settings
+    from prismal.core.database import _get_engine
 
     get_settings.cache_clear()
     _get_engine.cache_clear()

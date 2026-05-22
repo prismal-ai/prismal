@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lightagent.security.sanitizer import MAX_INPUT_LENGTH, InputSanitizer
+from prismal.security.sanitizer import MAX_INPUT_LENGTH, InputSanitizer
 
 
 @pytest.fixture

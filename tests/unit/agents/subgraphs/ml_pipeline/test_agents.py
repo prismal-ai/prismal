@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from lightagent.agents.state import create_initial_state
+from prismal.agents.state import create_initial_state
 
 
 def _base_state(task: str = "Train a model") -> dict:
@@ -21,7 +21,7 @@ def _base_state(task: str = "Train a model") -> dict:
 @pytest.mark.asyncio
 async def test_data_ingester_produces_dataset_profile() -> None:
     """data_ingester node populates ml_pipeline.dataset_profile in metadata."""
-    from lightagent.agents.subgraphs.ml_pipeline.data_ingester import data_ingester_node
+    from prismal.agents.subgraphs.ml_pipeline.data_ingester import data_ingester_node
 
     mock_response = AIMessage(
         content=(
@@ -45,7 +45,7 @@ async def test_data_ingester_produces_dataset_profile() -> None:
 @pytest.mark.asyncio
 async def test_data_ingester_handles_bad_llm_response() -> None:
     """data_ingester falls back gracefully on unparseable LLM response."""
-    from lightagent.agents.subgraphs.ml_pipeline.data_ingester import data_ingester_node
+    from prismal.agents.subgraphs.ml_pipeline.data_ingester import data_ingester_node
 
     mock_response = AIMessage(content="I cannot parse this")
     with patch("lightagent.providers.registry.ProviderRegistry.get_llm") as mock_llm:
@@ -59,7 +59,7 @@ async def test_data_ingester_handles_bad_llm_response() -> None:
 @pytest.mark.asyncio
 async def test_eda_analyst_produces_eda_report() -> None:
     """eda_analyst node populates ml_pipeline.eda_report in metadata."""
-    from lightagent.agents.subgraphs.ml_pipeline.eda_analyst import eda_analyst_node
+    from prismal.agents.subgraphs.ml_pipeline.eda_analyst import eda_analyst_node
 
     mock_response = AIMessage(
         content=(
@@ -95,7 +95,7 @@ async def test_eda_analyst_produces_eda_report() -> None:
 @pytest.mark.asyncio
 async def test_feature_engineer_produces_feature_set() -> None:
     """feature_engineer node populates ml_pipeline.feature_set in metadata."""
-    from lightagent.agents.subgraphs.ml_pipeline.feature_engineer import (
+    from prismal.agents.subgraphs.ml_pipeline.feature_engineer import (
         feature_engineer_node,
     )
 
@@ -146,7 +146,7 @@ async def test_feature_engineer_produces_feature_set() -> None:
 @pytest.mark.asyncio
 async def test_model_trainer_produces_trained_model() -> None:
     """model_trainer node populates ml_pipeline.trained_model in metadata."""
-    from lightagent.agents.subgraphs.ml_pipeline.model_trainer import model_trainer_node
+    from prismal.agents.subgraphs.ml_pipeline.model_trainer import model_trainer_node
 
     mock_response = AIMessage(
         content=(
@@ -196,7 +196,7 @@ async def test_model_trainer_produces_trained_model() -> None:
 @pytest.mark.asyncio
 async def test_model_trainer_enforces_random_seed() -> None:
     """model_trainer always sets random_seed from config (overrides LLM value)."""
-    from lightagent.agents.subgraphs.ml_pipeline.model_trainer import model_trainer_node
+    from prismal.agents.subgraphs.ml_pipeline.model_trainer import model_trainer_node
 
     mock_response = AIMessage(
         content=(
@@ -240,7 +240,7 @@ async def test_model_trainer_enforces_random_seed() -> None:
 @pytest.mark.asyncio
 async def test_model_evaluator_produces_evaluation_report() -> None:
     """model_evaluator node populates ml_pipeline.evaluation_report in metadata."""
-    from lightagent.agents.subgraphs.ml_pipeline.model_evaluator import (
+    from prismal.agents.subgraphs.ml_pipeline.model_evaluator import (
         model_evaluator_node,
     )
 
@@ -292,7 +292,7 @@ async def test_model_evaluator_produces_evaluation_report() -> None:
 @pytest.mark.asyncio
 async def test_model_evaluator_low_score_recommends_retrain() -> None:
     """model_evaluator sets recommendation=retrain when score is low."""
-    from lightagent.agents.subgraphs.ml_pipeline.model_evaluator import (
+    from prismal.agents.subgraphs.ml_pipeline.model_evaluator import (
         model_evaluator_node,
     )
 
@@ -338,7 +338,7 @@ async def test_model_evaluator_low_score_recommends_retrain() -> None:
 @pytest.mark.asyncio
 async def test_model_exporter_produces_model_package() -> None:
     """model_exporter node populates ml_pipeline.model_package in metadata."""
-    from lightagent.agents.subgraphs.ml_pipeline.model_exporter import (
+    from prismal.agents.subgraphs.ml_pipeline.model_exporter import (
         model_exporter_node,
     )
 

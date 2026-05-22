@@ -13,12 +13,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.agents.patterns.mixture_of_agents import (
+from prismal.agents.patterns.mixture_of_agents import (
     MixtureOfAgents,
     MoAError,
     MoAResult,
 )
-from lightagent.core.exceptions import LightAgentError
+from prismal.core.exceptions import LightAgentError
 
 PROVIDER_REGISTRY_PATH = "lightagent.agents.patterns.mixture_of_agents.ProviderRegistry"
 

@@ -15,7 +15,7 @@ from langchain_core.tools import BaseTool, tool
 if TYPE_CHECKING:
     import pytest
 
-from lightagent.agents import tool_registry
+from prismal.agents import tool_registry
 
 
 def _make_tools(prefix: str, count: int) -> list[BaseTool]:

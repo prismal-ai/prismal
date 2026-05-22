@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 def test_index_document_task_returns_string() -> None:
     """_index_document_task.fn returns a status string containing filename."""
-    from lightagent.scheduler.prefect_flows import _index_document_task
+    from prismal.scheduler.prefect_flows import _index_document_task
 
     result = _index_document_task.fn("/data/documents/report.txt")
     assert isinstance(result, str)
@@ -18,7 +18,7 @@ def test_index_document_task_returns_string() -> None:
 
 def test_index_document_task_result_format() -> None:
     """_index_document_task.fn returns 'indexed:<filename>' format."""
-    from lightagent.scheduler.prefect_flows import _index_document_task
+    from prismal.scheduler.prefect_flows import _index_document_task
 
     result = _index_document_task.fn("/some/path/annual_report.pdf")
     assert result.startswith("indexed:")
@@ -27,14 +27,14 @@ def test_index_document_task_result_format() -> None:
 
 def test_reload_config_task_returns_true() -> None:
     """_reload_config_task.fn returns True on success."""
-    from lightagent.scheduler.prefect_flows import _reload_config_task
+    from prismal.scheduler.prefect_flows import _reload_config_task
 
     assert _reload_config_task.fn() is True
 
 
 def test_discover_skills_task_calls_reload_all() -> None:
     """_discover_skills_task.fn calls asyncio.run(manager.reload_all())."""
-    from lightagent.scheduler.prefect_flows import _discover_skills_task
+    from prismal.scheduler.prefect_flows import _discover_skills_task
 
     with (
         patch("lightagent.scheduler.prefect_flows.SkillsManager") as mock_cls,
@@ -52,7 +52,7 @@ def test_discover_skills_task_calls_reload_all() -> None:
 
 def test_discover_skills_task_returns_skill_names() -> None:
     """_discover_skills_task.fn returns list of skill names."""
-    from lightagent.scheduler.prefect_flows import _discover_skills_task
+    from prismal.scheduler.prefect_flows import _discover_skills_task
 
     skill_a = MagicMock()
     skill_a.name = "weather"
@@ -78,7 +78,7 @@ def test_discover_skills_task_returns_skill_names() -> None:
 
 def test_document_index_flow_delegates_to_task() -> None:
     """document_index_flow.fn delegates to _index_document_task."""
-    from lightagent.scheduler.prefect_flows import document_index_flow
+    from prismal.scheduler.prefect_flows import document_index_flow
 
     with patch(
         "lightagent.scheduler.prefect_flows._index_document_task",
@@ -92,7 +92,7 @@ def test_document_index_flow_delegates_to_task() -> None:
 
 def test_skill_discovery_flow_delegates_to_task() -> None:
     """skill_discovery_flow.fn delegates to _discover_skills_task."""
-    from lightagent.scheduler.prefect_flows import skill_discovery_flow
+    from prismal.scheduler.prefect_flows import skill_discovery_flow
 
     with patch(
         "lightagent.scheduler.prefect_flows._discover_skills_task",
@@ -106,7 +106,7 @@ def test_skill_discovery_flow_delegates_to_task() -> None:
 
 def test_config_reload_flow_delegates_to_task() -> None:
     """config_reload_flow.fn delegates to _reload_config_task."""
-    from lightagent.scheduler.prefect_flows import config_reload_flow
+    from prismal.scheduler.prefect_flows import config_reload_flow
 
     with patch(
         "lightagent.scheduler.prefect_flows._reload_config_task",
@@ -121,7 +121,7 @@ def test_config_reload_flow_delegates_to_task() -> None:
 def test_agent_run_flow_returns_string() -> None:
     """agent_run_flow.fn returns a result string from the graph."""
 
-    from lightagent.scheduler.prefect_flows import agent_run_flow
+    from prismal.scheduler.prefect_flows import agent_run_flow
 
     def fake_run_drain(coro: object) -> str:  # type: ignore[type-arg]
         # Close the coroutine so Python doesn't warn about unawaited coroutine.
@@ -143,7 +143,7 @@ def test_agent_run_flow_returns_string() -> None:
 
 def test_agent_run_flow_with_empty_task() -> None:
     """agent_run_flow.fn handles empty task description gracefully."""
-    from lightagent.scheduler.prefect_flows import agent_run_flow
+    from prismal.scheduler.prefect_flows import agent_run_flow
 
     result = agent_run_flow.fn("")
     assert "no-op" in result
@@ -158,7 +158,7 @@ def test_agent_run_flow_calls_graph() -> None:
     """
     import asyncio as _asyncio
 
-    from lightagent.scheduler.prefect_flows import agent_run_flow
+    from prismal.scheduler.prefect_flows import agent_run_flow
 
     mock_msg = MagicMock()
     mock_msg.content = "done"
@@ -192,7 +192,7 @@ def test_agent_run_flow_returns_error_string_on_exception() -> None:
     """agent_run_flow.fn returns an error string instead of raising on failure."""
     import inspect
 
-    from lightagent.scheduler.prefect_flows import agent_run_flow
+    from prismal.scheduler.prefect_flows import agent_run_flow
 
     def fake_run_raise(coro: object) -> str:  # type: ignore[type-arg]
         if inspect.iscoroutine(coro):
@@ -217,7 +217,7 @@ def test_flows_are_prefect_flows() -> None:
     """All exported symbols are Prefect Flow instances."""
     from prefect import Flow
 
-    from lightagent.scheduler.prefect_flows import (
+    from prismal.scheduler.prefect_flows import (
         agent_run_flow,
         config_reload_flow,
         document_index_flow,
@@ -235,13 +235,13 @@ def test_flows_are_prefect_flows() -> None:
 
 def test_document_index_task_has_retries() -> None:
     """_index_document_task is configured with at least 1 retry."""
-    from lightagent.scheduler.prefect_flows import _index_document_task
+    from prismal.scheduler.prefect_flows import _index_document_task
 
     assert _index_document_task.retries >= 1
 
 
 def test_discover_skills_task_has_retries() -> None:
     """_discover_skills_task is configured with at least 1 retry."""
-    from lightagent.scheduler.prefect_flows import _discover_skills_task
+    from prismal.scheduler.prefect_flows import _discover_skills_task
 
     assert _discover_skills_task.retries >= 1

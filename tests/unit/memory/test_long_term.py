@@ -13,7 +13,7 @@ import pytest
 
 def test_redact_openai_key() -> None:
     """_redact_sensitive replaces OpenAI API keys."""
-    from lightagent.memory.long_term import _redact_sensitive
+    from prismal.memory.long_term import _redact_sensitive
 
     text = "My key is sk-" + "a" * 48
     result = _redact_sensitive(text)
@@ -23,7 +23,7 @@ def test_redact_openai_key() -> None:
 
 def test_redact_generic_api_key() -> None:
     """_redact_sensitive replaces generic api_key patterns."""
-    from lightagent.memory.long_term import _redact_sensitive
+    from prismal.memory.long_term import _redact_sensitive
 
     text = 'api_key="supersecretvalue12345678"'
     result = _redact_sensitive(text)
@@ -32,7 +32,7 @@ def test_redact_generic_api_key() -> None:
 
 def test_redact_safe_text_unchanged() -> None:
     """_redact_sensitive does not modify safe text."""
-    from lightagent.memory.long_term import _redact_sensitive
+    from prismal.memory.long_term import _redact_sensitive
 
     text = "The weather in Paris is sunny today."
     assert _redact_sensitive(text) == text
@@ -40,7 +40,7 @@ def test_redact_safe_text_unchanged() -> None:
 
 def test_redact_anthropic_key() -> None:
     """_redact_sensitive replaces Anthropic API keys."""
-    from lightagent.memory.long_term import _redact_sensitive
+    from prismal.memory.long_term import _redact_sensitive
 
     text = "sk-ant-" + "a" * 95
     result = _redact_sensitive(text)
@@ -52,7 +52,7 @@ def test_redact_anthropic_key() -> None:
 
 def test_memory_entry_has_required_fields() -> None:
     """MemoryEntry can be constructed with required fields."""
-    from lightagent.memory.long_term import MemoryEntry
+    from prismal.memory.long_term import MemoryEntry
 
     entry = MemoryEntry(
         id="test-id",
@@ -67,7 +67,7 @@ def test_memory_entry_has_required_fields() -> None:
 
 def test_memory_entry_is_expired() -> None:
     """MemoryEntry.is_expired() returns True for past expiry."""
-    from lightagent.memory.long_term import MemoryEntry
+    from prismal.memory.long_term import MemoryEntry
 
     entry = MemoryEntry(
         id="x",
@@ -81,7 +81,7 @@ def test_memory_entry_is_expired() -> None:
 
 def test_memory_entry_not_expired() -> None:
     """MemoryEntry.is_expired() returns False for future expiry."""
-    from lightagent.memory.long_term import MemoryEntry
+    from prismal.memory.long_term import MemoryEntry
 
     future = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=30)
     entry = MemoryEntry(
@@ -100,7 +100,7 @@ def test_memory_entry_not_expired() -> None:
 @pytest.mark.asyncio
 async def test_save_stores_entry(tmp_path: Path) -> None:
     """save() persists a memory entry and returns its id."""
-    from lightagent.memory.long_term import LongTermMemory
+    from prismal.memory.long_term import LongTermMemory
 
     mock_store = MagicMock()
     mock_store.add_documents.return_value = ["doc-id-1"]
@@ -116,7 +116,7 @@ async def test_save_stores_entry(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_save_redacts_sensitive_content(tmp_path: Path) -> None:
     """save() redacts API keys before storing."""
-    from lightagent.memory.long_term import LongTermMemory
+    from prismal.memory.long_term import LongTermMemory
 
     mock_store = MagicMock()
     mock_store.add_documents.return_value = ["doc-id-1"]
@@ -134,7 +134,7 @@ async def test_save_redacts_sensitive_content(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_save_persists_across_instances(tmp_path: Path) -> None:
     """Saved entries survive LongTermMemory reconstruction."""
-    from lightagent.memory.long_term import LongTermMemory
+    from prismal.memory.long_term import LongTermMemory
 
     mock_store = MagicMock()
     mock_store.add_documents.return_value = ["doc-id-1"]
@@ -156,7 +156,7 @@ async def test_recall_returns_memory_entries(tmp_path: Path) -> None:
     """recall() returns a list of MemoryEntry objects."""
     from langchain_core.documents import Document
 
-    from lightagent.memory.long_term import LongTermMemory
+    from prismal.memory.long_term import LongTermMemory
 
     mock_store = MagicMock()
     mock_store.add_documents.return_value = ["doc-abc"]
@@ -179,7 +179,7 @@ async def test_recall_with_session_filter(tmp_path: Path) -> None:
     """recall() with session_id filters to that session."""
     from langchain_core.documents import Document
 
-    from lightagent.memory.long_term import LongTermMemory
+    from prismal.memory.long_term import LongTermMemory
 
     mock_store = MagicMock()
     mock_store.add_documents.return_value = ["doc-1"]
@@ -203,7 +203,7 @@ async def test_recall_with_session_filter(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_clear_all_removes_all_entries(tmp_path: Path) -> None:
     """clear() with no session_id removes all entries."""
-    from lightagent.memory.long_term import LongTermMemory
+    from prismal.memory.long_term import LongTermMemory
 
     mock_store = MagicMock()
     mock_store.add_documents.side_effect = [["id-1"], ["id-2"]]
@@ -220,7 +220,7 @@ async def test_clear_all_removes_all_entries(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_clear_session_removes_only_that_session(tmp_path: Path) -> None:
     """clear(session_id=X) removes only entries for session X."""
-    from lightagent.memory.long_term import LongTermMemory
+    from prismal.memory.long_term import LongTermMemory
 
     mock_store = MagicMock()
     mock_store.add_documents.side_effect = [["id-1"], ["id-2"]]
@@ -242,7 +242,7 @@ async def test_clear_session_removes_only_that_session(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_expire_removes_old_entries(tmp_path: Path) -> None:
     """expire() removes entries past their expires_at timestamp."""
-    from lightagent.memory.long_term import LongTermMemory
+    from prismal.memory.long_term import LongTermMemory
 
     mock_store = MagicMock()
     mock_store.add_documents.return_value = ["id-1"]

@@ -6,8 +6,8 @@ import asyncio
 
 import pytest
 
-from lightagent.agents.spawner import SubAgentSpawner
-from lightagent.core.config import Settings
+from prismal.agents.spawner import SubAgentSpawner
+from prismal.core.config import Settings
 
 
 @pytest.fixture

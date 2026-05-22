@@ -3,14 +3,14 @@
 import pytest
 from pydantic import ValidationError
 
-from lightagent.agents.subgraphs.artifacts import (
+from prismal.agents.subgraphs.artifacts import (
     CodeArtifact,
     QAReport,
     ReviewResult,
     TechnicalSpec,
     UserStory,
 )
-from lightagent.agents.subgraphs.artifacts import (
+from prismal.agents.subgraphs.artifacts import (
     TestReport as UnitTestReport,
 )
 

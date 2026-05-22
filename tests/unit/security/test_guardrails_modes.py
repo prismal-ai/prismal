@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lightagent.security.guardrails import GuardrailResult, GuardrailsEngine
+from prismal.security.guardrails import GuardrailResult, GuardrailsEngine
 
 
 @pytest.fixture
@@ -59,7 +59,7 @@ async def test_strict_sanitized_text_returned(engine: GuardrailsEngine) -> None:
 @pytest.mark.asyncio
 async def test_permissive_allows_injection(monkeypatch: pytest.MonkeyPatch) -> None:
     """Permissive mode must allow known injections (safe=True) but still score."""
-    import lightagent.core.config as cfg_module
+    import prismal.core.config as cfg_module
 
     class _FakeSettings:
         security_mode = "permissive"
@@ -76,7 +76,7 @@ async def test_permissive_allows_injection(monkeypatch: pytest.MonkeyPatch) -> N
 @pytest.mark.asyncio
 async def test_audit_only_allows_everything(monkeypatch: pytest.MonkeyPatch) -> None:
     """Audit-only mode must allow everything while still computing scores."""
-    import lightagent.core.config as cfg_module
+    import prismal.core.config as cfg_module
 
     class _FakeSettings:
         security_mode = "audit-only"
@@ -142,7 +142,7 @@ async def test_validate_output_permissive_allows_pii(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """validate_output in permissive mode returns safe=True even for PII."""
-    import lightagent.core.config as cfg_module
+    import prismal.core.config as cfg_module
 
     class _FakeSettings:
         security_mode = "permissive"
@@ -160,7 +160,7 @@ async def test_validate_output_audit_only_allows_api_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """validate_output in audit-only mode returns safe=True even for API key patterns."""
-    import lightagent.core.config as cfg_module
+    import prismal.core.config as cfg_module
 
     class _FakeSettings:
         security_mode = "audit-only"

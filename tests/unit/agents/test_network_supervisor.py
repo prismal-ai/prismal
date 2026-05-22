@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.agents.network_supervisor import (
+from prismal.agents.network_supervisor import (
     NetworkNode,
     NetworkSupervisorAgent,
     _load_nodes,
@@ -163,7 +163,7 @@ def test_make_a2a_jwt_returns_signed_token() -> None:
     """_make_a2a_jwt returns a non-empty signed JWT string when jose is available."""
     from unittest.mock import MagicMock
 
-    from lightagent.agents.network_supervisor import _make_a2a_jwt
+    from prismal.agents.network_supervisor import _make_a2a_jwt
 
     mock_settings = MagicMock()
     mock_settings.jwt_secret_key.get_secret_value.return_value = "test-secret-key-long-enough"

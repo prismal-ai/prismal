@@ -18,14 +18,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lightagent.agents.patterns.llm_compiler import (
+from prismal.agents.patterns.llm_compiler import (
     CompilerError,
     CompilerPlan,
     CompilerResult,
     LLMCompiler,
     TaskNode,
 )
-from lightagent.core.exceptions import LightAgentError
+from prismal.core.exceptions import LightAgentError
 
 
 def _task(

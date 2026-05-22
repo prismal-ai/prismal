@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 def test_settings_default_model() -> None:
     """Settings loads default_model with its class-level default."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     s = Settings()
     assert s.default_model == "claude-sonnet-4-5"
@@ -14,7 +14,7 @@ def test_settings_default_model() -> None:
 
 def test_settings_fallback_model() -> None:
     """Settings has a fallback_model defined."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     s = Settings()
     assert s.fallback_model == "gpt-4o-mini"
@@ -22,7 +22,7 @@ def test_settings_fallback_model() -> None:
 
 def test_settings_security_mode_default() -> None:
     """Security mode defaults to 'strict'."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     s = Settings()
     assert s.security_mode == "strict"
@@ -30,7 +30,7 @@ def test_settings_security_mode_default() -> None:
 
 def test_settings_security_mode_invalid() -> None:
     """Invalid security_mode raises ValidationError."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     with pytest.raises(ValidationError):
         Settings(security_mode="unknown")  # type: ignore[arg-type]
@@ -38,7 +38,7 @@ def test_settings_security_mode_invalid() -> None:
 
 def test_settings_risk_threshold_default() -> None:
     """Risk threshold defaults to 30."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     s = Settings()
     assert s.risk_threshold == 30
@@ -46,7 +46,7 @@ def test_settings_risk_threshold_default() -> None:
 
 def test_settings_risk_threshold_out_of_range() -> None:
     """Risk threshold must be 0-100."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     with pytest.raises(ValidationError):
         Settings(risk_threshold=150)
@@ -54,7 +54,7 @@ def test_settings_risk_threshold_out_of_range() -> None:
 
 def test_settings_db_url_default() -> None:
     """DB URL defaults to SQLite path."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     s = Settings()
     assert "sqlite" in s.db_url
@@ -62,7 +62,7 @@ def test_settings_db_url_default() -> None:
 
 def test_settings_ports() -> None:
     """API and dashboard ports are defined."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     s = Settings()
     assert s.port == 8000
@@ -71,7 +71,7 @@ def test_settings_ports() -> None:
 
 def test_settings_shell_disabled_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """Shell execution is disabled by default (security)."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     monkeypatch.delenv("LIGHTAGENT_SHELL_ENABLED", raising=False)
     # Pass _env_file=None so .env on disk cannot override the default.
@@ -81,7 +81,7 @@ def test_settings_shell_disabled_by_default(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_get_settings_cache_clear(monkeypatch: pytest.MonkeyPatch) -> None:
     """get_settings() returns the same cached instance; cache can be cleared."""
-    from lightagent.core.config import get_settings
+    from prismal.core.config import get_settings
 
     get_settings.cache_clear()
     s1 = get_settings()
@@ -92,7 +92,7 @@ def test_get_settings_cache_clear(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_settings_env_var_override(monkeypatch: pytest.MonkeyPatch) -> None:
     """LIGHTAGENT_ env vars override defaults."""
-    from lightagent.core.config import Settings, get_settings
+    from prismal.core.config import Settings, get_settings
 
     get_settings.cache_clear()
     monkeypatch.setenv("LIGHTAGENT_DEFAULT_MODEL", "gpt-4o")
@@ -103,7 +103,7 @@ def test_settings_env_var_override(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_cron_notify_defaults_empty() -> None:
     """Cron notification targets default to empty strings (opt-in)."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     s = Settings()
     assert s.cron_notify_telegram_chat_id == ""
@@ -117,7 +117,7 @@ def test_cron_notify_defaults_empty() -> None:
 
 def test_llm_provider_blank_keeps_explicit_models() -> None:
     """With llm_provider='' the explicit default_model/fallback_model win."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     s = Settings(
         _env_file=None,  # type: ignore[call-arg]
@@ -131,7 +131,7 @@ def test_llm_provider_blank_keeps_explicit_models() -> None:
 
 def test_llm_provider_ollama_resolves_defaults() -> None:
     """llm_provider=ollama picks an ollama_chat/* model for native tools."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     s = Settings(
         _env_file=None,  # type: ignore[call-arg]
@@ -145,7 +145,7 @@ def test_llm_provider_ollama_resolves_defaults() -> None:
 
 def test_llm_provider_ollama_keeps_consistent_model() -> None:
     """A consistent ollama/* default_model is preserved (no override)."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     s = Settings(
         _env_file=None,  # type: ignore[call-arg]
@@ -160,7 +160,7 @@ def test_llm_provider_conflict_warns_and_overrides() -> None:
     """A cross-provider default_model triggers a warning and is overridden."""
     import warnings
 
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     with warnings.catch_warnings(record=True) as captured:
         warnings.simplefilter("always")
@@ -180,7 +180,7 @@ def test_llm_provider_conflict_warns_and_overrides() -> None:
 
 def test_llm_provider_unknown_value_raises() -> None:
     """Unknown provider names raise a clear validation error."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     with pytest.raises(ValidationError) as excinfo:
         Settings(_env_file=None, llm_provider="cohere")  # type: ignore[call-arg]
@@ -191,7 +191,7 @@ def test_default_model_accepts_lightagent_model_alias(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """LIGHTAGENT_MODEL is accepted as an alias for default_model."""
-    from lightagent.core.config import Settings
+    from prismal.core.config import Settings
 
     monkeypatch.delenv("LIGHTAGENT_DEFAULT_MODEL", raising=False)
     monkeypatch.setenv("LIGHTAGENT_MODEL", "ollama/codellama")

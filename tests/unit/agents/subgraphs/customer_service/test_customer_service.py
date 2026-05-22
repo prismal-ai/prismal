@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from lightagent.agents.subgraphs.customer_service import (
+from prismal.agents.subgraphs.customer_service import (
     CUSTOMER_SERVICE_CATEGORIES,
     CustomerServiceError,
     make_classifier_node,
@@ -30,10 +30,10 @@ from lightagent.agents.subgraphs.customer_service import (
     make_response_generator_node,
     make_ticket_creator_node,
 )
-from lightagent.agents.subgraphs.customer_service.builder import (
+from prismal.agents.subgraphs.customer_service.builder import (
     build_customer_service_subgraph,
 )
-from lightagent.core.exceptions import LightAgentError
+from prismal.core.exceptions import LightAgentError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

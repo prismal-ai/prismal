@@ -16,8 +16,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.mcp.client import MCPClientManager
-from lightagent.mcp.connection import MCPServerConfig
+from prismal.mcp.client import MCPClientManager
+from prismal.mcp.connection import MCPServerConfig
 
 pytestmark = pytest.mark.unit
 
@@ -53,7 +53,7 @@ def _manager_with_conns(conns: list[MagicMock]) -> MCPClientManager:
 
 def _adapter_passthrough():  # type: ignore[no-untyped-def]
     """Patch ``MCPToolAdapter`` to return its own MCP tool — simpler to count."""
-    from lightagent.mcp import adapter as adapter_module
+    from prismal.mcp import adapter as adapter_module
 
     def _fake_adapter(conn, tool):  # type: ignore[no-untyped-def]
         stub = MagicMock()
@@ -164,7 +164,7 @@ def test_general_and_matching_both_included() -> None:
 
 
 def test_get_tools_for_agent_forwards_capabilities_to_manager() -> None:
-    from lightagent.agents import tool_registry
+    from prismal.agents import tool_registry
 
     captured: dict[str, object] = {}
 
@@ -188,7 +188,7 @@ def test_get_tools_for_agent_forwards_capabilities_to_manager() -> None:
 
 def test_get_tools_for_agent_legacy_call_passes_none() -> None:
     """Callers that omit ``required_capabilities`` still trigger the legacy path."""
-    from lightagent.agents import tool_registry
+    from prismal.agents import tool_registry
 
     captured: dict[str, object] = {"caps": "UNSET"}
 
@@ -212,7 +212,7 @@ def test_get_tools_for_agent_legacy_call_passes_none() -> None:
 
 def test_default_capability_map_has_all_new_nodes() -> None:
     """Mapping covers the 4 Fase-B patterns + 5 Fase-C subgraphs from the prompt."""
-    from lightagent.agents.tool_registry import DEFAULT_CAPABILITY_MAP
+    from prismal.agents.tool_registry import DEFAULT_CAPABILITY_MAP
 
     expected = {
         "tot_agent",
@@ -230,14 +230,14 @@ def test_default_capability_map_has_all_new_nodes() -> None:
 
 def test_get_recommended_capabilities_unknown_returns_none() -> None:
     """Legacy agents not in the map get the full pool (None)."""
-    from lightagent.agents.tool_registry import get_recommended_capabilities
+    from prismal.agents.tool_registry import get_recommended_capabilities
 
     assert get_recommended_capabilities("researcher") is None
     assert get_recommended_capabilities("coder") is None
 
 
 def test_get_recommended_capabilities_new_nodes_return_lists() -> None:
-    from lightagent.agents.tool_registry import get_recommended_capabilities
+    from prismal.agents.tool_registry import get_recommended_capabilities
 
     assert get_recommended_capabilities("code_review") == [
         "code_review",
@@ -249,7 +249,7 @@ def test_get_recommended_capabilities_new_nodes_return_lists() -> None:
 
 def test_get_tools_for_agent_code_review_excludes_customer_service_tools() -> None:
     """End-to-end: code_review filter + fake servers → no customer_service tools."""
-    from lightagent.agents import tool_registry
+    from prismal.agents import tool_registry
 
     conns = [
         _mock_conn("cs", capabilities=["customer_service"], tool_count=2),

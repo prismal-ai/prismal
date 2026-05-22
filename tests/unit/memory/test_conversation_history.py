@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lightagent.memory.conversation_history import ConversationHistory
+from prismal.memory.conversation_history import ConversationHistory
 
 
 class TestConversationHistory:

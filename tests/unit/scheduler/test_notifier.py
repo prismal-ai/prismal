@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.scheduler.notifier import CronNotifier
+from prismal.scheduler.notifier import CronNotifier
 
 
 class TestCronNotifier:

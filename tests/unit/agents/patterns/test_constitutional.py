@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.agents.patterns.constitutional import (
+from prismal.agents.patterns.constitutional import (
     DEFAULT_PRINCIPLES,
     ConstitutionalError,
     ConstitutionalFilter,
@@ -19,7 +19,7 @@ from lightagent.agents.patterns.constitutional import (
     ConstitutionalResult,
     ConstitutionalRevision,
 )
-from lightagent.core.exceptions import LightAgentError
+from prismal.core.exceptions import LightAgentError
 
 PROVIDER_REGISTRY_PATH = "lightagent.agents.patterns.constitutional.ProviderRegistry"
 

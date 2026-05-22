@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from lightagent.security.audit import AuditLogger
+from prismal.security.audit import AuditLogger
 
 
 @pytest.fixture
@@ -124,7 +124,7 @@ def test_corrupted_log_warns_and_falls_back_to_genesis(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Corrupted log file must log a warning and fall back to genesis hash."""
-    import lightagent.security.audit as audit_module
+    import prismal.security.audit as audit_module
 
     warnings_emitted: list[str] = []
     original_logger = audit_module.logger

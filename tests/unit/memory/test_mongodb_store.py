@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.memory.mongodb_store import MongoDBMemoryStore
+from prismal.memory.mongodb_store import MongoDBMemoryStore
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

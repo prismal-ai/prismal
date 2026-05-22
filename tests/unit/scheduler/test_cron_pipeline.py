@@ -16,8 +16,8 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
-from lightagent.scheduler.cron_manager import CronManager
-from lightagent.scheduler.executor import CronExecutor
+from prismal.scheduler.cron_manager import CronManager
+from prismal.scheduler.executor import CronExecutor
 
 # ---------------------------------------------------------------------------
 # Helpers

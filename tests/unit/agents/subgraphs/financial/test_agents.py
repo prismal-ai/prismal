@@ -32,7 +32,7 @@ async def test_market_data_collector_produces_snapshot(
     base_state: dict[str, Any],
 ) -> None:
     """market_data_collector stores MarketSnapshot in metadata."""
-    from lightagent.agents.subgraphs.financial.market_data_collector import (
+    from prismal.agents.subgraphs.financial.market_data_collector import (
         market_data_collector_node,
     )
 
@@ -63,7 +63,7 @@ async def test_market_data_collector_graceful_fallback(
     base_state: dict[str, Any],
 ) -> None:
     """market_data_collector falls back to unknown snapshot on bad LLM JSON."""
-    from lightagent.agents.subgraphs.financial.market_data_collector import (
+    from prismal.agents.subgraphs.financial.market_data_collector import (
         market_data_collector_node,
     )
 
@@ -81,7 +81,7 @@ async def test_market_data_collector_graceful_fallback(
 @pytest.mark.asyncio
 async def test_technical_analyst_produces_analysis(base_state: dict[str, Any]) -> None:
     """technical_analyst stores TechnicalAnalysis in metadata."""
-    from lightagent.agents.subgraphs.financial.technical_analyst import (
+    from prismal.agents.subgraphs.financial.technical_analyst import (
         technical_analyst_node,
     )
 
@@ -122,7 +122,7 @@ async def test_fundamental_analyst_produces_analysis(
     base_state: dict[str, Any],
 ) -> None:
     """fundamental_analyst stores FundamentalAnalysis in metadata."""
-    from lightagent.agents.subgraphs.financial.fundamental_analyst import (
+    from prismal.agents.subgraphs.financial.fundamental_analyst import (
         fundamental_analyst_node,
     )
 
@@ -157,7 +157,7 @@ async def test_risk_sentiment_analyst_produces_report(
     base_state: dict[str, Any],
 ) -> None:
     """risk_sentiment_analyst stores RiskSentimentReport in metadata."""
-    from lightagent.agents.subgraphs.financial.risk_sentiment_analyst import (
+    from prismal.agents.subgraphs.financial.risk_sentiment_analyst import (
         risk_sentiment_analyst_node,
     )
 
@@ -196,7 +196,7 @@ async def test_report_generator_always_has_disclaimer(
     base_state: dict[str, Any],
 ) -> None:
     """report_generator stores FinancialReport with disclaimer in metadata."""
-    from lightagent.agents.subgraphs.financial.report_generator import (
+    from prismal.agents.subgraphs.financial.report_generator import (
         report_generator_node,
     )
 
@@ -256,7 +256,7 @@ async def test_report_generator_disclaimer_injected_on_bad_llm_json(
     base_state: dict[str, Any],
 ) -> None:
     """Even when LLM returns garbage JSON, disclaimer must be present."""
-    from lightagent.agents.subgraphs.financial.report_generator import (
+    from prismal.agents.subgraphs.financial.report_generator import (
         report_generator_node,
     )
 

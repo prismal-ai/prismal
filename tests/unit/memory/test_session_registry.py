@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lightagent.memory.session_registry import SessionRegistry
+from prismal.memory.session_registry import SessionRegistry
 
 
 class TestPersistentSession:

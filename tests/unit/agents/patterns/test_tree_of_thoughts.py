@@ -12,14 +12,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lightagent.agents.patterns.tree_of_thoughts import (
+from prismal.agents.patterns.tree_of_thoughts import (
     Thought,
     ToTError,
     ToTResult,
     make_tot_node,
     tree_of_thoughts,
 )
-from lightagent.core.exceptions import LightAgentError
+from prismal.core.exceptions import LightAgentError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

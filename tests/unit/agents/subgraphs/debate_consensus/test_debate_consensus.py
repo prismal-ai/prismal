@@ -19,18 +19,18 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from lightagent.agents.patterns.debate import DebatePosition
-from lightagent.agents.subgraphs.debate_consensus import (
+from prismal.agents.patterns.debate import DebatePosition
+from prismal.agents.subgraphs.debate_consensus import (
     DebateConsensusError,
     make_consensus_node,
     make_moderator_node,
     make_opponent_node,
     make_proponent_node,
 )
-from lightagent.agents.subgraphs.debate_consensus.builder import (
+from prismal.agents.subgraphs.debate_consensus.builder import (
     build_debate_consensus_subgraph,
 )
-from lightagent.core.exceptions import LightAgentError
+from prismal.core.exceptions import LightAgentError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

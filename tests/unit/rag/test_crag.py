@@ -25,8 +25,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.core.exceptions import RAGError
-from lightagent.rag.crag import CRAGPipeline, CRAGResult, RetrievedChunk
+from prismal.core.exceptions import RAGError
+from prismal.rag.crag import CRAGPipeline, CRAGResult, RetrievedChunk
 
 # ── Paths for patching ─────────────────────────────────────────────────────────
 

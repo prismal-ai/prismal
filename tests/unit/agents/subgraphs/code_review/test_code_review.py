@@ -21,7 +21,7 @@ from unittest.mock import MagicMock
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from lightagent.agents.subgraphs.code_review import (
+from prismal.agents.subgraphs.code_review import (
     CodeIssue,
     CodeReviewError,
     CodeReviewReport,
@@ -31,10 +31,10 @@ from lightagent.agents.subgraphs.code_review import (
     make_security_scanner_node,
     make_suggester_node,
 )
-from lightagent.agents.subgraphs.code_review.builder import (
+from prismal.agents.subgraphs.code_review.builder import (
     build_code_review_subgraph,
 )
-from lightagent.core.exceptions import LightAgentError
+from prismal.core.exceptions import LightAgentError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

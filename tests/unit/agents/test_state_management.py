@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING
 
 from langchain_core.messages import HumanMessage
 
-from lightagent.agents.graph import build_supervisor_graph
-from lightagent.agents.state import create_initial_state
+from prismal.agents.graph import build_supervisor_graph
+from prismal.agents.state import create_initial_state
 
 if TYPE_CHECKING:
     from pathlib import Path

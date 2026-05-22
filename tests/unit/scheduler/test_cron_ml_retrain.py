@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 def test_cron_add_schedules_ml_retrain() -> None:
     """cron_add persists a re-training job in the CronManager store."""
-    from lightagent.agents.tools import cron_add
+    from prismal.agents.tools import cron_add
 
     mock_manager = MagicMock()
     mock_manager.add.return_value = MagicMock(
@@ -57,7 +57,7 @@ def test_cron_add_schedules_ml_retrain() -> None:
 
 def test_cron_ml_retrain_description_preserved() -> None:
     """The scheduled job description includes the dataset path."""
-    from lightagent.agents.tools import cron_add
+    from prismal.agents.tools import cron_add
 
     task_desc = (
         "Retrain classification model on "

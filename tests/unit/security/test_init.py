@@ -2,8 +2,8 @@
 
 
 def test_security_package_exports() -> None:
-    """All public security symbols must be importable from lightagent.security."""
-    from lightagent.security import (  # noqa: F401
+    """All public security symbols must be importable from prismal.security."""
+    from prismal.security import (  # noqa: F401
         MAX_INPUT_LENGTH,
         ActionInterceptor,
         AuditLogger,

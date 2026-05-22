@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 @pytest.mark.asyncio
 async def test_engine_created_for_sqlite() -> None:
     """create_async_engine_from_url returns AsyncEngine for SQLite URL."""
-    from lightagent.core.database import create_async_engine_from_url
+    from prismal.core.database import create_async_engine_from_url
 
     engine = create_async_engine_from_url("sqlite+aiosqlite:///:memory:")
     assert isinstance(engine, AsyncEngine)
@@ -21,7 +21,7 @@ async def test_get_session_factory_returns_sessionmaker() -> None:
     """get_session_factory returns an async_sessionmaker."""
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
-    from lightagent.core.database import (
+    from prismal.core.database import (
         create_async_engine_from_url,
         get_session_factory,
     )
@@ -35,7 +35,7 @@ async def test_get_session_factory_returns_sessionmaker() -> None:
 @pytest.mark.asyncio
 async def test_get_db_session_yields_async_session() -> None:
     """get_db_session yields an AsyncSession."""
-    from lightagent.core.database import create_async_engine_from_url, get_db_session
+    from prismal.core.database import create_async_engine_from_url, get_db_session
 
     engine = create_async_engine_from_url("sqlite+aiosqlite:///:memory:")
     async for session in get_db_session(engine):
@@ -46,7 +46,7 @@ async def test_get_db_session_yields_async_session() -> None:
 @pytest.mark.asyncio
 async def test_init_db_creates_tables_without_error() -> None:
     """init_db() runs without error on a clean in-memory database."""
-    from lightagent.core.database import create_async_engine_from_url, init_db
+    from prismal.core.database import create_async_engine_from_url, init_db
 
     engine = create_async_engine_from_url("sqlite+aiosqlite:///:memory:")
     await init_db(engine)
@@ -65,7 +65,7 @@ def test_base_is_declarative_base() -> None:
     """Base is a SQLAlchemy DeclarativeBase subclass."""
     from sqlalchemy.orm import DeclarativeBase
 
-    from lightagent.core.database import Base
+    from prismal.core.database import Base
 
     assert issubclass(Base, DeclarativeBase)
 
@@ -73,7 +73,7 @@ def test_base_is_declarative_base() -> None:
 @pytest.mark.asyncio
 async def test_session_rolls_back_on_exception() -> None:
     """get_db_session rolls back and re-raises on exception."""
-    from lightagent.core.database import create_async_engine_from_url, get_db_session
+    from prismal.core.database import create_async_engine_from_url, get_db_session
 
     engine = create_async_engine_from_url("sqlite+aiosqlite:///:memory:")
 
@@ -88,7 +88,7 @@ async def test_session_rolls_back_on_exception() -> None:
 @pytest.mark.asyncio
 async def test_get_db_session_commits_on_success() -> None:
     """get_db_session commits when no exception is raised."""
-    from lightagent.core.database import create_async_engine_from_url, get_db_session
+    from prismal.core.database import create_async_engine_from_url, get_db_session
 
     engine = create_async_engine_from_url("sqlite+aiosqlite:///:memory:")
     # If commit fails it raises; this test simply ensures no exception occurs
@@ -104,7 +104,7 @@ def test_create_async_engine_postgresql_url() -> None:
     """create_async_engine_from_url configures pool settings for PostgreSQL."""
     from unittest.mock import MagicMock, patch
 
-    from lightagent.core.database import create_async_engine_from_url
+    from prismal.core.database import create_async_engine_from_url
 
     mock_engine = MagicMock()
     with patch(
@@ -127,7 +127,7 @@ def test_get_backend_type_returns_sqlite() -> None:
     """get_backend_type() returns 'sqlite' for SQLite URLs."""
     from unittest.mock import patch
 
-    from lightagent.core.database import get_backend_type
+    from prismal.core.database import get_backend_type
 
     with patch("lightagent.core.database.get_settings") as mock_settings:
         mock_settings.return_value.db_url = "sqlite:///data/db/lightagent.db"
@@ -140,7 +140,7 @@ def test_get_backend_type_returns_postgresql() -> None:
     """get_backend_type() returns 'postgresql' for PostgreSQL URLs."""
     from unittest.mock import patch
 
-    from lightagent.core.database import get_backend_type
+    from prismal.core.database import get_backend_type
 
     with patch("lightagent.core.database.get_settings") as mock_settings:
         mock_settings.return_value.db_url = "postgresql+asyncpg://localhost/db"
@@ -157,7 +157,7 @@ def test_get_checkpointer_sqlite_returns_saver() -> None:
     import sys
     from unittest.mock import MagicMock, patch
 
-    from lightagent.core.database import get_checkpointer
+    from prismal.core.database import get_checkpointer
 
     mock_saver_instance = MagicMock()
     mock_saver_cls = MagicMock()
@@ -189,7 +189,7 @@ def test_get_checkpointer_sqlite_import_error_raises() -> None:
 
     import pytest
 
-    from lightagent.core.database import get_checkpointer
+    from prismal.core.database import get_checkpointer
 
     with (
         patch("lightagent.core.database.get_settings") as mock_settings,
@@ -207,7 +207,7 @@ def test_get_checkpointer_postgresql_import_error_raises() -> None:
 
     import pytest
 
-    from lightagent.core.database import get_checkpointer
+    from prismal.core.database import get_checkpointer
 
     with (
         patch("lightagent.core.database.get_settings") as mock_settings,

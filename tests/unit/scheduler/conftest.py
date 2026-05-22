@@ -55,27 +55,27 @@ if not _package_installed("prefect"):
     sys.modules["prefect.deployments"] = MagicMock()
 
 # ── Agent graph stub ──────────────────────────────────────────────────────────
-# executor._run_job lazily imports lightagent.agents.graph.get_async_compiled_graph.
+# executor._run_job lazily imports prismal.agents.graph.get_async_compiled_graph.
 # Stub only the graph module to avoid the langchain_litellm dependency chain that
-# lives in lightagent.agents.__init__ → AgentFactory → providers.registry.
-# We keep lightagent.agents as a proper package (real __path__) so that other
-# scheduler tests can still import lightagent.agents.tools (which only needs
+# lives in prismal.agents.__init__ → AgentFactory → providers.registry.
+# We keep prismal.agents as a proper package (real __path__) so that other
+# scheduler tests can still import prismal.agents.tools (which only needs
 # langchain_core, which IS available in the system Python).
 import types
 from pathlib import Path as _Path
 
-if "lightagent.agents" not in sys.modules:
-    _agents_real = _Path(__file__).parent.parent.parent.parent / "lightagent" / "agents"
-    _agents_pkg = types.ModuleType("lightagent.agents")
+if "prismal.agents" not in sys.modules:
+    _agents_real = _Path(__file__).parent.parent.parent.parent / "prismal" / "agents"
+    _agents_pkg = types.ModuleType("prismal.agents")
     _agents_pkg.__path__ = [str(_agents_real)]  # type: ignore[attr-defined]
-    _agents_pkg.__package__ = "lightagent.agents"
-    sys.modules["lightagent.agents"] = _agents_pkg
+    _agents_pkg.__package__ = "prismal.agents"
+    sys.modules["prismal.agents"] = _agents_pkg
 
-if "lightagent.agents.graph" not in sys.modules:
+if "prismal.agents.graph" not in sys.modules:
     from unittest.mock import AsyncMock, MagicMock
 
-    _agents_graph = types.ModuleType("lightagent.agents.graph")
+    _agents_graph = types.ModuleType("prismal.agents.graph")
     _agents_graph.get_async_compiled_graph = AsyncMock()  # type: ignore[attr-defined]
     _agents_graph.get_compiled_graph = MagicMock()  # type: ignore[attr-defined]
     _agents_graph.list_session_ids = MagicMock(return_value=[])  # type: ignore[attr-defined]
-    sys.modules["lightagent.agents.graph"] = _agents_graph
+    sys.modules["prismal.agents.graph"] = _agents_graph

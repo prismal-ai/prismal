@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from lightagent.agents.tool_registry import react_loop
+from prismal.agents.tool_registry import react_loop
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -132,7 +132,7 @@ async def test_all_tools_fail_six_parallel_calls() -> None:
     same tool are skipped without calling the service.  The all-tools-failed
     exit then fires and asks the LLM to synthesise — only 2 LLM round-trips.
     """
-    from lightagent.agents.tool_registry import _MAX_TOOL_FAILURES
+    from prismal.agents.tool_registry import _MAX_TOOL_FAILURES
 
     error = RuntimeError("Tavily API error: Request failed with status code 400")
     tavily = _make_tool("tavily_search", raises=error)
@@ -169,7 +169,7 @@ async def test_tool_skipped_after_failure_budget_exhausted() -> None:
     exit does NOT fire and we continue iterating.  This lets us observe the
     per-tool skip behaviour across iterations.
     """
-    from lightagent.agents.tool_registry import _MAX_TOOL_FAILURES
+    from prismal.agents.tool_registry import _MAX_TOOL_FAILURES
 
     error = RuntimeError("service unavailable")
     bad_tool = _make_tool("broken", raises=error)
@@ -293,7 +293,7 @@ async def test_rate_limit_does_not_burn_failure_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A 429 rate-limit error must not count toward the permanent failure budget."""
-    import lightagent.agents.tool_registry as reg
+    import prismal.agents.tool_registry as reg
 
     monkeypatch.setattr(reg, "_RATE_LIMIT_BACKOFF", 0.0)  # no real sleep in tests
 
@@ -329,7 +329,7 @@ async def test_rate_limit_skips_subsequent_parallel_calls(
     The 3rd call must be skipped (same iteration, already rate-limited) without
     making an API call.  The tool must remain available in the next iteration.
     """
-    import lightagent.agents.tool_registry as reg
+    import prismal.agents.tool_registry as reg
 
     monkeypatch.setattr(reg, "_RATE_LIMIT_BACKOFF", 0.0)
 
@@ -369,7 +369,7 @@ async def test_rate_limit_different_from_permanent_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A 429 must NOT increment the permanent fail counter; a 400 MUST."""
-    import lightagent.agents.tool_registry as reg
+    import prismal.agents.tool_registry as reg
 
     monkeypatch.setattr(reg, "_RATE_LIMIT_BACKOFF", 0.0)
 
@@ -428,7 +428,7 @@ class _FakeRateLimitError(Exception):
 @pytest.mark.asyncio
 async def test_extract_retry_after_from_attribute() -> None:
     """``_extract_retry_after`` reads ``exc.retry_after`` numeric attribute."""
-    from lightagent.agents.tool_registry import _extract_retry_after
+    from prismal.agents.tool_registry import _extract_retry_after
 
     class RetryAfterAttrError(Exception):
         retry_after = 4
@@ -439,7 +439,7 @@ async def test_extract_retry_after_from_attribute() -> None:
 @pytest.mark.asyncio
 async def test_extract_retry_after_from_headers() -> None:
     """``_extract_retry_after`` parses ``exc.headers['Retry-After']``."""
-    from lightagent.agents.tool_registry import _extract_retry_after
+    from prismal.agents.tool_registry import _extract_retry_after
 
     class RetryAfterHeaderError(Exception):
         headers = {"Retry-After": "7"}
@@ -450,7 +450,7 @@ async def test_extract_retry_after_from_headers() -> None:
 @pytest.mark.asyncio
 async def test_extract_retry_after_returns_none_when_absent() -> None:
     """No hint on the exception → ``None`` so caller falls back to backoff."""
-    from lightagent.agents.tool_registry import _extract_retry_after
+    from prismal.agents.tool_registry import _extract_retry_after
 
     assert _extract_retry_after(Exception("boom")) is None
 
@@ -460,8 +460,8 @@ async def test_llm_rate_limit_succeeds_after_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """LLM rate-limited once then succeeds → final response reaches the user."""
-    import lightagent.agents.tool_registry as reg
-    from lightagent.core.config import get_settings
+    import prismal.agents.tool_registry as reg
+    from prismal.core.config import get_settings
 
     settings = get_settings()
     monkeypatch.setattr(settings, "llm_rate_limit_max_retries", 3)
@@ -496,8 +496,8 @@ async def test_llm_rate_limit_exhausts_retries_returns_apology(
     """When every retry is rate-limited, the helper re-raises and react_loop
     returns the canonical apology string (existing behaviour preserved).
     """
-    import lightagent.agents.tool_registry as reg
-    from lightagent.core.config import get_settings
+    import prismal.agents.tool_registry as reg
+    from prismal.core.config import get_settings
 
     settings = get_settings()
     monkeypatch.setattr(settings, "llm_rate_limit_max_retries", 2)
@@ -529,8 +529,8 @@ async def test_llm_rate_limit_retry_disabled_when_max_retries_zero(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``llm_rate_limit_max_retries=0`` reverts to fail-fast legacy behaviour."""
-    import lightagent.agents.tool_registry as reg
-    from lightagent.core.config import get_settings
+    import prismal.agents.tool_registry as reg
+    from prismal.core.config import get_settings
 
     settings = get_settings()
     monkeypatch.setattr(settings, "llm_rate_limit_max_retries", 0)
@@ -561,8 +561,8 @@ async def test_llm_rate_limit_retry_respects_retry_after_hint(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """When the exception carries ``retry_after``, that hint drives the delay."""
-    import lightagent.agents.tool_registry as reg
-    from lightagent.core.config import get_settings
+    import prismal.agents.tool_registry as reg
+    from prismal.core.config import get_settings
 
     settings = get_settings()
     monkeypatch.setattr(settings, "llm_rate_limit_max_retries", 2)
@@ -623,8 +623,8 @@ async def test_permanent_error_skips_retry_and_returns_unavailable(
 ) -> None:
     """Credit-balance / auth errors must NOT be retried; react_loop returns
     the dedicated 'service unavailable' message on the first attempt."""
-    import lightagent.agents.tool_registry as reg
-    from lightagent.core.config import get_settings
+    import prismal.agents.tool_registry as reg
+    from prismal.core.config import get_settings
 
     settings = get_settings()
     monkeypatch.setattr(settings, "llm_rate_limit_max_retries", 3)
@@ -657,8 +657,8 @@ async def test_permanent_error_in_retry_helper_raises_without_sleeping(
 ) -> None:
     """`_invoke_llm_with_backoff` must re-raise immediately on permanent
     errors — never sleep, never retry."""
-    import lightagent.agents.tool_registry as reg
-    from lightagent.core.config import get_settings
+    import prismal.agents.tool_registry as reg
+    from prismal.core.config import get_settings
 
     settings = get_settings()
     monkeypatch.setattr(settings, "llm_rate_limit_max_retries", 3)
@@ -700,7 +700,7 @@ async def test_permanent_error_in_retry_helper_raises_without_sleeping(
 
 def test_unwrap_synthetic_respond() -> None:
     """The canonical 'respond' shape emitted by Ollama is unwrapped."""
-    from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
+    from prismal.agents.tool_registry import _unwrap_synthetic_tool_call
 
     raw = '{"function": "respond", "arguments": {"response": "Hola. ¿En qué puedo ayudarte hoy?"}}'
     assert _unwrap_synthetic_tool_call(raw) == "Hola. ¿En qué puedo ayudarte hoy?"
@@ -708,7 +708,7 @@ def test_unwrap_synthetic_respond() -> None:
 
 def test_unwrap_synthetic_name_parameters_text() -> None:
     """Alternative shape with name/parameters/text is also supported."""
-    from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
+    from prismal.agents.tool_registry import _unwrap_synthetic_tool_call
 
     raw = '{"name": "final_answer", "parameters": {"text": "42"}}'
     assert _unwrap_synthetic_tool_call(raw) == "42"
@@ -717,7 +717,7 @@ def test_unwrap_synthetic_name_parameters_text() -> None:
 def test_unwrap_synthetic_leaves_real_tool_calls_alone() -> None:
     """A JSON blob invoking a real tool (not a final-answer wrapper) is
     ignored so the ReAct loop can still dispatch it normally."""
-    from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
+    from prismal.agents.tool_registry import _unwrap_synthetic_tool_call
 
     raw = '{"function": "cron_add", "arguments": {"name": "x"}}'
     assert _unwrap_synthetic_tool_call(raw) is None
@@ -725,7 +725,7 @@ def test_unwrap_synthetic_leaves_real_tool_calls_alone() -> None:
 
 def test_unwrap_synthetic_ignores_plain_text() -> None:
     """Plain conversational text is returned as None (no unwrap)."""
-    from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
+    from prismal.agents.tool_registry import _unwrap_synthetic_tool_call
 
     assert _unwrap_synthetic_tool_call("Hola, ¿cómo estás?") is None
     assert _unwrap_synthetic_tool_call("") is None
@@ -733,7 +733,7 @@ def test_unwrap_synthetic_ignores_plain_text() -> None:
 
 def test_unwrap_synthetic_handles_code_fence() -> None:
     """Ollama often wraps JSON in ```json ... ``` fences — also unwrap that."""
-    from lightagent.agents.tool_registry import _unwrap_synthetic_tool_call
+    from prismal.agents.tool_registry import _unwrap_synthetic_tool_call
 
     raw = '```json\n{"function": "respond", "arguments": {"response": "hi"}}\n```'
     assert _unwrap_synthetic_tool_call(raw) == "hi"

@@ -32,7 +32,7 @@ class TestWeatherSkill:
 
     def test_metadata(self) -> None:
         """WeatherSkill exposes correct metadata."""
-        from lightagent.skills.available.weather.skill import WeatherSkill
+        from prismal.skills.available.weather.skill import WeatherSkill
 
         skill = WeatherSkill()
         assert skill.metadata.name == "weather"
@@ -40,7 +40,7 @@ class TestWeatherSkill:
 
     def test_get_tools_returns_get_weather(self) -> None:
         """get_tools() returns a single 'get_weather' tool."""
-        from lightagent.skills.available.weather.skill import WeatherSkill
+        from prismal.skills.available.weather.skill import WeatherSkill
 
         tools = WeatherSkill().get_tools()
         assert len(tools) == 1
@@ -48,7 +48,7 @@ class TestWeatherSkill:
 
     def test_wttr_success(self) -> None:
         """get_weather returns formatted string on successful wttr.in response."""
-        from lightagent.skills.available.weather.skill import WeatherSkill
+        from prismal.skills.available.weather.skill import WeatherSkill
 
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -75,7 +75,7 @@ class TestWeatherSkill:
         """get_weather returns error string on HTTP failure."""
         import httpx
 
-        from lightagent.skills.available.weather.skill import WeatherSkill
+        from prismal.skills.available.weather.skill import WeatherSkill
 
         with patch(_WEATHER_PATCH, side_effect=httpx.HTTPError("timeout")):
             result = WeatherSkill().get_tools()[0].invoke({"city": "Nowhere"})
@@ -84,7 +84,7 @@ class TestWeatherSkill:
 
     def test_owm_used_when_configured(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """OpenWeatherMap backend is used when env vars are set."""
-        from lightagent.skills.available.weather.skill import WeatherSkill
+        from prismal.skills.available.weather.skill import WeatherSkill
 
         monkeypatch.setenv("LIGHTAGENT_WEATHER_PROVIDER", "openweathermap")
         monkeypatch.setenv("LIGHTAGENT_WEATHER_API_KEY", "testkey")
@@ -110,7 +110,7 @@ class TestWebSearchSkill:
 
     def test_metadata(self) -> None:
         """WebSearchSkill exposes correct metadata."""
-        from lightagent.skills.available.web_search.skill import WebSearchSkill
+        from prismal.skills.available.web_search.skill import WebSearchSkill
 
         skill = WebSearchSkill()
         assert skill.metadata.name == "web_search"
@@ -118,7 +118,7 @@ class TestWebSearchSkill:
 
     def test_get_tools_returns_web_search(self) -> None:
         """get_tools() returns a single 'web_search' tool."""
-        from lightagent.skills.available.web_search.skill import WebSearchSkill
+        from prismal.skills.available.web_search.skill import WebSearchSkill
 
         tools = WebSearchSkill().get_tools()
         assert len(tools) == 1
@@ -126,7 +126,7 @@ class TestWebSearchSkill:
 
     def test_ddg_success_with_abstract(self) -> None:
         """web_search returns abstract text from DDG response."""
-        from lightagent.skills.available.web_search.skill import WebSearchSkill
+        from prismal.skills.available.web_search.skill import WebSearchSkill
 
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -143,7 +143,7 @@ class TestWebSearchSkill:
 
     def test_ddg_no_results_returns_fallback(self) -> None:
         """web_search returns fallback URL when no DDG results found."""
-        from lightagent.skills.available.web_search.skill import WebSearchSkill
+        from prismal.skills.available.web_search.skill import WebSearchSkill
 
         mock_response = MagicMock()
         mock_response.json.return_value = {"AbstractText": "", "RelatedTopics": []}
@@ -158,7 +158,7 @@ class TestWebSearchSkill:
         """web_search returns error message on HTTP failure."""
         import httpx
 
-        from lightagent.skills.available.web_search.skill import WebSearchSkill
+        from prismal.skills.available.web_search.skill import WebSearchSkill
 
         with patch(_SEARCH_PATCH, side_effect=httpx.HTTPError("connection refused")):
             result = WebSearchSkill().get_tools()[0].invoke({"query": "test"})
@@ -174,7 +174,7 @@ class TestCodeExecutorSkill:
 
     def test_metadata(self) -> None:
         """CodeExecutorSkill exposes correct metadata."""
-        from lightagent.skills.available.code_executor.skill import CodeExecutorSkill
+        from prismal.skills.available.code_executor.skill import CodeExecutorSkill
 
         skill = CodeExecutorSkill()
         assert skill.metadata.name == "code_executor"
@@ -183,7 +183,7 @@ class TestCodeExecutorSkill:
 
     def test_disabled_by_default(self) -> None:
         """execute_python returns error when LIGHTAGENT_SHELL_ENABLED is not set."""
-        from lightagent.skills.available.code_executor.skill import CodeExecutorSkill
+        from prismal.skills.available.code_executor.skill import CodeExecutorSkill
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("LIGHTAGENT_SHELL_ENABLED", None)
@@ -193,7 +193,7 @@ class TestCodeExecutorSkill:
 
     def test_enabled_runs_code(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """execute_python runs code when LIGHTAGENT_SHELL_ENABLED=true."""
-        from lightagent.skills.available.code_executor.skill import CodeExecutorSkill
+        from prismal.skills.available.code_executor.skill import CodeExecutorSkill
 
         monkeypatch.setenv("LIGHTAGENT_SHELL_ENABLED", "true")
         tool = CodeExecutorSkill().get_tools()[0]
@@ -202,7 +202,7 @@ class TestCodeExecutorSkill:
 
     def test_syntax_error_captured(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Syntax errors in user code are captured in stderr, not raised."""
-        from lightagent.skills.available.code_executor.skill import CodeExecutorSkill
+        from prismal.skills.available.code_executor.skill import CodeExecutorSkill
 
         monkeypatch.setenv("LIGHTAGENT_SHELL_ENABLED", "true")
         result = CodeExecutorSkill().get_tools()[0].invoke({"code": "def broken("})
@@ -210,7 +210,7 @@ class TestCodeExecutorSkill:
 
     def test_timeout_respected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Code that exceeds the timeout returns a timeout error."""
-        from lightagent.skills.available.code_executor.skill import CodeExecutorSkill
+        from prismal.skills.available.code_executor.skill import CodeExecutorSkill
 
         monkeypatch.setenv("LIGHTAGENT_SHELL_ENABLED", "true")
         result = (
@@ -235,7 +235,7 @@ class TestEmailReaderSkill:
 
     def test_metadata(self) -> None:
         """EmailReaderSkill exposes correct metadata."""
-        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+        from prismal.skills.available.email_reader.skill import EmailReaderSkill
 
         skill = EmailReaderSkill()
         assert skill.metadata.name == "email_reader"
@@ -243,7 +243,7 @@ class TestEmailReaderSkill:
 
     def test_validate_false_without_env(self) -> None:
         """validate() returns False when IMAP env vars are missing."""
-        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+        from prismal.skills.available.email_reader.skill import EmailReaderSkill
 
         with patch.dict(os.environ, {}, clear=False):
             for key in _EMAIL_KEYS:
@@ -252,7 +252,7 @@ class TestEmailReaderSkill:
 
     def test_validate_true_with_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """validate() returns True when all IMAP env vars are present."""
-        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+        from prismal.skills.available.email_reader.skill import EmailReaderSkill
 
         monkeypatch.setenv("LIGHTAGENT_EMAIL_HOST", "imap.example.com")
         monkeypatch.setenv("LIGHTAGENT_EMAIL_USER", "user@example.com")
@@ -261,7 +261,7 @@ class TestEmailReaderSkill:
 
     def test_graceful_degradation_no_config(self) -> None:
         """read_emails returns error message when env vars are missing."""
-        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+        from prismal.skills.available.email_reader.skill import EmailReaderSkill
 
         with patch.dict(os.environ, {}, clear=False):
             for key in _EMAIL_KEYS:
@@ -291,7 +291,7 @@ class TestCalendarSkill:
 
     def test_metadata(self) -> None:
         """CalendarSkill exposes correct metadata."""
-        from lightagent.skills.available.calendar.skill import CalendarSkill
+        from prismal.skills.available.calendar.skill import CalendarSkill
 
         skill = CalendarSkill()
         assert skill.metadata.name == "calendar"
@@ -299,7 +299,7 @@ class TestCalendarSkill:
 
     def test_no_calendar_dir_returns_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """list_events returns error when calendar dir does not exist."""
-        from lightagent.skills.available.calendar.skill import CalendarSkill
+        from prismal.skills.available.calendar.skill import CalendarSkill
 
         monkeypatch.setenv("LIGHTAGENT_CALENDAR_DIR", "/nonexistent/dir/abc123")
         result = CalendarSkill().get_tools()[0].invoke({"days_ahead": 7})
@@ -307,7 +307,7 @@ class TestCalendarSkill:
 
     def test_reads_ics_events(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """list_events returns events found in .ics files."""
-        from lightagent.skills.available.calendar.skill import CalendarSkill
+        from prismal.skills.available.calendar.skill import CalendarSkill
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ics_path = Path(tmpdir) / "test.ics"
@@ -321,7 +321,7 @@ class TestCalendarSkill:
 
     def test_empty_dir_returns_no_events(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """list_events returns 'no events' for empty calendar directory."""
-        from lightagent.skills.available.calendar.skill import CalendarSkill
+        from prismal.skills.available.calendar.skill import CalendarSkill
 
         with tempfile.TemporaryDirectory() as tmpdir:
             monkeypatch.setenv("LIGHTAGENT_CALENDAR_DIR", tmpdir)
@@ -338,7 +338,7 @@ class TestDatabaseQuerySkill:
 
     def test_metadata(self) -> None:
         """DatabaseQuerySkill exposes correct metadata."""
-        from lightagent.skills.available.database_query.skill import DatabaseQuerySkill
+        from prismal.skills.available.database_query.skill import DatabaseQuerySkill
 
         skill = DatabaseQuerySkill()
         assert skill.metadata.name == "database_query"
@@ -347,7 +347,7 @@ class TestDatabaseQuerySkill:
 
     def test_select_only_blocks_insert(self) -> None:
         """INSERT statement is rejected before reaching the database."""
-        from lightagent.skills.available.database_query.skill import DatabaseQuerySkill
+        from prismal.skills.available.database_query.skill import DatabaseQuerySkill
 
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = str(Path(tmpdir) / "test.db")
@@ -368,7 +368,7 @@ class TestDatabaseQuerySkill:
 
     def test_select_only_blocks_drop(self) -> None:
         """DROP statement is rejected."""
-        from lightagent.skills.available.database_query.skill import DatabaseQuerySkill
+        from prismal.skills.available.database_query.skill import DatabaseQuerySkill
 
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = str(Path(tmpdir) / "test.db")
@@ -385,7 +385,7 @@ class TestDatabaseQuerySkill:
 
     def test_valid_select_returns_results(self) -> None:
         """SELECT query returns tabular results."""
-        from lightagent.skills.available.database_query.skill import DatabaseQuerySkill
+        from prismal.skills.available.database_query.skill import DatabaseQuerySkill
 
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = str(Path(tmpdir) / "test.db")
@@ -408,7 +408,7 @@ class TestDatabaseQuerySkill:
 
     def test_missing_db_returns_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Returns error message when database file does not exist."""
-        from lightagent.skills.available.database_query.skill import DatabaseQuerySkill
+        from prismal.skills.available.database_query.skill import DatabaseQuerySkill
 
         monkeypatch.setenv("LIGHTAGENT_DB_PATH", "/nonexistent/db.db")
         result = DatabaseQuerySkill().get_tools()[0].invoke({"query": "SELECT 1"})
@@ -416,7 +416,7 @@ class TestDatabaseQuerySkill:
 
     def test_with_cte_is_allowed(self) -> None:
         """WITH (CTE) queries are allowed."""
-        from lightagent.skills.available.database_query.skill import DatabaseQuerySkill
+        from prismal.skills.available.database_query.skill import DatabaseQuerySkill
 
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = str(Path(tmpdir) / "test.db")
@@ -445,19 +445,19 @@ class TestEmailReaderHelpers:
 
     def test_decode_header_value_plain_string(self) -> None:
         """_decode_header_value handles plain ASCII strings."""
-        from lightagent.skills.available.email_reader.skill import _decode_header_value
+        from prismal.skills.available.email_reader.skill import _decode_header_value
 
         assert _decode_header_value("Hello World") == "Hello World"
 
     def test_decode_header_value_none(self) -> None:
         """_decode_header_value returns empty string for None."""
-        from lightagent.skills.available.email_reader.skill import _decode_header_value
+        from prismal.skills.available.email_reader.skill import _decode_header_value
 
         assert _decode_header_value(None) == ""
 
     def test_decode_header_value_bytes(self) -> None:
         """_decode_header_value decodes bytes to string."""
-        from lightagent.skills.available.email_reader.skill import _decode_header_value
+        from prismal.skills.available.email_reader.skill import _decode_header_value
 
         assert _decode_header_value(b"Hello") == "Hello"
 
@@ -465,7 +465,7 @@ class TestEmailReaderHelpers:
         """_get_body extracts plain text from a simple email."""
         import email as email_lib
 
-        from lightagent.skills.available.email_reader.skill import _get_body
+        from prismal.skills.available.email_reader.skill import _get_body
 
         raw = (
             "From: test@example.com\r\n"
@@ -481,7 +481,7 @@ class TestEmailReaderHelpers:
         """_get_body extracts the text/plain part from a multipart email."""
         import email as email_lib
 
-        from lightagent.skills.available.email_reader.skill import _get_body
+        from prismal.skills.available.email_reader.skill import _get_body
 
         raw = (
             "From: test@example.com\r\n"
@@ -507,7 +507,7 @@ class TestEmailReaderHelpers:
         import imaplib
         from unittest.mock import MagicMock, patch
 
-        from lightagent.skills.available.email_reader.skill import _fetch_emails
+        from prismal.skills.available.email_reader.skill import _fetch_emails
 
         with patch("imaplib.IMAP4_SSL") as mock_ssl:
             mock_imap = MagicMock()
@@ -524,7 +524,7 @@ class TestEmailReaderHelpers:
         """_fetch_emails returns 'No emails found' when mailbox is empty."""
         from unittest.mock import MagicMock, patch
 
-        from lightagent.skills.available.email_reader.skill import _fetch_emails
+        from prismal.skills.available.email_reader.skill import _fetch_emails
 
         with patch("imaplib.IMAP4_SSL") as mock_ssl:
             mock_imap = MagicMock()
@@ -543,7 +543,7 @@ class TestEmailReaderHelpers:
         """_fetch_emails uses UNSEEN criterion when unread_only=True."""
         from unittest.mock import MagicMock, patch
 
-        from lightagent.skills.available.email_reader.skill import _fetch_emails
+        from prismal.skills.available.email_reader.skill import _fetch_emails
 
         with patch("imaplib.IMAP4_SSL") as mock_ssl:
             mock_imap = MagicMock()
@@ -564,7 +564,7 @@ class TestCalendarHelpers:
         """_parse_dt returns aware datetime unchanged."""
         from datetime import UTC, datetime
 
-        from lightagent.skills.available.calendar.skill import _parse_dt
+        from prismal.skills.available.calendar.skill import _parse_dt
 
         dt = datetime(2026, 3, 1, 9, 0, tzinfo=UTC)
         result = _parse_dt(dt)
@@ -574,7 +574,7 @@ class TestCalendarHelpers:
         """_parse_dt adds UTC to naive datetime."""
         from datetime import UTC, datetime
 
-        from lightagent.skills.available.calendar.skill import _parse_dt
+        from prismal.skills.available.calendar.skill import _parse_dt
 
         naive = datetime(2026, 3, 1, 9, 0)  # noqa: DTZ001 — intentionally naive for test
         result = _parse_dt(naive)
@@ -585,7 +585,7 @@ class TestCalendarHelpers:
         """_parse_dt converts date to UTC datetime."""
         from datetime import UTC, date
 
-        from lightagent.skills.available.calendar.skill import _parse_dt
+        from prismal.skills.available.calendar.skill import _parse_dt
 
         d = date(2026, 3, 1)
         result = _parse_dt(d)
@@ -595,7 +595,7 @@ class TestCalendarHelpers:
 
     def test_parse_dt_unknown_type(self) -> None:
         """_parse_dt returns None for unrecognised input."""
-        from lightagent.skills.available.calendar.skill import _parse_dt
+        from prismal.skills.available.calendar.skill import _parse_dt
 
         assert _parse_dt("not a date") is None
         assert _parse_dt(12345) is None
@@ -604,7 +604,7 @@ class TestCalendarHelpers:
         """_read_events returns empty list for directory with no .ics files."""
         import tempfile
 
-        from lightagent.skills.available.calendar.skill import _read_events
+        from prismal.skills.available.calendar.skill import _read_events
 
         with tempfile.TemporaryDirectory() as tmpdir:
             result = _read_events(Path(tmpdir), 30)
@@ -613,14 +613,14 @@ class TestCalendarHelpers:
 
     def test_read_events_nonexistent_dir(self) -> None:
         """_read_events returns empty list when directory does not exist."""
-        from lightagent.skills.available.calendar.skill import _read_events
+        from prismal.skills.available.calendar.skill import _read_events
 
         result = _read_events(Path("/nonexistent/calendar/dir"), 30)
         assert result == []
 
     def test_read_events_with_future_event(self) -> None:
         """_read_events returns events that fall within days_ahead window."""
-        from lightagent.skills.available.calendar.skill import _read_events
+        from prismal.skills.available.calendar.skill import _read_events
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ics_path = Path(tmpdir) / "cal.ics"
@@ -632,7 +632,7 @@ class TestCalendarHelpers:
 
     def test_read_events_event_with_location_and_description(self) -> None:
         """_read_events populates location and description fields."""
-        from lightagent.skills.available.calendar.skill import _read_events
+        from prismal.skills.available.calendar.skill import _read_events
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ics_path = Path(tmpdir) / "cal.ics"
@@ -647,7 +647,7 @@ class TestCalendarHelpers:
 
     def test_read_events_past_event_excluded(self) -> None:
         """_read_events does not include events in the past."""
-        from lightagent.skills.available.calendar.skill import _read_events
+        from prismal.skills.available.calendar.skill import _read_events
 
         past_ics = """\
 BEGIN:VCALENDAR
@@ -667,7 +667,7 @@ END:VCALENDAR
 
     def test_read_events_corrupted_ics_does_not_crash(self) -> None:
         """_read_events logs a warning and continues for corrupted .ics files."""
-        from lightagent.skills.available.calendar.skill import _read_events
+        from prismal.skills.available.calendar.skill import _read_events
 
         with tempfile.TemporaryDirectory() as tmpdir:
             bad_ics = Path(tmpdir) / "broken.ics"
@@ -682,7 +682,7 @@ class TestWebSearchHelpers:
 
     def test_search_ddg_related_topics(self) -> None:
         """_search_ddg extracts related topics from DDG response."""
-        from lightagent.skills.available.web_search.skill import _search_ddg
+        from prismal.skills.available.web_search.skill import _search_ddg
 
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -702,7 +702,7 @@ class TestWebSearchHelpers:
 
     def test_search_google_success(self) -> None:
         """_search_google returns formatted results from Google API."""
-        from lightagent.skills.available.web_search.skill import _search_google
+        from prismal.skills.available.web_search.skill import _search_google
 
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -724,7 +724,7 @@ class TestWebSearchHelpers:
 
     def test_search_google_no_results(self) -> None:
         """_search_google returns 'No results' when items list is empty."""
-        from lightagent.skills.available.web_search.skill import _search_google
+        from prismal.skills.available.web_search.skill import _search_google
 
         mock_response = MagicMock()
         mock_response.json.return_value = {"items": []}
@@ -784,7 +784,7 @@ class TestEmailReaderCoverage:
         be decoded using the provided charset — this exercises the ``isinstance(part,
         bytes)`` branch at line 59-60.
         """
-        from lightagent.skills.available.email_reader.skill import _decode_header_value
+        from prismal.skills.available.email_reader.skill import _decode_header_value
 
         # Build a proper RFC 2047 encoded-word: =?utf-8?b?<base64>?=
         # "Héllo" base64-encoded in utf-8 → SGVsbG8=  (just "Hello" for simplicity)
@@ -802,7 +802,7 @@ class TestEmailReaderCoverage:
         valid RFC822 message for each, and verifies the formatted output contains
         expected header values.
         """
-        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+        from prismal.skills.available.email_reader.skill import EmailReaderSkill
 
         mock_imap = _make_imap_mock(search_ids=b"1 2")
 
@@ -828,7 +828,7 @@ class TestEmailReaderCoverage:
         The fetch loop runs but fetch() returns data that is not a tuple, so no
         summaries are appended and the ternary falls to the else branch.
         """
-        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+        from prismal.skills.available.email_reader.skill import EmailReaderSkill
 
         # fetch returns a non-tuple raw item so the ``isinstance(raw, tuple)`` check
         # on line 137 skips the message — summaries stays empty.
@@ -861,7 +861,7 @@ class TestEmailReaderCoverage:
         """
         import imaplib
 
-        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+        from prismal.skills.available.email_reader.skill import EmailReaderSkill
 
         mock_imap = MagicMock()
         mock_imap.__enter__ = MagicMock(return_value=mock_imap)
@@ -890,7 +890,7 @@ class TestEmailReaderCoverage:
         Simulates a network failure (e.g. connection refused) so the OSError except
         clause at line 152 is exercised.
         """
-        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+        from prismal.skills.available.email_reader.skill import EmailReaderSkill
 
         mock_imap = MagicMock()
         mock_imap.__enter__ = MagicMock(return_value=mock_imap)
@@ -922,7 +922,7 @@ class TestEmailReaderCoverage:
         test ``test_read_emails_imap_fetch_loop`` ensures lines 215-216 ARE covered
         by setting all required env vars and providing a valid IMAP mock.
         """
-        from lightagent.skills.available.email_reader.skill import EmailReaderSkill
+        from prismal.skills.available.email_reader.skill import EmailReaderSkill
 
         # Ensure none of the required env vars are set
         env_removals = {
@@ -978,7 +978,7 @@ class TestCalendarCoverage:
         import sys
         import tempfile
 
-        from lightagent.skills.available.calendar.skill import _read_events
+        from prismal.skills.available.calendar.skill import _read_events
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1000,7 +1000,7 @@ class TestCalendarCoverage:
             ics_path = Path(tmpdir) / "nodtstart.ics"
             ics_path.write_text(_ICS_NO_DTSTART)
 
-            from lightagent.skills.available.calendar.skill import _read_events
+            from prismal.skills.available.calendar.skill import _read_events
 
             result = _read_events(Path(tmpdir), 30)
 
@@ -1016,7 +1016,7 @@ class TestCalendarCoverage:
         and the early return fires before the glob loop.  This also confirms lines
         93-96 cannot execute when no files are scanned.
         """
-        from lightagent.skills.available.calendar.skill import _read_events
+        from prismal.skills.available.calendar.skill import _read_events
 
         result = _read_events(Path("/this/path/does/not/exist/at/all"), 7)
 
@@ -1038,7 +1038,7 @@ class TestCalendarCoverage:
                 "lightagent.skills.available.calendar.skill._read_events",
                 return_value=[],
             ):
-                from lightagent.skills.available.calendar.skill import CalendarSkill
+                from prismal.skills.available.calendar.skill import CalendarSkill
 
                 list_events = CalendarSkill().get_tools()[0]
                 result = list_events.invoke({"days_ahead": 7})
@@ -1074,7 +1074,7 @@ class TestCalendarCoverage:
                 "lightagent.skills.available.calendar.skill._read_events",
                 return_value=mock_events,
             ):
-                from lightagent.skills.available.calendar.skill import CalendarSkill
+                from prismal.skills.available.calendar.skill import CalendarSkill
 
                 list_events = CalendarSkill().get_tools()[0]
                 result = list_events.invoke({"days_ahead": 7})
@@ -1110,7 +1110,7 @@ class TestCalendarCoverage:
                 "lightagent.skills.available.calendar.skill._read_events",
                 return_value=mock_events,
             ):
-                from lightagent.skills.available.calendar.skill import CalendarSkill
+                from prismal.skills.available.calendar.skill import CalendarSkill
 
                 list_events = CalendarSkill().get_tools()[0]
                 result = list_events.invoke({"days_ahead": 7})
@@ -1132,7 +1132,7 @@ class TestCalendarCoverage:
             ics_path = Path(tmpdir) / "future.ics"
             ics_path.write_text(_ICS_FUTURE_EVENT)
 
-            from lightagent.skills.available.calendar.skill import _read_events
+            from prismal.skills.available.calendar.skill import _read_events
 
             # 40 000 days ≈ 110 years — covers 2099-12-31
             result = _read_events(Path(tmpdir), 40_000)

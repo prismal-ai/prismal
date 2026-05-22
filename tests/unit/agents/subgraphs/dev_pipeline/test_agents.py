@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from lightagent.agents.state import create_initial_state
+from prismal.agents.state import create_initial_state
 
 
 def _base_state(task: str = "Build a login feature") -> dict:
@@ -19,7 +19,7 @@ def _base_state(task: str = "Build a login feature") -> dict:
 @pytest.mark.asyncio
 async def test_po_agent_adds_user_story() -> None:
     """PO agent node populates dev_pipeline.user_story in metadata."""
-    from lightagent.agents.subgraphs.dev_pipeline.po_agent import po_agent_node
+    from prismal.agents.subgraphs.dev_pipeline.po_agent import po_agent_node
 
     mock_response = AIMessage(
         content=(
@@ -39,7 +39,7 @@ async def test_po_agent_adds_user_story() -> None:
 @pytest.mark.asyncio
 async def test_architect_agent_adds_tech_spec() -> None:
     """Architect agent node populates dev_pipeline.technical_spec in metadata."""
-    from lightagent.agents.subgraphs.dev_pipeline.architect_agent import (
+    from prismal.agents.subgraphs.dev_pipeline.architect_agent import (
         architect_agent_node,
     )
 
@@ -68,7 +68,7 @@ async def test_architect_agent_adds_tech_spec() -> None:
 @pytest.mark.asyncio
 async def test_developer_agent_adds_code_artifact() -> None:
     """Developer agent node populates dev_pipeline.code_artifact in metadata."""
-    from lightagent.agents.subgraphs.dev_pipeline.developer_agent import (
+    from prismal.agents.subgraphs.dev_pipeline.developer_agent import (
         developer_agent_node,
     )
 
@@ -97,7 +97,7 @@ async def test_developer_agent_adds_code_artifact() -> None:
 @pytest.mark.asyncio
 async def test_unit_test_agent_adds_test_report() -> None:
     """Unit test agent node populates dev_pipeline.test_report in metadata."""
-    from lightagent.agents.subgraphs.dev_pipeline.unit_test_agent import (
+    from prismal.agents.subgraphs.dev_pipeline.unit_test_agent import (
         unit_test_agent_node,
     )
 
@@ -125,7 +125,7 @@ async def test_unit_test_agent_adds_test_report() -> None:
 @pytest.mark.asyncio
 async def test_qa_agent_adds_qa_report() -> None:
     """QA agent node populates dev_pipeline.qa_report in metadata."""
-    from lightagent.agents.subgraphs.dev_pipeline.qa_agent import qa_agent_node
+    from prismal.agents.subgraphs.dev_pipeline.qa_agent import qa_agent_node
 
     state = _base_state()
     state["metadata"]["dev_pipeline"]["code_artifact"] = {
@@ -151,7 +151,7 @@ async def test_qa_agent_adds_qa_report() -> None:
 @pytest.mark.asyncio
 async def test_reviewer_agent_adds_review_result() -> None:
     """Reviewer agent node populates dev_pipeline.review_result in metadata."""
-    from lightagent.agents.subgraphs.dev_pipeline.reviewer_agent import (
+    from prismal.agents.subgraphs.dev_pipeline.reviewer_agent import (
         reviewer_agent_node,
     )
 

@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from lightagent.agents.subgraphs.registry import SubgraphDefinition, SubgraphRegistry
+from prismal.agents.subgraphs.registry import SubgraphDefinition, SubgraphRegistry
 
 
 def _make_def(name: str = "test_graph") -> SubgraphDefinition:

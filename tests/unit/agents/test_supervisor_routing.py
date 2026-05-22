@@ -16,8 +16,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from lightagent.agents.state import create_initial_state
-from lightagent.agents.supervisor import supervisor_node, supervisor_router
+from prismal.agents.state import create_initial_state
+from prismal.agents.supervisor import supervisor_node, supervisor_router
 
 # ---------------------------------------------------------------------------
 # Helper

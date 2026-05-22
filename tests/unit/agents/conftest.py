@@ -38,7 +38,7 @@ def _isolate_llm_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(key, raising=False)
 
     try:
-        from lightagent.core.config import Settings, get_settings
+        from prismal.core.config import Settings, get_settings
     except Exception:  # pragma: no cover — early import failures
         return
 

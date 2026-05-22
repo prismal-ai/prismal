@@ -11,14 +11,14 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from lightagent.agents.state import AgentState
+    from prismal.agents.state import AgentState
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 _SAMPLE_SKILL_CODE = textwrap.dedent("""\
     from __future__ import annotations
     from langchain_core.tools import BaseTool, tool
-    from lightagent.skills.base import BaseSkill, SkillMetadata
+    from prismal.skills.base import BaseSkill, SkillMetadata
 
 
     class UnitConverterSkill(BaseSkill):
@@ -69,7 +69,7 @@ def _make_mock_llm(code: str) -> MagicMock:
 
 def test_slugify_basic() -> None:
     """_slugify converts class names to snake_case slugs."""
-    from lightagent.agents.skill_creator import _slugify
+    from prismal.agents.skill_creator import _slugify
 
     assert _slugify("UnitConverterSkill") == "unitconverterskill"
     assert _slugify("My Skill") == "my_skill"
@@ -78,7 +78,7 @@ def test_slugify_basic() -> None:
 
 def test_slugify_fallback() -> None:
     """_slugify returns 'custom_skill' for empty or symbol-only input."""
-    from lightagent.agents.skill_creator import _slugify
+    from prismal.agents.skill_creator import _slugify
 
     assert _slugify("") == "custom_skill"
     assert _slugify("---") == "custom_skill"
@@ -89,7 +89,7 @@ def test_slugify_fallback() -> None:
 
 def test_extract_class_name_found() -> None:
     """_extract_class_name finds BaseSkill subclass name."""
-    from lightagent.agents.skill_creator import _extract_class_name
+    from prismal.agents.skill_creator import _extract_class_name
 
     code = "class MyAwesomeSkill(BaseSkill):\n    pass\n"
     assert _extract_class_name(code) == "MyAwesomeSkill"
@@ -97,7 +97,7 @@ def test_extract_class_name_found() -> None:
 
 def test_extract_class_name_not_found() -> None:
     """_extract_class_name returns 'CustomSkill' when no match found."""
-    from lightagent.agents.skill_creator import _extract_class_name
+    from prismal.agents.skill_creator import _extract_class_name
 
     assert _extract_class_name("# no class here") == "CustomSkill"
 
@@ -108,7 +108,7 @@ def test_extract_class_name_not_found() -> None:
 @pytest.mark.asyncio
 async def test_create_skill_writes_files(tmp_path: Path) -> None:
     """create_skill writes skill.py and human_review_required.txt."""
-    from lightagent.agents.skill_creator import create_skill
+    from prismal.agents.skill_creator import create_skill
 
     mock_llm = _make_mock_llm(_SAMPLE_SKILL_CODE)
 
@@ -129,7 +129,7 @@ async def test_create_skill_writes_files(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_create_skill_strips_markdown_fences(tmp_path: Path) -> None:
     """create_skill strips ```python fences from LLM output."""
-    from lightagent.agents.skill_creator import create_skill
+    from prismal.agents.skill_creator import create_skill
 
     fenced_code = f"```python\n{_SAMPLE_SKILL_CODE}```\n"
     mock_llm = _make_mock_llm(fenced_code)
@@ -150,7 +150,7 @@ async def test_create_skill_strips_markdown_fences(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_create_skill_returns_result_string(tmp_path: Path) -> None:
     """create_skill returns a descriptive result string."""
-    from lightagent.agents.skill_creator import create_skill
+    from prismal.agents.skill_creator import create_skill
 
     mock_llm = _make_mock_llm(_SAMPLE_SKILL_CODE)
 
@@ -169,7 +169,7 @@ async def test_create_skill_returns_result_string(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_create_skill_ruff_failure_reported(tmp_path: Path) -> None:
     """create_skill reports ruff failures without aborting."""
-    from lightagent.agents.skill_creator import create_skill
+    from prismal.agents.skill_creator import create_skill
 
     mock_llm = _make_mock_llm(_SAMPLE_SKILL_CODE)
 
@@ -195,7 +195,7 @@ async def test_node_no_human_message() -> None:
     """skill_creator_node returns error when no human message in state."""
     from langchain_core.messages import AIMessage, SystemMessage
 
-    from lightagent.agents.skill_creator import skill_creator_node
+    from prismal.agents.skill_creator import skill_creator_node
 
     state: AgentState = {  # type: ignore[typeddict-item]
         "messages": [SystemMessage(content="system")],
@@ -224,7 +224,7 @@ async def test_node_with_human_message(tmp_path: Path) -> None:
     """skill_creator_node calls create_skill with the human message content."""
     from langchain_core.messages import AIMessage, HumanMessage
 
-    from lightagent.agents.skill_creator import skill_creator_node
+    from prismal.agents.skill_creator import skill_creator_node
 
     state: AgentState = {  # type: ignore[typeddict-item]
         "messages": [HumanMessage(content="Create a unit converter skill")],

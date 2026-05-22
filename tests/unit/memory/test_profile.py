@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lightagent.memory.profile import ProfileManager
+from prismal.memory.profile import ProfileManager
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -196,7 +196,7 @@ def test_default_profile_dir_is_data_workspace_profile() -> None:
 
 
 def test_profile_manager_exported_from_memory_package() -> None:
-    """ProfileManager is importable from lightagent.memory."""
-    from lightagent.memory import ProfileManager as PM
+    """ProfileManager is importable from prismal.memory."""
+    from prismal.memory import ProfileManager as PM
 
     assert PM is ProfileManager

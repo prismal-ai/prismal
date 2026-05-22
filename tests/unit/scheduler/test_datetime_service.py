@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from lightagent.scheduler.datetime_service import _UTC, DateTimeService
+from prismal.scheduler.datetime_service import _UTC, DateTimeService
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 

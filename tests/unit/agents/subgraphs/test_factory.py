@@ -4,9 +4,9 @@ import pytest
 from langchain_core.messages import HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 
-from lightagent.agents.state import create_initial_state
-from lightagent.agents.subgraphs.factory import SubgraphFactory
-from lightagent.agents.subgraphs.registry import SubgraphDefinition
+from prismal.agents.state import create_initial_state
+from prismal.agents.subgraphs.factory import SubgraphFactory
+from prismal.agents.subgraphs.registry import SubgraphDefinition
 
 # aiosqlite connections held by AsyncSqliteSaver are intentionally kept open
 # for the lifetime of the compiled graph; GC finaliser warnings are expected.

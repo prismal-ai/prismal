@@ -6,7 +6,7 @@ import json
 
 import structlog
 
-from lightagent.core.logging import get_logger, setup_logging
+from prismal.core.logging import get_logger, setup_logging
 
 
 def test_setup_logging_returns_no_error() -> None:

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from langgraph.graph.state import CompiledStateGraph
 
-from lightagent.agents.graph import build_supervisor_graph, get_compiled_graph
+from prismal.agents.graph import build_supervisor_graph, get_compiled_graph
 
 
 def test_build_supervisor_graph_returns_compiled_graph(tmp_path: Path) -> None:
@@ -73,7 +73,7 @@ def test_list_session_ids_returns_empty_when_no_db() -> None:
     from pathlib import Path
     from unittest.mock import patch
 
-    from lightagent.agents.graph import list_session_ids
+    from prismal.agents.graph import list_session_ids
 
     with patch(
         "lightagent.agents.graph._DEFAULT_CHECKPOINT_PATH",
@@ -88,7 +88,7 @@ def test_list_session_ids_reads_thread_ids(tmp_path: Path) -> None:
     import sqlite3
     from unittest.mock import patch
 
-    from lightagent.agents.graph import list_session_ids
+    from prismal.agents.graph import list_session_ids
 
     db_path = tmp_path / "checkpoints.db"
     with sqlite3.connect(db_path) as conn:
@@ -110,7 +110,7 @@ def test_list_session_ids_handles_exception(tmp_path: Path) -> None:
     """list_session_ids returns [] on any DB error (corrupt DB, etc.)."""
     from unittest.mock import patch
 
-    from lightagent.agents.graph import list_session_ids
+    from prismal.agents.graph import list_session_ids
 
     # Create a corrupted DB file (not a valid SQLite)
     db_path = tmp_path / "bad.db"
@@ -126,7 +126,7 @@ def test_supervisor_router_wrapper_delegates(tmp_path: Path) -> None:
     """_supervisor_router delegates correctly to the underlying supervisor_router."""
     from unittest.mock import MagicMock, patch
 
-    from lightagent.agents.graph import _supervisor_router
+    from prismal.agents.graph import _supervisor_router
 
     mock_state = MagicMock()
     with patch(

@@ -6,12 +6,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.rag.federated import FederatedRAGEngine, _merge_and_rerank
+from prismal.rag.federated import FederatedRAGEngine, _merge_and_rerank
 
 
 def test_merge_and_rerank_deduplicates_by_chunk_id() -> None:
     """_merge_and_rerank removes duplicate chunk IDs, keeping highest score."""
-    from lightagent.rag.crag import RetrievedChunk
+    from prismal.rag.crag import RetrievedChunk
 
     chunks = [
         RetrievedChunk(source="a.txt", chunk_id="c1", relevance_score=0.9, content="hello"),
@@ -27,7 +27,7 @@ def test_merge_and_rerank_deduplicates_by_chunk_id() -> None:
 
 def test_merge_and_rerank_sorts_by_score_desc() -> None:
     """_merge_and_rerank returns chunks sorted by relevance_score descending."""
-    from lightagent.rag.crag import RetrievedChunk
+    from prismal.rag.crag import RetrievedChunk
 
     chunks = [
         RetrievedChunk(source="a.txt", chunk_id="c1", relevance_score=0.5, content="a"),
@@ -42,7 +42,7 @@ def test_merge_and_rerank_sorts_by_score_desc() -> None:
 @pytest.mark.asyncio
 async def test_federated_search_empty_nodes_returns_local() -> None:
     """FederatedRAGEngine with no remote nodes returns local results only."""
-    from lightagent.rag.crag import RetrievedChunk
+    from prismal.rag.crag import RetrievedChunk
 
     local_chunk = RetrievedChunk(
         source="local.txt", chunk_id="l1", relevance_score=0.8, content="local"
@@ -61,7 +61,7 @@ async def test_federated_search_empty_nodes_returns_local() -> None:
 @pytest.mark.asyncio
 async def test_federated_search_merges_remote_results() -> None:
     """FederatedRAGEngine merges local + remote results and re-ranks."""
-    from lightagent.rag.crag import RetrievedChunk
+    from prismal.rag.crag import RetrievedChunk
 
     local_chunk = RetrievedChunk(
         source="local.txt", chunk_id="l1", relevance_score=0.5, content="local"
@@ -89,7 +89,7 @@ async def test_federated_search_merges_remote_results() -> None:
 @pytest.mark.asyncio
 async def test_federated_search_skips_failed_nodes() -> None:
     """FederatedRAGEngine skips nodes that raise exceptions (partial results)."""
-    from lightagent.rag.crag import RetrievedChunk
+    from prismal.rag.crag import RetrievedChunk
 
     local_chunk = RetrievedChunk(
         source="local.txt", chunk_id="l1", relevance_score=0.5, content="local"
@@ -150,7 +150,7 @@ def test_load_rag_nodes_returns_nodes_with_rag_capability() -> None:
     """_load_rag_nodes returns only nodes that have 'rag' in capabilities."""
     from unittest.mock import patch
 
-    from lightagent.agents.network_supervisor import NetworkNode
+    from prismal.agents.network_supervisor import NetworkNode
 
     nodes = [
         NetworkNode(

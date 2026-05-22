@@ -7,7 +7,7 @@ from typing import cast
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
-from lightagent.agents.state import create_initial_state
+from prismal.agents.state import create_initial_state
 
 
 def test_agent_state_has_required_fields() -> None:

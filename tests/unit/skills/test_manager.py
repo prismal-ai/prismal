@@ -7,14 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from lightagent.core.exceptions import SkillLoadError, SkillValidationError
-from lightagent.skills.manager import SkillsManager
+from prismal.core.exceptions import SkillLoadError, SkillValidationError
+from prismal.skills.manager import SkillsManager
 
 # ── Skill stubs ───────────────────────────────────────────────────────────────
 
 MINIMAL_SKILL_PY = """\
 from langchain_core.tools import BaseTool, tool
-from lightagent.skills.base import BaseSkill, SkillMetadata
+from prismal.skills.base import BaseSkill, SkillMetadata
 
 
 class _TestSkill(BaseSkill):
@@ -51,7 +51,7 @@ class _TestSkill(BaseSkill):
 
 UNSAFE_SKILL_PY = """\
 from langchain_core.tools import BaseTool
-from lightagent.skills.base import BaseSkill, SkillMetadata
+from prismal.skills.base import BaseSkill, SkillMetadata
 
 
 class _UnsafeSkill(BaseSkill):
@@ -75,7 +75,7 @@ class _UnsafeSkill(BaseSkill):
 
 INVALID_VALIDATE_SKILL_PY = """\
 from langchain_core.tools import BaseTool
-from lightagent.skills.base import BaseSkill, SkillMetadata
+from prismal.skills.base import BaseSkill, SkillMetadata
 
 
 class _BadSkill(BaseSkill):

@@ -20,24 +20,24 @@ import pytest
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-from lightagent.agents.subgraphs.artifacts import (
+from prismal.agents.subgraphs.artifacts import (
     CodeArtifact,
     QAReport,
     ReviewResult,
     TechnicalSpec,
     UserStory,
 )
-from lightagent.agents.subgraphs.artifacts import (
+from prismal.agents.subgraphs.artifacts import (
     TestReport as _TestReport,  # aliased: pytest treats `Test*` classes as test suites
 )
-from lightagent.agents.subgraphs.financial.artifacts import (
+from prismal.agents.subgraphs.financial.artifacts import (
     FinancialReport,
     FundamentalAnalysis,
     MarketSnapshot,
     RiskSentimentReport,
     TechnicalAnalysis,
 )
-from lightagent.agents.subgraphs.ml_pipeline.artifacts import (
+from prismal.agents.subgraphs.ml_pipeline.artifacts import (
     DatasetProfile,
     EDAReport,
     EvaluationReport,

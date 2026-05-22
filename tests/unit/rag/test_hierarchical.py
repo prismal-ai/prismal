@@ -18,8 +18,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lightagent.core.exceptions import HierarchicalRAGError, RAGError
-from lightagent.rag.hierarchical import (
+from prismal.core.exceptions import HierarchicalRAGError, RAGError
+from prismal.rag.hierarchical import (
     HierarchicalRAGEngine,
     HierarchicalSearchResult,
     ParentChunk,

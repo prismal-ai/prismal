@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 def test_short_term_memory_starts_empty() -> None:
     """A new ShortTermMemory has no messages."""
-    from lightagent.memory.short_term import ShortTermMemory
+    from prismal.memory.short_term import ShortTermMemory
 
     mem = ShortTermMemory()
     assert len(mem) == 0
@@ -20,7 +20,7 @@ def test_short_term_memory_starts_empty() -> None:
 
 def test_short_term_memory_custom_max() -> None:
     """max_messages parameter is stored."""
-    from lightagent.memory.short_term import ShortTermMemory
+    from prismal.memory.short_term import ShortTermMemory
 
     mem = ShortTermMemory(max_messages=10)
     assert mem.max_messages == 10
@@ -31,7 +31,7 @@ def test_short_term_memory_custom_max() -> None:
 
 def test_add_single_message() -> None:
     """add() stores a single message."""
-    from lightagent.memory.short_term import ShortTermMemory
+    from prismal.memory.short_term import ShortTermMemory
 
     mem = ShortTermMemory()
     msg = HumanMessage(content="Hello")
@@ -41,7 +41,7 @@ def test_add_single_message() -> None:
 
 def test_add_multiple_messages() -> None:
     """add() stores multiple messages in order."""
-    from lightagent.memory.short_term import ShortTermMemory
+    from prismal.memory.short_term import ShortTermMemory
 
     mem = ShortTermMemory()
     msgs = [HumanMessage(content="Hi"), AIMessage(content="Hello")]
@@ -55,7 +55,7 @@ def test_add_multiple_messages() -> None:
 
 def test_add_evicts_oldest_when_full() -> None:
     """add() evicts the oldest message when max_messages is reached."""
-    from lightagent.memory.short_term import ShortTermMemory
+    from prismal.memory.short_term import ShortTermMemory
 
     mem = ShortTermMemory(max_messages=3)
     for i in range(4):
@@ -73,7 +73,7 @@ def test_add_evicts_oldest_when_full() -> None:
 
 def test_get_all_returns_copy() -> None:
     """get_all() returns a list (modifications don't affect internal state)."""
-    from lightagent.memory.short_term import ShortTermMemory
+    from prismal.memory.short_term import ShortTermMemory
 
     mem = ShortTermMemory()
     mem.add(HumanMessage(content="X"))
@@ -87,7 +87,7 @@ def test_get_all_returns_copy() -> None:
 
 def test_get_recent_returns_last_n() -> None:
     """get_recent(n) returns the n most recent messages."""
-    from lightagent.memory.short_term import ShortTermMemory
+    from prismal.memory.short_term import ShortTermMemory
 
     mem = ShortTermMemory()
     for i in range(5):
@@ -101,7 +101,7 @@ def test_get_recent_returns_last_n() -> None:
 
 def test_get_recent_with_n_larger_than_size() -> None:
     """get_recent(n) returns all messages if n > len(memory)."""
-    from lightagent.memory.short_term import ShortTermMemory
+    from prismal.memory.short_term import ShortTermMemory
 
     mem = ShortTermMemory()
     mem.add(HumanMessage(content="only"))
@@ -110,7 +110,7 @@ def test_get_recent_with_n_larger_than_size() -> None:
 
 def test_get_recent_zero() -> None:
     """get_recent(0) returns empty list."""
-    from lightagent.memory.short_term import ShortTermMemory
+    from prismal.memory.short_term import ShortTermMemory
 
     mem = ShortTermMemory()
     mem.add(HumanMessage(content="x"))
@@ -122,7 +122,7 @@ def test_get_recent_zero() -> None:
 
 def test_clear_empties_memory() -> None:
     """clear() removes all messages."""
-    from lightagent.memory.short_term import ShortTermMemory
+    from prismal.memory.short_term import ShortTermMemory
 
     mem = ShortTermMemory()
     mem.add(HumanMessage(content="a"))
@@ -136,7 +136,7 @@ def test_clear_empties_memory() -> None:
 
 def test_concurrent_add_is_safe() -> None:
     """Concurrent add() calls do not corrupt the internal state."""
-    from lightagent.memory.short_term import ShortTermMemory
+    from prismal.memory.short_term import ShortTermMemory
 
     mem = ShortTermMemory(max_messages=1000)
     errors: list[Exception] = []
@@ -163,7 +163,7 @@ def test_concurrent_add_is_safe() -> None:
 
 def test_preserves_message_types() -> None:
     """get_all() returns messages with their original types."""
-    from lightagent.memory.short_term import ShortTermMemory
+    from prismal.memory.short_term import ShortTermMemory
 
     mem = ShortTermMemory()
     mem.add(SystemMessage(content="sys"))

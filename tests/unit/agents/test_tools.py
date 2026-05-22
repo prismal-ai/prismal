@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from langchain_core.tools import BaseTool
 
-from lightagent.agents.tools import (
+from prismal.agents.tools import (
     CODER_TOOLS,
     CRITIC_TOOLS,
     DATA_ANALYST_TOOLS,
@@ -340,7 +340,7 @@ def test_tool_groups_are_lists_of_base_tool() -> None:
 
 def test_read_file_blocks_system_path() -> None:
     """read_file must return an error string for blocked paths like /etc/passwd."""
-    from lightagent.agents.tools import read_file
+    from prismal.agents.tools import read_file
 
     result = read_file.invoke({"path": "/etc/passwd"})
     assert "error" in result.lower() or "blocked" in result.lower()
@@ -348,7 +348,7 @@ def test_read_file_blocks_system_path() -> None:
 
 def test_write_file_blocks_system_path() -> None:
     """write_file must return an error string for blocked paths like /etc/evil.txt."""
-    from lightagent.agents.tools import write_file
+    from prismal.agents.tools import write_file
 
     result = write_file.invoke({"path": "/etc/evil.txt", "content": "x"})
     assert "error" in result.lower() or "blocked" in result.lower()
@@ -392,8 +392,8 @@ def test_cron_add_tool_accepts_output_channel() -> None:
 
 def test_cron_add_auto_fills_from_channel_context() -> None:
     """When the LLM omits routing, cron_add borrows channel context."""
-    from lightagent.agents.context import use_channel_context
-    from lightagent.agents.tools import cron_add
+    from prismal.agents.context import use_channel_context
+    from prismal.agents.tools import cron_add
 
     with patch("lightagent.agents.tools.CronManager") as mock_cls:
         mock_manager = MagicMock()
@@ -427,8 +427,8 @@ def test_cron_add_auto_fills_from_channel_context() -> None:
 
 def test_cron_add_honours_explicit_none_opt_out() -> None:
     """Passing output_channel='none' disables auto-fill."""
-    from lightagent.agents.context import use_channel_context
-    from lightagent.agents.tools import cron_add
+    from prismal.agents.context import use_channel_context
+    from prismal.agents.tools import cron_add
 
     with patch("lightagent.agents.tools.CronManager") as mock_cls:
         mock_manager = MagicMock()
@@ -458,7 +458,7 @@ def test_cron_add_honours_explicit_none_opt_out() -> None:
 
 def test_cron_add_no_context_no_auto_fill() -> None:
     """Without channel context, cron_add does not auto-fill any routing."""
-    from lightagent.agents.tools import cron_add
+    from prismal.agents.tools import cron_add
 
     with patch("lightagent.agents.tools.CronManager") as mock_cls:
         mock_manager = MagicMock()
@@ -480,7 +480,7 @@ def test_cron_add_no_context_no_auto_fill() -> None:
 
 def test_cron_add_default_max_retries_is_two() -> None:
     """cron_add passes max_retries=2 to CronManager.add by default."""
-    from lightagent.agents.tools import CRON_ADD_DEFAULT_MAX_RETRIES, cron_add
+    from prismal.agents.tools import CRON_ADD_DEFAULT_MAX_RETRIES, cron_add
 
     assert CRON_ADD_DEFAULT_MAX_RETRIES == 2
     with patch("lightagent.agents.tools.CronManager") as mock_cls:
@@ -502,7 +502,7 @@ def test_cron_add_default_max_retries_is_two() -> None:
 
 def test_list_dir_returns_entries(tmp_path: Path) -> None:
     """list_dir returns [DIR] and [FILE] tagged entries for a directory."""
-    from lightagent.agents.tools import list_dir
+    from prismal.agents.tools import list_dir
 
     (tmp_path / "file1.txt").write_text("a")
     (tmp_path / "subdir").mkdir()
@@ -513,7 +513,7 @@ def test_list_dir_returns_entries(tmp_path: Path) -> None:
 
 def test_list_dir_blocks_system_path() -> None:
     """list_dir returns an error for blocked system paths."""
-    from lightagent.agents.tools import list_dir
+    from prismal.agents.tools import list_dir
 
     result = list_dir.invoke({"path": "/etc"})
     assert "error" in result.lower() or "blocked" in result.lower()
@@ -521,7 +521,7 @@ def test_list_dir_blocks_system_path() -> None:
 
 def test_find_files_finds_by_pattern(tmp_path: Path) -> None:
     """find_files returns files matching the glob pattern."""
-    from lightagent.agents.tools import find_files
+    from prismal.agents.tools import find_files
 
     (tmp_path / "main.py").write_text("x")
     (tmp_path / "test_main.py").write_text("y")
@@ -534,7 +534,7 @@ def test_find_files_finds_by_pattern(tmp_path: Path) -> None:
 
 def test_find_files_respects_max_results(tmp_path: Path) -> None:
     """find_files returns at most max_results entries."""
-    from lightagent.agents.tools import find_files
+    from prismal.agents.tools import find_files
 
     for i in range(20):
         (tmp_path / f"file{i}.txt").write_text("x")
@@ -550,7 +550,7 @@ def test_find_files_respects_max_results(tmp_path: Path) -> None:
 
 def test_create_dir_creates_nested(tmp_path: Path) -> None:
     """create_dir creates a nested directory structure."""
-    from lightagent.agents.tools import create_dir
+    from prismal.agents.tools import create_dir
 
     new_dir = tmp_path / "a" / "b" / "c"
     result = create_dir.invoke({"path": str(new_dir)})
@@ -560,7 +560,7 @@ def test_create_dir_creates_nested(tmp_path: Path) -> None:
 
 def test_create_dir_is_idempotent(tmp_path: Path) -> None:
     """create_dir on an existing directory does not raise."""
-    from lightagent.agents.tools import create_dir
+    from prismal.agents.tools import create_dir
 
     d = tmp_path / "existing"
     d.mkdir()
@@ -570,7 +570,7 @@ def test_create_dir_is_idempotent(tmp_path: Path) -> None:
 
 def test_create_dir_blocks_system_path() -> None:
     """create_dir returns an error for blocked paths."""
-    from lightagent.agents.tools import create_dir
+    from prismal.agents.tools import create_dir
 
     result = create_dir.invoke({"path": "/etc/newdir"})
     assert "error" in result.lower() or "blocked" in result.lower()
@@ -583,7 +583,7 @@ def test_create_dir_blocks_system_path() -> None:
 
 def test_move_path_renames_file(tmp_path: Path) -> None:
     """move_path moves a file from src to dst."""
-    from lightagent.agents.tools import move_path
+    from prismal.agents.tools import move_path
 
     src = tmp_path / "src.txt"
     dst = tmp_path / "dst.txt"
@@ -596,7 +596,7 @@ def test_move_path_renames_file(tmp_path: Path) -> None:
 
 def test_move_path_returns_error_for_missing_src(tmp_path: Path) -> None:
     """move_path returns an error if source does not exist."""
-    from lightagent.agents.tools import move_path
+    from prismal.agents.tools import move_path
 
     result = move_path.invoke(
         {"src": str(tmp_path / "missing.txt"), "dst": str(tmp_path / "dst.txt")}
@@ -611,8 +611,8 @@ def test_move_path_returns_error_for_missing_src(tmp_path: Path) -> None:
 
 def test_delete_path_removes_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """delete_path removes a file when fs_delete_enabled is True."""
-    from lightagent.agents.tools import delete_path
-    from lightagent.core.config import Settings
+    from prismal.agents.tools import delete_path
+    from prismal.core.config import Settings
 
     monkeypatch.setattr(
         "lightagent.agents.tools.get_settings", lambda: Settings(fs_delete_enabled=True)
@@ -626,8 +626,8 @@ def test_delete_path_removes_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
 def test_delete_path_blocked_when_disabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """delete_path returns an error when fs_delete_enabled is False."""
-    from lightagent.agents.tools import delete_path
-    from lightagent.core.config import Settings
+    from prismal.agents.tools import delete_path
+    from prismal.core.config import Settings
 
     monkeypatch.setattr(
         "lightagent.agents.tools.get_settings",
@@ -647,8 +647,8 @@ def test_delete_path_blocked_when_disabled(tmp_path: Path, monkeypatch: pytest.M
 
 def test_shell_exec_blocked_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     """shell_exec returns an error when shell_enabled is False."""
-    from lightagent.agents.tools import shell_exec
-    from lightagent.core.config import Settings
+    from prismal.agents.tools import shell_exec
+    from prismal.core.config import Settings
 
     monkeypatch.setattr(
         "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=False)
@@ -659,8 +659,8 @@ def test_shell_exec_blocked_when_disabled(monkeypatch: pytest.MonkeyPatch) -> No
 
 def test_shell_exec_returns_output(monkeypatch: pytest.MonkeyPatch) -> None:
     """shell_exec returns the stdout of the command."""
-    from lightagent.agents.tools import shell_exec
-    from lightagent.core.config import Settings
+    from prismal.agents.tools import shell_exec
+    from prismal.core.config import Settings
 
     monkeypatch.setattr(
         "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
@@ -671,8 +671,8 @@ def test_shell_exec_returns_output(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_shell_exec_captures_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     """shell_exec returns stderr content instead of raising."""
-    from lightagent.agents.tools import shell_exec
-    from lightagent.core.config import Settings
+    from prismal.agents.tools import shell_exec
+    from prismal.core.config import Settings
 
     monkeypatch.setattr(
         "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
@@ -684,8 +684,8 @@ def test_shell_exec_captures_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_shell_exec_timeout_respected(monkeypatch: pytest.MonkeyPatch) -> None:
     """shell_exec returns a timeout error when the command exceeds the limit."""
-    from lightagent.agents.tools import shell_exec
-    from lightagent.core.config import Settings
+    from prismal.agents.tools import shell_exec
+    from prismal.core.config import Settings
 
     monkeypatch.setattr(
         "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
@@ -696,8 +696,8 @@ def test_shell_exec_timeout_respected(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_shell_exec_rejects_empty_command(monkeypatch: pytest.MonkeyPatch) -> None:
     """shell_exec returns an error for blank commands."""
-    from lightagent.agents.tools import shell_exec
-    from lightagent.core.config import Settings
+    from prismal.agents.tools import shell_exec
+    from prismal.core.config import Settings
 
     monkeypatch.setattr(
         "lightagent.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
@@ -713,7 +713,7 @@ def test_shell_exec_rejects_empty_command(monkeypatch: pytest.MonkeyPatch) -> No
 
 def test_file_manager_tools_contains_new_tools() -> None:
     """FILE_MANAGER_TOOLS must include all filesystem tools."""
-    from lightagent.agents.tools import FILE_MANAGER_TOOLS
+    from prismal.agents.tools import FILE_MANAGER_TOOLS
 
     tool_names = {t.name for t in FILE_MANAGER_TOOLS}
     assert "list_dir" in tool_names
@@ -725,7 +725,7 @@ def test_file_manager_tools_contains_new_tools() -> None:
 
 def test_coder_tools_contains_shell_exec() -> None:
     """CODER_TOOLS must include shell_exec."""
-    from lightagent.agents.tools import CODER_TOOLS
+    from prismal.agents.tools import CODER_TOOLS
 
     tool_names = {t.name for t in CODER_TOOLS}
     assert "shell_exec" in tool_names
@@ -733,7 +733,7 @@ def test_coder_tools_contains_shell_exec() -> None:
 
 def test_all_exports_new_tools() -> None:
     """All new tools must appear in __all__."""
-    import lightagent.agents.tools as m
+    import prismal.agents.tools as m
 
     for name in [
         "list_dir",

@@ -24,8 +24,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lightagent.core.exceptions import LightAgentError
-from lightagent.rag.vector_store import ChromaStoreError, ChromaVectorStore
+from prismal.core.exceptions import LightAgentError
+from prismal.rag.vector_store import ChromaStoreError, ChromaVectorStore
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -72,7 +72,7 @@ def _build_store(
 
 
 def test_chroma_store_error_is_defined() -> None:
-    """ChromaStoreError must be importable from lightagent.rag.vector_store."""
+    """ChromaStoreError must be importable from prismal.rag.vector_store."""
     assert ChromaStoreError is not None
 
 

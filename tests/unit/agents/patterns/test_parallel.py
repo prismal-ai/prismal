@@ -10,8 +10,8 @@ import pytest
 from langgraph.graph import StateGraph
 from langgraph.types import Send
 
-from lightagent.agents.patterns.parallel import make_parallel_dispatcher
-from lightagent.agents.state import create_initial_state
+from prismal.agents.patterns.parallel import make_parallel_dispatcher
+from prismal.agents.state import create_initial_state
 
 # ---------------------------------------------------------------------------
 # Synchronous dispatcher behaviour
@@ -261,7 +261,7 @@ async def test_parallel_results_empty_when_no_tasks() -> None:
 @pytest.mark.asyncio
 async def test_research_aggregator_merges_parallel_results() -> None:
     """research_aggregator_node consolidates parallel_results into a summary."""
-    from lightagent.agents.parallel_research import research_aggregator_node
+    from prismal.agents.parallel_research import research_aggregator_node
 
     state = create_initial_state(session_id="t")
     state["parallel_results"] = [
@@ -292,7 +292,7 @@ async def test_research_aggregator_merges_parallel_results() -> None:
 @pytest.mark.asyncio
 async def test_research_aggregator_handles_empty_results() -> None:
     """Empty parallel_results yields a sane fallback message."""
-    from lightagent.agents.parallel_research import research_aggregator_node
+    from prismal.agents.parallel_research import research_aggregator_node
 
     state = create_initial_state(session_id="t")
     # parallel_results defaults to [] in create_initial_state.

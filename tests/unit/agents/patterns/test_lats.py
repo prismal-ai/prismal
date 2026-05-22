@@ -20,13 +20,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lightagent.agents.patterns.lats import (
+from prismal.agents.patterns.lats import (
     LATSAgent,
     LATSError,
     LATSNode,
     LATSResult,
 )
-from lightagent.core.exceptions import LightAgentError
+from prismal.core.exceptions import LightAgentError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

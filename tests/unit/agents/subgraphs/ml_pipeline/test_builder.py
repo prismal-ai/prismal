@@ -6,12 +6,12 @@ import pytest
 @pytest.mark.asyncio
 async def test_register_ml_pipeline_idempotent() -> None:
     """register_ml_pipeline() can be called twice without error."""
-    from lightagent.agents.subgraphs.registry import SubgraphRegistry
+    from prismal.agents.subgraphs.registry import SubgraphRegistry
 
     # Reset singleton for test isolation
     SubgraphRegistry._instance = None
 
-    from lightagent.agents.subgraphs.ml_pipeline.builder import register_ml_pipeline
+    from prismal.agents.subgraphs.ml_pipeline.builder import register_ml_pipeline
 
     await register_ml_pipeline(checkpointer_path=":memory:")
     # Second call should be a no-op (already registered)
@@ -24,7 +24,7 @@ async def test_register_ml_pipeline_idempotent() -> None:
 @pytest.mark.asyncio
 async def test_get_compiled_ml_pipeline_returns_graph() -> None:
     """get_compiled_ml_pipeline() returns a compiled graph object."""
-    from lightagent.agents.subgraphs.ml_pipeline.builder import (
+    from prismal.agents.subgraphs.ml_pipeline.builder import (
         _COMPILED_GRAPHS,
         get_compiled_ml_pipeline,
     )
@@ -37,7 +37,7 @@ async def test_get_compiled_ml_pipeline_returns_graph() -> None:
 
 def test_ml_pipeline_definition_has_six_nodes() -> None:
     """ML pipeline definition has exactly 6 agent nodes."""
-    from lightagent.agents.subgraphs.ml_pipeline.builder import _make_definition
+    from prismal.agents.subgraphs.ml_pipeline.builder import _make_definition
 
     defn = _make_definition()
     assert len(defn.nodes) == 6
@@ -51,7 +51,7 @@ def test_ml_pipeline_definition_has_six_nodes() -> None:
 
 def test_ml_pipeline_definition_entry_point() -> None:
     """ML pipeline entry point is data_ingester."""
-    from lightagent.agents.subgraphs.ml_pipeline.builder import _make_definition
+    from prismal.agents.subgraphs.ml_pipeline.builder import _make_definition
 
     defn = _make_definition()
     assert defn.entry_point == "data_ingester"
@@ -59,7 +59,7 @@ def test_ml_pipeline_definition_entry_point() -> None:
 
 def test_ml_pipeline_has_quality_gate() -> None:
     """ML pipeline has a conditional edge on model_evaluator."""
-    from lightagent.agents.subgraphs.ml_pipeline.builder import _make_definition
+    from prismal.agents.subgraphs.ml_pipeline.builder import _make_definition
 
     defn = _make_definition()
     assert "model_evaluator" in defn.conditional_edges
@@ -67,6 +67,6 @@ def test_ml_pipeline_has_quality_gate() -> None:
 
 def test_ml_pipeline_in_supervisor_members() -> None:
     """ml_pipeline is listed in supervisor MEMBERS."""
-    from lightagent.agents.supervisor import MEMBERS
+    from prismal.agents.supervisor import MEMBERS
 
     assert "ml_pipeline" in MEMBERS

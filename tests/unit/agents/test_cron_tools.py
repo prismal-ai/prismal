@@ -37,7 +37,7 @@ class TestCronAdd:
 
     def test_cron_add_success(self) -> None:
         """Mock CronManager.add returning a job; verify output contains name and next_run."""
-        from lightagent.agents.tools import cron_add
+        from prismal.agents.tools import cron_add
 
         job = _make_job(name="daily-brief", next_run=datetime(2099, 6, 15, 9, 0, 0))
 
@@ -51,7 +51,7 @@ class TestCronAdd:
 
     def test_cron_add_duplicate_returns_error(self) -> None:
         """When CronManager.add raises ValueError the tool returns an error string, not raise."""
-        from lightagent.agents.tools import cron_add
+        from prismal.agents.tools import cron_add
 
         with patch(
             "lightagent.scheduler.cron_manager.CronManager.add",
@@ -66,7 +66,7 @@ class TestCronAdd:
 
     def test_cron_add_no_next_run(self) -> None:
         """When job.next_run is None the output contains 'unknown'."""
-        from lightagent.agents.tools import cron_add
+        from prismal.agents.tools import cron_add
 
         job = _make_job(name="no-time-job", next_run=None)
         job.next_run = None  # ensure None
@@ -80,7 +80,7 @@ class TestCronAdd:
 
     def test_cron_add_passes_timezone_to_manager(self) -> None:
         """cron_add forwards the timezone parameter to CronManager.add()."""
-        from lightagent.agents.tools import cron_add
+        from prismal.agents.tools import cron_add
 
         job = _make_job(name="tz-job")
 
@@ -108,7 +108,7 @@ class TestCronAdd:
 
     def test_cron_add_includes_timezone_in_confirmation(self) -> None:
         """cron_add confirmation message includes timezone when provided."""
-        from lightagent.agents.tools import cron_add
+        from prismal.agents.tools import cron_add
 
         job = _make_job(name="tz-job")
 
@@ -126,7 +126,7 @@ class TestCronAdd:
 
     def test_cron_add_default_timezone_is_empty_string(self) -> None:
         """cron_add passes empty-string timezone when parameter is omitted."""
-        from lightagent.agents.tools import cron_add
+        from prismal.agents.tools import cron_add
 
         job = _make_job(name="no-tz-job")
 
@@ -154,7 +154,7 @@ class TestCronOnce:
 
     def test_cron_once_success(self) -> None:
         """cron_once returns a confirmation with the scheduled time."""
-        from lightagent.agents.tools import cron_once
+        from prismal.agents.tools import cron_once
 
         job = _make_job(name="once-job", schedule="once:2099-12-01T10:00:00")
 
@@ -172,7 +172,7 @@ class TestCronOnce:
 
     def test_cron_once_invalid_datetime_returns_error(self) -> None:
         """cron_once returns an error message for invalid datetime format."""
-        from lightagent.agents.tools import cron_once
+        from prismal.agents.tools import cron_once
 
         result = cron_once.invoke(
             {
@@ -186,7 +186,7 @@ class TestCronOnce:
 
     def test_cron_once_passes_timezone_to_manager(self) -> None:
         """cron_once forwards the timezone parameter to CronManager.add_once()."""
-        from lightagent.agents.tools import cron_once
+        from prismal.agents.tools import cron_once
 
         job = _make_job(name="tz-once", schedule="once:2099-12-01T10:00:00")
 
@@ -206,7 +206,7 @@ class TestCronOnce:
 
     def test_cron_once_includes_timezone_in_confirmation(self) -> None:
         """cron_once confirmation message includes timezone when provided."""
-        from lightagent.agents.tools import cron_once
+        from prismal.agents.tools import cron_once
 
         job = _make_job(name="tz-once", schedule="once:2099-12-01T10:00:00")
 
@@ -224,7 +224,7 @@ class TestCronOnce:
 
     def test_cron_once_default_timezone_is_empty_string(self) -> None:
         """cron_once passes empty-string timezone when parameter is omitted."""
-        from lightagent.agents.tools import cron_once
+        from prismal.agents.tools import cron_once
 
         job = _make_job(name="no-tz-once", schedule="once:2099-12-01T10:00:00")
 
@@ -252,7 +252,7 @@ class TestCronList:
 
     def test_cron_list_empty(self) -> None:
         """When no jobs exist the tool returns the empty-state message."""
-        from lightagent.agents.tools import cron_list
+        from prismal.agents.tools import cron_list
 
         with patch("lightagent.scheduler.cron_manager.CronManager.list_jobs", return_value=[]):
             result = cron_list.invoke({})
@@ -261,7 +261,7 @@ class TestCronList:
 
     def test_cron_list_with_jobs(self) -> None:
         """When two jobs exist both names appear in the output."""
-        from lightagent.agents.tools import cron_list
+        from prismal.agents.tools import cron_list
 
         jobs = [
             _make_job(name="job-alpha", next_run=datetime(2099, 1, 1, 9, 0)),
@@ -277,7 +277,7 @@ class TestCronList:
 
     def test_cron_list_error_returns_string(self) -> None:
         """When CronManager raises the tool returns an error string."""
-        from lightagent.agents.tools import cron_list
+        from prismal.agents.tools import cron_list
 
         with patch(
             "lightagent.scheduler.cron_manager.CronManager.list_jobs",
@@ -298,7 +298,7 @@ class TestCronPause:
 
     def test_cron_pause_success(self) -> None:
         """Verify the result contains 'paused' on success."""
-        from lightagent.agents.tools import cron_pause
+        from prismal.agents.tools import cron_pause
 
         with patch("lightagent.scheduler.cron_manager.CronManager.pause") as mock_pause:
             result = cron_pause.invoke({"name": "daily-brief"})
@@ -309,7 +309,7 @@ class TestCronPause:
 
     def test_cron_pause_not_found(self) -> None:
         """When CronManager.pause raises KeyError the result contains 'not found'."""
-        from lightagent.agents.tools import cron_pause
+        from prismal.agents.tools import cron_pause
 
         with patch(
             "lightagent.scheduler.cron_manager.CronManager.pause",
@@ -331,7 +331,7 @@ class TestCronResume:
 
     def test_cron_resume_success(self) -> None:
         """Verify the result contains 'resumed' on success."""
-        from lightagent.agents.tools import cron_resume
+        from prismal.agents.tools import cron_resume
 
         with patch("lightagent.scheduler.cron_manager.CronManager.resume") as mock_resume:
             result = cron_resume.invoke({"name": "daily-brief"})
@@ -342,7 +342,7 @@ class TestCronResume:
 
     def test_cron_resume_not_found(self) -> None:
         """When CronManager.resume raises KeyError the result contains 'not found'."""
-        from lightagent.agents.tools import cron_resume
+        from prismal.agents.tools import cron_resume
 
         with patch(
             "lightagent.scheduler.cron_manager.CronManager.resume",
@@ -364,7 +364,7 @@ class TestCronRemove:
 
     def test_cron_remove_success(self) -> None:
         """Verify the result contains 'removed' on success."""
-        from lightagent.agents.tools import cron_remove
+        from prismal.agents.tools import cron_remove
 
         with patch("lightagent.scheduler.cron_manager.CronManager.remove") as mock_remove:
             result = cron_remove.invoke({"name": "old-job"})
@@ -375,7 +375,7 @@ class TestCronRemove:
 
     def test_cron_remove_not_found(self) -> None:
         """When CronManager.remove raises KeyError the result contains 'not found'."""
-        from lightagent.agents.tools import cron_remove
+        from prismal.agents.tools import cron_remove
 
         with patch(
             "lightagent.scheduler.cron_manager.CronManager.remove",
@@ -401,7 +401,7 @@ class TestCronToolsRegistry:
             patch("lightagent.agents.tool_registry.get_mcp_tools", return_value=[]),
             patch("lightagent.agents.tool_registry.get_skill_tools", return_value=[]),
         ):
-            from lightagent.agents.tool_registry import get_tools_for_agent
+            from prismal.agents.tool_registry import get_tools_for_agent
 
             tools = get_tools_for_agent(agent_name)
             return [t.name for t in tools]
@@ -446,6 +446,6 @@ class TestCronToolsRegistry:
         The 7 tools are: get_current_time, cron_once, cron_add, cron_list,
         cron_pause, cron_resume, cron_remove.
         """
-        from lightagent.agents.tools import CRON_MANAGER_TOOLS
+        from prismal.agents.tools import CRON_MANAGER_TOOLS
 
         assert len(CRON_MANAGER_TOOLS) == 7

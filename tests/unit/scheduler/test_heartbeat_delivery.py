@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lightagent.scheduler.heartbeat_delivery import HeartbeatDelivery
+from prismal.scheduler.heartbeat_delivery import HeartbeatDelivery
 
 
 @pytest.mark.asyncio

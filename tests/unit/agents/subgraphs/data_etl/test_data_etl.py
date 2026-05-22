@@ -24,7 +24,7 @@ import polars as pl
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from lightagent.agents.subgraphs.data_etl import (
+from prismal.agents.subgraphs.data_etl import (
     DataETLError,
     make_auditor_node,
     make_etl_branching_gate,
@@ -33,8 +33,8 @@ from lightagent.agents.subgraphs.data_etl import (
     make_transformer_node,
     make_validator_node,
 )
-from lightagent.agents.subgraphs.data_etl.builder import build_data_etl_subgraph
-from lightagent.core.exceptions import LightAgentError
+from prismal.agents.subgraphs.data_etl.builder import build_data_etl_subgraph
+from prismal.core.exceptions import LightAgentError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

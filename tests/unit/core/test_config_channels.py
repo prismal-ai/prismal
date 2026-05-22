@@ -2,7 +2,7 @@
 
 import pytest
 
-from lightagent.core.config import Settings
+from prismal.core.config import Settings
 
 
 def test_telegram_bot_token_defaults_empty(monkeypatch: pytest.MonkeyPatch) -> None:

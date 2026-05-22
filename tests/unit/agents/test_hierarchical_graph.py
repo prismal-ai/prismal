@@ -21,12 +21,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from lightagent.agents.domain_supervisor import (
+from prismal.agents.domain_supervisor import (
     _MAX_DOMAIN_ITERATIONS,
     make_domain_supervisor,
 )
-from lightagent.agents.graph import _hierarchical_router
-from lightagent.agents.supervisor import (
+from prismal.agents.graph import _hierarchical_router
+from prismal.agents.supervisor import (
     HIERARCHICAL_MEMBERS,
     hierarchical_supervisor_node,
 )
@@ -380,7 +380,7 @@ class TestFlatModeUnchangedWhenHierarchicalDisabled:
         ``_build_hierarchical_graph()``. This is the contract that
         guarantees zero regression when the feature flag is off.
         """
-        import lightagent.agents.graph as graph_module
+        import prismal.agents.graph as graph_module
 
         graph_module._async_graph = None  # reset singleton
         try:
@@ -416,7 +416,7 @@ class TestFlatModeUnchangedWhenHierarchicalDisabled:
         must expose exactly the 4 routing targets (+ supervisor) and
         NONE of the flat leaves.
         """
-        import lightagent.agents.graph as graph_module
+        import prismal.agents.graph as graph_module
 
         graph_module._async_graph = None
         try:
@@ -450,7 +450,7 @@ class TestFlatModeUnchangedWhenHierarchicalDisabled:
 
     async def test_graph_singleton_is_reused(self) -> None:
         """``get_async_compiled_graph()`` returns the cached instance."""
-        import lightagent.agents.graph as graph_module
+        import prismal.agents.graph as graph_module
 
         graph_module._async_graph = None
         try:

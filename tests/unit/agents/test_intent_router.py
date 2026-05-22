@@ -6,7 +6,7 @@ import importlib
 
 import pytest
 
-from lightagent.agents.intent_router import match_intent
+from prismal.agents.intent_router import match_intent
 
 ENGLISH_CRON_INPUTS: list[str] = [
     "list crons",

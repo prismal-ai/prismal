@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lightagent.monitoring.otel import OTelManager, _NoOpSpan
+from prismal.monitoring.otel import OTelManager, _NoOpSpan
 
 
 def test_mcp_span_attributes() -> None:
@@ -42,6 +42,6 @@ def test_mcp_counter_increments() -> None:
 def test_mcp_adapter_imports_correctly() -> None:
     """MCP adapter module imports without error."""
     try:
-        import lightagent.mcp.adapter as _  # noqa: F401
+        import prismal.mcp.adapter as _  # noqa: F401
     except ImportError:
         pytest.skip("MCP adapter dependencies not available")

@@ -10,7 +10,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph
 from langgraph.types import Command
 
-from lightagent.agents.subgraphs.gates import (
+from prismal.agents.subgraphs.gates import (
     hitl_gate,
     human_approval_node,
     seed_hitl_metadata,

@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 def test_file_watcher_default_not_running() -> None:
     """A new FileWatcher is not running by default."""
-    from lightagent.events.file_watcher import FileWatcher
+    from prismal.events.file_watcher import FileWatcher
 
     watcher = FileWatcher()
     assert not watcher.is_running()
@@ -18,7 +18,7 @@ def test_file_watcher_default_not_running() -> None:
 
 def test_file_watcher_accepts_custom_observer() -> None:
     """FileWatcher accepts a custom Observer via constructor injection."""
-    from lightagent.events.file_watcher import FileWatcher
+    from prismal.events.file_watcher import FileWatcher
 
     mock_observer = MagicMock()
     mock_observer.is_alive.return_value = False
@@ -31,7 +31,7 @@ def test_file_watcher_accepts_custom_observer() -> None:
 
 def test_register_stores_watch(tmp_path: Path) -> None:
     """register() stores a watch entry for the given path."""
-    from lightagent.events.file_watcher import FileWatcher
+    from prismal.events.file_watcher import FileWatcher
 
     watcher = FileWatcher()
     watcher.register(tmp_path, "test_event", lambda event_type, path: None)
@@ -40,7 +40,7 @@ def test_register_stores_watch(tmp_path: Path) -> None:
 
 def test_register_multiple_paths(tmp_path: Path) -> None:
     """register() can store watches for multiple paths."""
-    from lightagent.events.file_watcher import FileWatcher
+    from prismal.events.file_watcher import FileWatcher
 
     docs = tmp_path / "docs"
     workspace = tmp_path / "workspace"
@@ -58,7 +58,7 @@ def test_register_multiple_paths(tmp_path: Path) -> None:
 
 def test_start_calls_observer_start(tmp_path: Path) -> None:
     """start() calls observer.start()."""
-    from lightagent.events.file_watcher import FileWatcher
+    from prismal.events.file_watcher import FileWatcher
 
     mock_observer = MagicMock()
     mock_observer.is_alive.return_value = True
@@ -70,7 +70,7 @@ def test_start_calls_observer_start(tmp_path: Path) -> None:
 
 def test_stop_calls_observer_stop() -> None:
     """stop() calls observer.stop() and observer.join()."""
-    from lightagent.events.file_watcher import FileWatcher
+    from prismal.events.file_watcher import FileWatcher
 
     mock_observer = MagicMock()
     mock_observer.is_alive.return_value = False
@@ -82,7 +82,7 @@ def test_stop_calls_observer_stop() -> None:
 
 def test_is_running_reflects_observer_state() -> None:
     """is_running() delegates to observer.is_alive()."""
-    from lightagent.events.file_watcher import FileWatcher
+    from prismal.events.file_watcher import FileWatcher
 
     mock_observer = MagicMock()
     mock_observer.is_alive.return_value = True
@@ -92,7 +92,7 @@ def test_is_running_reflects_observer_state() -> None:
 
 def test_start_skips_nonexistent_path(tmp_path: Path) -> None:
     """start() skips non-existent directories with a warning."""
-    from lightagent.events.file_watcher import FileWatcher
+    from prismal.events.file_watcher import FileWatcher
 
     missing = tmp_path / "does_not_exist"
     mock_observer = MagicMock()
@@ -108,7 +108,7 @@ def test_start_skips_nonexistent_path(tmp_path: Path) -> None:
 
 def test_start_schedules_existing_paths(tmp_path: Path) -> None:
     """start() schedules existing directories with the observer."""
-    from lightagent.events.file_watcher import FileWatcher
+    from prismal.events.file_watcher import FileWatcher
 
     existing = tmp_path / "docs"
     existing.mkdir()
@@ -130,7 +130,7 @@ def test_handler_calls_callback_on_created() -> None:
     """_LightAgentEventHandler calls callback on file creation."""
     from watchdog.events import FileCreatedEvent
 
-    from lightagent.events.file_watcher import _LightAgentEventHandler
+    from prismal.events.file_watcher import _LightAgentEventHandler
 
     received: list[tuple[str, str]] = []
 
@@ -149,7 +149,7 @@ def test_handler_calls_callback_on_modified() -> None:
     """_LightAgentEventHandler calls callback on file modification."""
     from watchdog.events import FileModifiedEvent
 
-    from lightagent.events.file_watcher import _LightAgentEventHandler
+    from prismal.events.file_watcher import _LightAgentEventHandler
 
     received: list[tuple[str, str]] = []
 
@@ -167,7 +167,7 @@ def test_handler_ignores_directory_created() -> None:
     """_LightAgentEventHandler ignores directory creation events."""
     from watchdog.events import DirCreatedEvent
 
-    from lightagent.events.file_watcher import _LightAgentEventHandler
+    from prismal.events.file_watcher import _LightAgentEventHandler
 
     received: list[tuple[str, str]] = []
     handler = _LightAgentEventHandler(
@@ -182,7 +182,7 @@ def test_handler_ignores_directory_modified() -> None:
     """_LightAgentEventHandler ignores directory modification events."""
     from watchdog.events import DirModifiedEvent
 
-    from lightagent.events.file_watcher import _LightAgentEventHandler
+    from prismal.events.file_watcher import _LightAgentEventHandler
 
     received: list[tuple[str, str]] = []
     handler = _LightAgentEventHandler(
@@ -198,7 +198,7 @@ def test_handler_ignores_directory_modified() -> None:
 
 def test_create_default_watcher_returns_file_watcher() -> None:
     """create_default_watcher() returns a FileWatcher instance."""
-    from lightagent.events.file_watcher import FileWatcher, create_default_watcher
+    from prismal.events.file_watcher import FileWatcher, create_default_watcher
 
     watcher = create_default_watcher()
     assert isinstance(watcher, FileWatcher)
@@ -206,7 +206,7 @@ def test_create_default_watcher_returns_file_watcher() -> None:
 
 def test_create_default_watcher_has_four_watches() -> None:
     """create_default_watcher() registers the four standard watch paths."""
-    from lightagent.events.file_watcher import create_default_watcher
+    from prismal.events.file_watcher import create_default_watcher
 
     watcher = create_default_watcher()
     assert len(watcher._watches) == 4
@@ -214,7 +214,7 @@ def test_create_default_watcher_has_four_watches() -> None:
 
 def test_create_default_watcher_uses_provided_callbacks() -> None:
     """create_default_watcher() uses provided callbacks over no-op default."""
-    from lightagent.events.file_watcher import create_default_watcher
+    from prismal.events.file_watcher import create_default_watcher
 
     called: list[str] = []
 
@@ -230,7 +230,7 @@ def test_create_default_watcher_uses_provided_callbacks() -> None:
 
 def test_create_default_watcher_event_names() -> None:
     """create_default_watcher() uses the four standard event names."""
-    from lightagent.events.file_watcher import create_default_watcher
+    from prismal.events.file_watcher import create_default_watcher
 
     watcher = create_default_watcher()
     event_names = {w.event_name for w in watcher._watches}

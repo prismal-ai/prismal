@@ -244,12 +244,13 @@ Changelog = "https://github.com/prismal-ai/prismal/blob/main/CHANGELOG.md"
 
 # ============================================================
 # HATCH BUILD CONFIG — namespace package (PEP 420)
-# lightagent/ has NO __init__.py → implicit namespace package
-# Both lightagent-agents and lightagent (app) contribute to
-# the same 'lightagent' namespace without conflicts.
+# prismal/ has NO __init__.py → implicit namespace package.
+# Renamed from 'lightagent' in v3.0.0 (Estrategia B). The repo-local
+# 'lightagent/' shim (transitional, removed before release) is intentionally
+# NOT packaged here.
 # ============================================================
 [tool.hatch.build.targets.wheel]
-packages = ["lightagent"]
+packages = ["prismal"]
 
 [tool.hatch.build.targets.sdist]
 exclude = [
@@ -267,7 +268,7 @@ exclude = [
 [tool.ruff]
 target-version = "py313"
 line-length = 100
-src = ["lightagent", "tests"]
+src = ["prismal", "tests"]
 
 [tool.ruff.lint]
 select = [
@@ -294,11 +295,11 @@ max-complexity = 40
   "S311", "ANN", "ARG", "N806", "E501", "E741",
   "RUF001", "RUF002", "RUF003", "SIM102", "F401",
 ]
-"lightagent/skills/available/**/*.py" = ["S603", "S607"]
-"lightagent/skills/custom/**/*.py" = ["S603", "S607"]
+"prismal/skills/available/**/*.py" = ["S603", "S607"]
+"prismal/skills/custom/**/*.py" = ["S603", "S607"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["lightagent"]
+known-first-party = ["prismal"]
 force-single-line = false
 
 [tool.ruff.format]
@@ -366,6 +367,8 @@ markers = [
 ]
 filterwarnings = [
   "error",
+  # Transitional 'lightagent' -> 'prismal' namespace shim (removed in Fase 6).
+  "ignore:The 'lightagent' import namespace is deprecated:DeprecationWarning",
   "ignore::DeprecationWarning:pydantic.*",
   "ignore::DeprecationWarning:chromadb.*",
   "ignore::DeprecationWarning:distutils.*",
@@ -387,10 +390,10 @@ filterwarnings = [
 # COVERAGE
 # ============================================================
 [tool.coverage.run]
-source = ["lightagent"]
+source = ["prismal"]
 branch = true
 omit = [
-  "lightagent/skills/custom/*",
+  "prismal/skills/custom/*",
   "*/__init__.py",
   "*/migrations/*",
 ]
@@ -411,7 +414,7 @@ show_missing = true
 # BANDIT — SECURITY LINTING
 # ============================================================
 [tool.bandit]
-exclude_dirs = ["tests", "lightagent/skills/custom"]
+exclude_dirs = ["tests", "prismal/skills/custom"]
 skips = ["B101", "B104", "B608"]
 severity_level = "medium"
 confidence_level = "medium"
