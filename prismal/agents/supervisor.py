@@ -76,6 +76,39 @@ MEMBERS: list[str] = [
 
 _VALID_ROUTES: frozenset[str] = frozenset(MEMBERS) | {"END"}
 
+# Phase D (D1-01/02): advanced-architecture nodes — 6 reasoning patterns and
+# 5 domain subgraphs — wired into the supervisor opt-in via
+# ``settings.enable_subgraphs``. They are appended to the valid routes and the
+# system prompt ONLY when the flag is on, so the default behaviour of the base
+# agents is byte-for-byte unchanged.
+ADVANCED_MEMBERS: list[str] = [
+    # Reasoning patterns (prismal/agents/patterns/nodes.py).
+    "tot_agent",
+    "debate_agent",
+    "constitutional_filter",
+    "lats_agent",
+    "llm_compiler",
+    "mixture_agent",
+    # Domain subgraph pipelines (prismal/agents/subgraphs/).
+    "customer_service",
+    "document_generation",
+    "data_etl",
+    "code_review",
+    "debate_consensus",
+]
+
+
+def effective_valid_routes(enable_advanced: bool) -> frozenset[str]:
+    """Return the set of routes the supervisor may select.
+
+    Always includes the base :data:`MEMBERS` plus ``END``; includes
+    :data:`ADVANCED_MEMBERS` only when *enable_advanced* is ``True``.
+    """
+    if enable_advanced:
+        return _VALID_ROUTES | frozenset(ADVANCED_MEMBERS)
+    return _VALID_ROUTES
+
+
 # Maximum number of recent messages sent to the LLM per supervisor call.
 # Older messages are kept in LangGraph state but not re-sent to the provider,
 # preventing token explosion in long sessions and avoiding rate-limit errors.
@@ -251,6 +284,45 @@ Routing rules:
   A specialist response — whether success or error — is always the final answer.
 
 Respond with ONLY the agent name (e.g. "researcher" or "END"). No explanation."""
+
+# Phase D (D1-02): advanced-architecture routing options. Appended to the
+# system prompt only when ``settings.enable_subgraphs`` is True so the default
+# routing prompt stays identical to the legacy behaviour.
+_ADVANCED_PROMPT_SECTION: str = """
+
+Additional advanced agents (opt-in — route here only when clearly applicable):
+- tot_agent: Tree-of-Thoughts reasoning. Explores multiple solution branches
+  with scoring. Route here for hard reasoning/planning puzzles that benefit
+  from exploring alternatives ("think step by step over several options").
+- debate_agent: Multi-agent debate that synthesises a consensus. Route here
+  for contested/subjective questions where weighing opposing views helps
+  ("argue both sides", "is X better than Y", "pros and cons debate").
+- constitutional_filter: Revises the latest answer against safety/accuracy
+  principles. Route here to sanitise or fact-check a drafted answer.
+- lats_agent: Language-Agent Tree Search (MCTS) for multi-step goal-seeking
+  with backtracking. Route here for sequential decision tasks.
+- llm_compiler: Decomposes a goal into a DAG of subtasks executed in parallel.
+  Route here for tasks naturally split into independent parallel subtasks.
+- mixture_agent: Mixture-of-Agents — multiple proposers + synthesis. Route here
+  when a higher-quality synthesised answer across models is worth the cost.
+- customer_service: Support pipeline (classify → FAQ → escalate → reply/ticket).
+- document_generation: Long-form doc pipeline (plan → research → write → edit).
+- data_etl: ETL pipeline (extract → validate → transform → load → audit).
+- code_review: Code review pipeline (lint → security scan → logic review → report).
+- debate_consensus: Structured proponent/opponent/moderator consensus pipeline."""
+
+
+def build_system_prompt(enable_advanced: bool) -> str:
+    """Return the supervisor routing prompt.
+
+    When *enable_advanced* is ``True`` the advanced-architecture agents
+    (:data:`ADVANCED_MEMBERS`) are appended; otherwise the prompt is identical
+    to the legacy default so base-agent routing is unchanged.
+    """
+    if enable_advanced:
+        return _SYSTEM_PROMPT + _ADVANCED_PROMPT_SECTION
+    return _SYSTEM_PROMPT
+
 
 # ---------------------------------------------------------------------------
 # Long-term memory helpers (SPEC-039 AC-039-3 / AC-039-4)
@@ -448,11 +520,12 @@ def _intent_short_circuit(
             last_human_text = str(getattr(msg, "content", ""))
             break
     matched_intent = match_intent(last_human_text)
-    if matched_intent is None or matched_intent not in _VALID_ROUTES:
+    valid_routes = effective_valid_routes(get_settings().enable_subgraphs)
+    if matched_intent is None or matched_intent not in valid_routes:
         return None
     logger.info(
         "supervisor_intent_short_circuit",
-        intent="cron_management",
+        intent=matched_intent,
         next_agent=matched_intent,
         session_id=session_id,
     )
@@ -470,7 +543,8 @@ def _match_route(raw: str, session_id: str) -> str:
     ``"END"`` with a warning log when the response is unrecognised.
     """
     normalised = raw.strip("\"' \t\n").upper()
-    for valid in _VALID_ROUTES:
+    valid_routes = effective_valid_routes(get_settings().enable_subgraphs)
+    for valid in valid_routes:
         if valid.upper() == normalised:
             return valid
     logger.warning(
@@ -646,7 +720,9 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
         llm = ProviderRegistry().get_llm_with_fallback()
         memory_context = await _recall_memory_context(state)
         routing_messages = [
-            SystemMessage(content=_SYSTEM_PROMPT + memory_context),
+            SystemMessage(
+                content=build_system_prompt(get_settings().enable_subgraphs) + memory_context
+            ),
             *trimmed,
             HumanMessage(
                 content=(
@@ -951,6 +1027,18 @@ _RouterLiteral = Literal[
     "ml_pipeline",  # Phase 26: ML/DL pipeline
     "financial_analyst",  # Phase 27: Financial Analysis pipeline
     "parallel_researcher",  # Phase 34: map-reduce parallel research
+    # Phase D (D1-01/02): advanced patterns + domain subgraphs (opt-in).
+    "tot_agent",
+    "debate_agent",
+    "constitutional_filter",
+    "lats_agent",
+    "llm_compiler",
+    "mixture_agent",
+    "customer_service",
+    "document_generation",
+    "data_etl",
+    "code_review",
+    "debate_consensus",
     "__end__",
 ]
 
@@ -979,8 +1067,11 @@ def supervisor_router(state: AgentState) -> _RouterLiteral:
 
 
 __all__ = [
+    "ADVANCED_MEMBERS",
     "HIERARCHICAL_MEMBERS",
     "MEMBERS",
+    "build_system_prompt",
+    "effective_valid_routes",
     "hierarchical_supervisor_node",
     "supervisor_node",
     "supervisor_router",

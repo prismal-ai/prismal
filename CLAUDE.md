@@ -92,6 +92,38 @@ Each subgraph exports both `build_<name>_subgraph()` (returns `SubgraphDefinitio
 
 `agents/subgraphs/gates.py::hitl_gate()` uses `interrupt()` for Human-in-the-Loop pauses.
 
+### Multimodal layer (Fase F — `specs/multimodal-agents/`, opt-in)
+
+A planned multimodal capability layer covers audio, image, and video on top of the existing text agents. It is **opt-in**: gated by `settings.multimodal_enabled` (default `False`) and registered through `register_multimodal_pipeline(registry)` only when the operator decides. Without the toggle, the 26 text agents behave identically to today.
+
+- `providers/stt.py`, `providers/tts.py`, `providers/vision.py`, `providers/multimodal.py`, `providers/cross_modal_embeddings.py` — provider wrappers (Whisper, pyttsx3/openai/elevenlabs, vision LLM, Gemini/GPT-4o/Sonnet, CLIP). All provider SDK imports stay isolated here.
+- `agents/multimodal/vision_agent.py` — `VisionAgent` (analyze + optional OCR).
+- `agents/multimodal/audio_agent.py` — `AudioAgent` (STT → reason → optional TTS).
+- `agents/multimodal/video_agent.py` — `VideoAgent` (FFmpeg frame extraction via `SandboxExecutor` + audio transcribe + fusion).
+- `agents/multimodal/modality_router.py` — heuristic classifier `classify_modality()` + LangGraph node factory; LLM fallback opt-in.
+- `agents/multimodal/multimodal_fusion.py` — `MultimodalFusion` with `moa | moderator | concat` strategies (reuses `patterns/mixture_of_agents.py`).
+- `agents/subgraphs/multimodal_pipeline/` — `router → [vision | audio | video | text] → fusion → output_formatter`; exports `build_multimodal_subgraph()` + `register_multimodal_pipeline()`.
+- `rag/multimodal.py` — `MultimodalRAGEngine` with `MultimodalRetrievedChunk` and `modality` metadata on Chroma; cross-modal embeddings (CLIP) are an opt-in extra, otherwise the engine falls back to textual captions/transcripts.
+- `rag/loaders/{image,audio,video}_loader.py` — multimodal loaders composing the agents.
+- `security/media_validator.py` — `MediaValidator` (magic bytes, size/duration limits) runs **before** `InputSanitizer.sanitize_media()`; `AuditLogger.log_media()` records hash + modality (never content); FFmpeg always inside `SandboxExecutor`.
+
+Heavy dependencies (Whisper local, ElevenLabs, CLIP, FFmpeg wrappers, Pillow, imagehash) are gated by optional extras `[multimodal]`, `[multimodal-local]`, `[multimodal-premium]`, `[multimodal-embed]` so the base install stays slim.
+
+All multimodal state lives under `state["metadata"]["mm"]` to isolate the new layer from the rest of `AgentState`.
+
+### Extension surface (Fase X — `specs/extension-surface/`, planned)
+
+A planned public extension API exposes LangGraph as a first-class build target for users and third-party plugins, without forcing them to fork the repo. It is opt-in and additive — existing nodes/subgraphs are unaffected.
+
+- `prismal/langgraph.py` — official re-export of `StateGraph`, `START`, `END`, `Send`, `interrupt`, `add_messages`, `CompiledStateGraph` plus `AgentState`, `SubgraphDefinition`, `SubgraphRegistry`, and a `VERSION` constant resolved dynamically from `importlib.metadata`. Importing from here (rather than `langgraph.*` directly) guarantees version compatibility.
+- `agents/extension/decorators.py` — `@prismal_node(name=..., capabilities=..., security=..., audit=..., retry=..., timeout_s=...)` wraps any `async (state) → state_update` with a middleware chain: `InputSanitizer`+`SecurePromptBuilder`+`ActionInterceptor` → OTel span → structured logger bind → retry/backoff → `asyncio.wait_for` → user fn → audit log → error mapping to `NodeExecutionError`. Side effect: registers the node's capabilities in `tool_registry.DEFAULT_CAPABILITY_MAP`.
+- `agents/extension/builder.py` — `PrismalStateGraphBuilder` fluent API over `StateGraph[AgentState]`. `add_node()` auto-wraps callables with `@prismal_node` if they lack the `__prismal_node__` attribute. `compile()` returns a `SubgraphDefinition` ready for `SubgraphRegistry`; `compile_raw()` is the escape hatch returning `CompiledStateGraph`.
+- `agents/extension/plugins.py` — `discover_plugins(settings)` iterates `importlib.metadata.entry_points()` across four groups (`prismal.subgraphs`, `prismal.nodes`, `prismal.tools`, `prismal.rag_engines`), applies allowlist/denylist, and registers each plugin in isolation (failures don't abort startup). `prismal/plugins.py` is a `python -m prismal.plugins` CLI (`list`, `info`, `doctor`).
+- `agents/extension/adapters.py` — `LangChainRunnableAdapter(runnable).as_node(name=..., capabilities=...)` converts any `Runnable` or `AgentExecutor` into a prismal node, with auto input/output mapping between `state["messages"]` and the Runnable's signature.
+- `agents/extension/ports.py` — formal `Protocol`s for `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort`. Existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, `BaseTool`) conform structurally; users substitute with their own adapters without modifying the core.
+
+Plugin authors declare entry points in their `pyproject.toml` (e.g. `[project.entry-points."prismal.subgraphs"] my_pipeline = "my_pkg:register_my_pipeline"`); after `pip install`, `discover_plugins()` auto-registers them. Allowlist/denylist via `settings.plugins_allowlist` / `plugins_denylist`. Recommended convention: namespace plugins as `prismal-x-<domain>`.
+
 ### Security (5-layer defense-in-depth)
 
 All layers live in `prismal/security/` and are re-exported from its `__init__.py`:
@@ -122,12 +154,14 @@ All LLM calls go through `prismal/providers/` (LiteLLM wrapper + per-provider co
 
 ## Critical rules
 
-1. **Never** concatenate user input into prompts — use `SecurePromptBuilder`.
+1. **Never** concatenate user input into prompts — use `SecurePromptBuilder`. This applies to STT transcripts, OCR text, and image captions as well — they are user-controlled content.
 2. **Never** bypass `GuardrailsEngine` / `ActionInterceptor`; they are the gateway.
 3. **Always** use `get_async_compiled_graph()` in async contexts (the sync variant uses a non-async SQLite saver).
-4. **Never** add provider-specific imports outside `prismal/providers/`.
-5. **Always** call `ActionInterceptor.check()` before tool calls that write files or execute code.
-6. **Never** add `__init__.py` to `prismal/` — it must remain a PEP 420 namespace package. (The repo-local `lightagent/__init__.py` shim is a deliberate, temporary migration exception and is not shipped.)
+4. **Never** add provider-specific imports outside `prismal/providers/`. This includes `whisper`, `pyttsx3`, `elevenlabs`, `open_clip_torch`, etc. for the multimodal layer.
+5. **Always** call `ActionInterceptor.check()` before tool calls that write files or execute code; call `ActionInterceptor.check_media_op()` before media read/write.
+6. **Always** validate incoming media with `MediaValidator.validate()` before passing it to a multimodal agent — `AuditLogger.log_media()` records hash + modality, never content.
+7. **Always** run FFmpeg via `SandboxExecutor` in `VideoAgent` and `VideoLoader` — never in-process.
+8. **Never** add `__init__.py` to `prismal/` — it must remain a PEP 420 namespace package. (The repo-local `lightagent/__init__.py` shim is a deliberate, temporary migration exception and is not shipped.)
 
 ## Testing notes
 

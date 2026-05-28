@@ -4,12 +4,30 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
 from prismal.monitoring.otel import OTelManager, _NoOpSpan
 
 
 def _reset_singleton() -> None:
     OTelManager._instance = None
     OTelManager._initialized = False
+
+
+@pytest.fixture(autouse=True)
+def _otel_singleton_isolation() -> object:
+    """Reset the ``OTelManager`` singleton around every test in this module.
+
+    These tests deliberately construct partially-initialised singletons (e.g.
+    instances built via ``__new__`` with ``_initialized=True``). Without a
+    teardown reset that poisoned state leaks to whatever test runs next on the
+    same process/xdist worker — surfacing as ``AttributeError: 'OTelManager'
+    object has no attribute '_counters'`` in unrelated suites. Resetting after
+    each test (not just before) keeps the singleton isolated.
+    """
+    _reset_singleton()
+    yield
+    _reset_singleton()
 
 
 def test_otel_manager_is_singleton() -> None:

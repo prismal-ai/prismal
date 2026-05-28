@@ -81,6 +81,19 @@ _CRON_VERB_RECURRENCE_RE: re.Pattern[str] = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+# Phase D (D1-03): conservative, unambiguous patterns for the advanced
+# architectures. These only short-circuit routing when ``enable_subgraphs`` is
+# on (gated by the supervisor), so they never affect the default base agents.
+# ``consensus`` is checked before ``debate`` so a debate-to-consensus request
+# routes to the dedicated subgraph rather than the bare debate pattern.
+_TOT_RE: re.Pattern[str] = re.compile(r"\btree\s+of\s+thoughts?\b", re.IGNORECASE)
+_ETL_RE: re.Pattern[str] = re.compile(
+    r"\betl\b|\bextract[\s,]+transform[\s,]+(?:and\s+)?load\b", re.IGNORECASE
+)
+_CODE_REVIEW_RE: re.Pattern[str] = re.compile(r"\bcode\s+review\b", re.IGNORECASE)
+_CONSENSUS_RE: re.Pattern[str] = re.compile(r"\bconsensus\b", re.IGNORECASE)
+_DEBATE_RE: re.Pattern[str] = re.compile(r"\bdebate\b", re.IGNORECASE)
+
 
 def match_intent(text: str | None) -> str | None:
     """Return a supervisor member name for high-confidence intents.
@@ -93,7 +106,9 @@ def match_intent(text: str | None) -> str | None:
         text: Raw user message content (the most recent ``HumanMessage``).
 
     Returns:
-        The target agent name (currently only ``"cron_manager"``) or
+        The target agent name (``"cron_manager"`` or one of the advanced
+        architecture nodes such as ``"code_review"`` / ``"data_etl"`` /
+        ``"tot_agent"`` / ``"debate_agent"`` / ``"debate_consensus"``) or
         ``None`` when no high-confidence rule fires.
     """
     if text is None:
@@ -107,4 +122,15 @@ def match_intent(text: str | None) -> str | None:
         return "cron_manager"
     if _CRON_VERB_RECURRENCE_RE.search(normalised):
         return "cron_manager"
+    # Advanced architectures (opt-in; gated downstream by enable_subgraphs).
+    if _TOT_RE.search(normalised):
+        return "tot_agent"
+    if _ETL_RE.search(normalised):
+        return "data_etl"
+    if _CONSENSUS_RE.search(normalised):
+        return "debate_consensus"
+    if _DEBATE_RE.search(normalised):
+        return "debate_agent"
+    if _CODE_REVIEW_RE.search(normalised):
+        return "code_review"
     return None
