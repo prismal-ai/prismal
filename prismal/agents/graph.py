@@ -201,6 +201,7 @@ def build_supervisor_graph(
     dev_pipeline_graph: Any = None,
     ml_pipeline_graph: Any = None,
     financial_analyst_graph: Any = None,
+    advanced_nodes: dict[str, Any] | None = None,
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Build and compile the LangGraph SUPERVISOR state machine.
@@ -305,6 +306,18 @@ def build_supervisor_graph(
     if _include_financial_analyst:
         builder.add_node("financial_analyst", financial_analyst_graph)
 
+    # Phase D (D1-01): advanced-architecture nodes — 6 reasoning patterns +
+    # 5 domain subgraphs. Opt-in via ``enable_subgraphs`` and only when the
+    # caller supplies the pre-built node map (built async in
+    # ``get_async_compiled_graph``). Each entry is either a plain async node
+    # callable (patterns) or a compiled subgraph (pipelines); LangGraph treats
+    # both identically as nodes.
+    _advanced_nodes: dict[str, Any] = (
+        dict(advanced_nodes) if (get_settings().enable_subgraphs and advanced_nodes) else {}
+    )
+    for _adv_name, _adv_node in _advanced_nodes.items():
+        builder.add_node(_adv_name, _adv_node)
+
     # Entry point
     builder.set_entry_point("supervisor")
 
@@ -330,6 +343,8 @@ def build_supervisor_graph(
         conditional_edges["ml_pipeline"] = "ml_pipeline"
     if _include_financial_analyst:
         conditional_edges["financial_analyst"] = "financial_analyst"
+    for _adv_name in _advanced_nodes:
+        conditional_edges[_adv_name] = _adv_name
 
     builder.add_conditional_edges(
         "supervisor",
@@ -376,6 +391,8 @@ def build_supervisor_graph(
         builder.add_edge("ml_pipeline", "supervisor")
     if _include_financial_analyst:
         builder.add_edge("financial_analyst", "supervisor")
+    for _adv_name in _advanced_nodes:
+        builder.add_edge(_adv_name, "supervisor")
 
     # ------------------------------------------------------------------ #
     # Compile with checkpointing                                           #
@@ -394,6 +411,60 @@ def build_supervisor_graph(
 
     logger.info("supervisor_graph_compiled", checkpoint_path=str(db_path))
     return compiled
+
+
+async def _build_advanced_nodes() -> dict[str, Any]:
+    """Build the advanced-architecture node map (Phase D / D1-01).
+
+    Returns a mapping of supervisor route name -> node, combining the 6
+    reasoning-pattern nodes (plain async callables with lazily-resolved LLM
+    defaults) and the 5 domain subgraphs (compiled via
+    :class:`~prismal.agents.subgraphs.factory.SubgraphFactory`). The names
+    match :data:`~prismal.agents.supervisor.ADVANCED_MEMBERS`.
+
+    Only invoked when ``settings.enable_subgraphs`` is ``True``; the subgraph
+    builders resolve their own LLM at build time, so this requires a configured
+    provider (consistent with the existing dev/ml/financial subgraphs).
+    """
+    from prismal.agents.patterns.nodes import (
+        make_constitutional_node,
+        make_debate_node,
+        make_lats_node,
+        make_llm_compiler_node,
+        make_mixture_node,
+        make_tot_agent_node,
+    )
+    from prismal.agents.subgraphs.code_review.builder import build_code_review_subgraph
+    from prismal.agents.subgraphs.customer_service.builder import (
+        build_customer_service_subgraph,
+    )
+    from prismal.agents.subgraphs.data_etl.builder import build_data_etl_subgraph
+    from prismal.agents.subgraphs.debate_consensus.builder import (
+        build_debate_consensus_subgraph,
+    )
+    from prismal.agents.subgraphs.document_generation.builder import (
+        build_document_generation_subgraph,
+    )
+    from prismal.agents.subgraphs.factory import SubgraphFactory
+
+    factory = SubgraphFactory()
+    nodes: dict[str, Any] = {
+        # Reasoning patterns (lazy LLM resolution at call time).
+        "tot_agent": make_tot_agent_node(),
+        "debate_agent": make_debate_node(),
+        "constitutional_filter": make_constitutional_node(),
+        "lats_agent": make_lats_node(),
+        "llm_compiler": make_llm_compiler_node(),
+        "mixture_agent": make_mixture_node(),
+        # Domain subgraph pipelines (compiled now).
+        "customer_service": await factory.build(build_customer_service_subgraph()),
+        "document_generation": await factory.build(build_document_generation_subgraph()),
+        "data_etl": await factory.build(build_data_etl_subgraph()),
+        "code_review": await factory.build(build_code_review_subgraph()),
+        "debate_consensus": await factory.build(build_debate_consensus_subgraph()),
+    }
+    logger.info("advanced_nodes_built", count=len(nodes))
+    return nodes
 
 
 @lru_cache(maxsize=1)
@@ -454,6 +525,7 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     dev_pipeline_graph: Any = None  # ANN401: no common base type for compiled subgraphs
     ml_pipeline_graph: Any = None  # ANN401: no common base type for compiled subgraphs
     financial_analyst_graph: Any = None  # ANN401: no common base type
+    advanced_nodes: dict[str, Any] | None = None
     if get_settings().enable_subgraphs:
         from prismal.agents.subgraphs.dev_pipeline.builder import (
             get_compiled_dev_pipeline,
@@ -472,11 +544,16 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
 
         financial_analyst_graph = await get_compiled_financial_analyst()
 
+        # Phase D (D1-01): build the advanced-architecture node map — 6 pattern
+        # nodes (lazy LLM defaults) + 5 compiled domain subgraphs.
+        advanced_nodes = await _build_advanced_nodes()
+
     _async_graph = build_supervisor_graph(
         checkpointer=checkpointer,
         dev_pipeline_graph=dev_pipeline_graph,
         ml_pipeline_graph=ml_pipeline_graph,
         financial_analyst_graph=financial_analyst_graph,
+        advanced_nodes=advanced_nodes,
     )
     logger.debug("async_graph_initialized")
     return _async_graph
@@ -614,6 +691,7 @@ def list_session_ids() -> list[str]:
 
 
 __all__ = [
+    "_build_advanced_nodes",
     "_build_hierarchical_graph",
     "_hierarchical_router",
     "build_checkpointer",

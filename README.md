@@ -19,6 +19,8 @@ This package is the **agent framework layer** extracted from the [Prismal](https
 - **7 RAG engines** — standard + CRAG, HyDE, RAG-Fusion (RRF), Hybrid (BM25 + semantic), Self-RAG, Parent-Child hierarchical, Multi-Vector, and Adaptive facade
 - **7 agent reasoning patterns** — Tree of Thoughts, Debate, Constitutional AI, LATS (MCTS), LLM-Compiler (parallel DAG), Mixture of Agents, Swarm/Handoff
 - **5 domain subgraph pipelines** — Customer Service, Document Generation, Data ETL, Code Review, Debate/Consensus — on top of the existing dev/ml/financial pipelines
+- **Multimodal layer (planned, opt-in)** — Vision / Audio / Video agents, modality router, multimodal fusion, multimodal subgraph, multimodal RAG engine with cross-modal embeddings, and `MediaValidator` security gate — see [`specs/multimodal-agents/`](./specs/multimodal-agents/)
+- **Extension surface (planned, opt-in)** — `prismal.langgraph` re-export, `@prismal_node` decorator (security/OTel/audit/retry middleware), `PrismalStateGraphBuilder` fluent API, plugin discovery via `importlib.metadata` entry points, `LangChainRunnableAdapter`, and formal `Protocol`s for ports (checkpoint/audit/embeddings/tools) — see [`specs/extension-surface/`](./specs/extension-surface/)
 - **MCP client with capability routing** — [Model Context Protocol](https://modelcontextprotocol.io) with auto-discovery and per-agent capability-based tool filtering (`config/mcp_servers.yaml`)
 - **Process isolation** — `SandboxExecutor` with docker/podman/nsjail/bwrap/firejail backends
 - **Human-in-the-Loop** — `hitl_gate()` with LangGraph `interrupt()` support
@@ -52,7 +54,11 @@ pip install "prismal[finance]"           # yfinance + pandas-ta
 pip install "prismal[analytics]"         # matplotlib + plotly
 pip install "prismal[datetime]"          # tzdata + NTP
 pip install "prismal[maintenance]"       # pip-audit
-pip install "prismal[all]"               # Everything above
+pip install "prismal[multimodal]"         # Pillow + ffmpeg-python + imagehash (planned Fase F)
+pip install "prismal[multimodal-local]"   # openai-whisper / faster-whisper (local STT)
+pip install "prismal[multimodal-premium]" # elevenlabs TTS
+pip install "prismal[multimodal-embed]"   # open_clip_torch (CLIP cross-modal embeddings)
+pip install "prismal[all]"                # Everything above
 ```
 
 ---
@@ -126,9 +132,123 @@ Each subgraph exports both `build_<name>_subgraph()` (returns a `SubgraphDefinit
 
 ### MCP capability routing
 
-`config/mcp_servers.yaml` declares each server's `capabilities: list[str]`. `MCPClientManager.get_all_langchain_tools(capabilities=…)` and `get_tools_for_agent(agent, required_capabilities=…)` filter the tool pool per agent. Servers tagged `general` are always included; omitting `capabilities` from a YAML entry defaults to `["general"]` for backward compatibility.
+`config/mcp_servers.yaml` declares each server's `capabilities: list[str]`. `MCPClientManager.get_all_langchain_tools(capabilities=…)` and `get_tools_for_agent(agent, required_capabilities=…)` filter the tool pool per agent. Servers tagged `general` are always included; omitting `capabilities` from a YAML entry defaults to `["general"]` for backward compatibility. The capability set is extended in Fase F to include `vision`, `audio`, and `video`.
 
-See [`specs/advanced-architectures/SPEC.md`](./specs/advanced-architectures/SPEC.md) for the full interface contracts.
+See [`specs/advanced-architectures/SPEC.md`](./specs/advanced-architectures/SPEC.md) for the full interface contracts of Fases A/B/C/D/E.
+
+### Multimodal layer (Fase F — planned, opt-in)
+
+The multimodal expansion described in [`specs/multimodal-agents/`](./specs/multimodal-agents/) adds voice, image, and video to the existing text-only stack without modifying any existing agent. It is **opt-in**: gated by `settings.multimodal_enabled` (default `False`) and registered via `register_multimodal_pipeline(registry)` when the operator is ready.
+
+#### Provider wrappers (`prismal/providers/`)
+
+| Wrapper | Module | Backends |
+|---------|--------|----------|
+| **STT** | `stt.py` | OpenAI Whisper API, local (`openai-whisper` / `faster-whisper`) |
+| **TTS** | `tts.py` | `pyttsx3` (offline default), OpenAI, ElevenLabs — automatic cascade fallback |
+| **Vision LLM** | `vision.py` | Any LiteLLM model with vision (Claude, GPT-4o, Gemini) |
+| **Multimodal LLM** | `multimodal.py` | Gemini 2.x, GPT-4o, Sonnet 4.6 (native multimodal) |
+| **Cross-modal embeddings** | `cross_modal_embeddings.py` | CLIP / `open_clip_torch` (opt-in extra) |
+
+#### Modal agents (`prismal/agents/multimodal/`)
+
+| Agent | Module | Purpose |
+|-------|--------|---------|
+| **VisionAgent** | `vision_agent.py` | General-purpose image analysis: description, object detection, optional OCR |
+| **AudioAgent** | `audio_agent.py` | Voice-to-voice pipeline: STT → LLM reasoning → optional TTS |
+| **VideoAgent** | `video_agent.py` | FFmpeg frame extraction (via `SandboxExecutor`) + audio transcript + fusion summary |
+| **ModalityRouter** | `modality_router.py` | Heuristic classifier (MIME + regex) with optional LLM fallback |
+| **MultimodalFusion** | `multimodal_fusion.py` | Combines outputs from modal agents using `moa`, `moderator`, or `concat` strategies (reuses `mixture_of_agents.py`) |
+
+#### Multimodal subgraph (`prismal/agents/subgraphs/multimodal_pipeline/`)
+
+```
+router_node → [vision_node | audio_node | video_node | text passthrough] → fusion_node → output_formatter_node
+```
+
+Exports `build_multimodal_subgraph()` (returns `SubgraphDefinition`) and an idempotent `register_multimodal_pipeline()` matching the existing `register_ml_pipeline` pattern.
+
+#### Multimodal RAG (`prismal/rag/`)
+
+`MultimodalRAGEngine` indexes text + image captions + audio/video transcripts and exposes `search(query, modalities=[...])` with metadata-based modality filtering. Without the `[multimodal-embed]` extra it falls back to textual captions; with it, vectors come from CLIP-style cross-modal embeddings. New loaders: `loaders/image_loader.py`, `loaders/audio_loader.py`, `loaders/video_loader.py`.
+
+#### Security (`prismal/security/`)
+
+`MediaValidator` enforces magic-byte verification + size/duration limits before any media reaches an agent. `InputSanitizer.sanitize_media()` strips EXIF; `AuditLogger.log_media()` records SHA-256 + modality (never content); `ActionInterceptor.check_media_op()` gates filesystem media operations; FFmpeg always runs inside `SandboxExecutor`.
+
+See [`specs/multimodal-agents/SPEC.md`](./specs/multimodal-agents/SPEC.md) for the full interface contracts of Fase F.
+
+### Extension surface (Fase X — planned, opt-in)
+
+The extension surface described in [`specs/extension-surface/`](./specs/extension-surface/) exposes LangGraph as a first-class build target for users and third-party plugins, so you can write new patterns without forking prismal. Five components:
+
+#### `prismal.langgraph` — official re-export
+
+```python
+from prismal.langgraph import StateGraph, START, END, Send, interrupt, add_messages, AgentState, VERSION
+
+graph = StateGraph(AgentState)
+graph.add_node("my_node", my_node)
+graph.add_edge(START, "my_node")
+graph.add_edge("my_node", END)
+compiled = graph.compile()
+```
+
+Importing from `prismal.langgraph` (rather than `langgraph.*` directly) guarantees the LangGraph version prismal was tested against, exposed as `VERSION`.
+
+#### `@prismal_node` decorator
+
+```python
+from prismal.agents.extension import prismal_node
+
+@prismal_node(name="my_classifier", capabilities=["general"], security="standard", audit=True)
+async def my_classifier(state):
+    last = state["messages"][-1].content
+    label = await classify(last)
+    return {"metadata": {"my_classifier": {"label": label}}}
+```
+
+Wraps any async `(state) → state_update` with a middleware chain: `InputSanitizer` + `SecurePromptBuilder` + `ActionInterceptor` → OTel span → structured logger bind → retry/backoff → timeout → user function → audit log → error mapping. Side effect: registers the node's capabilities in `tool_registry.DEFAULT_CAPABILITY_MAP`.
+
+#### `PrismalStateGraphBuilder` — fluent API
+
+```python
+from prismal.agents.extension import PrismalStateGraphBuilder
+
+builder = PrismalStateGraphBuilder("my_pipeline")
+builder.add_node("classify", classify_fn)        # auto-wraps with @prismal_node if missing
+builder.add_node("respond", respond_fn)
+builder.add_edge("classify", "respond")
+builder.set_entry_point("classify")
+subgraph = builder.compile()                      # returns SubgraphDefinition
+```
+
+#### Plugin discovery via entry points
+
+```toml
+# prismal-x-healthcare/pyproject.toml
+[project.entry-points."prismal.subgraphs"]
+healthcare_triage = "prismal_x_healthcare:register_healthcare_pipeline"
+```
+
+After `pip install prismal-x-healthcare`, `discover_plugins()` auto-registers the subgraph. Allowlist/denylist via `settings.plugins_allowlist` / `plugins_denylist`. CLI: `python -m prismal.plugins list | info <name> | doctor`. Each plugin loads in isolation — individual failures do not abort startup.
+
+#### `LangChainRunnableAdapter` — bridge for existing LangChain code
+
+```python
+from prismal.agents.extension import LangChainRunnableAdapter
+
+adapter = LangChainRunnableAdapter(my_agent_executor)
+node = adapter.as_node(name="legacy_research", capabilities=["research"])
+```
+
+Automatically maps `state["messages"]` ↔ the Runnable's input/output. Supports `Runnable`, `RunnableSequence`, `RunnableLambda`, `AgentExecutor`.
+
+#### Formal ports (hexagonal)
+
+`prismal/agents/extension/ports.py` declares `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort` as `Protocol`s. Existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, `BaseTool`) conform structurally; users substitute their own (Redis checkpointer, Splunk audit, etc.) without modifying the core.
+
+See [`specs/extension-surface/SPEC.md`](./specs/extension-surface/SPEC.md) for the full interface contracts of Fase X.
 
 ---
 
@@ -191,6 +311,12 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 │   │   ├── llm_compiler.py         ← DAG compilation + Kahn validation + parallel waves
 │   │   ├── mixture_of_agents.py    ← multi-provider proposers + aggregator
 │   │   └── swarm.py                ← decentralised handoff with audit
+│   ├── multimodal/                  ← (Fase F) vision / audio / video agents + router + fusion
+│   │   ├── vision_agent.py
+│   │   ├── audio_agent.py
+│   │   ├── video_agent.py
+│   │   ├── modality_router.py
+│   │   └── multimodal_fusion.py
 │   └── subgraphs/
 │       ├── factory.py              ← SubgraphFactory
 │       ├── registry.py             ← SubgraphRegistry
@@ -203,14 +329,16 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 │       ├── data_etl/               ← extractor → validator → gate → transformer → loader → auditor
 │       ├── code_review/            ← linter → security_scanner → logic_reviewer → suggester → report
 │       ├── debate_consensus/       ← proponent → opponent → moderator → consensus
+│       ├── multimodal_pipeline/    ← (Fase F) router → vision|audio|video → fusion → output_formatter
 │       ├── analysis_orchestrator/
 │       ├── engineering_orchestrator/
 │       └── research_orchestrator/
 ├── core/                  ← Pydantic Settings, logging, exceptions, DB, user model
-├── providers/             ← LiteLLM wrapper (ONLY location for provider-specific imports)
+├── providers/             ← LiteLLM wrapper (ONLY location for provider-specific imports;
+│                             Fase F adds stt/tts/vision/multimodal/cross_modal_embeddings)
 ├── memory/                ← Short-term history + long-term PII-sanitized store
 ├── mcp/                   ← MCP client, adapter, connection manager, capability routing
-├── security/              ← 5-layer defense-in-depth (see below)
+├── security/              ← 5-layer defense-in-depth (see below) + (Fase F) media_validator.py
 ├── rag/                   ← 7 retrieval engines:
 │   ├── engine.py          ← standard RAGEngine
 │   ├── crag.py            ← CRAG pipeline
@@ -222,7 +350,9 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 │   ├── multi_vector.py    ← chunk + summary + N hypothetical questions
 │   ├── adaptive.py        ← facade routing by query type
 │   ├── federated.py       ← federated search
-│   └── vector_store.py    ← ChromaDB vector store
+│   ├── multimodal.py      ← (Fase F) MultimodalRAGEngine — text + image captions + audio/video transcripts
+│   ├── loaders/           ← (Fase F) document/image/audio/video loaders
+│   └── vector_store.py    ← ChromaDB vector store (extended with modality metadata in Fase F)
 ├── skills/                ← available/ (source) · active/ (gitignored) · custom/ (gitignored)
 ├── scheduler/             ← APScheduler CronExecutor, DateTimeService, Prefect flows
 ├── monitoring/            ← Langfuse, OpenTelemetry, structlog
@@ -253,12 +383,13 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 
 ## Critical rules
 
-1. **Never** concatenate user input into prompts — use `SecurePromptBuilder`.
+1. **Never** concatenate user input into prompts — use `SecurePromptBuilder`. This applies to STT transcripts, OCR text, and image captions as well — they are user-controlled content.
 2. **Never** bypass `GuardrailsEngine` / `ActionInterceptor`.
 3. **Always** use `get_async_compiled_graph()` in async contexts (the sync variant wires a non-async SQLite saver).
-4. **Never** add provider-specific imports (`anthropic`, `openai`, `google.generativeai`, `ollama`, …) outside `prismal/providers/`.
-5. **Always** call `ActionInterceptor.check()` before tool calls that write files or execute code.
-6. **Never** add `__init__.py` to `prismal/` — it must remain a PEP 420 namespace package.
+4. **Never** add provider-specific imports (`anthropic`, `openai`, `google.generativeai`, `ollama`, `whisper`, `pyttsx3`, `elevenlabs`, `open_clip_torch`, …) outside `prismal/providers/`.
+5. **Always** call `ActionInterceptor.check()` before tool calls that write files or execute code; call `ActionInterceptor.check_media_op()` before media filesystem operations (Fase F).
+6. **Always** validate incoming media with `MediaValidator.validate()` before passing to a multimodal agent (Fase F); FFmpeg always runs inside `SandboxExecutor`.
+7. **Never** add `__init__.py` to `prismal/` — it must remain a PEP 420 namespace package.
 
 See [CLAUDE.md](./CLAUDE.md) for the full working guide (commands, testing notes, architectural context for contributors and AI assistants).
 
