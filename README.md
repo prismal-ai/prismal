@@ -20,7 +20,7 @@ This package is the **agent framework layer** extracted from the [Prismal](https
 - **7 agent reasoning patterns** — Tree of Thoughts, Debate, Constitutional AI, LATS (MCTS), LLM-Compiler (parallel DAG), Mixture of Agents, Swarm/Handoff
 - **5 domain subgraph pipelines** — Customer Service, Document Generation, Data ETL, Code Review, Debate/Consensus — on top of the existing dev/ml/financial pipelines
 - **Multimodal layer (planned, opt-in)** — Vision / Audio / Video agents, modality router, multimodal fusion, multimodal subgraph, multimodal RAG engine with cross-modal embeddings, and `MediaValidator` security gate — see [`specs/multimodal-agents/`](./specs/multimodal-agents/)
-- **Extension surface (planned, opt-in)** — `prismal.langgraph` re-export, `@prismal_node` decorator (security/OTel/audit/retry middleware), `PrismalStateGraphBuilder` fluent API, plugin discovery via `importlib.metadata` entry points, `LangChainRunnableAdapter`, and formal `Protocol`s for ports (checkpoint/audit/embeddings/tools) — see [`specs/extension-surface/`](./specs/extension-surface/)
+- **Extension surface (implemented, opt-in)** — `prismal.langgraph` re-export, `@prismal_node` decorator (security/OTel/audit/retry middleware), `PrismalStateGraphBuilder` fluent API, plugin discovery via `importlib.metadata` entry points, `LangChainRunnableAdapter`, and formal `Protocol`s for ports (checkpoint/audit/embeddings/tools) — see [`docs/extension.md`](./docs/extension.md) and [`specs/extension-surface/`](./specs/extension-surface/)
 - **MCP client with capability routing** — [Model Context Protocol](https://modelcontextprotocol.io) with auto-discovery and per-agent capability-based tool filtering (`config/mcp_servers.yaml`)
 - **Process isolation** — `SandboxExecutor` with docker/podman/nsjail/bwrap/firejail backends
 - **Human-in-the-Loop** — `hitl_gate()` with LangGraph `interrupt()` support
@@ -178,9 +178,9 @@ Exports `build_multimodal_subgraph()` (returns `SubgraphDefinition`) and an idem
 
 See [`specs/multimodal-agents/SPEC.md`](./specs/multimodal-agents/SPEC.md) for the full interface contracts of Fase F.
 
-### Extension surface (Fase X — planned, opt-in)
+### Extension surface (Fase X — implemented, opt-in)
 
-The extension surface described in [`specs/extension-surface/`](./specs/extension-surface/) exposes LangGraph as a first-class build target for users and third-party plugins, so you can write new patterns without forking prismal. Five components:
+The extension surface (user guide: [`docs/extension.md`](./docs/extension.md); contracts: [`specs/extension-surface/`](./specs/extension-surface/)) exposes LangGraph as a first-class build target for users and third-party plugins, so you can write new patterns without forking prismal. All public symbols import from `prismal.agents.extension`. Five components:
 
 #### `prismal.langgraph` — official re-export
 

@@ -8,6 +8,47 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added — Extension Surface (Fase X)
+
+Public, opt-in extension API so users and third-party plugins can build on
+LangGraph without forking the repo. See `docs/extension.md` and
+`specs/extension-surface/`.
+
+- **`prismal.langgraph`** — official re-export of `StateGraph`, `START`, `END`,
+  `Send`, `interrupt`, `add_messages`, `CompiledStateGraph`, plus `AgentState`,
+  `SubgraphDefinition`, `SubgraphRegistry`, and a dynamic `VERSION`.
+- **`@prismal_node`** decorator (`prismal.agents.extension`) wrapping any
+  `async (state) -> state_update` with a middleware chain (security → OTel →
+  logging → retry → timeout → audit → error mapping), plus
+  `list_registered_nodes()` / `get_node_metadata()` and auto-registration of
+  capabilities in `DEFAULT_CAPABILITY_MAP`.
+- **`PrismalStateGraphBuilder`** — fluent builder over `StateGraph[AgentState]`
+  with node auto-wrapping; `compile()` → `SubgraphDefinition`, `compile_raw()`
+  → `CompiledStateGraph`.
+- **Plugin discovery** — `discover_plugins()` over four entry-point groups
+  (`prismal.subgraphs|nodes|tools|rag_engines`) with allowlist/denylist and
+  per-plugin failure isolation; `list_plugins()` / `get_plugin_info()`; CLI
+  `python -m prismal.plugins {list,info,doctor,enable,disable}`; new
+  `RAGEngineRegistry`.
+- **`LangChainRunnableAdapter`** — wrap any `Runnable` / `AgentExecutor` as a
+  prismal node with auto input/output mapping.
+- **Hexagonal ports** — `CheckpointPort`, `AuditPort`, `EmbeddingsPort`,
+  `ToolPort` (`@runtime_checkable` Protocols) + `conforms_to()`.
+- **Settings** — `plugins_autodiscover`, `plugins_allowlist`,
+  `plugins_denylist`, `plugins_groups_enabled`, `extension_default_security`,
+  `extension_default_audit`, `extension_default_timeout_s`.
+- **Exceptions** — `ExtensionError`, `NodeExecutionError`, `NodeTimeoutError`,
+  `NodeValidationError`, `PluginLoadError`, `PluginConflictError`,
+  `AdapterError`, `LangChainAdapterError`.
+- **`SubgraphRegistry.register_sync()`** for synchronous (startup/plugin)
+  registration; **`AuditLogger.log_event()` / `log_node()` / `log_media()`**.
+- Runnable examples under `examples/extension/` and an installable
+  `examples/plugin_template/`.
+
+---
+
 ## [3.0.0] — 2026-05-22
 
 Rebrand of the framework from **LightAgent** to **Prismal**

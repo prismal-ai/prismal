@@ -407,6 +407,8 @@ exclude_lines = [
   "raise NotImplementedError",
   "@abstractmethod",
   "if __name__ == .__main__.:",
+  "^\\s*\\.\\.\\.$",
+  "@(typing\\.)?overload",
 ]
 fail_under = 80
 show_missing = true

@@ -401,7 +401,121 @@ class DebateConsensusError(PrismalError):
     """Debate/consensus subgraph error (C5)."""
 
 
+# ── Extension surface (Fase X) ────────────────────────────────────────────────
+
+
+class ExtensionError(PrismalError):
+    """Base for errors raised by the public extension surface."""
+
+
+class NodeExecutionError(ExtensionError):
+    """Error captured while executing a node wrapped by ``@prismal_node``.
+
+    Args:
+        node_name: Name of the failing node.
+        state_keys: Keys present in the state passed to the node (for context;
+            values are never stored to avoid leaking user content).
+        cause: The original exception raised by the user function.
+    """
+
+    def __init__(
+        self,
+        node_name: str,
+        state_keys: list[str],
+        cause: BaseException,
+    ) -> None:
+        """Initialize NodeExecutionError."""
+        self.node_name = node_name
+        self.state_keys = state_keys
+        self.cause = cause
+        super().__init__(f"Node '{node_name}' failed: {cause!r}")
+
+
+class NodeTimeoutError(NodeExecutionError):
+    """Raised when a decorated node exceeds its ``timeout_s``.
+
+    Args:
+        node_name: Name of the node.
+        state_keys: Keys present in the state at timeout.
+        cause: Underlying ``TimeoutError`` (or the cancellation cause).
+        timeout_s: The configured timeout that was exceeded.
+    """
+
+    def __init__(
+        self,
+        node_name: str,
+        state_keys: list[str],
+        cause: BaseException,
+        *,
+        timeout_s: float,
+    ) -> None:
+        """Initialize NodeTimeoutError."""
+        self.timeout_s = timeout_s
+        super().__init__(node_name, state_keys, cause)
+        self.args = (f"Node '{node_name}' timed out after {timeout_s}s",)
+
+
+class NodeValidationError(NodeExecutionError):
+    """Raised when the ``state_update`` returned by a node is not valid."""
+
+
+class PluginLoadError(ExtensionError):
+    """Error raised while loading a plugin from an entry point.
+
+    Args:
+        plugin_name: Entry-point name of the plugin.
+        entry_point: The ``module:object`` reference that failed.
+        cause: The original exception.
+    """
+
+    def __init__(
+        self,
+        plugin_name: str,
+        entry_point: str,
+        cause: BaseException,
+    ) -> None:
+        """Initialize PluginLoadError."""
+        self.plugin_name = plugin_name
+        self.entry_point = entry_point
+        self.cause = cause
+        super().__init__(f"Plugin '{plugin_name}' ({entry_point}) failed to load: {cause!r}")
+
+
+class PluginConflictError(ExtensionError):
+    """Raised when two plugins try to register the same name.
+
+    Args:
+        conflicting_name: The name both plugins tried to register.
+        plugins: Distribution names of the conflicting plugins.
+    """
+
+    def __init__(self, conflicting_name: str, plugins: list[str]) -> None:
+        """Initialize PluginConflictError."""
+        self.conflicting_name = conflicting_name
+        self.plugins = plugins
+        super().__init__(f"Plugin name conflict on '{conflicting_name}': {plugins}")
+
+
+class AdapterError(ExtensionError):
+    """Base for adapter errors."""
+
+
+class LangChainAdapterError(AdapterError):
+    """Error raised by :class:`LangChainRunnableAdapter`.
+
+    Args:
+        runnable_type: Type name of the offending Runnable.
+        message: Human-readable description of the failure.
+    """
+
+    def __init__(self, runnable_type: str, message: str) -> None:
+        """Initialize LangChainAdapterError."""
+        self.runnable_type = runnable_type
+        super().__init__(f"{message} (runnable_type={runnable_type})")
+
+
 __all__ = [
+    "AdapterError",
     "AdaptiveRAGError",
     "CanaryLeakError",
     "CodeReviewError",
@@ -415,13 +529,14 @@ __all__ = [
     "DebateError",
     "DocumentGenerationError",
     "DocumentLoadError",
+    "ExtensionError",
     "FusionError",
     "HierarchicalRAGError",
     "HyDEError",
     "HybridSearchError",
     "InjectionDetectedError",
     "LATSError",
-    "PrismalError",
+    "LangChainAdapterError",
     "MCPConnectionError",
     "MCPError",
     "MCPToolError",
@@ -430,7 +545,13 @@ __all__ = [
     "MoAError",
     "ModelNotFoundError",
     "MultiVectorError",
+    "NodeExecutionError",
+    "NodeTimeoutError",
+    "NodeValidationError",
     "PermissionDeniedError",
+    "PluginConflictError",
+    "PluginLoadError",
+    "PrismalError",
     "ProviderError",
     "ProviderTimeoutError",
     "RAGError",
