@@ -200,27 +200,34 @@ jobs:
   security-trivy:
     runs-on: ubuntu-latest
     needs: [lint]
+    # aquasecurity/trivy-action's setup step (setup-trivy) flakily fails while
+    # downloading the trivy binary from GitHub, even with a token. Install trivy
+    # directly from the pinned release tarball — deterministic — and run the CLI.
+    # The vuln DB is still fetched at runtime from its OCI registry (unaffected).
+    env:
+      TRIVY_VERSION: "0.70.0"
     steps:
       - uses: actions/checkout@v4
+      - name: Install trivy
+        run: |
+          curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" -o "$RUNNER_TEMP/trivy.tar.gz"
+          tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP" trivy
+          "$RUNNER_TEMP/trivy" --version
       - name: Trivy fs (JSON report)
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          scan-type: fs
-          scanners: vuln,misconfig,secret
-          trivyignores: .trivyignore
-          format: json
-          output: trivy-fs.json
-          exit-code: "0"
+        run: |
+          "$RUNNER_TEMP/trivy" fs . \
+            --scanners vuln,misconfig,secret \
+            --ignorefile .trivyignore \
+            --format json \
+            --output trivy-fs.json \
+            --exit-code 0
       - name: Trivy fs (gate — HIGH,CRITICAL)
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          scan-type: fs
-          scanners: vuln,misconfig,secret
-          severity: HIGH,CRITICAL
-          trivyignores: .trivyignore
-          format: table
-          exit-code: "1"
-          skip-setup-trivy: true
+        run: |
+          "$RUNNER_TEMP/trivy" fs . \
+            --scanners vuln,misconfig,secret \
+            --severity HIGH,CRITICAL \
+            --ignorefile .trivyignore \
+            --exit-code 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
