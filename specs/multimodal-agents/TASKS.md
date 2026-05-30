@@ -5,12 +5,23 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
+| **Estado** | `APPROVED — PENDING IMPLEMENTATION` |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-05-27 |
 | **PLAN** | `specs/multimodal-agents/PLAN.md` |
 | **Architecture** | `specs/multimodal-agents/ARCHITECTURE.md` |
 | **SPEC** | `specs/multimodal-agents/SPEC.md` |
+
+---
+
+> **Estado de implementación (2026-05-30):** La Fase F **no está implementada** —
+> es la única spec del repo todavía pendiente. No existe ningún módulo en disco
+> (`prismal/providers/{stt,tts,vision,multimodal,cross_modal_embeddings}.py`,
+> `prismal/agents/multimodal/`, `prismal/agents/subgraphs/multimodal_pipeline/`,
+> `prismal/rag/multimodal.py`, `prismal/rag/loaders/`,
+> `prismal/security/media_validator.py`), no hay settings `multimodal_*` en
+> `core/config.py` ni extras `[multimodal*]` en `pyproject.toml`. Los checkboxes
+> `☐` de abajo reflejan fielmente el trabajo restante.
 
 ---
 

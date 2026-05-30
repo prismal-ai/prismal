@@ -6,7 +6,7 @@
 
 **Prismal AI Agent Framework** — the core engine powering multi-agent orchestration, security guardrails, RAG, MCP integration, and observability.
 
-This package is the **agent framework layer** extracted from the [Prismal](https://github.com/your-org/prismal) monorepo as a standalone, publishable PyPI package (v2.0.0). It provides everything needed to build and run AI agents without the web server, dashboard, or CLI. The sibling `prismal` app package depends on this one via `prismal>=2.0.0`.
+This package is the **agent framework layer** extracted from the larger monorepo as a standalone, publishable PyPI package. It provides everything needed to build and run AI agents without the web server, dashboard, or CLI. It was published as `lightagent-agents` through v2.x and **rebranded to `prismal` in v3.0.0** (distribution name plus the `lightagent.*` → `prismal.*` import namespace). End-user backward compatibility is provided by the deprecated `lightagent-agents` distribution, which now depends on `prismal`. The sibling `lightagent` app package historically shared this import namespace and is rebranded/coordinated in tandem.
 
 ---
 
@@ -54,11 +54,13 @@ pip install "prismal[finance]"           # yfinance + pandas-ta
 pip install "prismal[analytics]"         # matplotlib + plotly
 pip install "prismal[datetime]"          # tzdata + NTP
 pip install "prismal[maintenance]"       # pip-audit
-pip install "prismal[multimodal]"         # Pillow + ffmpeg-python + imagehash (planned Fase F)
-pip install "prismal[multimodal-local]"   # openai-whisper / faster-whisper (local STT)
-pip install "prismal[multimodal-premium]" # elevenlabs TTS
-pip install "prismal[multimodal-embed]"   # open_clip_torch (CLIP cross-modal embeddings)
 pip install "prismal[all]"                # Everything above
+
+# Planned (Fase F — NOT yet released; these extras do not exist on PyPI yet):
+#   prismal[multimodal]          # Pillow + ffmpeg-python + imagehash
+#   prismal[multimodal-local]    # openai-whisper / faster-whisper (local STT)
+#   prismal[multimodal-premium]  # elevenlabs TTS
+#   prismal[multimodal-embed]    # open_clip_torch (CLIP cross-modal embeddings)
 ```
 
 ---
@@ -364,7 +366,7 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 
 ### Namespace package
 
-`prismal/` has **no `__init__.py`** — it is a PEP 420 implicit namespace package. Both `prismal` and the separate `prismal` app package contribute modules into the same `prismal.*` namespace. Do not add `prismal/__init__.py`; it would break the sibling package.
+`prismal/` has **no `__init__.py`** — it is a PEP 420 implicit namespace package (renamed from `lightagent/` in v3.0.0). Both `prismal` and the sibling `lightagent` app package contribute modules into the same `prismal.*` namespace. Do not add `prismal/__init__.py`; it would break the sibling package.
 
 ### Security stack (5 layers)
 
@@ -401,7 +403,7 @@ This package follows [Semantic Versioning](https://semver.org/).
 Tag format for releases: `prismal/vMAJOR.MINOR.PATCH`
 
 ```bash
-git tag prismal/v2.1.0
+git tag prismal/v3.0.0
 git push --tags
 ```
 
