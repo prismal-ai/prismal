@@ -34,6 +34,54 @@ if TYPE_CHECKING:
 logger = structlog.get_logger("prismal.subgraphs.factory")
 
 
+def assemble_state_graph(
+    definition: SubgraphDefinition,
+) -> StateGraph[AgentState, Any, Any, Any]:
+    """Assemble (but do not compile) a ``StateGraph`` from a definition.
+
+    Registers nodes, the entry point, linear edges, conditional edges and
+    Send-based fan-out edges, then wires terminal nodes to ``END``. Shared by
+    :meth:`SubgraphFactory.build` (which adds a checkpointer and compiles) and
+    the visualization helpers (which compile without a checkpointer). No
+    checkpointer, no I/O — pure, synchronous assembly.
+
+    Args:
+        definition: The :class:`SubgraphDefinition` to assemble.
+
+    Returns:
+        An uncompiled ``StateGraph`` mirroring the definition's topology.
+    """
+    builder: StateGraph[AgentState, Any, Any, Any] = StateGraph(AgentState)
+
+    for node_name, node_fn in definition.nodes.items():
+        builder.add_node(node_name, node_fn)
+
+    builder.set_entry_point(definition.entry_point)
+
+    for from_node, to_node in definition.edges:
+        builder.add_edge(from_node, END if to_node == "__end__" else to_node)
+
+    for source_node, routing_fn in definition.conditional_edges.items():
+        builder.add_conditional_edges(source_node, routing_fn)
+
+    # Phase 34: Send-based fan-out edges — dispatcher returns list[Send] or a
+    # fallback node name; both are valid ``add_conditional_edges`` returns.
+    for source_node, dispatcher_fn in definition.send_edges:
+        builder.add_conditional_edges(source_node, dispatcher_fn)
+
+    # Nodes with no outgoing edge of any kind terminate at END.
+    all_sources = (
+        {f for f, _ in definition.edges}
+        | set(definition.conditional_edges)
+        | {src for src, _ in definition.send_edges}
+    )
+    for node_name in definition.nodes:
+        if node_name not in all_sources:
+            builder.add_edge(node_name, END)
+
+    return builder
+
+
 class SubgraphFactory:
     """Builds compiled LangGraph subgraphs from :class:`SubgraphDefinition` objects.
 
@@ -89,53 +137,7 @@ class SubgraphFactory:
             A compiled ``CompiledStateGraph`` ready to be used as a
             node.
         """
-        builder: StateGraph[AgentState, Any, Any, Any] = StateGraph(AgentState)
-
-        # Register all nodes
-        for node_name, node_fn in definition.nodes.items():
-            builder.add_node(node_name, node_fn)
-            logger.debug(
-                "subgraph.node_added",
-                subgraph=definition.name,
-                node=node_name,
-            )
-
-        # Set entry point
-        builder.set_entry_point(definition.entry_point)
-
-        # Add linear edges
-        for from_node, to_node in definition.edges:
-            if to_node == "__end__":
-                builder.add_edge(from_node, END)
-            else:
-                builder.add_edge(from_node, to_node)
-
-        # Add conditional edges
-        for source_node, routing_fn in definition.conditional_edges.items():
-            builder.add_conditional_edges(source_node, routing_fn)
-
-        # Phase 34: add Send-based fan-out edges.  Each dispatcher_fn returns
-        # either a list of ``Send`` objects (one per parallel worker) or a
-        # string fallback node name; both forms are valid return types for
-        # ``add_conditional_edges``.
-        for source_node, dispatcher_fn in definition.send_edges:
-            builder.add_conditional_edges(source_node, dispatcher_fn)
-            logger.debug(
-                "subgraph.send_edge_added",
-                subgraph=definition.name,
-                source=source_node,
-                dispatcher=getattr(dispatcher_fn, "__name__", "<dispatcher>"),
-            )
-
-        # Nodes with no outgoing edges or conditional edges go to END
-        all_sources = (
-            {f for f, _ in definition.edges}
-            | set(definition.conditional_edges)
-            | {src for src, _ in definition.send_edges}
-        )
-        for node_name in definition.nodes:
-            if node_name not in all_sources:
-                builder.add_edge(node_name, END)
+        builder = assemble_state_graph(definition)
 
         if checkpointer_path is None:
             # Phase 36: delegate to the global checkpointer factory so the
@@ -163,4 +165,4 @@ class SubgraphFactory:
         return compiled
 
 
-__all__ = ["SubgraphFactory"]
+__all__ = ["SubgraphFactory", "assemble_state_graph"]

@@ -368,6 +368,8 @@ module = [
   # Multimodal extras (Fase F) — lazy-imported inside functions.
   "ffmpeg", "imagehash", "faster_whisper", "whisper",
   "open_clip", "pyttsx3", "elevenlabs", "elevenlabs.*", "cv2",
+  # Optional notebook dependency for graph visualization.
+  "IPython", "IPython.*",
 ]
 ignore_missing_imports = true
 
