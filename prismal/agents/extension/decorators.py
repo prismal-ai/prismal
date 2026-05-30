@@ -109,7 +109,9 @@ def prismal_node(
         if getattr(fn, "__prismal_node__", None) is not None:
             return fn
 
-        node_name = name or fn.__name__
+        # ty (alpha) doesn't expose ``__name__`` on the Callable alias NodeFn;
+        # mypy resolves it correctly to ``str``.
+        node_name = name or fn.__name__  # ty: ignore[unresolved-attribute]
         metadata = NodeMetadata(
             name=node_name,
             capabilities=tuple(capabilities or []),
@@ -127,7 +129,7 @@ def prismal_node(
         async def wrapper(state: AgentState) -> dict[str, Any]:
             return await pipeline(state)
 
-        wrapper.__prismal_node__ = metadata  # type: ignore[attr-defined]
+        wrapper.__prismal_node__ = metadata  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]
 
         _registry.register_node(metadata)
         if metadata.capabilities:

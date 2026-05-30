@@ -20,7 +20,7 @@ f-stringed into a prompt template.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
@@ -374,7 +374,7 @@ def make_tot_agent_node(
     depth: int = 2,
     beam_size: int = 2,
     threshold: float = 0.9,
-    search_strategy: str = "beam",
+    search_strategy: Literal["bfs", "dfs", "beam"] = "beam",
 ) -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:
     """Build a Tree-of-Thoughts node, defaulting to LLM-backed generate/score."""
     gen = generate_fn or _default_tot_generate(llm, breadth)
@@ -386,7 +386,7 @@ def make_tot_agent_node(
         depth=depth,
         beam_size=beam_size,
         threshold=threshold,
-        search_strategy=search_strategy,  # type: ignore[arg-type]
+        search_strategy=search_strategy,
     )
 
 

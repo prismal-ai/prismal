@@ -246,7 +246,10 @@ class PrismalStateGraphBuilder:
         """Escape hatch: validate and return a raw ``CompiledStateGraph``."""
         self._validate()
         assert self._entry_point is not None
-        graph: StateGraph[AgentState, Any, Any, Any] = StateGraph(AgentState)
+        # ty (alpha) does not match our AgentState TypedDict against langgraph's
+        # StateT bound, though mypy and the other 10 identical StateGraph(AgentState)
+        # call sites accept it. Suppress the lone ty false positive.
+        graph: StateGraph[AgentState, Any, Any, Any] = StateGraph(AgentState)  # ty: ignore[invalid-argument-type]
         for node_name, node_fn in self._nodes.items():
             graph.add_node(node_name, cast("Any", node_fn))
         graph.set_entry_point(self._entry_point)

@@ -16,7 +16,7 @@ import hashlib
 import json
 import time
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 
@@ -78,7 +78,7 @@ def _sanitize_state(state: AgentState) -> AgentState:
             break
     new_state = dict(state)
     new_state["messages"] = messages
-    return new_state  # type: ignore[return-value]
+    return cast("AgentState", new_state)
 
 
 async def _check_tool_calls(update: dict[str, Any], _metadata: NodeMetadata) -> None:

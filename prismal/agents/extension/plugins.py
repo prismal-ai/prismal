@@ -123,7 +123,7 @@ class RAGEngineRegistry:
         """Return the engine class for ``name`` or ``None``."""
         return self._engines.get(name)
 
-    def list(self) -> list[str]:
+    def list(self) -> list[str]:  # ty: ignore[invalid-type-form]
         """Return sorted registered engine names."""
         return sorted(self._engines)
 
