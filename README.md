@@ -19,7 +19,7 @@ This package is the **agent framework layer** extracted from the larger monorepo
 - **7 RAG engines** — standard + CRAG, HyDE, RAG-Fusion (RRF), Hybrid (BM25 + semantic), Self-RAG, Parent-Child hierarchical, Multi-Vector, and Adaptive facade
 - **7 agent reasoning patterns** — Tree of Thoughts, Debate, Constitutional AI, LATS (MCTS), LLM-Compiler (parallel DAG), Mixture of Agents, Swarm/Handoff
 - **5 domain subgraph pipelines** — Customer Service, Document Generation, Data ETL, Code Review, Debate/Consensus — on top of the existing dev/ml/financial pipelines
-- **Multimodal layer (planned, opt-in)** — Vision / Audio / Video agents, modality router, multimodal fusion, multimodal subgraph, multimodal RAG engine with cross-modal embeddings, and `MediaValidator` security gate — see [`specs/multimodal-agents/`](./specs/multimodal-agents/)
+- **Multimodal layer (implemented, opt-in)** — Vision / Audio / Video agents, modality router, multimodal fusion, multimodal subgraph, multimodal RAG engine with cross-modal embeddings, and `MediaValidator` security gate — gated by `settings.multimodal_enabled` (default `False`); see [`specs/multimodal-agents/`](./specs/multimodal-agents/)
 - **Extension surface (implemented, opt-in)** — `prismal.langgraph` re-export, `@prismal_node` decorator (security/OTel/audit/retry middleware), `PrismalStateGraphBuilder` fluent API, plugin discovery via `importlib.metadata` entry points, `LangChainRunnableAdapter`, and formal `Protocol`s for ports (checkpoint/audit/embeddings/tools) — see [`docs/extension.md`](./docs/extension.md) and [`specs/extension-surface/`](./specs/extension-surface/)
 - **MCP client with capability routing** — [Model Context Protocol](https://modelcontextprotocol.io) with auto-discovery and per-agent capability-based tool filtering (`config/mcp_servers.yaml`)
 - **Process isolation** — `SandboxExecutor` with docker/podman/nsjail/bwrap/firejail backends
@@ -54,13 +54,11 @@ pip install "prismal[finance]"           # yfinance + pandas-ta
 pip install "prismal[analytics]"         # matplotlib + plotly
 pip install "prismal[datetime]"          # tzdata + NTP
 pip install "prismal[maintenance]"       # pip-audit
+pip install "prismal[multimodal]"         # Pillow + ffmpeg-python + imagehash (Fase F)
+pip install "prismal[multimodal-local]"   # faster-whisper (local STT)
+pip install "prismal[multimodal-premium]" # elevenlabs TTS
+pip install "prismal[multimodal-embed]"   # open-clip-torch (CLIP cross-modal embeddings)
 pip install "prismal[all]"                # Everything above
-
-# Planned (Fase F — NOT yet released; these extras do not exist on PyPI yet):
-#   prismal[multimodal]          # Pillow + ffmpeg-python + imagehash
-#   prismal[multimodal-local]    # openai-whisper / faster-whisper (local STT)
-#   prismal[multimodal-premium]  # elevenlabs TTS
-#   prismal[multimodal-embed]    # open_clip_torch (CLIP cross-modal embeddings)
 ```
 
 ---
@@ -138,7 +136,7 @@ Each subgraph exports both `build_<name>_subgraph()` (returns a `SubgraphDefinit
 
 See [`specs/advanced-architectures/SPEC.md`](./specs/advanced-architectures/SPEC.md) for the full interface contracts of Fases A/B/C/D/E.
 
-### Multimodal layer (Fase F — planned, opt-in)
+### Multimodal layer (Fase F — implemented, opt-in)
 
 The multimodal expansion described in [`specs/multimodal-agents/`](./specs/multimodal-agents/) adds voice, image, and video to the existing text-only stack without modifying any existing agent. It is **opt-in**: gated by `settings.multimodal_enabled` (default `False`) and registered via `register_multimodal_pipeline(registry)` when the operator is ready.
 

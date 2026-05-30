@@ -92,9 +92,9 @@ Each subgraph exports both `build_<name>_subgraph()` (returns `SubgraphDefinitio
 
 `agents/subgraphs/gates.py::hitl_gate()` uses `interrupt()` for Human-in-the-Loop pauses.
 
-### Multimodal layer (Fase F — `specs/multimodal-agents/`, opt-in)
+### Multimodal layer (Fase F — `specs/multimodal-agents/`, implemented, opt-in)
 
-A planned multimodal capability layer covers audio, image, and video on top of the existing text agents. It is **opt-in**: gated by `settings.multimodal_enabled` (default `False`) and registered through `register_multimodal_pipeline(registry)` only when the operator decides. Without the toggle, the 26 text agents behave identically to today.
+A multimodal capability layer covers audio, image, and video on top of the existing text agents. It is **opt-in**: gated by `settings.multimodal_enabled` (default `False`) and registered through `register_multimodal_pipeline(registry)` only when the operator decides. Without the toggle, the 26 text agents behave identically to today. The modal agents are not yet bound as direct supervisor member nodes in `graph.py` — that binding is the operator opt-in (DD-MM-006); intent-router patterns and `DEFAULT_CAPABILITY_MAP` entries for vision/audio/video are already in place and inert until the routes are enabled.
 
 - `providers/stt.py`, `providers/tts.py`, `providers/vision.py`, `providers/multimodal.py`, `providers/cross_modal_embeddings.py` — provider wrappers (Whisper, pyttsx3/openai/elevenlabs, vision LLM, Gemini/GPT-4o/Sonnet, CLIP). All provider SDK imports stay isolated here.
 - `agents/multimodal/vision_agent.py` — `VisionAgent` (analyze + optional OCR).

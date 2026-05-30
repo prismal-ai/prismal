@@ -10,6 +10,43 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Multimodal Agents (Fase F)
+
+Opt-in vision/audio/video layer on top of the text agents, gated by
+`settings.multimodal_enabled` (default `False`). See `specs/multimodal-agents/`.
+
+- **Providers** (`prismal/providers/`) — `get_stt()` (Whisper API + local
+  faster-whisper), `get_tts()` (pyttsx3 → openai → elevenlabs cascade),
+  `get_vision_llm()`, `get_multimodal_llm()`, `get_cross_modal_embeddings()`
+  (CLIP). All SDK access stays isolated here.
+- **Modal agents** (`prismal/agents/multimodal/`) — `VisionAgent`,
+  `AudioAgent`, `VideoAgent`, `classify_modality()` +
+  `make_modality_router_node()`, and `MultimodalFusion`
+  (`concat`/`moderator`/`moa`). Callable-injected and degrade gracefully.
+- **Subgraph** (`agents/subgraphs/multimodal_pipeline/`) —
+  `build_multimodal_subgraph()` + idempotent `register_multimodal_pipeline()`
+  (router → [vision|audio|video|text] → fusion → output_formatter).
+- **Multimodal RAG** (`rag/multimodal.py`) — `MultimodalRAGEngine` +
+  `MultimodalRetrievedChunk` with modality-filtered search; `rag/loaders/`
+  package adds `ImageLoader` / `AudioLoader` / `VideoLoader` (backward-compatible
+  with the former `rag/loaders.py`).
+- **Security** — `MediaValidator` (magic bytes, size/duration limits) +
+  `InputSanitizer.sanitize_media()` (EXIF strip) + `ActionInterceptor`
+  `.check_media_op()`; `AuditLogger.log_media()` (hash + modality, never content).
+- **Settings** — `multimodal_enabled`, `vision/audio/video_enabled`, model
+  strings, media size/duration limits, `max_frames_per_video`,
+  `video_sample_fps`, `tts_max_chars`, `vision_ocr_enabled`.
+- **Exceptions** — `MultimodalError`, `STTError`, `TTSError`,
+  `VisionAgentError`, `AudioAgentError`, `VideoAgentError`,
+  `ModalityRouterError`, `MultimodalFusionError`, `MultimodalRAGError`,
+  `MediaValidationError`, `MissingDependencyError`.
+- **Packaging** — extras `[multimodal]`, `[multimodal-local]`,
+  `[multimodal-premium]`, `[multimodal-embed]`.
+- **Opt-in wiring** — intent-router patterns + `DEFAULT_CAPABILITY_MAP`
+  entries (vision/audio/video) + documented MCP capability servers; binding
+  the modal agents as direct supervisor nodes in `graph.py` is left as an
+  operator opt-in (DD-MM-006).
+
 ### Added — Extension Surface (Fase X)
 
 Public, opt-in extension API so users and third-party plugins can build on
