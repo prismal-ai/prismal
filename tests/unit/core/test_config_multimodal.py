@@ -38,6 +38,14 @@ class TestMultimodalToggleDefaults:
         assert s.tts_max_chars == 2000
         assert s.vision_ocr_enabled is False
 
+    def test_media_workspace_default_empty(self) -> None:
+        # Empty means "use the system temp dir" at ingestion time.
+        assert Settings().media_workspace == ""
+
+    def test_media_workspace_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("PRISMAL_MEDIA_WORKSPACE", "/data/media")
+        assert Settings().media_workspace == "/data/media"
+
 
 class TestMultimodalSettingsOverrides:
     def test_env_prefix(self, monkeypatch: pytest.MonkeyPatch) -> None:

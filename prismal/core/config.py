@@ -760,6 +760,13 @@ class Settings(BaseSettings):
         default=False,
         description="Run an OCR pass in VisionAgent by default.",
     )
+    media_workspace: str = Field(
+        default="",
+        description=(
+            "Filesystem root where ingested media is spilled to content-addressed "
+            "files (per session). Empty string uses the system temp dir."
+        ),
+    )
 
     # ---------------------------------------------------------------------------
     # Channel gateway settings

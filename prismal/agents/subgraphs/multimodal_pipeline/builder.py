@@ -23,6 +23,7 @@ full parallel multi-modal fan-out is a planned enhancement.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import AIMessage
@@ -79,8 +80,24 @@ def _append_contribution(
 
 
 def _media_of(state: dict[str, Any]) -> Any:
-    """Read the input media blob/path from ``metadata.mm.media``."""
-    return (state.get("metadata") or {}).get("mm", {}).get("media")
+    """Resolve the primary input media from ``metadata.mm.media``.
+
+    Supports both the ingestion-contract form (a list of descriptors → the
+    ``primary_media_index`` entry's ``uri`` as a :class:`~pathlib.Path`) and the
+    legacy/direct form (raw ``bytes`` or ``Path``).
+    """
+    mm = (state.get("metadata") or {}).get("mm", {})
+    media = mm.get("media")
+    if isinstance(media, list):
+        if not media:
+            return None
+        index = mm.get("primary_media_index", 0)
+        if not isinstance(index, int) or not 0 <= index < len(media):
+            index = 0
+        descriptor = media[index]
+        uri = descriptor.get("uri") if isinstance(descriptor, dict) else descriptor
+        return Path(uri) if isinstance(uri, str) else uri
+    return media
 
 
 def _make_router_node(
@@ -161,8 +178,6 @@ def _make_video_node(
     video_agent: VideoAgent,
 ) -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:
     async def video_node(state: dict[str, Any]) -> dict[str, Any]:
-        from pathlib import Path
-
         media = _media_of(state)
         if not isinstance(media, (str, Path)):
             return _append_contribution(

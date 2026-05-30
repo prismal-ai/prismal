@@ -1,6 +1,7 @@
 """Multimodal agents package (Fase F) — vision/audio/video + router + fusion."""
 
 from prismal.agents.multimodal.audio_agent import AudioAgent, AudioResult
+from prismal.agents.multimodal.ingestion import cleanup_session_media, ingest_media
 from prismal.agents.multimodal.modality_router import (
     Modality,
     ModalityClassification,
@@ -38,5 +39,7 @@ __all__ = [
     "VisionAgent",
     "VisionResult",
     "classify_modality",
+    "cleanup_session_media",
+    "ingest_media",
     "make_modality_router_node",
 ]

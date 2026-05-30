@@ -172,6 +172,49 @@ class TestModalNodes:
         )
         assert update["metadata"]["mm"]["contributions"][0]["content"] == ""
 
+    async def test_vision_node_reads_descriptor_list(self, tmp_path: Path) -> None:
+        img = tmp_path / "x.png"
+        img.write_bytes(PNG)
+        vision = _vision_agent("from descriptor")
+        definition = build_multimodal_subgraph(vision_agent=vision)
+        update = await definition.nodes["vision_node"](
+            {
+                "messages": [],
+                "metadata": {
+                    "mm": {
+                        "media": [{"uri": str(img), "kind": "image"}],
+                        "primary_media_index": 0,
+                    }
+                },
+            }
+        )
+        assert update["metadata"]["mm"]["contributions"][0]["content"] == "from descriptor"
+        # The node must hand the agent a Path resolved from the descriptor uri.
+        assert vision.analyze.call_args.args[0] == img
+
+    async def test_primary_media_index_selects_descriptor(self, tmp_path: Path) -> None:
+        first = tmp_path / "a.png"
+        second = tmp_path / "b.png"
+        first.write_bytes(PNG)
+        second.write_bytes(PNG)
+        vision = _vision_agent()
+        definition = build_multimodal_subgraph(vision_agent=vision)
+        await definition.nodes["vision_node"](
+            {
+                "messages": [],
+                "metadata": {
+                    "mm": {
+                        "media": [
+                            {"uri": str(first), "kind": "image"},
+                            {"uri": str(second), "kind": "image"},
+                        ],
+                        "primary_media_index": 1,
+                    }
+                },
+            }
+        )
+        assert vision.analyze.call_args.args[0] == second
+
 
 class TestRouterEdgeCases:
     async def test_empty_messages_routes_to_text(self) -> None:
