@@ -17,10 +17,13 @@ from __future__ import annotations
 import asyncio
 import threading
 from collections.abc import Callable  # noqa: TC003
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class SubgraphDefinition(BaseModel):
@@ -64,6 +67,28 @@ class SubgraphDefinition(BaseModel):
     )
 
     model_config = {"arbitrary_types_allowed": True}
+
+    # ── Visualization (V2) ────────────────────────────────────────────────
+    # Thin delegations to ``prismal.agents.visualization`` (imported lazily to
+    # avoid an import cycle: that module resolves SubgraphDefinition itself).
+
+    def to_mermaid(self) -> str:
+        """Return the Mermaid source for this subgraph (offline)."""
+        from prismal.agents.visualization import to_mermaid
+
+        return to_mermaid(self)
+
+    def visualize(self) -> None:
+        """Display the subgraph as a PNG (notebook) or print its Mermaid text."""
+        from prismal.agents.visualization import visualize
+
+        visualize(self)
+
+    def save_image(self, path: str | Path) -> None:
+        """Render this subgraph to a PNG file at *path*."""
+        from prismal.agents.visualization import save_graph_image
+
+        save_graph_image(self, path)
 
 
 class SubgraphRegistry:
