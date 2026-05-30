@@ -42,10 +42,17 @@ Opt-in vision/audio/video layer on top of the text agents, gated by
   `MediaValidationError`, `MissingDependencyError`.
 - **Packaging** — extras `[multimodal]`, `[multimodal-local]`,
   `[multimodal-premium]`, `[multimodal-embed]`.
-- **Opt-in wiring** — intent-router patterns + `DEFAULT_CAPABILITY_MAP`
-  entries (vision/audio/video) + documented MCP capability servers; binding
-  the modal agents as direct supervisor nodes in `graph.py` is left as an
-  operator opt-in (DD-MM-006).
+- **Supervisor wiring** — when `multimodal_enabled=True`,
+  `get_async_compiled_graph()` wires a single `multimodal_pipeline` supervisor
+  route (`effective_valid_routes`/`build_system_prompt` gate on the flag;
+  `match_intent` returns `multimodal_pipeline` for media intents) +
+  `DEFAULT_CAPABILITY_MAP` entries + documented MCP capability servers.
+  Byte-for-byte unchanged when the flag is off.
+- **Media ingestion** — `agents/multimodal/ingestion.py::ingest_media()` /
+  `cleanup_session_media()`: the entry-layer boundary that validates,
+  EXIF-strips, spills bytes to a content-addressed file, audits the hash, and
+  records a path-based descriptor in `state["metadata"]["mm"]["media"]` (no raw
+  bytes in checkpointed state); `settings.media_workspace`.
 
 ### Added — Extension Surface (Fase X)
 
