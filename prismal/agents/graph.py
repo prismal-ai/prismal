@@ -507,6 +507,20 @@ async def _build_multimodal_nodes() -> dict[str, Any]:
     return nodes
 
 
+def visualize_supervisor_graph(
+    graph: CompiledStateGraph[AgentState, Any, Any, Any] | None = None,
+) -> None:
+    """Visualize the compiled supervisor graph (PNG in a notebook, else Mermaid).
+
+    Args:
+        graph: A compiled graph to render. When ``None``, the cached
+            :func:`get_compiled_graph` instance is used.
+    """
+    from prismal.agents.visualization import visualize
+
+    visualize(graph if graph is not None else get_compiled_graph())
+
+
 @lru_cache(maxsize=1)
 def get_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """

@@ -10,6 +10,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Graph visualization
+
+A reusable way to visualize any graph-based architecture (the compiled
+supervisor graph, every `SubgraphDefinition`, and `PrismalStateGraphBuilder`
+output).
+
+- **`prismal/agents/visualization.py`** — `to_mermaid(obj)` (offline Mermaid
+  source), `to_mermaid_png(obj)`, `save_graph_image(obj, path)`, and
+  `visualize(obj)` (inline PNG in a notebook via IPython with a graceful
+  fallback to Mermaid text). Non-graph architectures (reasoning patterns, modal
+  agents) raise a clear `TypeError`.
+- **`SubgraphDefinition.to_mermaid()` / `.visualize()` / `.save_image(path)`** —
+  one-line visualization for any subgraph.
+- **`prismal.langgraph`** re-exports `to_mermaid` / `to_mermaid_png` /
+  `visualize` / `save_graph_image`; **`agents.graph.visualize_supervisor_graph()`**
+  renders the main graph.
+- Internal: `subgraphs/factory.py` exposes `assemble_state_graph(definition)`
+  (sync, checkpointer-less topology assembly) shared by `build` and the viz
+  helpers. Runnable demo: `examples/visualize_graphs.py`.
+
 ### Added — Multimodal Agents (Fase F)
 
 Opt-in vision/audio/video layer on top of the text agents, gated by

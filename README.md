@@ -30,6 +30,7 @@ This package is the **agent framework layer** extracted from the larger monorepo
 - **Observability** — Langfuse traces, OpenTelemetry spans, structlog
 - **Deterministic intent routing** — regex-based `match_intent()` ahead of LLM supervision
 - **120-tool global cap** enforced by `tool_registry.py`
+- **Graph visualization** — `to_mermaid()` / `visualize()` / `save_graph_image()` (from `prismal.langgraph`) render any compiled graph or `SubgraphDefinition`; `SubgraphDefinition.to_mermaid()` and `visualize_supervisor_graph()` are one-line shortcuts (see `examples/visualize_graphs.py`)
 
 ---
 

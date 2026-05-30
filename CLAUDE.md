@@ -157,6 +157,7 @@ All LLM calls go through `prismal/providers/` (LiteLLM wrapper + per-provider co
 - `sandbox/` — `SandboxExecutor` with docker/podman/nsjail/bwrap/firejail backends (Phase 43); AST denylist in `codeact_agent.py`.
 - `monitoring/` — Langfuse traces, OpenTelemetry spans, structlog.
 - `data/` — DuckDB + Polars utilities.
+- `agents/visualization.py` — `to_mermaid()`/`to_mermaid_png()`/`visualize()`/`save_graph_image()` for any graph-based architecture (compiled graph, `SubgraphDefinition`, `PrismalStateGraphBuilder`); re-exported from `prismal.langgraph`. `SubgraphDefinition` gains `.to_mermaid()`/`.visualize()`/`.save_image()`; `agents.graph.visualize_supervisor_graph()` renders the main graph. `subgraphs/factory.py::assemble_state_graph()` is the shared sync topology builder. Non-graph architectures (patterns, modal agents) raise `TypeError`.
 - `skills/` — `available/` (source, committed) · `active/` (runtime-enabled, gitignored) · `custom/` (AI-generated, gitignored).
 
 ## Critical rules

@@ -101,6 +101,11 @@ class TestPublicApi:
             "SubgraphDefinition",
             "SubgraphRegistry",
             "VERSION",
+            # V3: graph visualization helpers re-exported as public surface.
+            "to_mermaid",
+            "to_mermaid_png",
+            "visualize",
+            "save_graph_image",
         }
         assert set(pl.__all__) == expected
 
