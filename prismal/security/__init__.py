@@ -13,6 +13,11 @@ Support:
 from prismal.security.action_interceptor import ActionInterceptor
 from prismal.security.audit import AuditLogger
 from prismal.security.guardrails import GuardrailResult, GuardrailsEngine
+from prismal.security.media_validator import (
+    MediaKind,
+    MediaValidationResult,
+    MediaValidator,
+)
 from prismal.security.permissions import (
     PermissionManager,
     PermissionRecord,
@@ -28,6 +33,9 @@ __all__ = [
     "GuardrailResult",
     "GuardrailsEngine",
     "InputSanitizer",
+    "MediaKind",
+    "MediaValidationResult",
+    "MediaValidator",
     "PermissionManager",
     "PermissionRecord",
     "PermissionType",
