@@ -33,6 +33,7 @@ class TestGraphWiring:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(graph_module, "get_settings", lambda: _Settings())
+
         # A trivial stand-in node (build_supervisor_graph only registers it).
         async def _fake_pipeline(state: dict) -> dict:
             return {}

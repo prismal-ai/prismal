@@ -77,9 +77,7 @@ class AudioLoader:
         return docs
 
     @staticmethod
-    def _make_doc(
-        text: str, path: Path, language: str, start_s: float, end_s: float
-    ) -> Document:
+    def _make_doc(text: str, path: Path, language: str, start_s: float, end_s: float) -> Document:
         return Document(
             page_content=text,
             metadata={

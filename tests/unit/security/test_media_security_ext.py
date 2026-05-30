@@ -57,7 +57,9 @@ class TestSanitizeMedia:
 class TestCheckMediaOp:
     def test_allows_op_within_workspace(self, tmp_path: Path) -> None:
         target = tmp_path / "media" / "in.png"
-        assert ActionInterceptor.check_media_op("read", target, workspace_root=str(tmp_path)) is True
+        assert (
+            ActionInterceptor.check_media_op("read", target, workspace_root=str(tmp_path)) is True
+        )
         assert (
             ActionInterceptor.check_media_op("write", target, workspace_root=str(tmp_path)) is True
         )

@@ -38,12 +38,7 @@ def get_vision_llm(
         from prismal.core.config import get_settings
 
         settings = get_settings()
-    resolved = (
-        model
-        or settings.vision_model
-        or settings.cua_vision_model
-        or settings.default_model
-    )
+    resolved = model or settings.vision_model or settings.cua_vision_model or settings.default_model
     return ProviderRegistry(settings).get_llm(resolved)
 
 

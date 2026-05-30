@@ -97,9 +97,7 @@ class TestProcess:
 class TestDegradation:
     async def test_invalid_audio_degrades(self) -> None:
         stt = _stt_client()
-        agent = AudioAgent(
-            stt_client=stt, reason_fn=AsyncMock(), media_validator=MediaValidator()
-        )
+        agent = AudioAgent(stt_client=stt, reason_fn=AsyncMock(), media_validator=MediaValidator())
         result = await agent.process(NOT_AUDIO)
         assert result.transcript == ""
         stt.transcribe.assert_not_awaited()
@@ -117,9 +115,7 @@ class TestDegradation:
     async def test_stt_error_degrades(self) -> None:
         stt = AsyncMock()
         stt.transcribe = AsyncMock(side_effect=RuntimeError("stt down"))
-        agent = AudioAgent(
-            stt_client=stt, reason_fn=AsyncMock(), media_validator=MediaValidator()
-        )
+        agent = AudioAgent(stt_client=stt, reason_fn=AsyncMock(), media_validator=MediaValidator())
         result = await agent.process(_wav())
         assert result.transcript == ""
         assert result.response_text == ""

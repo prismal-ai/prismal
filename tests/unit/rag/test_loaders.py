@@ -314,7 +314,9 @@ def test_load_docx_returns_list_of_documents(tmp_path: Path) -> None:
         metadata={"source": str(docx_file)},
     )
 
-    with patch("prismal.rag.loaders.document_loader.Docx2txtLoader", autospec=True) as mock_loader_cls:
+    with patch(
+        "prismal.rag.loaders.document_loader.Docx2txtLoader", autospec=True
+    ) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -334,7 +336,9 @@ def test_load_docx_calls_docx2txtloader_with_path(tmp_path: Path) -> None:
 
     fake_doc = Document(page_content="memo body", metadata={"source": str(docx_file)})
 
-    with patch("prismal.rag.loaders.document_loader.Docx2txtLoader", autospec=True) as mock_loader_cls:
+    with patch(
+        "prismal.rag.loaders.document_loader.Docx2txtLoader", autospec=True
+    ) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -352,7 +356,9 @@ def test_load_docx_sets_metadata_source(tmp_path: Path) -> None:
 
     fake_doc = Document(page_content="notes", metadata={})
 
-    with patch("prismal.rag.loaders.document_loader.Docx2txtLoader", autospec=True) as mock_loader_cls:
+    with patch(
+        "prismal.rag.loaders.document_loader.Docx2txtLoader", autospec=True
+    ) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance

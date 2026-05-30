@@ -552,9 +552,7 @@ def _intent_short_circuit(
             break
     matched_intent = match_intent(last_human_text)
     _settings = get_settings()
-    valid_routes = effective_valid_routes(
-        _settings.enable_subgraphs, _settings.multimodal_enabled
-    )
+    valid_routes = effective_valid_routes(_settings.enable_subgraphs, _settings.multimodal_enabled)
     if matched_intent is None or matched_intent not in valid_routes:
         return None
     logger.info(
@@ -578,9 +576,7 @@ def _match_route(raw: str, session_id: str) -> str:
     """
     normalised = raw.strip("\"' \t\n").upper()
     _settings = get_settings()
-    valid_routes = effective_valid_routes(
-        _settings.enable_subgraphs, _settings.multimodal_enabled
-    )
+    valid_routes = effective_valid_routes(_settings.enable_subgraphs, _settings.multimodal_enabled)
     for valid in valid_routes:
         if valid.upper() == normalised:
             return valid

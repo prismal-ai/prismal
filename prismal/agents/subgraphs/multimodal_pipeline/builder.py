@@ -47,9 +47,7 @@ if TYPE_CHECKING:
 logger = get_logger("prismal.subgraphs.multimodal_pipeline.builder")
 
 _NAME = "multimodal_pipeline"
-_DESCRIPTION = (
-    "Multimodal pipeline: router → [vision|audio|video|text] → fusion → output_formatter"
-)
+_DESCRIPTION = "Multimodal pipeline: router → [vision|audio|video|text] → fusion → output_formatter"
 
 _MODALITY_TO_NODE: dict[str, str] = {
     Modality.IMAGE.value: "vision_node",
@@ -137,14 +135,17 @@ def _make_vision_node(
         if media is None:
             return _append_contribution(
                 state,
-                {"modality": "image", "content": "", "agent_id": "vision_agent",
-                 "confidence": 0.0},
+                {"modality": "image", "content": "", "agent_id": "vision_agent", "confidence": 0.0},
             )
         result = await vision_agent.analyze(media)
         return _append_contribution(
             state,
-            {"modality": "image", "content": result.description, "agent_id": "vision_agent",
-             "confidence": 0.0 if result.used_fallback else 0.9},
+            {
+                "modality": "image",
+                "content": result.description,
+                "agent_id": "vision_agent",
+                "confidence": 0.0 if result.used_fallback else 0.9,
+            },
             vision={"description": result.description, "ocr_text": result.ocr_text},
         )
 
@@ -159,15 +160,13 @@ def _make_audio_node(
         if media is None:
             return _append_contribution(
                 state,
-                {"modality": "audio", "content": "", "agent_id": "audio_agent",
-                 "confidence": 0.0},
+                {"modality": "audio", "content": "", "agent_id": "audio_agent", "confidence": 0.0},
             )
         result = await audio_agent.process(media, state=state)
         content = result.response_text or result.transcript
         return _append_contribution(
             state,
-            {"modality": "audio", "content": content, "agent_id": "audio_agent",
-             "confidence": 0.9},
+            {"modality": "audio", "content": content, "agent_id": "audio_agent", "confidence": 0.9},
             audio={"transcript": result.transcript, "response_text": result.response_text},
         )
 
@@ -182,14 +181,17 @@ def _make_video_node(
         if not isinstance(media, (str, Path)):
             return _append_contribution(
                 state,
-                {"modality": "video", "content": "", "agent_id": "video_agent",
-                 "confidence": 0.0},
+                {"modality": "video", "content": "", "agent_id": "video_agent", "confidence": 0.0},
             )
         result = await video_agent.summarize(Path(media))
         return _append_contribution(
             state,
-            {"modality": "video", "content": result.summary, "agent_id": "video_agent",
-             "confidence": 0.9},
+            {
+                "modality": "video",
+                "content": result.summary,
+                "agent_id": "video_agent",
+                "confidence": 0.9,
+            },
             video={"summary": result.summary, "frames": result.total_frames_processed},
         )
 
@@ -238,8 +240,9 @@ async def _output_formatter_node(state: dict[str, Any]) -> dict[str, Any]:
     answer = mm.get("fusion", {}).get("answer", "")
     preferred = mm.get("preferred_output", "text")
     if preferred == "json":
-        payload = json.dumps({"answer": answer, "mm": {k: v for k, v in mm.items()
-                                                       if k != "media"}})
+        payload = json.dumps(
+            {"answer": answer, "mm": {k: v for k, v in mm.items() if k != "media"}}
+        )
         return {"messages": [AIMessage(content=payload)]}
     # "text" and "audio" both surface the text answer here; TTS bytes (if any)
     # remain available under metadata.mm for the caller to play.

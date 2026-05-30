@@ -48,8 +48,11 @@ def _video_agent(summary: str = "a clip") -> AsyncMock:
     agent = AsyncMock()
     agent.summarize = AsyncMock(
         return_value=VideoResult(
-            transcript="t", frame_descriptions=[], summary=summary,
-            total_frames_processed=3, duration_s=3.0,
+            transcript="t",
+            frame_descriptions=[],
+            summary=summary,
+            total_frames_processed=3,
+            duration_s=3.0,
         )
     )
     return agent
@@ -60,8 +63,14 @@ class TestBuilder:
         definition = build_multimodal_subgraph(vision_agent=_vision_agent())
         assert isinstance(definition, SubgraphDefinition)
         assert definition.entry_point == "router"
-        for node in ("router", "vision_node", "audio_node", "video_node", "fusion_node",
-                     "output_formatter_node"):
+        for node in (
+            "router",
+            "vision_node",
+            "audio_node",
+            "video_node",
+            "fusion_node",
+            "output_formatter_node",
+        ):
             assert node in definition.nodes
 
     def test_router_has_conditional_edge(self) -> None:
@@ -79,8 +88,11 @@ class TestRouterNode:
         definition = build_multimodal_subgraph(vision_agent=_vision_agent())
         router = definition.nodes["router"]
         state = {
-            "messages": [HumanMessage(content="look", additional_kwargs={
-                "attachments": [{"mime_type": "image/png"}]})],
+            "messages": [
+                HumanMessage(
+                    content="look", additional_kwargs={"attachments": [{"mime_type": "image/png"}]}
+                )
+            ],
             "metadata": {"mm": {"media": PNG}},
         }
         update = await router(state)
@@ -112,8 +124,12 @@ class TestFusionNode:
             "metadata": {
                 "mm": {
                     "contributions": [
-                        {"modality": "image", "content": "a dog", "agent_id": "vision_agent",
-                         "confidence": 0.9}
+                        {
+                            "modality": "image",
+                            "content": "a dog",
+                            "agent_id": "vision_agent",
+                            "confidence": 0.9,
+                        }
                     ]
                 }
             },
@@ -167,9 +183,7 @@ class TestModalNodes:
 
     async def test_node_without_media_yields_empty_contribution(self) -> None:
         definition = build_multimodal_subgraph(vision_agent=_vision_agent())
-        update = await definition.nodes["vision_node"](
-            {"messages": [], "metadata": {"mm": {}}}
-        )
+        update = await definition.nodes["vision_node"]({"messages": [], "metadata": {"mm": {}}})
         assert update["metadata"]["mm"]["contributions"][0]["content"] == ""
 
     async def test_vision_node_reads_descriptor_list(self, tmp_path: Path) -> None:
@@ -225,19 +239,24 @@ class TestRouterEdgeCases:
 
     async def test_force_modality(self) -> None:
         definition = build_multimodal_subgraph(vision_agent=_vision_agent())
-        state = {"messages": [HumanMessage(content="x")],
-                 "metadata": {"mm": {"force_modality": "audio"}}}
+        state = {
+            "messages": [HumanMessage(content="x")],
+            "metadata": {"mm": {"force_modality": "audio"}},
+        }
         update = await definition.nodes["router"](state)
-        assert definition.conditional_edges["router"]({"metadata": update["metadata"]}) \
-            == "audio_node"
+        assert (
+            definition.conditional_edges["router"]({"metadata": update["metadata"]}) == "audio_node"
+        )
 
 
 class TestOutputFormatterJson:
     async def test_json_output(self) -> None:
         definition = build_multimodal_subgraph(vision_agent=_vision_agent())
         update = await definition.nodes["output_formatter_node"](
-            {"messages": [], "metadata": {"mm": {"fusion": {"answer": "A"},
-                                                 "preferred_output": "json"}}}
+            {
+                "messages": [],
+                "metadata": {"mm": {"fusion": {"answer": "A"}, "preferred_output": "json"}},
+            }
         )
         payload = json.loads(update["messages"][-1].content)
         assert payload["answer"] == "A"

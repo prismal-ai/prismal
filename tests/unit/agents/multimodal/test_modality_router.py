@@ -113,9 +113,7 @@ class TestRouterNode:
 
         llm = MagicMock()
         llm.ainvoke = AsyncMock(return_value=type("M", (), {"content": "image"})())
-        monkeypatch.setattr(
-            "prismal.providers.multimodal.get_multimodal_llm", lambda **_k: llm
-        )
+        monkeypatch.setattr("prismal.providers.multimodal.get_multimodal_llm", lambda **_k: llm)
         node = make_modality_router_node(use_llm_fallback=True)
         # An empty-content message with no attachments classifies as UNKNOWN.
         state = {"messages": [_msg("")], "metadata": {}}

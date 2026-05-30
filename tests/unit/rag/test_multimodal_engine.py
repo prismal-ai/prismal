@@ -75,10 +75,19 @@ class TestSearch:
         store = _store()
         store.similarity_search = MagicMock(
             return_value=[
-                (Document(page_content="a cat", metadata={"modality": "image",
-                                                           "source_uri": "x.png"}), 0.9),
-                (Document(page_content="some words", metadata={"modality": "text",
-                                                               "source_uri": "d.txt"}), 0.7),
+                (
+                    Document(
+                        page_content="a cat", metadata={"modality": "image", "source_uri": "x.png"}
+                    ),
+                    0.9,
+                ),
+                (
+                    Document(
+                        page_content="some words",
+                        metadata={"modality": "text", "source_uri": "d.txt"},
+                    ),
+                    0.7,
+                ),
             ]
         )
         engine = MultimodalRAGEngine(store)
@@ -92,10 +101,18 @@ class TestSearch:
         store = _store()
         store.similarity_search = MagicMock(
             return_value=[
-                (Document(page_content="a cat", metadata={"modality": "image",
-                                                           "source_uri": "x.png"}), 0.9),
-                (Document(page_content="words", metadata={"modality": "text",
-                                                          "source_uri": "d.txt"}), 0.7),
+                (
+                    Document(
+                        page_content="a cat", metadata={"modality": "image", "source_uri": "x.png"}
+                    ),
+                    0.9,
+                ),
+                (
+                    Document(
+                        page_content="words", metadata={"modality": "text", "source_uri": "d.txt"}
+                    ),
+                    0.7,
+                ),
             ]
         )
         engine = MultimodalRAGEngine(store)
@@ -107,8 +124,13 @@ class TestSearch:
         store = _store()
         store.similarity_search = MagicMock(
             return_value=[
-                (Document(page_content="waving", metadata={"modality": "video_frame",
-                                                           "source_uri": "v.mp4"}), 0.8),
+                (
+                    Document(
+                        page_content="waving",
+                        metadata={"modality": "video_frame", "source_uri": "v.mp4"},
+                    ),
+                    0.8,
+                ),
             ]
         )
         engine = MultimodalRAGEngine(store)

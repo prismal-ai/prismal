@@ -68,9 +68,7 @@ class TestDefaultModerator:
 
         llm = MagicMock()
         llm.ainvoke = AsyncMock(return_value=type("M", (), {"content": "fused answer"})())
-        monkeypatch.setattr(
-            "prismal.providers.multimodal.get_multimodal_llm", lambda **_k: llm
-        )
+        monkeypatch.setattr("prismal.providers.multimodal.get_multimodal_llm", lambda **_k: llm)
         fusion = MultimodalFusion(strategy="moderator")
         result = await fusion.combine(CONTRIBS)
         assert result.answer == "fused answer"
@@ -82,9 +80,7 @@ class TestDefaultModerator:
 
         llm = MagicMock()
         llm.ainvoke = AsyncMock(side_effect=RuntimeError("llm down"))
-        monkeypatch.setattr(
-            "prismal.providers.multimodal.get_multimodal_llm", lambda **_k: llm
-        )
+        monkeypatch.setattr("prismal.providers.multimodal.get_multimodal_llm", lambda **_k: llm)
         fusion = MultimodalFusion(strategy="moderator")
         with pytest.raises(MultimodalFusionError):
             await fusion.combine(CONTRIBS)

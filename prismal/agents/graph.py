@@ -322,9 +322,7 @@ def build_supervisor_graph(
     # Fase F (P3): multimodal pipeline node. Opt-in via ``multimodal_enabled``
     # and only when the caller supplies the pre-built (compiled) node map.
     _multimodal_nodes: dict[str, Any] = (
-        dict(multimodal_nodes)
-        if (get_settings().multimodal_enabled and multimodal_nodes)
-        else {}
+        dict(multimodal_nodes) if (get_settings().multimodal_enabled and multimodal_nodes) else {}
     )
     for _mm_name, _mm_node in _multimodal_nodes.items():
         builder.add_node(_mm_name, _mm_node)

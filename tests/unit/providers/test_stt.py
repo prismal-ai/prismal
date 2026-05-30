@@ -122,7 +122,10 @@ class TestLocalTranscription:
                 self.name = name
 
             def transcribe(
-                self, _source: object, language: str | None = None, initial_prompt: str | None = None
+                self,
+                _source: object,
+                language: str | None = None,
+                initial_prompt: str | None = None,
             ) -> tuple[list[_Seg], SimpleNamespace]:
                 return (
                     [_Seg(0.0, 1.0, "hola"), _Seg(1.0, 2.0, " mundo")],
@@ -150,9 +153,7 @@ class TestLocalTranscription:
         result = await client.transcribe(audio)
         assert result.text == "hola mundo"
 
-    async def test_local_transcribe_wraps_error(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_local_transcribe_wraps_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         module = types.ModuleType("faster_whisper")
 
         class _WhisperModel:

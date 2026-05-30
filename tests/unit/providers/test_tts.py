@@ -126,9 +126,7 @@ class TestElevenLabsBackend:
         class _FakeEleven:
             def __init__(self, api_key: str) -> None:
                 self.api_key = api_key
-                self.text_to_speech = SimpleNamespace(
-                    convert=lambda **_kwargs: [b"AB", b"CD"]
-                )
+                self.text_to_speech = SimpleNamespace(convert=lambda **_kwargs: [b"AB", b"CD"])
 
         client_mod.ElevenLabs = _FakeEleven  # type: ignore[attr-defined]
         monkeypatch.setitem(sys.modules, "elevenlabs", pkg)

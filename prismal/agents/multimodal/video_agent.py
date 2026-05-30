@@ -149,9 +149,7 @@ class VideoAgent:
             duration_s=duration_s,
         )
 
-    async def _describe_frames(
-        self, frame_paths: list[Path], fps: float
-    ) -> list[FrameDescription]:
+    async def _describe_frames(self, frame_paths: list[Path], fps: float) -> list[FrameDescription]:
         """Describe each frame in parallel via the vision agent."""
         if not frame_paths:
             return []

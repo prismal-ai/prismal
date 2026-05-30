@@ -69,9 +69,7 @@ class TestIngestMedia:
         assert state["metadata"]["mm"]["media"][0]["kind"] == "image"
 
     def test_sets_preferred_output(self, tmp_path: Path) -> None:
-        state = ingest_media(
-            _state(), PNG, workspace=tmp_path, preferred_output="audio"
-        )
+        state = ingest_media(_state(), PNG, workspace=tmp_path, preferred_output="audio")
         assert state["metadata"]["mm"]["preferred_output"] == "audio"
 
     def test_audit_logs_hash_and_modality(self, tmp_path: Path) -> None:

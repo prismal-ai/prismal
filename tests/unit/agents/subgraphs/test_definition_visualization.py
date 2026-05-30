@@ -24,9 +24,7 @@ class TestSubgraphDefinitionViz:
         assert "Mermaid del grafo:" in out
         assert "router" in out
 
-    def test_save_image_method(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
+    def test_save_image_method(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         monkeypatch.setattr(viz, "to_mermaid_png", lambda _o: b"PNGBYTES")
         out = tmp_path / "mm.png"
         build_multimodal_subgraph().save_image(out)

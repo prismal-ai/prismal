@@ -110,9 +110,7 @@ class TestDefaultBackends:
     def _mock_vision_llm(self, monkeypatch: pytest.MonkeyPatch) -> None:
         llm = MagicMock()
         llm.ainvoke = AsyncMock(return_value=SimpleNamespace(content="a cat on a sofa"))
-        monkeypatch.setattr(
-            "prismal.providers.vision.get_vision_llm", lambda **_kwargs: llm
-        )
+        monkeypatch.setattr("prismal.providers.vision.get_vision_llm", lambda **_kwargs: llm)
 
     async def test_default_vision_fn_calls_vlm(self, _mock_vision_llm: None) -> None:
         agent = VisionAgent(media_validator=MediaValidator())

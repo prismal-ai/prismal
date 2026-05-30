@@ -155,8 +155,6 @@ def match_intent(text: str | None) -> str | None:
     # route is enabled, otherwise the supervisor falls through to the LLM). All
     # modal intents route to the single ``multimodal_pipeline`` member, which
     # fans out to the vision/audio/video agents internally.
-    if _VIDEO_RE.search(normalised) or _AUDIO_RE.search(normalised) or _IMAGE_RE.search(
-        normalised
-    ):
+    if _VIDEO_RE.search(normalised) or _AUDIO_RE.search(normalised) or _IMAGE_RE.search(normalised):
         return "multimodal_pipeline"
     return None
