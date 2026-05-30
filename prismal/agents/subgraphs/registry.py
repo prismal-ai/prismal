@@ -15,6 +15,7 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import Callable  # noqa: TC003
 from typing import Any
 
@@ -83,6 +84,7 @@ class SubgraphRegistry:
         """Initialise an empty registry."""
         self._subgraphs: dict[str, SubgraphDefinition] = {}
         self._lock: asyncio.Lock = asyncio.Lock()
+        self._sync_lock: threading.Lock = threading.Lock()
         self._log = structlog.get_logger("prismal.subgraphs.registry")
 
     @classmethod
@@ -111,6 +113,27 @@ class SubgraphRegistry:
                 raise ValueError(f"Subgraph '{name}' already registered")
             self._subgraphs[name] = definition
             self._log.info("subgraph.registered", name=name)
+
+    def register_sync(self, name: str, definition: SubgraphDefinition) -> None:
+        """Register a subgraph synchronously (startup / plugin discovery).
+
+        Thread-safe via a ``threading.Lock``. Use this from plugin entry-point
+        callables, which run synchronously at import/startup time before any
+        event loop owns the registry. Runtime registration should use the
+        async :meth:`register`.
+
+        Args:
+            name: Unique identifier for the subgraph.
+            definition: The subgraph definition to store.
+
+        Raises:
+            ValueError: If ``name`` is already registered.
+        """
+        with self._sync_lock:
+            if name in self._subgraphs:
+                raise ValueError(f"Subgraph '{name}' already registered")
+            self._subgraphs[name] = definition
+            self._log.info("subgraph.registered_sync", name=name)
 
     async def unregister(self, name: str) -> None:
         """Remove a registered subgraph.

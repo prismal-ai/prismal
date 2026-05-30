@@ -510,9 +510,7 @@ def test_cron_next_run_naive_fire_time() -> None:
     mock_cron = MagicMock()
     mock_cron.get_next.return_value = naive_dt
 
-    with mpatch(
-        "prismal.mcp.servers.datetime_server.croniter", return_value=mock_cron
-    ) as mock_cls:
+    with mpatch("prismal.mcp.servers.datetime_server.croniter", return_value=mock_cron) as mock_cls:
         mock_cls.is_valid.return_value = True
         result = datetime_cron_next_run(schedule="0 9 * * *", count=1, timezone="UTC")
 

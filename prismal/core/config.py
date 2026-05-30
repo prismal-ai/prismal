@@ -937,6 +937,39 @@ class Settings(BaseSettings):
         description="Enable dynamic sub-agent orchestration (Phase 24).",
     )
 
+    # ── Extension surface (Fase X) ───────────────────────────────────
+    plugins_autodiscover: bool = Field(
+        default=True,
+        description="Enable plugin auto-discovery via entry points at startup.",
+    )
+    plugins_allowlist: list[str] = Field(
+        default_factory=list,
+        description=(
+            "If non-empty, only plugins whose entry-point name appears here "
+            "are loaded. Recommended in production."
+        ),
+    )
+    plugins_denylist: list[str] = Field(
+        default_factory=list,
+        description="Plugins to disable. Takes precedence over the allowlist.",
+    )
+    plugins_groups_enabled: list[str] = Field(
+        default_factory=lambda: ["subgraphs", "nodes", "tools", "rag_engines"],
+        description="Entry-point groups to discover. Default: all supported groups.",
+    )
+    extension_default_security: Literal["off", "standard", "strict"] = Field(
+        default="standard",
+        description="Default security level for @prismal_node when not set explicitly.",
+    )
+    extension_default_audit: bool = Field(
+        default=True,
+        description="Default audit flag for @prismal_node when not set explicitly.",
+    )
+    extension_default_timeout_s: float | None = Field(
+        default=None,
+        description="Default per-invocation timeout for @prismal_node (None = no timeout).",
+    )
+
     # Webhooks (Phase 25)
     webhooks_enabled: bool = Field(
         default=True,

@@ -3,18 +3,17 @@
 # Activate the LIGHTAGENT_ -> PRISMAL_ environment fallback before any settings
 # or os.getenv read occurs (side effect on import). Transitional; see env_compat.
 from prismal.core import env_compat as _env_compat  # noqa: F401
-
 from prismal.core.config import Settings, get_settings
 from prismal.core.database import Base, get_db_session, init_db
 from prismal.core.exceptions import (
     CanaryLeakError,
     InjectionDetectedError,
-    PrismalError,
     MCPConnectionError,
     MCPError,
     MCPToolError,
     ModelNotFoundError,
     PermissionDeniedError,
+    PrismalError,
     ProviderError,
     ProviderTimeoutError,
     SecurityError,
@@ -28,12 +27,12 @@ __all__ = [
     "Base",
     "CanaryLeakError",
     "InjectionDetectedError",
-    "PrismalError",
     "MCPConnectionError",
     "MCPError",
     "MCPToolError",
     "ModelNotFoundError",
     "PermissionDeniedError",
+    "PrismalError",
     "ProviderError",
     "ProviderTimeoutError",
     "SecurityError",

@@ -24,9 +24,7 @@ def test_langfuse_disabled_without_keys() -> None:
     """Manager is disabled when keys are not configured."""
     _reset_singleton()
     with patch("prismal.monitoring.langfuse_client.logger"):
-        with patch(
-            "prismal.monitoring._settings_proxy.get_monitoring_settings"
-        ) as mock_settings:
+        with patch("prismal.monitoring._settings_proxy.get_monitoring_settings") as mock_settings:
             from unittest.mock import MagicMock
 
             s = MagicMock()

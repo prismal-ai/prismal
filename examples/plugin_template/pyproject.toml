@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prismal-x-example"
+version = "0.1.0"
+description = "Example prismal extension plugin (template)."
+requires-python = ">=3.13"
+dependencies = ["prismal>=3.0.0"]
+
+# Declaring entry points is what makes the plugin discoverable. After
+# `pip install`, prismal.discover_plugins() finds and registers these.
+[project.entry-points."prismal.subgraphs"]
+example_pipeline = "prismal_x_example.plugin:register_example_pipeline"
+
+[project.entry-points."prismal.nodes"]
+example_classifier = "prismal_x_example.nodes:example_classifier"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prismal_x_example"]

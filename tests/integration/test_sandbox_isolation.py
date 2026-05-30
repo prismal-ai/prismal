@@ -16,10 +16,30 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from collections.abc import Iterator
+from unittest.mock import patch
 
 import pytest
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.fixture(autouse=True)
+def _allow_shell_for_sandbox_tests() -> Iterator[None]:
+    """Open the L4 shell gate so the docker backend can actually spawn.
+
+    Production defaults to ``PRISMAL_SHELL_ENABLED=false`` (Phase 43 /
+    ActionInterceptor), which makes ``DockerBackend.run`` short-circuit with
+    exit code 126 before launching any container. These tests verify container
+    *hardening* (read-only root, ``--network=none``, empty env allowlist,
+    ``--rm`` cleanup), not the gate itself, so we open it for every test here —
+    mirroring ``tests/unit/sandbox/conftest.py``.
+    """
+    with patch(
+        "prismal.security.action_interceptor.ActionInterceptor.check_shell",
+        return_value=True,
+    ):
+        yield
 
 
 def _docker_available() -> bool:

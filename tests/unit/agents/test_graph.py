@@ -129,9 +129,7 @@ def test_supervisor_router_wrapper_delegates(tmp_path: Path) -> None:
     from prismal.agents.graph import _supervisor_router
 
     mock_state = MagicMock()
-    with patch(
-        "prismal.agents.graph.supervisor_router", return_value="researcher"
-    ) as mock_router:
+    with patch("prismal.agents.graph.supervisor_router", return_value="researcher") as mock_router:
         result = _supervisor_router(mock_state)
 
     mock_router.assert_called_once_with(mock_state)

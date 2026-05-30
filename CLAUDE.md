@@ -111,9 +111,9 @@ Heavy dependencies (Whisper local, ElevenLabs, CLIP, FFmpeg wrappers, Pillow, im
 
 All multimodal state lives under `state["metadata"]["mm"]` to isolate the new layer from the rest of `AgentState`.
 
-### Extension surface (Fase X — `specs/extension-surface/`, planned)
+### Extension surface (Fase X — `specs/extension-surface/`, implemented)
 
-A planned public extension API exposes LangGraph as a first-class build target for users and third-party plugins, without forcing them to fork the repo. It is opt-in and additive — existing nodes/subgraphs are unaffected.
+A public extension API exposes LangGraph as a first-class build target for users and third-party plugins, without forcing them to fork the repo. It is opt-in and additive — existing nodes/subgraphs are unaffected. All public symbols are re-exported from `prismal/agents/extension/__init__.py`; user guide in `docs/extension.md`, runnable examples in `examples/extension/` + `examples/plugin_template/`.
 
 - `prismal/langgraph.py` — official re-export of `StateGraph`, `START`, `END`, `Send`, `interrupt`, `add_messages`, `CompiledStateGraph` plus `AgentState`, `SubgraphDefinition`, `SubgraphRegistry`, and a `VERSION` constant resolved dynamically from `importlib.metadata`. Importing from here (rather than `langgraph.*` directly) guarantees version compatibility.
 - `agents/extension/decorators.py` — `@prismal_node(name=..., capabilities=..., security=..., audit=..., retry=..., timeout_s=...)` wraps any `async (state) → state_update` with a middleware chain: `InputSanitizer`+`SecurePromptBuilder`+`ActionInterceptor` → OTel span → structured logger bind → retry/backoff → `asyncio.wait_for` → user fn → audit log → error mapping to `NodeExecutionError`. Side effect: registers the node's capabilities in `tool_registry.DEFAULT_CAPABILITY_MAP`.
@@ -123,6 +123,13 @@ A planned public extension API exposes LangGraph as a first-class build target f
 - `agents/extension/ports.py` — formal `Protocol`s for `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort`. Existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, `BaseTool`) conform structurally; users substitute with their own adapters without modifying the core.
 
 Plugin authors declare entry points in their `pyproject.toml` (e.g. `[project.entry-points."prismal.subgraphs"] my_pipeline = "my_pkg:register_my_pipeline"`); after `pip install`, `discover_plugins()` auto-registers them. Allowlist/denylist via `settings.plugins_allowlist` / `plugins_denylist`. Recommended convention: namespace plugins as `prismal-x-<domain>`.
+
+**Implementation notes (deviations from the spec text — keep in mind when editing):**
+- `Send` is imported from `langgraph.types` (not `langgraph.constants`, deprecated in LangGraph v1.0 and an error under `filterwarnings=error`).
+- The `@prismal_node` middleware order is **outermost→innermost: error_mapping → otel → logger → security → audit → retry → timeout → user fn** (intentional fix of the SPEC's contradictory ordering so retries run before error mapping and audit duration spans all attempts). `_middleware._tool_call_checker` is a monkeypatchable seam used by `security="strict"`.
+- `builder.compile()` returns the **real** `SubgraphDefinition` (`nodes`/`edges`/`conditional_edges`/`entry_point`), not a `compiled_graph`; `compile_raw()` returns a `CompiledStateGraph`.
+- Subgraph plugins register via the new **sync** `SubgraphRegistry.register_sync()` (the existing `register_<name>()` functions remain async and use the singleton). `discover_plugins()` is sync; a subgraph entry point either self-registers via `register_sync` or returns a `SubgraphDefinition`.
+- The 8th SPEC middleware "validation" is folded into `error_mapping` (`NodeValidationError` available for callers that validate explicitly).
 
 ### Security (5-layer defense-in-depth)
 

@@ -102,9 +102,10 @@ repos:
   # Tambien aplica formato (reemplaza black + isort)
   # ----------------------------------------------------------
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    # Mantener alineado con .gitlab-ci.yml -> ruff-lint (ruff==0.15.10).
-    # Si actualizas aqui, actualiza tambien el CI para evitar drift.
-    rev: v0.15.10
+    # Mantener alineado con la version de ruff en uv.lock (la que usa el job
+    # `lint` de .github/workflows/ci.yml via `uv run ruff`). Si actualizas el
+    # lock, actualiza este rev para evitar drift entre pre-commit y CI.
+    rev: v0.15.11
     hooks:
       - id: ruff
         name: "lint: Ruff (lint + C901)"
@@ -138,7 +139,7 @@ repos:
   # Umbral: 12 (mas estricto que ciclomatica por su naturaleza)
   # ----------------------------------------------------------
   - repo: https://github.com/PyCQA/flake8
-    rev: 7.2.0
+    rev: 7.3.0
     hooks:
       - id: flake8
         name: "complexity: cognitive CCR001 (baseline=100)"
@@ -196,7 +197,7 @@ repos:
   # pickle inseguro, hardcoded passwords, assert en produccion
   # ----------------------------------------------------------
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.3
+    rev: 1.9.4
     hooks:
       - id: bandit
         name: "sast: Bandit (medium+)"
@@ -256,17 +257,21 @@ repos:
           - --ignore-vuln=GHSA-x284-j5p8-9c5p
           - --ignore-vuln=CVE-2025-62379
           - --ignore-vuln=GHSA-wj6h-64fc-37mp
-          # litellm 1.83.7 fixes GHSA-xqmj-j6mv-4862 + CVE-2026-42203 +
-          # CVE-2026-42208 + CVE-2026-42271 but pins click/jsonschema/openai/
-          # pydantic/python-dotenv to older versions, downgrading aiohttp/
-          # python-dotenv and opening 11 new CVEs. Net negative — staying on
-          # 1.83.0 until a clean fix.
+          # litellm bumped 1.83.0 -> 1.86.2 (clean resolve, no stack downgrade),
+          # which fixes CVE-2026-40217 plus the earlier GHSA-xqmj-j6mv-4862 +
+          # CVE-2026-42203 + CVE-2026-42208 + CVE-2026-42271. Ignores kept as a
+          # backstop in case the floor (>=1.58.0) ever resolves lower again.
           - --ignore-vuln=GHSA-xqmj-j6mv-4862
           - --ignore-vuln=CVE-2026-42203
           - --ignore-vuln=CVE-2026-42208
           - --ignore-vuln=CVE-2026-42271
           # pip 26.0.1 is the latest release; CVE-2026-3219 has no fix version yet.
           - --ignore-vuln=CVE-2026-3219
+          # chromadb 1.5.8: CVE-2026-45829 has no fix version published yet.
+          - --ignore-vuln=CVE-2026-45829
+          # prefect 3.6.27: CVE-2026-7724 fix lands only in 3.6.28.dev2 (a
+          # pre-release); ignore until a stable 3.6.28 ships.
+          - --ignore-vuln=CVE-2026-7724
           - --skip-editable
         pass_filenames: false
         files: ^(pyproject\.toml|uv\.lock)$

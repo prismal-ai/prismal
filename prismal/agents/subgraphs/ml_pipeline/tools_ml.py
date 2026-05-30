@@ -660,9 +660,7 @@ def evaluate_model(
             }
         )
     except ImportError as exc:  # pragma: no cover
-        return json.dumps(
-            {"error": (f"Missing dependency: {exc}. Run: pip install 'prismal[ml]'")}
-        )
+        return json.dumps({"error": (f"Missing dependency: {exc}. Run: pip install 'prismal[ml]'")})
     except Exception as exc:
         return json.dumps({"error": str(exc)})
 
