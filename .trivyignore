@@ -43,6 +43,17 @@ CVE-2025-62379
 # arrastra `ecdsa` como dep regular. TODO: evaluar migracion a PyJWT.
 CVE-2024-23342
 
+# --- chromadb 1.5.8 -> CVE-2026-45829 (sin fix upstream) -----
+# CRITICAL — pre-authentication code injection (GHSA-f4j7-r4q5-qw2c). El rango
+# vulnerable es >=1.0.0,<=1.5.9 con first_patched=None: NO existe version
+# parcheada (1.5.9 sigue afectada) y el stack langchain-chroma no admite
+# downgrade a <1.0.0. ChromaDB se usa aqui como vector store local/embebido
+# (SQLite + Chroma), no como servidor HTTP expuesto, lo que limita la
+# explotabilidad pre-auth. Mismo ignore en pip-audit (.pre-commit-config.yaml
+# + ci.yml). Quitar en cuanto chromadb publique fix. Triage: `prismal doctor
+# security-check`.
+CVE-2026-45829
+
 # ============================================================
 # TODO: TRIAGE — detectados por Trivy (mas reciente que pip-audit DB).
 # Pendientes de revisar via `prismal doctor security-check` (Phase 30).
