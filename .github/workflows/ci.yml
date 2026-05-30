@@ -203,7 +203,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Trivy fs (JSON report)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: fs
           scanners: vuln,misconfig,secret
@@ -212,7 +212,7 @@ jobs:
           output: trivy-fs.json
           exit-code: "0"
       - name: Trivy fs (gate — HIGH,CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: fs
           scanners: vuln,misconfig,secret
