@@ -678,6 +678,89 @@ class Settings(BaseSettings):
         description="Max recording duration per voice turn in seconds",
     )
 
+    # ── Multimodal layer (Fase F, opt-in) ──────────────────────────────
+    multimodal_enabled: bool = Field(
+        default=False,
+        description="Master toggle for the multimodal layer (vision/audio/video).",
+    )
+    vision_enabled: bool = Field(
+        default=False,
+        description="Enable VisionAgent and the vision_node.",
+    )
+    audio_enabled: bool = Field(
+        default=False,
+        description="Enable AudioAgent and the audio_node.",
+    )
+    video_enabled: bool = Field(
+        default=False,
+        description="Enable VideoAgent and the video_node.",
+    )
+
+    # Multimodal models
+    vision_model: str = Field(
+        default="",
+        description="VLM model string (LiteLLM). Reuses cua_vision_model when empty.",
+    )
+    multimodal_model: str = Field(
+        default="gemini/gemini-2.0-flash",
+        description="Natively multimodal model (audio+image+video+text).",
+    )
+    cross_modal_embedding_model: str = Field(
+        default="open_clip:ViT-B-32",
+        description="Cross-modal embedding model (CLIP-style), used by [multimodal-embed].",
+    )
+
+    # Media limits (inherited by MediaValidator)
+    max_image_bytes: int = Field(
+        default=10_485_760,
+        ge=1024,
+        description="Max image size in bytes (10 MB default).",
+    )
+    max_audio_bytes: int = Field(
+        default=52_428_800,
+        ge=1024,
+        description="Max audio size in bytes (50 MB default).",
+    )
+    max_video_bytes: int = Field(
+        default=209_715_200,
+        ge=1024,
+        description="Max video size in bytes (200 MB default).",
+    )
+    max_audio_duration_s: float = Field(
+        default=600.0,
+        ge=0.5,
+        description="Max audio duration in seconds.",
+    )
+    max_video_duration_s: float = Field(
+        default=300.0,
+        ge=0.5,
+        description="Max video duration in seconds.",
+    )
+    max_frames_per_video: int = Field(
+        default=60,
+        ge=1,
+        le=600,
+        description="Max frames sampled per video (caps LLM cost).",
+    )
+    video_sample_fps: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=10.0,
+        description="Frames-per-second sampled from video.",
+    )
+
+    # TTS / OCR
+    tts_max_chars: int = Field(
+        default=2000,
+        ge=1,
+        le=10_000,
+        description="Max characters per TTS synthesis call.",
+    )
+    vision_ocr_enabled: bool = Field(
+        default=False,
+        description="Run an OCR pass in VisionAgent by default.",
+    )
+
     # ---------------------------------------------------------------------------
     # Channel gateway settings
     # ---------------------------------------------------------------------------
