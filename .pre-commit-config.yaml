@@ -102,9 +102,10 @@ repos:
   # Tambien aplica formato (reemplaza black + isort)
   # ----------------------------------------------------------
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    # Mantener alineado con .gitlab-ci.yml -> ruff-lint (ruff==0.15.10).
-    # Si actualizas aqui, actualiza tambien el CI para evitar drift.
-    rev: v0.15.10
+    # Mantener alineado con la version de ruff en uv.lock (la que usa el job
+    # `lint` de .github/workflows/ci.yml via `uv run ruff`). Si actualizas el
+    # lock, actualiza este rev para evitar drift entre pre-commit y CI.
+    rev: v0.15.11
     hooks:
       - id: ruff
         name: "lint: Ruff (lint + C901)"
@@ -138,7 +139,7 @@ repos:
   # Umbral: 12 (mas estricto que ciclomatica por su naturaleza)
   # ----------------------------------------------------------
   - repo: https://github.com/PyCQA/flake8
-    rev: 7.2.0
+    rev: 7.3.0
     hooks:
       - id: flake8
         name: "complexity: cognitive CCR001 (baseline=100)"
@@ -196,7 +197,7 @@ repos:
   # pickle inseguro, hardcoded passwords, assert en produccion
   # ----------------------------------------------------------
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.3
+    rev: 1.9.4
     hooks:
       - id: bandit
         name: "sast: Bandit (medium+)"
