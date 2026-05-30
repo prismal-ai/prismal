@@ -10,17 +10,18 @@ from prismal.agents.tool_registry import DEFAULT_CAPABILITY_MAP, get_recommended
 
 class TestIntentRouter:
     @pytest.mark.parametrize(
-        ("text", "expected"),
+        "text",
         [
-            ("please transcribe this voice note", "audio_agent"),
-            ("speech-to-text for this clip", "audio_agent"),
-            ("summarize this video for me", "video_agent"),
-            ("describe the image attached", "vision_agent"),
-            ("what's in this photo?", "vision_agent"),
+            "please transcribe this voice note",
+            "speech-to-text for this clip",
+            "summarize this video for me",
+            "describe the image attached",
+            "what's in this photo?",
         ],
     )
-    def test_multimodal_intents_match(self, text: str, expected: str) -> None:
-        assert match_intent(text) == expected
+    def test_multimodal_intents_route_to_pipeline(self, text: str) -> None:
+        # All modal intents funnel to the single multimodal_pipeline member.
+        assert match_intent(text) == "multimodal_pipeline"
 
     @pytest.mark.parametrize(
         "text",
@@ -33,9 +34,8 @@ class TestIntentRouter:
     )
     def test_non_multimodal_text_still_falls_through(self, text: str) -> None:
         # Zero regression: ordinary requests must not be captured by multimodal
-        # patterns (they return None or a non-multimodal route).
-        result = match_intent(text)
-        assert result not in ("vision_agent", "audio_agent", "video_agent")
+        # patterns.
+        assert match_intent(text) != "multimodal_pipeline"
 
 
 class TestCapabilityMap:

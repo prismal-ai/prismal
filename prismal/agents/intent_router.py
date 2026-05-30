@@ -124,10 +124,10 @@ def match_intent(text: str | None) -> str | None:
         text: Raw user message content (the most recent ``HumanMessage``).
 
     Returns:
-        The target agent name (``"cron_manager"`` or one of the advanced
-        architecture nodes such as ``"code_review"`` / ``"data_etl"`` /
-        ``"tot_agent"`` / ``"debate_agent"`` / ``"debate_consensus"``) or
-        ``None`` when no high-confidence rule fires.
+        The target agent name (``"cron_manager"``; an advanced-architecture
+        node such as ``"code_review"`` / ``"data_etl"`` / ``"tot_agent"`` /
+        ``"debate_agent"`` / ``"debate_consensus"``; or ``"multimodal_pipeline"``
+        for media intents) or ``None`` when no high-confidence rule fires.
     """
     if text is None:
         return None
@@ -152,11 +152,11 @@ def match_intent(text: str | None) -> str | None:
     if _CODE_REVIEW_RE.search(normalised):
         return "code_review"
     # Multimodal (opt-in; gated downstream — only honoured when the multimodal
-    # routes are enabled, otherwise the supervisor falls through to the LLM).
-    if _VIDEO_RE.search(normalised):
-        return "video_agent"
-    if _AUDIO_RE.search(normalised):
-        return "audio_agent"
-    if _IMAGE_RE.search(normalised):
-        return "vision_agent"
+    # route is enabled, otherwise the supervisor falls through to the LLM). All
+    # modal intents route to the single ``multimodal_pipeline`` member, which
+    # fans out to the vision/audio/video agents internally.
+    if _VIDEO_RE.search(normalised) or _AUDIO_RE.search(normalised) or _IMAGE_RE.search(
+        normalised
+    ):
+        return "multimodal_pipeline"
     return None

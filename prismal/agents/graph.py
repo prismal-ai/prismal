@@ -202,6 +202,7 @@ def build_supervisor_graph(
     ml_pipeline_graph: Any = None,
     financial_analyst_graph: Any = None,
     advanced_nodes: dict[str, Any] | None = None,
+    multimodal_nodes: dict[str, Any] | None = None,
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Build and compile the LangGraph SUPERVISOR state machine.
@@ -318,6 +319,16 @@ def build_supervisor_graph(
     for _adv_name, _adv_node in _advanced_nodes.items():
         builder.add_node(_adv_name, _adv_node)
 
+    # Fase F (P3): multimodal pipeline node. Opt-in via ``multimodal_enabled``
+    # and only when the caller supplies the pre-built (compiled) node map.
+    _multimodal_nodes: dict[str, Any] = (
+        dict(multimodal_nodes)
+        if (get_settings().multimodal_enabled and multimodal_nodes)
+        else {}
+    )
+    for _mm_name, _mm_node in _multimodal_nodes.items():
+        builder.add_node(_mm_name, _mm_node)
+
     # Entry point
     builder.set_entry_point("supervisor")
 
@@ -345,6 +356,8 @@ def build_supervisor_graph(
         conditional_edges["financial_analyst"] = "financial_analyst"
     for _adv_name in _advanced_nodes:
         conditional_edges[_adv_name] = _adv_name
+    for _mm_name in _multimodal_nodes:
+        conditional_edges[_mm_name] = _mm_name
 
     builder.add_conditional_edges(
         "supervisor",
@@ -393,6 +406,8 @@ def build_supervisor_graph(
         builder.add_edge("financial_analyst", "supervisor")
     for _adv_name in _advanced_nodes:
         builder.add_edge(_adv_name, "supervisor")
+    for _mm_name in _multimodal_nodes:
+        builder.add_edge(_mm_name, "supervisor")
 
     # ------------------------------------------------------------------ #
     # Compile with checkpointing                                           #
@@ -464,6 +479,31 @@ async def _build_advanced_nodes() -> dict[str, Any]:
         "debate_consensus": await factory.build(build_debate_consensus_subgraph()),
     }
     logger.info("advanced_nodes_built", count=len(nodes))
+    return nodes
+
+
+async def _build_multimodal_nodes() -> dict[str, Any]:
+    """Build the multimodal node map (Fase F / P3).
+
+    Returns a single ``{"multimodal_pipeline": <compiled subgraph>}`` entry: the
+    multimodal pipeline (router → vision|audio|video|text → fusion → output)
+    compiled via :class:`~prismal.agents.subgraphs.factory.SubgraphFactory`. The
+    name matches :data:`~prismal.agents.supervisor.MULTIMODAL_MEMBERS`.
+
+    Only invoked when ``settings.multimodal_enabled`` is ``True``; the modal
+    agents resolve their providers lazily at call time, so compilation here
+    needs no network.
+    """
+    from prismal.agents.subgraphs.factory import SubgraphFactory
+    from prismal.agents.subgraphs.multimodal_pipeline.builder import (
+        build_multimodal_subgraph,
+    )
+
+    factory = SubgraphFactory()
+    nodes: dict[str, Any] = {
+        "multimodal_pipeline": await factory.build(build_multimodal_subgraph()),
+    }
+    logger.info("multimodal_nodes_built", count=len(nodes))
     return nodes
 
 
@@ -548,12 +588,19 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
         # nodes (lazy LLM defaults) + 5 compiled domain subgraphs.
         advanced_nodes = await _build_advanced_nodes()
 
+    # Fase F (P3): build the multimodal pipeline node when the layer is enabled.
+    # Independent of ``enable_subgraphs`` — gated by its own toggle.
+    multimodal_nodes: dict[str, Any] | None = None
+    if get_settings().multimodal_enabled:
+        multimodal_nodes = await _build_multimodal_nodes()
+
     _async_graph = build_supervisor_graph(
         checkpointer=checkpointer,
         dev_pipeline_graph=dev_pipeline_graph,
         ml_pipeline_graph=ml_pipeline_graph,
         financial_analyst_graph=financial_analyst_graph,
         advanced_nodes=advanced_nodes,
+        multimodal_nodes=multimodal_nodes,
     )
     logger.debug("async_graph_initialized")
     return _async_graph
