@@ -536,8 +536,7 @@ class _ContainerBackend(IsolationBackend):
             blocked = ExecutionResult(
                 stdout="",
                 stderr=(
-                    "Sandbox execution blocked by ActionInterceptor "
-                    "(PRISMAL_SHELL_ENABLED=false)."
+                    "Sandbox execution blocked by ActionInterceptor (PRISMAL_SHELL_ENABLED=false)."
                 ),
                 exit_code=126,
                 language=lang,
@@ -785,8 +784,7 @@ class _NamespaceBackend(IsolationBackend):
             blocked = ExecutionResult(
                 stdout="",
                 stderr=(
-                    "Sandbox execution blocked by ActionInterceptor "
-                    "(PRISMAL_SHELL_ENABLED=false)."
+                    "Sandbox execution blocked by ActionInterceptor (PRISMAL_SHELL_ENABLED=false)."
                 ),
                 exit_code=126,
                 language=lang,

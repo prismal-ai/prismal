@@ -297,6 +297,9 @@ max-complexity = 40
 ]
 "prismal/skills/available/**/*.py" = ["S603", "S607"]
 "prismal/skills/custom/**/*.py" = ["S603", "S607"]
+# Deprecated lightagent->prismal bridge: find_spec/exec_module signatures are
+# mandated by importlib's MetaPathFinder/Loader ABCs, so unused args are unavoidable.
+"compat/**/*.py" = ["ARG002"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["prismal"]

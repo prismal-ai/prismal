@@ -187,9 +187,7 @@ class TestSecurity:
         assert "\x00" not in out["current_agent"]
         assert "cleantext" in out["current_agent"].replace(" ", "")
 
-    async def test_off_does_not_invoke_tool_checker(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_off_does_not_invoke_tool_checker(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from prismal.agents.extension import _middleware
 
         invoked = {"n": 0}
@@ -248,9 +246,7 @@ class TestDefaultToolChecker:
         # Must not raise for a tool that is not in the permission map.
         await _check_tool_calls(update, meta)
 
-    async def test_mapped_tool_without_grant_raises(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_mapped_tool_without_grant_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from prismal.agents.extension._middleware import _check_tool_calls
         from prismal.agents.extension.decorators import NodeMetadata
         from prismal.core.exceptions import PermissionDeniedError

@@ -70,9 +70,7 @@ async def test_supervisor_routes_to_end_with_fake_llm() -> None:
         patch("prismal.agents.supervisor._spawn_memory_extraction", new=MagicMock()),
     ):
         mock_llm.return_value.ainvoke = fake_ainvoke
-        result = await graph.ainvoke(
-            state, config={"configurable": {"thread_id": "e2e-route-end"}}
-        )
+        result = await graph.ainvoke(state, config={"configurable": {"thread_id": "e2e-route-end"}})
 
     # The run completed and terminated at the supervisor (routed to END).
     assert result["session_id"] == "e2e-route-end"

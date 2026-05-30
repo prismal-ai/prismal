@@ -137,8 +137,7 @@ class PrismalStateGraphBuilder:
             nxt = await routing_fn(state)
             if nxt not in allowed:
                 raise ValueError(
-                    f"Supervisor '{name}' routed to invalid node '{nxt}'; "
-                    f"valid targets: {allowed}"
+                    f"Supervisor '{name}' routed to invalid node '{nxt}'; valid targets: {allowed}"
                 )
             return {"next_agent": nxt}
 
@@ -219,9 +218,7 @@ class PrismalStateGraphBuilder:
         if self._entry_point is None:
             raise ValueError(f"Builder '{self.name}' has no entry point set")
         if self._entry_point not in self._nodes:
-            raise ValueError(
-                f"Entry point '{self._entry_point}' is not a registered node"
-            )
+            raise ValueError(f"Entry point '{self._entry_point}' is not a registered node")
         known = set(self._nodes) | {_END_SENTINEL, END}
         for from_, to in self._edges:
             if from_ not in self._nodes:

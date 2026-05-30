@@ -67,8 +67,7 @@ def _cmd_info(name: str) -> int:
 def _cmd_doctor() -> int:
     report = discover_plugins()
     print(
-        f"loaded={report.loaded_count} failed={report.failed_count} "
-        f"skipped={report.skipped_count}"
+        f"loaded={report.loaded_count} failed={report.failed_count} skipped={report.skipped_count}"
     )
     for result in report.failed:
         print(f"  FAIL {result.info.name} ({result.info.group}): {result.error}")
@@ -78,7 +77,7 @@ def _cmd_doctor() -> int:
 def _cmd_enable(name: str) -> int:
     print(
         f"To allowlist '{name}', add it to PRISMAL_PLUGINS_ALLOWLIST, e.g.:\n"
-        f'  export PRISMAL_PLUGINS_ALLOWLIST=\'["{name}"]\''
+        f"  export PRISMAL_PLUGINS_ALLOWLIST='[\"{name}\"]'"
     )
     return 0
 
@@ -86,7 +85,7 @@ def _cmd_enable(name: str) -> int:
 def _cmd_disable(name: str) -> int:
     print(
         f"To disable '{name}', add it to PRISMAL_PLUGINS_DENYLIST, e.g.:\n"
-        f'  export PRISMAL_PLUGINS_DENYLIST=\'["{name}"]\''
+        f"  export PRISMAL_PLUGINS_DENYLIST='[\"{name}\"]'"
     )
     return 0
 

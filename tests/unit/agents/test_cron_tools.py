@@ -84,9 +84,7 @@ class TestCronAdd:
 
         job = _make_job(name="tz-job")
 
-        with patch(
-            "prismal.scheduler.cron_manager.CronManager.add", return_value=job
-        ) as mock_add:
+        with patch("prismal.scheduler.cron_manager.CronManager.add", return_value=job) as mock_add:
             cron_add.invoke(
                 {
                     "name": "tz-job",
@@ -130,9 +128,7 @@ class TestCronAdd:
 
         job = _make_job(name="no-tz-job")
 
-        with patch(
-            "prismal.scheduler.cron_manager.CronManager.add", return_value=job
-        ) as mock_add:
+        with patch("prismal.scheduler.cron_manager.CronManager.add", return_value=job) as mock_add:
             cron_add.invoke(
                 {
                     "name": "no-tz-job",

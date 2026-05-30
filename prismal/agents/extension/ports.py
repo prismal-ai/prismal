@@ -28,8 +28,9 @@ class CheckpointPort(Protocol):
         self, config: dict[str, Any], checkpoint: Any, metadata: dict[str, Any], *args: Any
     ) -> Any: ...
 
-    def alist(self, config: dict[str, Any] | None, *args: Any, **kwargs: Any) -> AsyncIterator[Any]:
-        ...
+    def alist(
+        self, config: dict[str, Any] | None, *args: Any, **kwargs: Any
+    ) -> AsyncIterator[Any]: ...
 
 
 @runtime_checkable

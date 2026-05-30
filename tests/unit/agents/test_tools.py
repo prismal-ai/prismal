@@ -650,9 +650,7 @@ def test_shell_exec_blocked_when_disabled(monkeypatch: pytest.MonkeyPatch) -> No
     from prismal.agents.tools import shell_exec
     from prismal.core.config import Settings
 
-    monkeypatch.setattr(
-        "prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=False)
-    )
+    monkeypatch.setattr("prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=False))
     result = shell_exec.invoke({"command": "echo hello"})
     assert "not enabled" in result.lower() or "disabled" in result.lower()
 
@@ -662,9 +660,7 @@ def test_shell_exec_returns_output(monkeypatch: pytest.MonkeyPatch) -> None:
     from prismal.agents.tools import shell_exec
     from prismal.core.config import Settings
 
-    monkeypatch.setattr(
-        "prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
-    )
+    monkeypatch.setattr("prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
     result = shell_exec.invoke({"command": "echo hello_world"})
     assert "hello_world" in result
 
@@ -674,9 +670,7 @@ def test_shell_exec_captures_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     from prismal.agents.tools import shell_exec
     from prismal.core.config import Settings
 
-    monkeypatch.setattr(
-        "prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
-    )
+    monkeypatch.setattr("prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
     result = shell_exec.invoke({"command": "ls /nonexistent_path_xyz_abc_123"})
     assert isinstance(result, str)
     assert len(result) > 0
@@ -687,9 +681,7 @@ def test_shell_exec_timeout_respected(monkeypatch: pytest.MonkeyPatch) -> None:
     from prismal.agents.tools import shell_exec
     from prismal.core.config import Settings
 
-    monkeypatch.setattr(
-        "prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
-    )
+    monkeypatch.setattr("prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
     result = shell_exec.invoke({"command": "sleep 60", "timeout": 1})
     assert "timeout" in result.lower() or "timed out" in result.lower()
 
@@ -699,9 +691,7 @@ def test_shell_exec_rejects_empty_command(monkeypatch: pytest.MonkeyPatch) -> No
     from prismal.agents.tools import shell_exec
     from prismal.core.config import Settings
 
-    monkeypatch.setattr(
-        "prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=True)
-    )
+    monkeypatch.setattr("prismal.agents.tools.get_settings", lambda: Settings(shell_enabled=True))
     result = shell_exec.invoke({"command": "   "})
     assert "empty" in result.lower() or "error" in result.lower()
 

@@ -210,9 +210,7 @@ _LOADERS: dict[PluginGroup, Any] = {
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
-def _resolve_groups(
-    groups: list[PluginGroup] | None, settings: Settings
-) -> list[PluginGroup]:
+def _resolve_groups(groups: list[PluginGroup] | None, settings: Settings) -> list[PluginGroup]:
     if groups is not None:
         return groups
     if not settings.plugins_autodiscover:
@@ -276,9 +274,7 @@ def discover_plugins(
                 )
             else:
                 duration = (time.monotonic() - t0) * 1000.0
-                loaded.append(
-                    PluginLoadResult(info=info, status="loaded", duration_ms=duration)
-                )
+                loaded.append(PluginLoadResult(info=info, status="loaded", duration_ms=duration))
                 logger.info("plugin.loaded", plugin=ep.name, group=group)
                 audit.log_event(
                     "plugin_loaded",
