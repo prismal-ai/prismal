@@ -44,7 +44,8 @@ class TestSanitizeMedia:
         with_exif = buf.getvalue()
 
         # Sanity: the original carries EXIF.
-        assert Image.open(BytesIO(with_exif)).getexif()
+        original_exif = Image.open(BytesIO(with_exif)).getexif()
+        assert original_exif
 
         sanitizer = InputSanitizer()
         cleaned = sanitizer.sanitize_media(with_exif, MediaKind.IMAGE)
