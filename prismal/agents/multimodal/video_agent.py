@@ -31,9 +31,9 @@ if TYPE_CHECKING:
 
 logger = get_logger("prismal.agents.multimodal.video_agent")
 
-type FrameExtractorFn = Callable[[Path, float, int], Awaitable[list[Path]]]
-type TranscribeFn = Callable[[Path], Awaitable[str]]
-type FusionFn = Callable[[str, "list[FrameDescription]"], Awaitable[str]]
+FrameExtractorFn = Callable[[Path, float, int], Awaitable[list[Path]]]
+TranscribeFn = Callable[[Path], Awaitable[str]]
+FusionFn = Callable[[str, "list[FrameDescription]"], Awaitable[str]]
 
 
 @dataclass(frozen=True)
