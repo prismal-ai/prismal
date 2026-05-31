@@ -131,4 +131,5 @@ class TestEXIFStrip:
         img.save(buf, format="JPEG", exif=exif)
         state = ingest_media(_state(), buf.getvalue(), workspace=tmp_path)
         stored = Path(state["metadata"]["mm"]["media"][0]["uri"]).read_bytes()
-        assert not Image.open(BytesIO(stored)).getexif()
+        exif_data = Image.open(BytesIO(stored)).getexif()
+        assert not exif_data
