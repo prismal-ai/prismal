@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 import litellm
 
@@ -84,9 +84,10 @@ def _coerce_segments(raw: object) -> list[STTSegment]:
     segments: list[STTSegment] = []
     for item in raw:
         if isinstance(item, dict):
-            start = item.get("start", 0.0)
-            end = item.get("end", 0.0)
-            text = item.get("text", "")
+            mapping = cast("dict[str, Any]", item)
+            start = mapping.get("start", 0.0)
+            end = mapping.get("end", 0.0)
+            text = mapping.get("text", "")
         else:
             start = getattr(item, "start", 0.0)
             end = getattr(item, "end", 0.0)

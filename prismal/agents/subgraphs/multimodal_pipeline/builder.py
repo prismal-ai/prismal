@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from langchain_core.messages import AIMessage
 
@@ -255,7 +255,7 @@ def build_multimodal_subgraph(
     audio_agent: AudioAgent | None = None,
     video_agent: VideoAgent | None = None,
     fusion: MultimodalFusion | None = None,
-    fusion_strategy: str = "moderator",
+    fusion_strategy: Literal["moa", "moderator", "concat"] = "moderator",
     settings: Settings | None = None,
 ) -> SubgraphDefinition:
     """Build the multimodal pipeline :class:`SubgraphDefinition`.
@@ -275,7 +275,7 @@ def build_multimodal_subgraph(
 
         video_agent = VideoAgent(settings=settings)
     if fusion is None:
-        fusion = MultimodalFusion(strategy=fusion_strategy, settings=settings)  # type: ignore[arg-type]
+        fusion = MultimodalFusion(strategy=fusion_strategy, settings=settings)
 
     definition = SubgraphDefinition(
         name=_NAME,
