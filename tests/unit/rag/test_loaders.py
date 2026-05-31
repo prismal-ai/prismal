@@ -181,7 +181,7 @@ def test_load_json_returns_list_of_documents(tmp_path: Path) -> None:
         metadata={"source": str(json_file), "seq_num": 1},
     )
 
-    with patch("prismal.rag.loaders.JSONLoader", autospec=True) as mock_loader_cls:
+    with patch("prismal.rag.loaders.document_loader.JSONLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -204,7 +204,7 @@ def test_load_json_calls_jsonloader_with_correct_args(tmp_path: Path) -> None:
         metadata={"source": str(json_file)},
     )
 
-    with patch("prismal.rag.loaders.JSONLoader", autospec=True) as mock_loader_cls:
+    with patch("prismal.rag.loaders.document_loader.JSONLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -223,7 +223,7 @@ def test_load_json_sets_metadata_source(tmp_path: Path) -> None:
     # Loader returns doc WITHOUT source; factory must set it
     fake_doc = Document(page_content='{"key": "value"}', metadata={})
 
-    with patch("prismal.rag.loaders.JSONLoader", autospec=True) as mock_loader_cls:
+    with patch("prismal.rag.loaders.document_loader.JSONLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -248,7 +248,7 @@ def test_load_pdf_returns_list_of_documents(tmp_path: Path) -> None:
         metadata={"source": str(pdf_file), "page": 0},
     )
 
-    with patch("prismal.rag.loaders.PyPDFLoader", autospec=True) as mock_loader_cls:
+    with patch("prismal.rag.loaders.document_loader.PyPDFLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -271,7 +271,7 @@ def test_load_pdf_calls_pypdfloader_with_path(tmp_path: Path) -> None:
         metadata={"source": str(pdf_file)},
     )
 
-    with patch("prismal.rag.loaders.PyPDFLoader", autospec=True) as mock_loader_cls:
+    with patch("prismal.rag.loaders.document_loader.PyPDFLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -290,7 +290,7 @@ def test_load_pdf_sets_metadata_source(tmp_path: Path) -> None:
     # Loader returns doc WITHOUT source; factory must set it
     fake_doc = Document(page_content="page", metadata={})
 
-    with patch("prismal.rag.loaders.PyPDFLoader", autospec=True) as mock_loader_cls:
+    with patch("prismal.rag.loaders.document_loader.PyPDFLoader", autospec=True) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -314,7 +314,9 @@ def test_load_docx_returns_list_of_documents(tmp_path: Path) -> None:
         metadata={"source": str(docx_file)},
     )
 
-    with patch("prismal.rag.loaders.Docx2txtLoader", autospec=True) as mock_loader_cls:
+    with patch(
+        "prismal.rag.loaders.document_loader.Docx2txtLoader", autospec=True
+    ) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -334,7 +336,9 @@ def test_load_docx_calls_docx2txtloader_with_path(tmp_path: Path) -> None:
 
     fake_doc = Document(page_content="memo body", metadata={"source": str(docx_file)})
 
-    with patch("prismal.rag.loaders.Docx2txtLoader", autospec=True) as mock_loader_cls:
+    with patch(
+        "prismal.rag.loaders.document_loader.Docx2txtLoader", autospec=True
+    ) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance
@@ -352,7 +356,9 @@ def test_load_docx_sets_metadata_source(tmp_path: Path) -> None:
 
     fake_doc = Document(page_content="notes", metadata={})
 
-    with patch("prismal.rag.loaders.Docx2txtLoader", autospec=True) as mock_loader_cls:
+    with patch(
+        "prismal.rag.loaders.document_loader.Docx2txtLoader", autospec=True
+    ) as mock_loader_cls:
         mock_instance = MagicMock()
         mock_instance.load.return_value = [fake_doc]
         mock_loader_cls.return_value = mock_instance

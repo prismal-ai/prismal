@@ -8,8 +8,13 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from io import BytesIO
+from typing import TYPE_CHECKING
 
 from prismal.core.logging import get_logger
+
+if TYPE_CHECKING:
+    from prismal.security.media_validator import MediaKind, MediaValidator
 
 logger = get_logger("prismal.security.sanitizer")
 
@@ -85,6 +90,65 @@ class InputSanitizer:
         text = self.strip_control_chars(text)
         text = self.normalize_unicode(text)
         return self.enforce_length_limit(text, max_chars)
+
+    def sanitize_media(
+        self,
+        blob: bytes,
+        kind: MediaKind,
+        *,
+        validator: MediaValidator | None = None,
+    ) -> bytes:
+        """Validate media and strip risky metadata before it reaches an agent.
+
+        Runs :class:`MediaValidator` first (magic bytes, size, duration); on
+        rejection raises ``MediaValidationError``. For images, EXIF/metadata is
+        stripped best-effort (requires Pillow; skipped with a warning when it is
+        unavailable or the bytes are not a decodable image).
+
+        Args:
+            blob: Raw media bytes.
+            kind: Expected media kind.
+            validator: Optional injected validator (defaults to a fresh one).
+
+        Returns:
+            Sanitized media bytes (EXIF-stripped for valid images).
+
+        Raises:
+            MediaValidationError: If the media fails validation.
+        """
+        from prismal.core.exceptions import MediaValidationError
+        from prismal.security.media_validator import MediaKind as _MediaKind
+        from prismal.security.media_validator import MediaValidator
+
+        validator = validator or MediaValidator()
+        result = validator.validate(blob, expected_kind=kind)
+        if not result.ok:
+            raise MediaValidationError(result.reason or "invalid media")
+        if kind is _MediaKind.IMAGE:
+            return self._strip_image_metadata(blob)
+        return blob
+
+    @staticmethod
+    def _strip_image_metadata(blob: bytes) -> bytes:
+        """Re-encode an image without metadata; return original on any failure."""
+        try:
+            from PIL import Image, UnidentifiedImageError
+        except ImportError:
+            logger.warning("exif_strip_skipped_no_pillow")
+            return blob
+        try:
+            with Image.open(BytesIO(blob)) as img:
+                img.load()
+                image_format = img.format
+                mode, size, raw = img.mode, img.size, img.tobytes()
+            # Rebuild from raw pixels only — drops EXIF and every metadata chunk.
+            clean = Image.frombytes(mode, size, raw)
+            out = BytesIO()
+            clean.save(out, format=image_format)
+            return out.getvalue()
+        except (UnidentifiedImageError, OSError, ValueError):
+            logger.warning("exif_strip_failed")
+            return blob
 
 
 __all__ = ["MAX_INPUT_LENGTH", "InputSanitizer"]

@@ -514,9 +514,77 @@ class LangChainAdapterError(AdapterError):
         super().__init__(f"{message} (runnable_type={runnable_type})")
 
 
+# ── Multimodal (Fase F) ───────────────────────────────────────────────────────
+
+
+class MultimodalError(PrismalError):
+    """Base for errors raised by the multimodal layer (Fase F)."""
+
+
+class STTError(MultimodalError):
+    """Speech-to-text transcription failed in the backend."""
+
+
+class TTSError(MultimodalError):
+    """Text-to-speech synthesis failed across every configured backend."""
+
+
+class VisionAgentError(MultimodalError):
+    """:class:`VisionAgent` failed (validation or VLM call)."""
+
+
+class AudioAgentError(MultimodalError):
+    """:class:`AudioAgent` failed at one of its pipeline stages."""
+
+
+class VideoAgentError(MultimodalError):
+    """:class:`VideoAgent` failed (extraction, transcription or fusion)."""
+
+
+class ModalityRouterError(MultimodalError):
+    """Modality classification or routing failed."""
+
+
+class MultimodalFusionError(MultimodalError):
+    """Fusion of modal contributions failed."""
+
+
+class MultimodalRAGError(RAGError):
+    """Multimodal RAG indexing or search failed.
+
+    Inherits from :class:`RAGError` so callers catching the RAG hierarchy keep
+    working when they enable the multimodal engine.
+    """
+
+
+class MediaValidationError(PrismalError):
+    """Incoming media was rejected by :class:`MediaValidator`.
+
+    This is intentionally *not* a :class:`MultimodalError`: rejection happens
+    before any multimodal agent runs.
+    """
+
+
+class MissingDependencyError(PrismalError):
+    """Raised when a backend whose optional extra is not installed is requested.
+
+    Args:
+        message: Human-readable description of what is missing.
+        extra_to_install: The pip extra that provides the missing dependency
+            (e.g. ``"multimodal-embed"``), surfaced so the message can suggest
+            ``pip install "prismal[<extra>]"``.
+    """
+
+    def __init__(self, message: str, *, extra_to_install: str) -> None:
+        """Initialize MissingDependencyError."""
+        self.extra_to_install = extra_to_install
+        super().__init__(f'{message} (install with: pip install "prismal[{extra_to_install}]")')
+
+
 __all__ = [
     "AdapterError",
     "AdaptiveRAGError",
+    "AudioAgentError",
     "CanaryLeakError",
     "CodeReviewError",
     "CompilerError",
@@ -540,11 +608,17 @@ __all__ = [
     "MCPConnectionError",
     "MCPError",
     "MCPToolError",
+    "MediaValidationError",
     "MemoryError",
     "MemoryRedactionError",
+    "MissingDependencyError",
     "MoAError",
+    "ModalityRouterError",
     "ModelNotFoundError",
     "MultiVectorError",
+    "MultimodalError",
+    "MultimodalFusionError",
+    "MultimodalRAGError",
     "NodeExecutionError",
     "NodeTimeoutError",
     "NodeValidationError",
@@ -556,6 +630,7 @@ __all__ = [
     "ProviderTimeoutError",
     "RAGError",
     "RAGIndexError",
+    "STTError",
     "SchedulerError",
     "SecurityError",
     "SelfRAGError",
@@ -563,5 +638,8 @@ __all__ = [
     "SkillLoadError",
     "SkillValidationError",
     "SwarmError",
+    "TTSError",
     "ToTError",
+    "VideoAgentError",
+    "VisionAgentError",
 ]

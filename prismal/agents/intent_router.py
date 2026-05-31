@@ -94,6 +94,24 @@ _CODE_REVIEW_RE: re.Pattern[str] = re.compile(r"\bcode\s+review\b", re.IGNORECAS
 _CONSENSUS_RE: re.Pattern[str] = re.compile(r"\bconsensus\b", re.IGNORECASE)
 _DEBATE_RE: re.Pattern[str] = re.compile(r"\bdebate\b", re.IGNORECASE)
 
+# Fase F (F7-03): conservative multimodal intent patterns. Like the advanced
+# architectures, these only short-circuit when the matched route is enabled
+# (the supervisor gates routes not present in ``effective_valid_routes``), so
+# they never affect the default text agents when the multimodal layer is off.
+_AUDIO_RE: re.Pattern[str] = re.compile(
+    r"\b(?:transcrib\w*|voice\s+note|voz|speech[\s-]?to[\s-]?text)\b", re.IGNORECASE
+)
+_VIDEO_RE: re.Pattern[str] = re.compile(
+    r"\b(?:summari[sz]e|describe|analy[sz]e)\b.{0,40}\bvideo\b|\bvideo\b.{0,40}"
+    r"\b(?:summary|transcript)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+_IMAGE_RE: re.Pattern[str] = re.compile(
+    r"\b(?:describe|analy[sz]e|caption|what(?:'s| is) in)\b.{0,40}"
+    r"\b(?:image|imagen|picture|photo|foto|screenshot)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
 
 def match_intent(text: str | None) -> str | None:
     """Return a supervisor member name for high-confidence intents.
@@ -106,10 +124,10 @@ def match_intent(text: str | None) -> str | None:
         text: Raw user message content (the most recent ``HumanMessage``).
 
     Returns:
-        The target agent name (``"cron_manager"`` or one of the advanced
-        architecture nodes such as ``"code_review"`` / ``"data_etl"`` /
-        ``"tot_agent"`` / ``"debate_agent"`` / ``"debate_consensus"``) or
-        ``None`` when no high-confidence rule fires.
+        The target agent name (``"cron_manager"``; an advanced-architecture
+        node such as ``"code_review"`` / ``"data_etl"`` / ``"tot_agent"`` /
+        ``"debate_agent"`` / ``"debate_consensus"``; or ``"multimodal_pipeline"``
+        for media intents) or ``None`` when no high-confidence rule fires.
     """
     if text is None:
         return None
@@ -133,4 +151,10 @@ def match_intent(text: str | None) -> str | None:
         return "debate_agent"
     if _CODE_REVIEW_RE.search(normalised):
         return "code_review"
+    # Multimodal (opt-in; gated downstream — only honoured when the multimodal
+    # route is enabled, otherwise the supervisor falls through to the LLM). All
+    # modal intents route to the single ``multimodal_pipeline`` member, which
+    # fans out to the vision/audio/video agents internally.
+    if _VIDEO_RE.search(normalised) or _AUDIO_RE.search(normalised) or _IMAGE_RE.search(normalised):
+        return "multimodal_pipeline"
     return None

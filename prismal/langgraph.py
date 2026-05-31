@@ -32,6 +32,12 @@ from langgraph.types import Send, interrupt
 
 from prismal.agents.state import AgentState
 from prismal.agents.subgraphs.registry import SubgraphDefinition, SubgraphRegistry
+from prismal.agents.visualization import (
+    save_graph_image,
+    to_mermaid,
+    to_mermaid_png,
+    visualize,
+)
 
 VERSION: str = _pkg_version("langgraph")
 """Installed LangGraph version, resolved at import time."""
@@ -48,4 +54,8 @@ __all__ = [
     "SubgraphRegistry",
     "add_messages",
     "interrupt",
+    "save_graph_image",
+    "to_mermaid",
+    "to_mermaid_png",
+    "visualize",
 ]

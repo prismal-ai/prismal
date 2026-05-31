@@ -5,12 +5,24 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
+| **Estado** | `IMPLEMENTED` |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-05-27 |
 | **PLAN** | `specs/extension-surface/PLAN.md` |
 | **Architecture** | `specs/extension-surface/ARCHITECTURE.md` |
 | **SPEC** | `specs/extension-surface/SPEC.md` |
+
+---
+
+> **Estado de implementación (2026-05-30):** La Fase X está **implementada** en el
+> repositorio. Los módulos viven en `prismal/agents/extension/` (`decorators.py`,
+> `_middleware.py`, `_registry.py`, `builder.py`, `plugins.py`, `adapters.py`,
+> `ports.py`), más `prismal/langgraph.py` y el CLI `prismal/plugins.py`. La
+> documentación está en `docs/extension.md`, los ejemplos en `examples/extension/`
+> y el `examples/plugin_template/`, con tests en `tests/unit/agents/extension/`.
+> Registrada en `CHANGELOG.md` bajo `[Unreleased] — Extension Surface (Fase X)`.
+> Los checkboxes `☐` de abajo son el plan original y no se mantuvieron al día
+> durante la ejecución; sirven como referencia histórica, no como estado vivo.
 
 ---
 

@@ -92,9 +92,9 @@ Each subgraph exports both `build_<name>_subgraph()` (returns `SubgraphDefinitio
 
 `agents/subgraphs/gates.py::hitl_gate()` uses `interrupt()` for Human-in-the-Loop pauses.
 
-### Multimodal layer (Fase F — `specs/multimodal-agents/`, opt-in)
+### Multimodal layer (Fase F — `specs/multimodal-agents/`, implemented, opt-in)
 
-A planned multimodal capability layer covers audio, image, and video on top of the existing text agents. It is **opt-in**: gated by `settings.multimodal_enabled` (default `False`) and registered through `register_multimodal_pipeline(registry)` only when the operator decides. Without the toggle, the 26 text agents behave identically to today.
+A multimodal capability layer covers audio, image, and video on top of the existing text agents. It is **opt-in**: gated by `settings.multimodal_enabled` (default `False`). Without the toggle, the 26 text agents behave identically to today. When `multimodal_enabled=True`, `get_async_compiled_graph()` wires a single `multimodal_pipeline` supervisor route (the subgraph fans out to vision/audio/video internally and emits the answer); `effective_valid_routes`/`build_system_prompt` gate on the flag, and `intent_router.match_intent()` returns `multimodal_pipeline` for media intents. Incoming attachments reach the pipeline via `agents/multimodal/ingestion.py::ingest_media()`, which spills bytes to a content-addressed file and records a path-based descriptor under `state["metadata"]["mm"]["media"]` (never raw bytes in checkpointed state).
 
 - `providers/stt.py`, `providers/tts.py`, `providers/vision.py`, `providers/multimodal.py`, `providers/cross_modal_embeddings.py` — provider wrappers (Whisper, pyttsx3/openai/elevenlabs, vision LLM, Gemini/GPT-4o/Sonnet, CLIP). All provider SDK imports stay isolated here.
 - `agents/multimodal/vision_agent.py` — `VisionAgent` (analyze + optional OCR).
@@ -157,6 +157,7 @@ All LLM calls go through `prismal/providers/` (LiteLLM wrapper + per-provider co
 - `sandbox/` — `SandboxExecutor` with docker/podman/nsjail/bwrap/firejail backends (Phase 43); AST denylist in `codeact_agent.py`.
 - `monitoring/` — Langfuse traces, OpenTelemetry spans, structlog.
 - `data/` — DuckDB + Polars utilities.
+- `agents/visualization.py` — `to_mermaid()`/`to_mermaid_png()`/`visualize()`/`save_graph_image()` for any graph-based architecture (compiled graph, `SubgraphDefinition`, `PrismalStateGraphBuilder`); re-exported from `prismal.langgraph`. `SubgraphDefinition` gains `.to_mermaid()`/`.visualize()`/`.save_image()`; `agents.graph.visualize_supervisor_graph()` renders the main graph. `subgraphs/factory.py::assemble_state_graph()` is the shared sync topology builder. Non-graph architectures (patterns, modal agents) raise `TypeError`.
 - `skills/` — `available/` (source, committed) · `active/` (runtime-enabled, gitignored) · `custom/` (AI-generated, gitignored).
 
 ## Critical rules

@@ -10,6 +10,70 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Graph visualization
+
+A reusable way to visualize any graph-based architecture (the compiled
+supervisor graph, every `SubgraphDefinition`, and `PrismalStateGraphBuilder`
+output).
+
+- **`prismal/agents/visualization.py`** — `to_mermaid(obj)` (offline Mermaid
+  source), `to_mermaid_png(obj)`, `save_graph_image(obj, path)`, and
+  `visualize(obj)` (inline PNG in a notebook via IPython with a graceful
+  fallback to Mermaid text). Non-graph architectures (reasoning patterns, modal
+  agents) raise a clear `TypeError`.
+- **`SubgraphDefinition.to_mermaid()` / `.visualize()` / `.save_image(path)`** —
+  one-line visualization for any subgraph.
+- **`prismal.langgraph`** re-exports `to_mermaid` / `to_mermaid_png` /
+  `visualize` / `save_graph_image`; **`agents.graph.visualize_supervisor_graph()`**
+  renders the main graph.
+- Internal: `subgraphs/factory.py` exposes `assemble_state_graph(definition)`
+  (sync, checkpointer-less topology assembly) shared by `build` and the viz
+  helpers. Runnable demo: `examples/visualize_graphs.py`.
+
+### Added — Multimodal Agents (Fase F)
+
+Opt-in vision/audio/video layer on top of the text agents, gated by
+`settings.multimodal_enabled` (default `False`). See `specs/multimodal-agents/`.
+
+- **Providers** (`prismal/providers/`) — `get_stt()` (Whisper API + local
+  faster-whisper), `get_tts()` (pyttsx3 → openai → elevenlabs cascade),
+  `get_vision_llm()`, `get_multimodal_llm()`, `get_cross_modal_embeddings()`
+  (CLIP). All SDK access stays isolated here.
+- **Modal agents** (`prismal/agents/multimodal/`) — `VisionAgent`,
+  `AudioAgent`, `VideoAgent`, `classify_modality()` +
+  `make_modality_router_node()`, and `MultimodalFusion`
+  (`concat`/`moderator`/`moa`). Callable-injected and degrade gracefully.
+- **Subgraph** (`agents/subgraphs/multimodal_pipeline/`) —
+  `build_multimodal_subgraph()` + idempotent `register_multimodal_pipeline()`
+  (router → [vision|audio|video|text] → fusion → output_formatter).
+- **Multimodal RAG** (`rag/multimodal.py`) — `MultimodalRAGEngine` +
+  `MultimodalRetrievedChunk` with modality-filtered search; `rag/loaders/`
+  package adds `ImageLoader` / `AudioLoader` / `VideoLoader` (backward-compatible
+  with the former `rag/loaders.py`).
+- **Security** — `MediaValidator` (magic bytes, size/duration limits) +
+  `InputSanitizer.sanitize_media()` (EXIF strip) + `ActionInterceptor`
+  `.check_media_op()`; `AuditLogger.log_media()` (hash + modality, never content).
+- **Settings** — `multimodal_enabled`, `vision/audio/video_enabled`, model
+  strings, media size/duration limits, `max_frames_per_video`,
+  `video_sample_fps`, `tts_max_chars`, `vision_ocr_enabled`.
+- **Exceptions** — `MultimodalError`, `STTError`, `TTSError`,
+  `VisionAgentError`, `AudioAgentError`, `VideoAgentError`,
+  `ModalityRouterError`, `MultimodalFusionError`, `MultimodalRAGError`,
+  `MediaValidationError`, `MissingDependencyError`.
+- **Packaging** — extras `[multimodal]`, `[multimodal-local]`,
+  `[multimodal-premium]`, `[multimodal-embed]`.
+- **Supervisor wiring** — when `multimodal_enabled=True`,
+  `get_async_compiled_graph()` wires a single `multimodal_pipeline` supervisor
+  route (`effective_valid_routes`/`build_system_prompt` gate on the flag;
+  `match_intent` returns `multimodal_pipeline` for media intents) +
+  `DEFAULT_CAPABILITY_MAP` entries + documented MCP capability servers.
+  Byte-for-byte unchanged when the flag is off.
+- **Media ingestion** — `agents/multimodal/ingestion.py::ingest_media()` /
+  `cleanup_session_media()`: the entry-layer boundary that validates,
+  EXIF-strips, spills bytes to a content-addressed file, audits the hash, and
+  records a path-based descriptor in `state["metadata"]["mm"]["media"]` (no raw
+  bytes in checkpointed state); `settings.media_workspace`.
+
 ### Added — Extension Surface (Fase X)
 
 Public, opt-in extension API so users and third-party plugins can build on

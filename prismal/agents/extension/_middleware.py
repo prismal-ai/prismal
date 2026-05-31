@@ -237,7 +237,7 @@ async def error_mapping_middleware(
         if metadata.raise_on_error:
             raise
         return _error_update(metadata.name, exc.cause, timeout=False)
-    except BaseException as exc:
+    except Exception as exc:
         if metadata.raise_on_error:
             raise NodeExecutionError(metadata.name, _state_keys(state), exc) from exc
         return _error_update(metadata.name, exc, timeout=False)

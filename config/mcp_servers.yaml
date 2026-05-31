@@ -14,6 +14,9 @@
 #   data_etl             — databases, DataFrame transformations.
 #   document_generation  — templates, formatting, export.
 #   rag                  — document indexing and vector search.
+#   vision               — image analysis / OCR (Fase F).
+#   audio                — speech-to-text / text-to-speech (Fase F).
+#   video                — frame extraction / video understanding (Fase F).
 #
 # If ``capabilities`` is omitted the server is treated as ``["general"]``
 # — universally included in every filter.
@@ -50,3 +53,22 @@ servers:
     description: Vector-store / knowledge-base RAG index.
     capabilities: ["rag", "research"]
     priority: 1
+
+  # ── Multimodal capability servers (Fase F, opt-in) ──────────────────────────
+  # Enable alongside settings.multimodal_enabled to route vision/audio/video
+  # tools to the matching modal agents (see DEFAULT_CAPABILITY_MAP).
+  - name: ocr_service
+    type: stdio
+    enabled: false
+    command: ["python", "-m", "prismal.mcp.servers.ocr"]
+    description: OCR-as-a-service for the vision agent (images to text).
+    capabilities: ["vision"]
+    priority: 2
+
+  - name: media_transcode
+    type: stdio
+    enabled: false
+    command: ["python", "-m", "prismal.mcp.servers.media"]
+    description: Sandboxed FFmpeg transcode / probe for audio + video agents.
+    capabilities: ["audio", "video"]
+    priority: 2

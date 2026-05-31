@@ -170,6 +170,12 @@ DEFAULT_CAPABILITY_MAP: dict[str, list[str]] = {
     "data_etl": ["data_etl", "file_management", "general"],
     "document_generation": ["document_generation", "research", "file_management"],
     "debate_consensus": ["research", "general"],
+    # Multimodal agents from Fase F (opt-in; gated by settings.multimodal_enabled).
+    "multimodal_pipeline": ["vision", "audio", "video", "general"],
+    "multimodal_router": ["general"],
+    "vision_agent": ["vision", "general"],
+    "audio_agent": ["audio", "general"],
+    "video_agent": ["vision", "audio", "video", "general"],
 }
 
 

@@ -194,9 +194,32 @@ maintenance = [
   "pip-audit>=2.7.0",
 ]
 
+# Multimodal layer — base media handling (Fase F)
+multimodal = [
+  "Pillow>=11.0.0",
+  "ffmpeg-python>=0.2.0",
+  "imagehash>=4.3.1",
+]
+
+# Multimodal — local STT (offline Whisper)
+multimodal-local = [
+  "faster-whisper>=1.1.0",
+]
+
+# Multimodal — premium TTS
+multimodal-premium = [
+  "elevenlabs>=1.13.0",
+]
+
+# Multimodal — cross-modal (CLIP) embeddings
+multimodal-embed = [
+  "open-clip-torch>=2.30.0",
+  "torch>=2.5.1",
+]
+
 # All optional extras combined
 all = [
-  "prismal[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance]",
+  "prismal[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance,multimodal,multimodal-local,multimodal-premium,multimodal-embed]",
 ]
 
 # Development tools
@@ -342,6 +365,11 @@ module = [
   "motor", "motor.*", "aiosmtplib", "ntplib",
   "langgraph.checkpoint.postgres.*", "langgraph.store.postgres.*",
   "psutil", "jose", "joblib",
+  # Multimodal extras (Fase F) — lazy-imported inside functions.
+  "ffmpeg", "imagehash", "faster_whisper", "whisper",
+  "open_clip", "pyttsx3", "elevenlabs", "elevenlabs.*", "cv2",
+  # Optional notebook dependency for graph visualization.
+  "IPython", "IPython.*",
 ]
 ignore_missing_imports = true
 

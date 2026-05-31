@@ -5,12 +5,25 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
+| **Estado** | `IMPLEMENTED` |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-05-27 |
 | **PLAN** | `specs/multimodal-agents/PLAN.md` |
 | **Architecture** | `specs/multimodal-agents/ARCHITECTURE.md` |
 | **SPEC** | `specs/multimodal-agents/SPEC.md` |
+
+---
+
+> **Estado de implementación (2026-05-30):** La Fase F está **implementada**
+> (opt-in, gated por `settings.multimodal_enabled`). Módulos en disco:
+> `providers/{stt,tts,vision,multimodal,cross_modal_embeddings}.py`,
+> `agents/multimodal/`, `agents/subgraphs/multimodal_pipeline/`,
+> `rag/multimodal.py`, `rag/loaders/{image,audio,video}_loader.py`,
+> `security/media_validator.py`; settings `multimodal_*` en `core/config.py`;
+> extras `[multimodal*]` en `pyproject.toml`. Registrada en `CHANGELOG.md`.
+> Única salvedad (DD-MM-006): ligar los agentes modales como nodos directos del
+> supervisor en `graph.py` queda como opt-in del operador. Los checkboxes `☐`
+> de abajo son el plan original; no se mantuvieron al día durante la ejecución.
 
 ---
 

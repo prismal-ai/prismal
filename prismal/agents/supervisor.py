@@ -98,15 +98,31 @@ ADVANCED_MEMBERS: list[str] = [
 ]
 
 
-def effective_valid_routes(enable_advanced: bool) -> frozenset[str]:
+# Fase F (P3): multimodal pipeline route — a single member that fans out to the
+# vision/audio/video modal agents internally. Appended to the valid routes and
+# the system prompt ONLY when ``settings.multimodal_enabled`` is on, so the
+# default behaviour is byte-for-byte unchanged.
+MULTIMODAL_MEMBERS: list[str] = [
+    "multimodal_pipeline",
+]
+
+
+def effective_valid_routes(
+    enable_advanced: bool,
+    enable_multimodal: bool = False,
+) -> frozenset[str]:
     """Return the set of routes the supervisor may select.
 
     Always includes the base :data:`MEMBERS` plus ``END``; includes
-    :data:`ADVANCED_MEMBERS` only when *enable_advanced* is ``True``.
+    :data:`ADVANCED_MEMBERS` when *enable_advanced* is ``True`` and
+    :data:`MULTIMODAL_MEMBERS` when *enable_multimodal* is ``True``.
     """
+    routes = _VALID_ROUTES
     if enable_advanced:
-        return _VALID_ROUTES | frozenset(ADVANCED_MEMBERS)
-    return _VALID_ROUTES
+        routes = routes | frozenset(ADVANCED_MEMBERS)
+    if enable_multimodal:
+        routes = routes | frozenset(MULTIMODAL_MEMBERS)
+    return routes
 
 
 # Maximum number of recent messages sent to the LLM per supervisor call.
@@ -312,16 +328,31 @@ Additional advanced agents (opt-in — route here only when clearly applicable):
 - debate_consensus: Structured proponent/opponent/moderator consensus pipeline."""
 
 
-def build_system_prompt(enable_advanced: bool) -> str:
+# Appended only when ``settings.multimodal_enabled`` is True.
+_MULTIMODAL_PROMPT_SECTION: str = """
+
+Multimodal pipeline (opt-in — route here only when the request involves an
+image, audio, or video attachment, or asks to transcribe/describe/summarise
+such media):
+- multimodal_pipeline: Routes the input by modality to the vision / audio /
+  video agents, fuses their outputs, and returns a single answer. Route here
+  for "transcribe this", "what's in this image", "summarise this video"."""
+
+
+def build_system_prompt(enable_advanced: bool, enable_multimodal: bool = False) -> str:
     """Return the supervisor routing prompt.
 
     When *enable_advanced* is ``True`` the advanced-architecture agents
-    (:data:`ADVANCED_MEMBERS`) are appended; otherwise the prompt is identical
-    to the legacy default so base-agent routing is unchanged.
+    (:data:`ADVANCED_MEMBERS`) are appended; when *enable_multimodal* is ``True``
+    the multimodal pipeline section is appended. With both ``False`` the prompt
+    is byte-identical to the legacy default so base-agent routing is unchanged.
     """
+    prompt = _SYSTEM_PROMPT
     if enable_advanced:
-        return _SYSTEM_PROMPT + _ADVANCED_PROMPT_SECTION
-    return _SYSTEM_PROMPT
+        prompt += _ADVANCED_PROMPT_SECTION
+    if enable_multimodal:
+        prompt += _MULTIMODAL_PROMPT_SECTION
+    return prompt
 
 
 # ---------------------------------------------------------------------------
@@ -520,7 +551,8 @@ def _intent_short_circuit(
             last_human_text = str(getattr(msg, "content", ""))
             break
     matched_intent = match_intent(last_human_text)
-    valid_routes = effective_valid_routes(get_settings().enable_subgraphs)
+    _settings = get_settings()
+    valid_routes = effective_valid_routes(_settings.enable_subgraphs, _settings.multimodal_enabled)
     if matched_intent is None or matched_intent not in valid_routes:
         return None
     logger.info(
@@ -543,7 +575,8 @@ def _match_route(raw: str, session_id: str) -> str:
     ``"END"`` with a warning log when the response is unrecognised.
     """
     normalised = raw.strip("\"' \t\n").upper()
-    valid_routes = effective_valid_routes(get_settings().enable_subgraphs)
+    _settings = get_settings()
+    valid_routes = effective_valid_routes(_settings.enable_subgraphs, _settings.multimodal_enabled)
     for valid in valid_routes:
         if valid.upper() == normalised:
             return valid
@@ -721,7 +754,10 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
         memory_context = await _recall_memory_context(state)
         routing_messages = [
             SystemMessage(
-                content=build_system_prompt(get_settings().enable_subgraphs) + memory_context
+                content=build_system_prompt(
+                    get_settings().enable_subgraphs, get_settings().multimodal_enabled
+                )
+                + memory_context
             ),
             *trimmed,
             HumanMessage(

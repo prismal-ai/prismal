@@ -5,12 +5,20 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
+| **Estado** | `IMPLEMENTED` |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-04-19 |
 | **PRD** | `specs/advanced-architectures/PRD.md` |
 | **Tech Design** | `specs/advanced-architectures/ARCHITECTURE.md` |
 | **API Spec** | `specs/advanced-architectures/SPEC.md` |
+
+---
+
+> **Estado de implementación (2026-05-30):** Las Fases A, B, C y D están
+> **implementadas**: 7 engines RAG en `prismal/rag/`, 7 patrones en
+> `prismal/agents/patterns/` y 5 subgraphs en `prismal/agents/subgraphs/`, con el
+> wiring opt-in al supervisor (`enable_subgraphs`). Cada tarea está marcada
+> `✅ DONE` en línea más abajo.
 
 ---
 
