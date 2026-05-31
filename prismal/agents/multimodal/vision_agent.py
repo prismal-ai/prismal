@@ -26,8 +26,8 @@ logger = get_logger("prismal.agents.multimodal.vision_agent")
 _DEFAULT_PROMPT = "Describe la imagen y lista los objetos visibles."
 _OCR_PROMPT = "Extract all readable text from this image. Return only the text."
 
-type VisionFn = Callable[[bytes | Path, str], Awaitable[str]]
-type OcrFn = Callable[[bytes | Path], Awaitable[str]]
+VisionFn = Callable[[bytes | Path, str], Awaitable[str]]
+OcrFn = Callable[[bytes | Path], Awaitable[str]]
 
 
 @dataclass(frozen=True)
