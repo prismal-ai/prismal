@@ -50,7 +50,8 @@ class TestSanitizeMedia:
         cleaned = sanitizer.sanitize_media(with_exif, MediaKind.IMAGE)
 
         # Cleaned image must no longer carry EXIF metadata.
-        assert not Image.open(BytesIO(cleaned)).getexif()
+        cleaned_exif = Image.open(BytesIO(cleaned)).getexif()
+        assert not cleaned_exif
         assert pil  # importorskip handle used
 
 
