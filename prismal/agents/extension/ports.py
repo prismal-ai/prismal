@@ -55,7 +55,8 @@ class AuditPort(Protocol):
         status: str,
         state_hash: str,
         duration_ms: float,
-    ) -> None: ...
+    ) -> None:
+        pass
 
     def log_media(
         self,
