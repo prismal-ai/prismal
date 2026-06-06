@@ -40,7 +40,6 @@ from prismal.agents.multimodal import (
     VideoAgent,
     VideoResult,
     VisionAgent,
-    VisionResult,
 )
 
 # ── Dataset: 3 clips sintéticos estilo ActivityNet ───────────────────────────
