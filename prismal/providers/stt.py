@@ -20,13 +20,10 @@ from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 import litellm
 
 from prismal.core.exceptions import MissingDependencyError, STTError
-from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
 
 if TYPE_CHECKING:
     from prismal.core.config import Settings
-
-logger = get_logger("prismal.providers.stt")
 
 
 class STTProvider(StrEnum):
