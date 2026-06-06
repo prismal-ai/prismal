@@ -15,14 +15,11 @@ from typing import TYPE_CHECKING, Any
 from langchain_core.embeddings import Embeddings
 
 from prismal.core.exceptions import MissingDependencyError
-from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from prismal.core.config import Settings
-
-logger = get_logger("prismal.providers.cross_modal_embeddings")
 
 
 def _parse_model_spec(spec: str) -> tuple[str, str]:
