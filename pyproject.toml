@@ -138,7 +138,7 @@ mongodb = [
 
 # Full local embeddings (HuggingFace, no API required)
 local-embeddings = [
-  "torch>=2.5.1",
+  "torch>=2.6",            # >=2.6 neutralizes CVE-2026-1839 (transformers Trainer torch.load)
   "transformers>=4.47.1",
   "accelerate>=1.2.1",
 ]
@@ -172,7 +172,7 @@ ml = [
 # ML + Deep Learning (Phase 26)
 ml-dl = [
   "prismal[ml]",
-  "torch>=2.5.1",
+  "torch>=2.6",  # >=2.6 neutralizes CVE-2026-1839 (transformers Trainer torch.load)
   "lightning>=2.4.0",
 ]
 
@@ -214,7 +214,7 @@ multimodal-premium = [
 # Multimodal — cross-modal (CLIP) embeddings
 multimodal-embed = [
   "open-clip-torch>=2.30.0",
-  "torch>=2.5.1",
+  "torch>=2.6",  # >=2.6 neutralizes CVE-2026-1839 (transformers Trainer torch.load)
 ]
 
 # All optional extras combined
