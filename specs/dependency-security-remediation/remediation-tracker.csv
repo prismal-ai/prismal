@@ -1,0 +1,19 @@
+alert_id,package,severity,cve_ghsa,current_version,fixed_version,status,surface,action,task
+4,litellm,Critical,CVE-2026-42208 / GHSA-r75f-5x8p-qvmc,1.86.2,1.83.7,RESUELTA,server,Verificar + cerrar,P0-01
+15,chromadb,Critical,CVE-2026-45829 / GHSA-f4j7-r4q5-qw2c,1.5.8,sin fix,MITIGAR,server,Uso embebido; no server HTTP; monitor,P0-03
+14,aquasecurity/trivy-action,Critical,GHSA-69fq-xp46-6x23,ci.yml,trivy-action 0.35.0 / setup-trivy 0.2.6 / trivy 0.69.3,SUPPLY-CHAIN,ci,Verificar referencia + pin SHA + rotar secretos,P0-02
+5,litellm,High,cluster X41 1.83.x (confirmar GHSA),1.86.2,~1.83.x,RESUELTA,server,Verificar + cerrar,P0-01
+3,litellm,High,SSTI /prompts/test (confirmar GHSA),1.86.2,~1.83.x,RESUELTA,server,Verificar + cerrar,P0-01
+8,litellm,High,CVE-2026-40217 (X41-2026-001),1.86.2,1.83.10,RESUELTA,server,Verificar + cerrar,P0-01
+7,urllib3,High,CVE-2026-21441 / GHSA-38jv-5279-wg99,2.7.0,2.6.3,RESUELTA,runtime,Verificar + cerrar,P0-01
+6,urllib3,High,GHSA-qccp-gfcp-xxvc,2.7.0,2.7.0,RESUELTA,runtime,Verificar + cerrar,P0-01
+1,ecdsa,High,CVE-2024-23342 / GHSA-wj6h-64fc-37mp,0.19.2,won't-fix,MITIGAR,runtime (transitiva),Aceptar + deuda PyJWT,P0-03
+9,langsmith,High,CVE-2026-45134,0.8.7,0.8.0,RESUELTA,runtime,Verificar + cerrar,P0-01
+10,langchain-classic->langsmith,High,CVE-2026-45134,1.0.7 / 0.8.7,langsmith 0.8.0,RESUELTA,runtime,Verificar + cerrar (misma CVE que #9),P0-01
+11,idna,Moderate,CVE-2026-45409 (bypass CVE-2024-3651),3.17,3.15,RESUELTA,runtime (transitiva),Verificar + cerrar,P0-01
+18,starlette,Moderate,CVE-2026-48710 (BadHost),1.2.0,1.0.1,RESUELTA,server (transitiva),Verificar + cerrar,P0-01
+17,aiohttp,Moderate,CVE-2026-47265,3.13.5,3.14.0,UPGRADE,runtime,Subir a >=3.14.0,P1-01
+16,aiohttp,Moderate,CVE-2026-34993,3.13.5,3.14.0,UPGRADE,runtime,Subir a >=3.14.0,P1-01
+2,transformers,Moderate,CVE-2026-1839,4.57.6,5.0.0rc3,MITIGAR/UPGRADE,runtime (no usa Trainer),Mitigar torch>=2.6 o subir a 5.x,P1-02
+12,pymdown-extensions,Moderate,regresion GHSA-jh85-wwv9-24hv / CVE-2023-32309,10.21.3,confirmar GHSA,VERIFICAR,dev/docs,Confirmar GHSA y subir,P1-04
+13,prefect,Low,SSRF DNS-rebinding (PR #21591 / OSS-7874),3.6.27,confirmar version,UPGRADE,runtime (webhooks),Subir a version con fix,P1-03
