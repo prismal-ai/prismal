@@ -359,14 +359,14 @@ def test_markdown_skill_get_tools_combines_scripts_and_references(tmp_path: Path
     scripts.mkdir()
     # A script exposing a @tool-decorated function.
     (scripts / "greeter.py").write_text(
-        'from langchain_core.tools import tool\n\n\n'
-        '@tool\n'
-        'def greet(name: str) -> str:\n'
+        "from langchain_core.tools import tool\n\n\n"
+        "@tool\n"
+        "def greet(name: str) -> str:\n"
         '    """Greet someone.\n\n'
-        '    Args:\n'
-        '        name: Person to greet.\n\n'
-        '    Returns:\n'
-        '        A greeting.\n'
+        "    Args:\n"
+        "        name: Person to greet.\n\n"
+        "    Returns:\n"
+        "        A greeting.\n"
         '    """\n'
         '    return f"hi {name}"\n',
         encoding="utf-8",
