@@ -94,7 +94,8 @@ class ToolPort(Protocol):
     name: str
     description: str
 
-    async def ainvoke(self, args: Any, *posargs: Any, **kwargs: Any) -> Any: ...
+    async def ainvoke(self, args: Any, *posargs: Any, **kwargs: Any) -> Any:
+        pass
 
 
 @runtime_checkable
