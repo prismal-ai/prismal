@@ -79,7 +79,7 @@ dependencies = [
   # ── Lexical Retrieval ─────────────────────────────────────
   "rank-bm25>=0.2.2",               # BM25 ranking for hybrid search (SPEC-RAG-003)
   # ── Scheduler ─────────────────────────────────────────────
-  "prefect>=3.1.10",                # Workflow orchestration
+  "prefect>=3.6.28",                # Workflow orchestration (CVE-2026-7724 SSRF DNS-rebinding fix)
   "watchdog>=6.0.0",                # Filesystem event monitoring
   "apscheduler>=3.10",              # AsyncIOScheduler for cron execution
   "croniter>=2.0",                  # Cron expression parsing

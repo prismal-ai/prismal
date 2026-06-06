@@ -4869,7 +4869,7 @@ wheels = [
 
 [[package]]
 name = "prefect"
-version = "3.6.27"
+version = "3.7.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -4922,15 +4922,16 @@ dependencies = [
     { name = "semver" },
     { name = "sniffio" },
     { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "starlette" },
     { name = "toml" },
     { name = "typing-extensions" },
     { name = "uvicorn" },
     { name = "websockets" },
     { name = "whenever" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bb/eb/577e6f2a4a8b3707bfe64ea79bc91d45af2f883a5e5cf7073425e1842614/prefect-3.6.27.tar.gz", hash = "sha256:9959978eaa305eec49f7146eb3a5450cfff2a110033b27e5b6bed772139a6065", size = 11108814, upload-time = "2026-04-17T20:11:02.722Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0a/f6/0992db98fc12ee627a8d492b2a370762b6ed8f3edcb36f78077431e8196a/prefect-3.7.4.tar.gz", hash = "sha256:65a143310a42850caa1d7f21c2d9be5dfd18ee4b7baa1ce6dd8c6b421bc3e4ea", size = 14098696, upload-time = "2026-06-05T17:52:18.752Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/4e/25f9b1f0fcaafc60a60a03ae35d34ad1cfcb8e71e0c3e6fd4873ce2deacc/prefect-3.6.27-py3-none-any.whl", hash = "sha256:c2e87a174e423ca2becd02a9bd8363af16632e4511f99bce138a1c75723aab63", size = 12038508, upload-time = "2026-04-17T20:10:59.257Z" },
+    { url = "https://files.pythonhosted.org/packages/77/69/b674cc47e0f35094a44b1671ad092e243acaa75157ae84725819aeeae9c5/prefect-3.7.4-py3-none-any.whl", hash = "sha256:1ab7c5e9d418eb6e7dbb870b08704a2cce9ff054369c3bd1a9e9b0f8ec0d1257", size = 14987192, upload-time = "2026-06-05T17:52:14.651Z" },
 ]
 
 [[package]]
@@ -5259,7 +5260,7 @@ requires-dist = [
     { name = "plotly", marker = "extra == 'analytics'", specifier = ">=5.24.1" },
     { name = "polars", specifier = ">=1.17.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.1" },
-    { name = "prefect", specifier = ">=3.1.10" },
+    { name = "prefect", specifier = ">=3.6.28" },
     { name = "prismal", extras = ["ml"], marker = "extra == 'ml-dl'" },
     { name = "prismal", extras = ["postgres", "mongodb", "local-embeddings", "ollama", "analytics", "ml", "finance", "datetime", "maintenance", "multimodal", "multimodal-local", "multimodal-premium", "multimodal-embed"], marker = "extra == 'all'" },
     { name = "psutil", specifier = ">=6.1.1" },
