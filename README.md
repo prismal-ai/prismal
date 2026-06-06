@@ -274,6 +274,25 @@ Runnable examples: [`examples/tool_provider_host.py`](./examples/tool_provider_h
 
 ---
 
+## Roadmap — features por desarrollar
+
+Ya implementadas: extension surface (Fase X), advanced architectures (Fase A/B/C), multimodal (Fase F), y la remediación de dependencias (18/18 alertas en estado terminal).
+
+Lo que falta, **ordenado de implementación rápida y necesaria → compleja y menos necesaria**. Cada feature tiene su contrato SDD en [`specs/`](./specs/). Estado: `spec ready` = listo para construir (PLAN/ARCHITECTURE/SPEC/TASKS); `PRD seed` = solo PRD, requiere expandir antes de construir.
+
+1. **Terminar Tool Provider Injection (Fase Y)** — *rápido · necesario · en curso* — [`specs/tool-provider-injection/`](./specs/tool-provider-injection/). El código de Y1–Y5 ya aterrizó; falta cerrar Y6–Y8 (settings/observabilidad, docs/ejemplos, tests de paridad) y marcar el spec `IMPLEMENTED`.
+2. **Vector Store Port (Fase Z)** — *moderado · necesario · spec ready* — [`specs/vector-store-port/`](./specs/vector-store-port/). Quita el lock-in de ChromaDB tras un `VectorStorePort` con adaptadores (Chroma default + LanceDB, sqlite-vec, Qdrant, pgvector). Reduce superficie de seguridad y abre backends embebidos.
+3. **Runtime Composition Root (Fase R)** — *moderado · necesario · spec ready* — [`specs/composition-root/`](./specs/composition-root/). `build_runtime()` compone e inyecta todos los puertos (tools, vector store, embeddings, checkpoint, audit) en una llamada; **desbloquea `prismal-server` / `prismal-dashboard`**. Depende de Fase Y + Z.
+4. **Cost & Budget Governance** — *rápido-moderado · útil · PRD seed* — [`specs/cost-budget-governance/`](./specs/cost-budget-governance/). Presupuesto por run/sesión/tenant + circuit-breakers de coste/tokens/llamadas en `react_loop` y los patrones caros (debate, ToT, LATS, MoA). Seguro barato contra gasto runaway.
+5. **A2A / Agent Cards interop (Fase I)** — *complejo · necesario (ecosistema) · spec ready* — [`specs/a2a-interop/`](./specs/a2a-interop/). Interop agente-a-agente bidireccional: exponer prismal como agente A2A (Agent Card en `/.well-known/agent-card.json`, JSON-RPC + SSE) y consumir agentes remotos como nodos/tools. Complementa MCP; cierra la brecha frente a MS Agent Framework / Google ADK.
+6. **Agent Identity & Access Governance** — *complejo · necesario (enterprise) · PRD seed* — [`specs/agent-identity-governance/`](./specs/agent-identity-governance/). Identidad por agente (W3C DID), credenciales acotadas, OAuth-on-behalf y un `PolicyEngine`. Es la base de confianza que consume A2A; production-blocker enterprise.
+7. **Agent Evaluation & Reliability Harness** — *moderado-complejo · útil (fiabilidad) · PRD seed* — [`specs/agent-eval-harness/`](./specs/agent-eval-harness/). Eval a nivel de sistema del grafo (trayectorias, tool-usage, groundedness RAG), regresión con gate en CI y suite adversaria. Cierra el "scaffold gap".
+8. **Pulido (sin spec aún)** — *variable · menos urgente* — UI de observabilidad de primera parte (o integración profunda LangSmith/Langfuse) y type-safety por nodo (validación Pydantic del I/O de nodos; evolución de `AgentState`).
+
+Análisis completo y comparativa con frameworks 2026 en [`docs/competitive-analysis.md`](./docs/competitive-analysis.md).
+
+---
+
 ## Development
 
 Python 3.13+ is required. `uv` is the recommended package manager.
