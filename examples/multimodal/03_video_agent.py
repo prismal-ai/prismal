@@ -34,7 +34,6 @@ import asyncio
 import struct
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import AsyncMock
 
 from prismal.agents.multimodal import (
     FrameDescription,
