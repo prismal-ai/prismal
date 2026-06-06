@@ -55,15 +55,15 @@ def test_zip_detect_prefix_filename_case_insensitive() -> None:
     assert _zip_detect_prefix(["demo/SKILL.md"]) == "demo/"
 
 
-def test_zip_detect_prefix_uppercase_dir_not_matched() -> None:
-    """Documents a limitation: the top-dir name comparison is case-sensitive.
+def test_zip_detect_prefix_uppercase_dir_matched_preserving_case() -> None:
+    """An upper-case directory with SKILL.md is detected, prefix keeps its case.
 
-    ``_zip_detect_prefix`` lower-cases member names for the lookup table but
-    rebuilds the probe key with the original-case directory, so an upper-case
-    directory with ``SKILL.md`` is not detected. Captured here so the behaviour
-    is intentional and visible rather than a silent surprise.
+    The detection is case-insensitive on both the directory and the filename,
+    but the returned prefix preserves the original case so extraction writes to
+    the real paths inside the archive.
     """
-    assert _zip_detect_prefix(["Demo/SKILL.md"]) is None
+    assert _zip_detect_prefix(["Demo/SKILL.md"]) == "Demo/"
+    assert _zip_detect_prefix(["MySkill/Scripts/x.py", "MySkill/SKILL.md"]) == "MySkill/"
 
 
 def test_zip_detect_prefix_none_when_missing() -> None:
