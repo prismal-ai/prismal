@@ -2,36 +2,36 @@
 
 ## Metadata
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-06-05 |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` |
+| **Version** | 1.0 |
+| **Date** | 2026-06-05 |
 | **PLAN** | `specs/composition-root/PLAN.md` |
 | **Architecture** | `specs/composition-root/ARCHITECTURE.md` |
 | **TASKS** | `specs/composition-root/TASKS.md` |
 
 ---
 
-## Convenciones
+## Conventions
 
 - `from __future__ import annotations`.
-- `build_runtime` es **async** (conecta MCP, abre stores). Los loaders puros son sync.
-- Imports de subsistemas opcionales **diferidos**.
-- Reutiliza, no reimplementa: `build_default_tool_provider` (Y), `VectorStoreFactory`/`set_vector_store_provider` (Z), `EmbeddingsFactory`, `build_checkpointer`, `AuditLogger`.
+- `build_runtime` is **async** (connects MCP, opens stores). The pure loaders are sync.
+- Imports of optional subsystems **deferred**.
+- Reuse, do not reimplement: `build_default_tool_provider` (Y), `VectorStoreFactory`/`set_vector_store_provider` (Z), `EmbeddingsFactory`, `build_checkpointer`, `AuditLogger`.
 
 ---
 
-## Resumen de módulos
+## Module Summary
 
-| Módulo | Estado | Contenido |
+| Module | Status | Content |
 |---|---|---|
-| `prismal/composition.py` | NUEVO | `RuntimeConfig`, `RuntimeContext`, `build_runtime`, `build_test_runtime` |
-| `prismal/composition/config_sources.py` | NUEVO | `load_mcp_config`, `resolve_skills_source`, `resolve_vector_store`, `apply_org_overrides`, `collection_for` |
-| `prismal/core/config.py` | MODIFICADO | `+ runtime_mode` |
-| `prismal/core/exceptions.py` | MODIFICADO | `+ RuntimeCompositionError` |
-| `prismal/agents/graph.py` | MODIFICADO | acepta `vector_store_provider` en modo context (consistencia con Z) |
+| `prismal/composition.py` | NEW | `RuntimeConfig`, `RuntimeContext`, `build_runtime`, `build_test_runtime` |
+| `prismal/composition/config_sources.py` | NEW | `load_mcp_config`, `resolve_skills_source`, `resolve_vector_store`, `apply_org_overrides`, `collection_for` |
+| `prismal/core/config.py` | MODIFIED | `+ runtime_mode` |
+| `prismal/core/exceptions.py` | MODIFIED | `+ RuntimeCompositionError` |
+| `prismal/agents/graph.py` | MODIFIED | accepts `vector_store_provider` in context mode (consistency with Z) |
 
 ---
 
@@ -40,14 +40,14 @@
 ```python
 @dataclass(frozen=True)
 class RuntimeConfig:
-    """Vista inmutable de config resuelta para un runtime (opcionalmente por tenant)."""
+    """Immutable view of resolved config for a runtime (optionally per tenant)."""
     org_id: str | None
     runtime_mode: Literal["global", "context"]
     mcp_config_path: Path | None
     vector_store_backend: str
     collection_base: str
     collection_name: str            # collection_for(collection_base, org_id)
-    # campos sensibles (DSN/keys) NO se incluyen aquí en claro; se referencian desde settings
+    # sensitive fields (DSN/keys) are NOT included here in cleartext; they are referenced from settings
 ```
 
 ## SPEC-CR-002: `RuntimeContext`
@@ -55,18 +55,18 @@ class RuntimeConfig:
 ```python
 @dataclass
 class RuntimeContext:
-    """Agrupa los puertos compuestos. No añade lógica de negocio."""
+    """Groups the composed ports. Adds no business logic."""
     config: RuntimeConfig
-    tool_provider: ToolProviderPort          # Fase Y
-    vector_store_provider: VectorStoreProviderPort | None   # Fase Z (None si factory-mode)
+    tool_provider: ToolProviderPort          # Phase Y
+    vector_store_provider: VectorStoreProviderPort | None   # Phase Z (None if factory-mode)
     embeddings: EmbeddingsPort
     checkpointer: CheckpointPort
     audit: AuditPort
     org_id: str | None
 
     async def aclose(self) -> None: ...
-        # cierra MCP (desconecta servers), vector store (conexiones servidor), checkpointer.
-        # Idempotente; no lanza si ya cerrado.
+        # closes MCP (disconnects servers), vector store (server connections), checkpointer.
+        # Idempotent; does not raise if already closed.
 
     async def __aenter__(self) -> RuntimeContext: ...
     async def __aexit__(self, *exc) -> None: ...   # -> aclose()
@@ -82,22 +82,22 @@ async def build_runtime(
     overrides: dict[str, Any] | None = None,
     mode: Literal["global", "context"] | None = None,   # None -> settings.runtime_mode
 ) -> RuntimeContext:
-    """Compone TODOS los puertos del core en una llamada.
+    """Composes ALL the core ports in one call.
 
-    Pasos:
+    Steps:
       1. settings_eff = apply_org_overrides(settings or get_settings(), org_id, overrides)
       2. cfg = resolve RuntimeConfig (backend, collection_name=collection_for(base, org_id), ...)
-      3. tool_provider   = await build_default_tool_provider(settings_eff)        [Fase Y]
-      4. vstore_provider = (VectorStoreFactory-based provider)(settings_eff)      [Fase Z]
+      3. tool_provider   = await build_default_tool_provider(settings_eff)        [Phase Y]
+      4. vstore_provider = (VectorStoreFactory-based provider)(settings_eff)      [Phase Z]
       5. embeddings      = EmbeddingsFactory.create(settings_eff)
       6. checkpointer    = build_checkpointer(settings_eff)
       7. audit           = AuditLogger(...)
       8. if mode == "global":
              set_tool_provider(tool_provider); set_vector_store_provider(vstore_provider)
-         # mode == "context": no toca globals; el contexto se pasa a get_async_compiled_graph(...)
+         # mode == "context": does not touch globals; the context is passed to get_async_compiled_graph(...)
       9. return RuntimeContext(...)
 
-    Si algún paso falla -> aclose() de lo creado + raise RuntimeCompositionError.
+    If any step fails -> aclose() of what was created + raise RuntimeCompositionError.
     """
 ```
 
@@ -111,25 +111,25 @@ def build_test_runtime(
     embeddings: EmbeddingsPort | None = None,
     org_id: str | None = None,
 ) -> RuntimeContext:
-    """Compone un RuntimeContext determinista con fakes (FakeToolProvider/FakeVectorStore),
-    sin I/O ni conexiones. aclose() es no-op."""
+    """Composes a deterministic RuntimeContext with fakes (FakeToolProvider/FakeVectorStore),
+    with no I/O or connections. aclose() is a no-op."""
 ```
 
 ## SPEC-CR-005: Config loaders (`config_sources.py`)
 
 ```python
 def load_mcp_config(path: Path | None = None) -> "McpConfig": ...
-    # parsea config/mcp_servers.yaml (default settings); no conecta.
+    # parses config/mcp_servers.yaml (default settings); does not connect.
 
 def resolve_skills_source(settings: Settings) -> "SkillsSource": ...
-    # describe dirs available/active/custom y estado activado.
+    # describes available/active/custom dirs and activated state.
 
 def resolve_vector_store(settings: Settings, org_id: str | None) -> tuple[str, str]: ...
     # -> (backend, collection_name) ; collection_name = collection_for(base, org_id)
 
 def apply_org_overrides(settings: Settings, org_id: str | None,
                         overrides: dict[str, Any] | None) -> Settings: ...
-    # devuelve settings efectivos para el tenant (no muta el global).
+    # returns effective settings for the tenant (does not mutate the global).
 
 def collection_for(base: str, org_id: str | None) -> str:
     return base if org_id is None else f"{base}_{org_id}"
@@ -139,22 +139,22 @@ def collection_for(base: str, org_id: str | None) -> str:
 
 ```python
 runtime_mode: Literal["global", "context"] = "global"
-# Unifica tool_provider_mode (Y) y el modo de vector store (Z): build_runtime los propaga.
-# Retrocompat: si runtime_mode no se setea, se deriva de tool_provider_mode cuando exista.
+# Unifies tool_provider_mode (Y) and the vector store mode (Z): build_runtime propagates them.
+# Backward-compat: if runtime_mode is not set, it is derived from tool_provider_mode when present.
 ```
 
-## SPEC-CR-007: Excepción (`core/exceptions.py`)
+## SPEC-CR-007: Exception (`core/exceptions.py`)
 
 ```python
 class RuntimeCompositionError(PrismalError):
-    """Falla al componer el runtime. Lleva el nombre del puerto que falló."""
+    """Failure composing the runtime. Carries the name of the port that failed."""
     def __init__(self, port: str, cause: str) -> None:
         super().__init__(f"Failed to compose runtime port '{port}': {cause}")
 ```
 
-## SPEC-CR-008: Integración con el grafo (modo context)
+## SPEC-CR-008: Integration with the graph (context mode)
 
-`get_async_compiled_graph` ya acepta `tool_provider` (Y) y `vector_store_provider` (Z, según `specs/vector-store-port`). El composition root provee ambos desde el `RuntimeContext`:
+`get_async_compiled_graph` already accepts `tool_provider` (Y) and `vector_store_provider` (Z, per `specs/vector-store-port`). The composition root provides both from the `RuntimeContext`:
 
 ```python
 graph = await get_async_compiled_graph(
@@ -162,11 +162,11 @@ graph = await get_async_compiled_graph(
     vector_store_provider=ctx.vector_store_provider,
 )
 ```
-En modo global no hace falta pasarlos (ya inyectados como singletons).
+In global mode there is no need to pass them (already injected as singletons).
 
 ---
 
-## Contrato del Host — `prismal-server` (lifespan)
+## Host Contract — `prismal-server` (lifespan)
 
 ```python
 from contextlib import asynccontextmanager
@@ -193,36 +193,36 @@ async def graph_for_org(org_id: str):
         tool_provider=ctx.tool_provider,
         vector_store_provider=ctx.vector_store_provider,
     )
-    return ctx, graph     # el caller hace ctx.aclose() al terminar
+    return ctx, graph     # the caller calls ctx.aclose() when done
 ```
 
 ---
 
-## Contrato del Dashboard — `prismal-dashboard` (config)
+## Dashboard Contract — `prismal-dashboard` (config)
 
-El dashboard lee/edita las fuentes que `build_runtime` consume; **no** llama a `build_runtime` (eso lo hace el server). Esquema estable:
+The dashboard reads/edits the sources that `build_runtime` consumes; it does **not** call `build_runtime` (that is the server's job). Stable schema:
 
-| Sección UI | Fuente que el composition root resuelve |
+| UI Section | Source that the composition root resolves |
 |---|---|
-| **MCP servers** | `config/mcp_servers.yaml` (vía `load_mcp_config`) |
-| **Skills** | dirs `available/active/custom` (vía `resolve_skills_source`) |
+| **MCP servers** | `config/mcp_servers.yaml` (via `load_mcp_config`) |
+| **Skills** | dirs `available/active/custom` (via `resolve_skills_source`) |
 | **Settings → Vector store** | `settings.vector_store_backend` + `vector_store_path/url` |
 | **Settings → Runtime** | `settings.runtime_mode` |
 
-El dashboard persiste cambios; el server re-compone (reinicio o hot-reload futuro).
+The dashboard persists changes; the server re-composes (restart or future hot-reload).
 
 ---
 
-## Compatibilidad y Versionado
+## Compatibility and Versioning
 
-- `build_runtime`, `RuntimeContext`, `RuntimeConfig` son **API pública** (SemVer; breaking → minor + deprecación 1 release).
-- **Opt-in:** sin `build_runtime`, la inyección individual de Fase Y/Z y los defaults siguen válidos.
-- No cambia firmas de nodos ni de patrones RAG/memoria.
+- `build_runtime`, `RuntimeContext`, `RuntimeConfig` are **public API** (SemVer; breaking → minor + 1-release deprecation).
+- **Opt-in:** without `build_runtime`, the individual injection of Phase Y/Z and the defaults remain valid.
+- Does not change the signatures of nodes or RAG/memory patterns.
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-06-05 | Ernesto Crespo | Especificación inicial — composition root, loaders, contratos host/dashboard |
+| 1.0 | 2026-06-05 | Ernesto Crespo | Initial specification — composition root, loaders, host/dashboard contracts |

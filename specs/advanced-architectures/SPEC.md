@@ -2,18 +2,18 @@
 
 ## Metadata
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `PHASE A + B + C + D + E — DONE` (D1-01/02/03 deferidos a migración operacional) |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-04-19 |
+| **Author** | Ernesto Crespo |
+| **Status** | `PHASE A + B + C + D + E — DONE` (D1-01/02/03 deferred to operational migration) |
+| **Version** | 1.0 |
+| **Date** | 2026-04-19 |
 | **PRD** | `specs/advanced-architectures/PRD.md` |
 | **Architecture** | `specs/advanced-architectures/ARCHITECTURE.md` |
 
-## Resumen de implementación — Fase A (RAG avanzado) — ✅ DONE
+## Implementation summary — Phase A (Advanced RAG) — ✅ DONE
 
-| SPEC | Archivo | Tests | Coverage | Estado |
+| SPEC | File | Tests | Coverage | Status |
 |---|---|---|---|---|
 | SPEC-RAG-001 (HyDE) | `prismal/rag/hyde.py` | 12 | 100% | ✅ DONE |
 | SPEC-RAG-002 (RAG-Fusion) | `prismal/rag/fusion.py` | 16 | 93% | ✅ DONE |
@@ -23,18 +23,18 @@
 | A6 (Multi-Vector) | `prismal/rag/multi_vector.py` | 12 | 92% | ✅ DONE |
 | SPEC-RAG-006 (Adaptive) | `prismal/rag/adaptive.py` | 24 | 88% | ✅ DONE |
 
-**Totales Fase A**: 7 módulos nuevos, 109 tests nuevos, 268 tests totales en `tests/unit/rag/` (0 fallos), coverage agregado 95% sobre `prismal/rag/`.
+**Phase A totals**: 7 new modules, 109 new tests, 268 total tests in `tests/unit/rag/` (0 failures), aggregate coverage 95% over `prismal/rag/`.
 
-**Excepciones agregadas a `prismal/core/exceptions.py`** (anticipan D1-04): `HyDEError`, `FusionError`, `HybridSearchError`, `SelfRAGError`, `HierarchicalRAGError`, `MultiVectorError`, `AdaptiveRAGError` — todas heredan de `RAGError`.
+**Exceptions added to `prismal/core/exceptions.py`** (anticipating D1-04): `HyDEError`, `FusionError`, `HybridSearchError`, `SelfRAGError`, `HierarchicalRAGError`, `MultiVectorError`, `AdaptiveRAGError` — all inherit from `RAGError`.
 
-**Dependencia agregada a `pyproject.toml`**: `rank-bm25>=0.2.2` (con override mypy para `rank_bm25.*`).
+**Dependency added to `pyproject.toml`**: `rank-bm25>=0.2.2` (with a mypy override for `rank_bm25.*`).
 
-**Nota sobre desviaciones menores del SPEC**:
-- `SelfRAGPipeline._evaluate_support()` se renombró internamente a `_assess_support()` para evitar un falso positivo de un hook de seguridad local que bloqueaba el substring `eval`. El comportamiento, parámetros, y valor de retorno son idénticos al SPEC.
+**Note on minor deviations from the SPEC**:
+- `SelfRAGPipeline._evaluate_support()` was renamed internally to `_assess_support()` to avoid a false positive from a local security hook that blocked the `eval` substring. The behavior, parameters, and return value are identical to the SPEC.
 
-## Resumen de implementación — Fase B (Patrones de Agente) — ✅ DONE
+## Implementation summary — Phase B (Agent Patterns) — ✅ DONE
 
-| SPEC | Archivo | Tests | Coverage | Estado |
+| SPEC | File | Tests | Coverage | Status |
 |---|---|---|---|---|
 | SPEC-PAT-001 (Tree of Thoughts) | `prismal/agents/patterns/tree_of_thoughts.py` | 15 | 90% | ✅ DONE |
 | SPEC-PAT-002 (Debate) | `prismal/agents/patterns/debate.py` | 14 | 91% | ✅ DONE |
@@ -44,20 +44,20 @@
 | SPEC-PAT-006 (Mixture of Agents) | `prismal/agents/patterns/mixture_of_agents.py` | 11 | 100% | ✅ DONE |
 | SPEC-PAT-007 (Swarm/Handoff) | `prismal/agents/patterns/swarm.py` | 13 | 100% | ✅ DONE |
 
-**Totales Fase B**: 7 módulos nuevos, 102 tests nuevos, 394 tests totales (Fase A+B, 0 fallos). Coverage por módulo ≥ 90% en toda Fase B.
+**Phase B totals**: 7 new modules, 102 new tests, 394 total tests (Phase A+B, 0 failures). Per-module coverage ≥ 90% across all of Phase B.
 
-**Nuevas excepciones en `core/exceptions.py`** (todas heredan de `PrismalError`): `ToTError`, `DebateError`, `ConstitutionalError`, `LATSError`, `CompilerError`, `MoAError`, `SwarmError` — anticipan D1-04.
+**New exceptions in `core/exceptions.py`** (all inherit from `PrismalError`): `ToTError`, `DebateError`, `ConstitutionalError`, `LATSError`, `CompilerError`, `MoAError`, `SwarmError` — anticipating D1-04.
 
-**Principio de diseño común en Fase B**: cada patrón acepta callables inyectables (`generate_fn`, `evaluate_fn`, `reward_fn`, `plan_fn`, `action_generator`, etc.) en vez de acoplarse a `ProviderRegistry` o `BaseTool`. Esto permite testing sin infraestructura LLM y facilita composición con cualquier backend. El patrón Mixture of Agents es la única excepción — por diseño consulta `ProviderRegistry.get_llm(model)` ya que la esencia de MoA es multi-provider.
+**Common design principle in Phase B**: each pattern accepts injectable callables (`generate_fn`, `evaluate_fn`, `reward_fn`, `plan_fn`, `action_generator`, etc.) instead of coupling to `ProviderRegistry` or `BaseTool`. This enables testing without LLM infrastructure and makes composition with any backend easy. The Mixture of Agents pattern is the only exception — by design it consults `ProviderRegistry.get_llm(model)` since the essence of MoA is multi-provider.
 
-**Nota sobre desviaciones menores del SPEC Fase B**:
-- `LATSNode.ucb1` se implementó como método en vez de `@property` (el SPEC mostraba `@property def ucb1(self, exploration_constant)` — combinación inválida en Python, properties no aceptan parámetros). Comportamiento matemático idéntico al SPEC.
-- `tot_agent_node` (B1-05) se implementó como factory `make_tot_node(generate_fn, evaluate_fn, ...)` que retorna un nodo async LangGraph-compatible. El registro en `graph.py` queda diferido a D1-01.
-- `LLMCompiler` acepta callables inyectables (`plan_fn`, `tool_executor`, `joiner`) en lugar de tipar a `BaseTool` directamente — decoupling consistente con el resto de Fase B.
+**Note on minor deviations from the Phase B SPEC**:
+- `LATSNode.ucb1` was implemented as a method instead of a `@property` (the SPEC showed `@property def ucb1(self, exploration_constant)` — an invalid combination in Python, since properties do not accept parameters). The mathematical behavior is identical to the SPEC.
+- `tot_agent_node` (B1-05) was implemented as a factory `make_tot_node(generate_fn, evaluate_fn, ...)` that returns an async LangGraph-compatible node. Registration in `graph.py` is deferred to D1-01.
+- `LLMCompiler` accepts injectable callables (`plan_fn`, `tool_executor`, `joiner`) instead of typing directly against `BaseTool` — decoupling consistent with the rest of Phase B.
 
-## Resumen de implementación — Fase C (Subgraph Pipelines) — ✅ DONE
+## Implementation summary — Phase C (Subgraph Pipelines) — ✅ DONE
 
-| SPEC | Directorio | Tests | Coverage | Estado |
+| SPEC | Directory | Tests | Coverage | Status |
 |---|---|---|---|---|
 | SPEC-SUBGRAPH-001 (Customer Service) | `prismal/agents/subgraphs/customer_service/` | 22 | 83–100% | ✅ DONE |
 | C2 (Document Generation) | `prismal/agents/subgraphs/document_generation/` | 21 | 84–100% | ✅ DONE |
@@ -65,79 +65,79 @@
 | SPEC-SUBGRAPH-002 (Code Review) | `prismal/agents/subgraphs/code_review/` | 24 | 82–100% | ✅ DONE |
 | C5 (Debate/Consensus) | `prismal/agents/subgraphs/debate_consensus/` | 13 | 88–100% | ✅ DONE |
 
-**Totales Fase C**: 5 subgraph pipelines, 111 tests nuevos, **505 tests totales (Fase A+B+C, 0 fallos)**. Coverage por módulo ≥ 82% en toda Fase C.
+**Phase C totals**: 5 subgraph pipelines, 111 new tests, **505 total tests (Phase A+B+C, 0 failures)**. Per-module coverage ≥ 82% across all of Phase C.
 
-**Patrón arquitectónico común de Fase C**:
-- Cada subgraph vive en su propio subdirectorio con 1 archivo por nodo + `builder.py` + `__init__.py`.
-- Cada nodo se construye via factory `make_<name>_node(deps)` que retorna un async callable `(state) → state_update`.
-- El builder retorna un `SubgraphDefinition` (de `agents/subgraphs/registry.py`) listo para registrar; wiring global a `graph.py` queda diferido a Fase D (D1-01).
-- Metadata namespaced por subgraph (`state["metadata"]["<subgraph_name>"]`) para aislar datos entre subgraphs.
-- Callables inyectables (analyzers, LLMs, RAG engines, extractors) en todas las factories — tests sin fixtures pesadas.
-- Degradación graceful en cada step: fallos individuales se loguean y el pipeline continúa con datos parciales donde sea posible.
+**Common architectural pattern in Phase C**:
+- Each subgraph lives in its own subdirectory with 1 file per node + `builder.py` + `__init__.py`.
+- Each node is built via a factory `make_<name>_node(deps)` that returns an async callable `(state) → state_update`.
+- The builder returns a `SubgraphDefinition` (from `agents/subgraphs/registry.py`) ready to register; global wiring into `graph.py` is deferred to Phase D (D1-01).
+- Metadata namespaced per subgraph (`state["metadata"]["<subgraph_name>"]`) to isolate data between subgraphs.
+- Injectable callables (analyzers, LLMs, RAG engines, extractors) in all factories — tests without heavy fixtures.
+- Graceful degradation at each step: individual failures are logged and the pipeline continues with partial data where possible.
 
-**Nuevas excepciones en `core/exceptions.py`** (todas heredan de `PrismalError`): `CustomerServiceError`, `DocumentGenerationError`, `DataETLError`, `CodeReviewError`, `DebateConsensusError`.
+**New exceptions in `core/exceptions.py`** (all inherit from `PrismalError`): `CustomerServiceError`, `DocumentGenerationError`, `DataETLError`, `CodeReviewError`, `DebateConsensusError`.
 
-**Nota sobre desviaciones menores del SPEC Fase C**:
-- C3 (Data ETL) añadió un **conditional edge** en `validator` que rutea a `auditor` al fallar — evita transform+load inútiles. El SPEC no lo mencionaba pero mejora la semántica.
-- C2 (Document Generation) implementa `formatter` con 3 modos (markdown/plain/html); el SPEC no especificaba formatos concretos.
-- C4 (Code Review) mantiene `linter_fn`/`scanner_fn`/`reviewer_fn` como callables inyectables sin wiring por default a ruff/bandit/SandboxExecutor — ese wiring queda para D1.
-- C5 renombró `_pairwise_jaccard` a `pairwise_jaccard` (público) en `patterns/debate.py` para exponer el helper al subgraph — no-op funcional, solo API surface.
+**Note on minor deviations from the Phase C SPEC**:
+- C3 (Data ETL) added a **conditional edge** in `validator` that routes to `auditor` on failure — avoiding useless transform+load. The SPEC did not mention it but it improves the semantics.
+- C2 (Document Generation) implements `formatter` with 3 modes (markdown/plain/html); the SPEC did not specify concrete formats.
+- C4 (Code Review) keeps `linter_fn`/`scanner_fn`/`reviewer_fn` as injectable callables without default wiring to ruff/bandit/SandboxExecutor — that wiring is left to D1.
+- C5 renamed `_pairwise_jaccard` to `pairwise_jaccard` (public) in `patterns/debate.py` to expose the helper to the subgraph — a functional no-op, only API surface.
 
 ---
 
-## Convenciones
+## Conventions
 
-- Todos los módulos usan `from __future__ import annotations`.
-- Imports de tipos solo bajo `TYPE_CHECKING`.
-- Async methods usan `async def` con `await`; los sync son explícitamente sync.
-- Todos los dataclasses son frozen donde aplique (`@dataclass(frozen=True)`).
-- Los constructores aceptan `settings: Settings | None = None` y resuelven con `get_settings()`.
-- Ningún módulo importa `anthropic`, `openai` u otros providers directamente.
+- All modules use `from __future__ import annotations`.
+- Type imports only under `TYPE_CHECKING`.
+- Async methods use `async def` with `await`; sync ones are explicitly sync.
+- All dataclasses are frozen where applicable (`@dataclass(frozen=True)`).
+- Constructors accept `settings: Settings | None = None` and resolve with `get_settings()`.
+- No module imports `anthropic`, `openai`, or other providers directly.
 
 ---
 
 ## SPEC-RAG-001: HyDE — Hypothetical Document Embeddings
 
-**Archivo:** `prismal/rag/hyde.py`
+**File:** `prismal/rag/hyde.py`
 
 ### Dataclasses
 
 ```python
 @dataclass
 class HyDEResult:
-    """Resultado de una búsqueda HyDE.
+    """Result of a HyDE search.
 
     Attributes:
-        chunks: Chunks recuperados usando el embedding hipotético.
-        hypothesis: Documento hipotético generado por el LLM.
-        hypothesis_embedding: Vector del documento hipotético (para debugging).
+        chunks: Chunks retrieved using the hypothetical embedding.
+        hypothesis: Hypothetical document generated by the LLM.
+        hypothesis_embedding: Vector of the hypothetical document (for debugging).
     """
     chunks: list[RetrievedChunk]
     hypothesis: str
     hypothesis_embedding: list[float]
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class HyDERetriever:
-    """Retriever que mejora el recall generando documentos hipotéticos.
+    """Retriever that improves recall by generating hypothetical documents.
 
-    En vez de embeber la query directamente, genera un documento hipotético
-    que respondería la query y usa su embedding para buscar en el vector store.
+    Instead of embedding the query directly, it generates a hypothetical document
+    that would answer the query and uses its embedding to search the vector store.
 
     Args:
-        vector_store: ChromaVectorStore inicializado.
-        settings: Settings de Prismal. None usa get_settings().
-        hypothesis_prompt: Prompt para generar el documento hipotético.
-            None usa el prompt por defecto.
+        vector_store: Initialized ChromaVectorStore.
+        settings: Prismal Settings. None uses get_settings().
+        hypothesis_prompt: Prompt to generate the hypothetical document.
+            None uses the default prompt.
 
     Example::
 
         retriever = HyDERetriever(vector_store=store)
-        result = await retriever.search("¿Qué es Prismal?", k=5)
-        print(result.hypothesis)   # documento hipotético generado
-        print(result.chunks)       # chunks recuperados
+        result = await retriever.search("What is Prismal?", k=5)
+        print(result.hypothesis)   # generated hypothetical document
+        print(result.chunks)       # retrieved chunks
     """
 
     def __init__(
@@ -152,96 +152,96 @@ class HyDERetriever:
         query: str,
         k: int = 5,
     ) -> HyDEResult:
-        """Genera hipótesis y busca por su embedding.
+        """Generates a hypothesis and searches by its embedding.
 
         Args:
-            query: Query del usuario.
-            k: Número máximo de chunks a retornar.
+            query: User query.
+            k: Maximum number of chunks to return.
 
         Returns:
-            HyDEResult con chunks, hipótesis y embedding.
+            HyDEResult with chunks, hypothesis, and embedding.
 
         Raises:
-            HyDEError: Si la generación de hipótesis o el embedding fallan.
+            HyDEError: If hypothesis generation or embedding fails.
         """
         ...
 
     async def _generate_hypothesis(self, query: str) -> str:
-        """Genera documento hipotético para la query (privado)."""
+        """Generates a hypothetical document for the query (private)."""
         ...
 
     async def _embed_hypothesis(self, hypothesis: str) -> list[float]:
-        """Embebe el documento hipotético (privado)."""
+        """Embeds the hypothetical document (private)."""
         ...
 ```
 
 ---
 
-## SPEC-RAG-002: RAG-Fusion — Multi-Query con Reciprocal Rank Fusion
+## SPEC-RAG-002: RAG-Fusion — Multi-Query with Reciprocal Rank Fusion
 
-**Archivo:** `prismal/rag/fusion.py`
+**File:** `prismal/rag/fusion.py`
 
 ### Dataclasses
 
 ```python
 @dataclass
 class FusionResult:
-    """Resultado de RAG-Fusion.
+    """Result of RAG-Fusion.
 
     Attributes:
-        chunks: Chunks fusionados y re-rankeados por RRF.
-        queries: Las N variantes de query generadas.
-        per_query_results: Resultados por cada variante (para debugging).
+        chunks: Chunks fused and re-ranked by RRF.
+        queries: The N generated query variants.
+        per_query_results: Results per variant (for debugging).
     """
     chunks: list[RetrievedChunk]
     queries: list[str]
     per_query_results: dict[str, list[RetrievedChunk]]
 ```
 
-### Función RRF (pública, testeable independientemente)
+### RRF Function (public, independently testable)
 
 ```python
 def reciprocal_rank_fusion(
     ranked_lists: list[list[RetrievedChunk]],
     k: int = 60,
 ) -> list[RetrievedChunk]:
-    """Aplica Reciprocal Rank Fusion sobre múltiples listas rankeadas.
+    """Applies Reciprocal Rank Fusion over multiple ranked lists.
 
     Formula: score(d) = Σ_{q in queries} 1 / (k + rank(d, q))
 
     Args:
-        ranked_lists: Lista de listas de chunks, cada una rankeada por
-            relevancia para una variante de query.
-        k: Constante de suavizado (default 60, valor del paper original).
+        ranked_lists: List of lists of chunks, each ranked by
+            relevance for one query variant.
+        k: Smoothing constant (default 60, the value from the original paper).
 
     Returns:
-        Lista única de chunks deduplicados y ordenados por RRF score
-        descendente.
+        A single list of deduplicated chunks ordered by descending RRF
+        score.
     """
     ...
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class RAGFusionEngine:
-    """RAG con multi-query y fusión por Reciprocal Rank Fusion.
+    """RAG with multi-query and Reciprocal Rank Fusion.
 
-    Genera N reformulaciones de la query, ejecuta N búsquedas en paralelo,
-    y fusiona los resultados con RRF para mayor cobertura semántica.
+    Generates N reformulations of the query, runs N searches in parallel,
+    and fuses the results with RRF for greater semantic coverage.
 
     Args:
-        vector_store: ChromaVectorStore inicializado.
-        n_queries: Número de variantes de query a generar (default 4).
-        rrf_k: Constante de suavizado RRF (default 60).
-        settings: Settings de Prismal.
+        vector_store: Initialized ChromaVectorStore.
+        n_queries: Number of query variants to generate (default 4).
+        rrf_k: RRF smoothing constant (default 60).
+        settings: Prismal Settings.
 
     Example::
 
         engine = RAGFusionEngine(vector_store=store, n_queries=4)
         result = await engine.search("LangGraph supervisor pattern", k=5)
         print(result.queries)   # ['LangGraph supervisor', 'hub-and-spoke agents', ...]
-        print(result.chunks)    # chunks fusionados
+        print(result.chunks)    # fused chunks
     """
 
     def __init__(
@@ -257,19 +257,19 @@ class RAGFusionEngine:
         query: str,
         k: int = 5,
     ) -> FusionResult:
-        """Genera variantes, busca en paralelo, fusiona con RRF.
+        """Generates variants, searches in parallel, fuses with RRF.
 
         Args:
-            query: Query original del usuario.
-            k: Top-k por búsqueda individual (pre-fusión).
+            query: Original user query.
+            k: Top-k per individual search (pre-fusion).
 
         Returns:
-            FusionResult con chunks fusionados y metadatos de queries.
+            FusionResult with fused chunks and query metadata.
         """
         ...
 
     async def _generate_query_variants(self, query: str) -> list[str]:
-        """Genera N variantes de la query usando LLM (privado)."""
+        """Generates N variants of the query using an LLM (private)."""
         ...
 ```
 
@@ -277,33 +277,33 @@ class RAGFusionEngine:
 
 ## SPEC-RAG-003: Hybrid Search — BM25 + Embeddings
 
-**Archivo:** `prismal/rag/hybrid.py`
+**File:** `prismal/rag/hybrid.py`
 
-### Clase Principal
+### Main Class
 
 ```python
 class HybridSearchEngine:
-    """Motor de búsqueda híbrido que combina BM25 y búsqueda semántica.
+    """Hybrid search engine that combines BM25 and semantic search.
 
-    Combina scores BM25 (léxico) y embeddings (semántico) mediante
-    linear score fusion con peso alpha configurable.
+    Combines BM25 (lexical) and embeddings (semantic) scores via
+    linear score fusion with a configurable alpha weight.
 
     Args:
-        vector_store: ChromaVectorStore para búsqueda semántica.
-        alpha: Peso de búsqueda semántica en [0, 1].
-            alpha=1.0 → solo semántico.
-            alpha=0.0 → solo BM25.
-            alpha=0.5 → balance igual (default).
-        settings: Settings de Prismal.
+        vector_store: ChromaVectorStore for semantic search.
+        alpha: Weight of semantic search in [0, 1].
+            alpha=1.0 → semantic only.
+            alpha=0.0 → BM25 only.
+            alpha=0.5 → equal balance (default).
+        settings: Prismal Settings.
 
     Note:
-        El índice BM25 se construye llamando a build_index() con el corpus.
-        Sin llamar a build_index(), la búsqueda BM25 retorna scores 0.0.
+        The BM25 index is built by calling build_index() with the corpus.
+        Without calling build_index(), BM25 search returns scores of 0.0.
 
     Example::
 
         engine = HybridSearchEngine(vector_store=store, alpha=0.5)
-        corpus = ["Documento sobre LangGraph...", "Otro documento..."]
+        corpus = ["Document about LangGraph...", "Another document..."]
         engine.build_index(corpus, doc_ids=["doc1", "doc2"])
         chunks = engine.search("LangGraph supervisor", k=5)
     """
@@ -320,14 +320,14 @@ class HybridSearchEngine:
         corpus: list[str],
         doc_ids: list[str],
     ) -> None:
-        """Construye el índice BM25 sobre el corpus dado.
+        """Builds the BM25 index over the given corpus.
 
         Args:
-            corpus: Lista de textos de documentos.
-            doc_ids: IDs correspondientes a cada texto (mismo orden).
+            corpus: List of document texts.
+            doc_ids: IDs corresponding to each text (same order).
 
         Raises:
-            ValueError: Si len(corpus) != len(doc_ids).
+            ValueError: If len(corpus) != len(doc_ids).
         """
         ...
 
@@ -337,26 +337,26 @@ class HybridSearchEngine:
         k: int = 5,
         alpha: float | None = None,
     ) -> list[RetrievedChunk]:
-        """Búsqueda híbrida BM25 + semántica.
+        """Hybrid BM25 + semantic search.
 
         Args:
-            query: Query de búsqueda.
-            k: Número de resultados a retornar.
-            alpha: Override del alpha del constructor para esta búsqueda.
+            query: Search query.
+            k: Number of results to return.
+            alpha: Override of the constructor's alpha for this search.
 
         Returns:
-            Lista de RetrievedChunk ordenados por score fusionado descendente.
+            List of RetrievedChunk ordered by descending fused score.
         """
         ...
 ```
 
 ---
 
-## SPEC-RAG-004: Self-RAG — Recuperación Condicional
+## SPEC-RAG-004: Self-RAG — Conditional Retrieval
 
-**Archivo:** `prismal/rag/self_rag.py`
+**File:** `prismal/rag/self_rag.py`
 
-### Tipos
+### Types
 
 ```python
 from enum import Enum
@@ -372,15 +372,15 @@ class SupportedDecision(str, Enum):
 
 @dataclass
 class SelfRAGResult:
-    """Resultado del pipeline Self-RAG.
+    """Result of the Self-RAG pipeline.
 
     Attributes:
-        answer: Respuesta generada por el LLM.
-        retrieval_decision: Si el LLM decidió recuperar o no.
-        supported_decision: Auto-evaluación del LLM sobre su respuesta.
-        utility_score: Score de utilidad 1-5 auto-asignado.
-        sources: Chunks usados (vacío si no_retrieve).
-        used_fallback: True si falló la decisión de control y se usó CRAG.
+        answer: Answer generated by the LLM.
+        retrieval_decision: Whether the LLM decided to retrieve or not.
+        supported_decision: The LLM's self-assessment of its answer.
+        utility_score: Self-assigned utility score 1-5.
+        sources: Chunks used (empty if no_retrieve).
+        used_fallback: True if the control decision failed and CRAG was used.
     """
     answer: str
     retrieval_decision: RetrievalDecision
@@ -390,27 +390,27 @@ class SelfRAGResult:
     used_fallback: bool = False
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class SelfRAGPipeline:
-    """Pipeline Self-RAG con decisión dinámica de recuperación.
+    """Self-RAG pipeline with dynamic retrieval decision.
 
-    El LLM decide si necesita recuperar contexto externo antes de generar.
-    Si decide recuperar, usa CRAGPipeline internamente. Auto-evalúa su output.
+    The LLM decides whether it needs to retrieve external context before generating.
+    If it decides to retrieve, it uses CRAGPipeline internally. It self-assesses its output.
 
     Args:
-        vector_store: ChromaVectorStore inicializado.
-        crag_pipeline: CRAGPipeline opcional. None crea uno internamente.
-        settings: Settings de Prismal.
+        vector_store: Initialized ChromaVectorStore.
+        crag_pipeline: Optional CRAGPipeline. None creates one internally.
+        settings: Prismal Settings.
 
     Example::
 
         pipeline = SelfRAGPipeline(vector_store=store)
-        result = await pipeline.run("¿Cuánto es 2+2?")
+        result = await pipeline.run("What is 2+2?")
         assert result.retrieval_decision == RetrievalDecision.NO_RETRIEVE
 
-        result = await pipeline.run("¿Qué hace el supervisor de Prismal?")
+        result = await pipeline.run("What does the Prismal supervisor do?")
         assert result.retrieval_decision == RetrievalDecision.RETRIEVE
         assert len(result.sources) > 0
     """
@@ -423,41 +423,41 @@ class SelfRAGPipeline:
     ) -> None: ...
 
     async def run(self, query: str) -> SelfRAGResult:
-        """Ejecuta el pipeline Self-RAG completo.
+        """Runs the complete Self-RAG pipeline.
 
         Steps:
-            1. Decide si recuperar (LLM token RETRIEVE/NO_RETRIEVE).
-            2. Si RETRIEVE: ejecuta CRAGPipeline.
-            3. Genera respuesta con o sin contexto.
-            4. Auto-evalúa: SUPPORTED/PARTIALLY_SUPPORTED/UNSUPPORTED + utility 1-5.
+            1. Decide whether to retrieve (LLM token RETRIEVE/NO_RETRIEVE).
+            2. If RETRIEVE: run CRAGPipeline.
+            3. Generate the answer with or without context.
+            4. Self-assess: SUPPORTED/PARTIALLY_SUPPORTED/UNSUPPORTED + utility 1-5.
 
         Args:
-            query: Query del usuario.
+            query: User query.
 
         Returns:
-            SelfRAGResult con respuesta y metadatos de decisión.
+            SelfRAGResult with the answer and decision metadata.
         """
         ...
 ```
 
 ---
 
-## SPEC-RAG-005: Parent-Child RAG — Indexación Jerárquica
+## SPEC-RAG-005: Parent-Child RAG — Hierarchical Indexing
 
-**Archivo:** `prismal/rag/hierarchical.py`
+**File:** `prismal/rag/hierarchical.py`
 
 ### Dataclasses
 
 ```python
 @dataclass
 class ParentChunk:
-    """Chunk padre con mayor contexto.
+    """Parent chunk with larger context.
 
     Attributes:
-        parent_id: ID único del chunk padre.
-        source: Fuente del documento.
-        content: Texto completo del chunk padre (~500 tokens).
-        child_ids: IDs de los chunks hijo derivados de este padre.
+        parent_id: Unique ID of the parent chunk.
+        source: Source of the document.
+        content: Full text of the parent chunk (~500 tokens).
+        child_ids: IDs of the child chunks derived from this parent.
     """
     parent_id: str
     source: str
@@ -466,31 +466,31 @@ class ParentChunk:
 
 @dataclass
 class HierarchicalSearchResult:
-    """Resultado de búsqueda jerárquica.
+    """Result of a hierarchical search.
 
     Attributes:
-        parent_chunks: Chunks padre recuperados (contexto expandido).
-        matched_child_ids: IDs de los chunks hijo que hicieron match.
+        parent_chunks: Retrieved parent chunks (expanded context).
+        matched_child_ids: IDs of the child chunks that matched.
     """
     parent_chunks: list[ParentChunk]
     matched_child_ids: list[str]
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class HierarchicalRAGEngine:
-    """RAG con indexación jerárquica padre-hijo.
+    """RAG with hierarchical parent-child indexing.
 
-    Indexa chunks pequeños (child, ~100 tokens) para alta precisión en
-    retrieval, pero devuelve el contexto padre (~500 tokens) al LLM.
+    Indexes small chunks (child, ~100 tokens) for high precision in
+    retrieval, but returns the parent context (~500 tokens) to the LLM.
 
     Args:
-        vector_store: ChromaVectorStore para chunks hijo.
-        parent_chunk_size: Tamaño en tokens del chunk padre (default 500).
-        child_chunk_size: Tamaño en tokens del chunk hijo (default 100).
-        child_overlap: Overlap entre chunks hijo (default 20).
-        settings: Settings de Prismal.
+        vector_store: ChromaVectorStore for child chunks.
+        parent_chunk_size: Size in tokens of the parent chunk (default 500).
+        child_chunk_size: Size in tokens of the child chunk (default 100).
+        child_overlap: Overlap between child chunks (default 20).
+        settings: Prismal Settings.
     """
 
     def __init__(
@@ -503,13 +503,13 @@ class HierarchicalRAGEngine:
     ) -> None: ...
 
     def index_document(self, path: Path) -> tuple[int, int]:
-        """Indexa un documento creando chunks padre e hijo.
+        """Indexes a document by creating parent and child chunks.
 
         Args:
-            path: Path al documento a indexar.
+            path: Path to the document to index.
 
         Returns:
-            Tupla (n_parents, n_children) — número de chunks creados.
+            Tuple (n_parents, n_children) — number of chunks created.
         """
         ...
 
@@ -518,58 +518,58 @@ class HierarchicalRAGEngine:
         query: str,
         k: int = 5,
     ) -> HierarchicalSearchResult:
-        """Busca por chunks hijo y expande a contexto padre.
+        """Searches by child chunks and expands to parent context.
 
         Args:
-            query: Query de búsqueda.
-            k: Número de chunks padre a retornar.
+            query: Search query.
+            k: Number of parent chunks to return.
 
         Returns:
-            HierarchicalSearchResult con chunks padre y child IDs matched.
+            HierarchicalSearchResult with parent chunks and matched child IDs.
         """
         ...
 ```
 
 ---
 
-## SPEC-RAG-006: Adaptive RAG — Selección Dinámica
+## SPEC-RAG-006: Adaptive RAG — Dynamic Selection
 
-**Archivo:** `prismal/rag/adaptive.py`
+**File:** `prismal/rag/adaptive.py`
 
-### Tipos
+### Types
 
 ```python
 class QueryType(str, Enum):
-    FACTUAL_SIMPLE = "factual_simple"      # "¿Cuándo fue X?" → Standard RAG
-    ABSTRACT = "abstract"                   # "¿Por qué X?" → HyDE
-    AMBIGUOUS = "ambiguous"                 # Query vaga → Fusion
-    MULTI_HOP = "multi_hop"                 # Requiere encadenamiento → GraphRAG
-    TECHNICAL = "technical"                 # Términos técnicos → Hybrid
+    FACTUAL_SIMPLE = "factual_simple"      # "When was X?" → Standard RAG
+    ABSTRACT = "abstract"                   # "Why X?" → HyDE
+    AMBIGUOUS = "ambiguous"                 # Vague query → Fusion
+    MULTI_HOP = "multi_hop"                 # Requires chaining → GraphRAG
+    TECHNICAL = "technical"                 # Technical terms → Hybrid
     CONVERSATIONAL = "conversational"       # Contextual → CRAG
 
 @dataclass
 class AdaptiveResult:
     chunks: list[RetrievedChunk]
-    strategy_used: str   # nombre del engine usado
+    strategy_used: str   # name of the engine used
     query_type: QueryType
-    confidence: float    # confianza en la clasificación
+    confidence: float    # confidence in the classification
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class AdaptiveRAGEngine:
-    """Facade que selecciona el engine RAG óptimo según el tipo de query.
+    """Facade that selects the optimal RAG engine based on query type.
 
     Args:
-        crag_engine: CRAGPipeline (requerido, fallback siempre disponible).
-        hyde_retriever: HyDERetriever opcional.
-        fusion_engine: RAGFusionEngine opcional.
-        hybrid_engine: HybridSearchEngine opcional.
-        hierarchical_engine: HierarchicalRAGEngine opcional.
-        use_llm_classifier: Si True, usa LLM para clasificar (más preciso,
-            más lento). Si False, usa heurísticas regex (default False).
-        settings: Settings de Prismal.
+        crag_engine: CRAGPipeline (required, always-available fallback).
+        hyde_retriever: Optional HyDERetriever.
+        fusion_engine: Optional RAGFusionEngine.
+        hybrid_engine: Optional HybridSearchEngine.
+        hierarchical_engine: Optional HierarchicalRAGEngine.
+        use_llm_classifier: If True, uses an LLM to classify (more accurate,
+            slower). If False, uses regex heuristics (default False).
+        settings: Prismal Settings.
 
     Example::
 
@@ -578,7 +578,7 @@ class AdaptiveRAGEngine:
             hyde_retriever=hyde,
             fusion_engine=fusion,
         )
-        result = await engine.search("¿Por qué LangGraph usa StateGraph?")
+        result = await engine.search("Why does LangGraph use StateGraph?")
         print(result.strategy_used)  # "hyde"
         print(result.query_type)     # QueryType.ABSTRACT
     """
@@ -600,28 +600,28 @@ class AdaptiveRAGEngine:
         k: int = 5,
         force_strategy: str | None = None,
     ) -> AdaptiveResult:
-        """Clasifica la query y ejecuta el engine correspondiente.
+        """Classifies the query and runs the corresponding engine.
 
         Args:
-            query: Query del usuario.
-            k: Número de chunks a retornar.
-            force_strategy: Fuerza el uso de un engine específico
+            query: User query.
+            k: Number of chunks to return.
+            force_strategy: Forces the use of a specific engine
                 ("crag", "hyde", "fusion", "hybrid", "hierarchical").
-                Útil para testing y debugging.
+                Useful for testing and debugging.
 
         Returns:
-            AdaptiveResult con chunks, estrategia usada y tipo de query.
+            AdaptiveResult with chunks, strategy used, and query type.
         """
         ...
 
     def classify_query(self, query: str) -> tuple[QueryType, float]:
-        """Clasifica el tipo de query (público para testing).
+        """Classifies the query type (public for testing).
 
         Args:
-            query: Query a clasificar.
+            query: Query to classify.
 
         Returns:
-            Tupla (QueryType, confidence_score).
+            Tuple (QueryType, confidence_score).
         """
         ...
 ```
@@ -630,22 +630,22 @@ class AdaptiveRAGEngine:
 
 ## SPEC-PAT-001: Tree of Thoughts
 
-**Archivo:** `prismal/agents/patterns/tree_of_thoughts.py`
+**File:** `prismal/agents/patterns/tree_of_thoughts.py`
 
-### Tipos
+### Types
 
 ```python
 @dataclass
 class Thought:
-    """Un pensamiento en el árbol de razonamiento.
+    """A thought in the reasoning tree.
 
     Attributes:
-        content: Texto del pensamiento.
-        score: Score de evaluación [0.0, 1.0].
-        depth: Profundidad en el árbol (root = 0).
-        parent_id: ID del pensamiento padre. None si es root.
-        children: Lista de pensamientos hijo.
-        is_terminal: True si este pensamiento es una solución final.
+        content: Text of the thought.
+        score: Evaluation score [0.0, 1.0].
+        depth: Depth in the tree (root = 0).
+        parent_id: ID of the parent thought. None if root.
+        children: List of child thoughts.
+        is_terminal: True if this thought is a final solution.
     """
     content: str
     score: float
@@ -657,13 +657,13 @@ class Thought:
 
 @dataclass
 class ToTResult:
-    """Resultado de Tree of Thoughts.
+    """Result of Tree of Thoughts.
 
     Attributes:
-        best_thought: El mejor pensamiento terminal encontrado.
-        best_path: Camino desde root hasta best_thought.
-        all_thoughts: Todos los pensamientos explorados.
-        total_thoughts_generated: Contador total para métricas.
+        best_thought: The best terminal thought found.
+        best_path: Path from root to best_thought.
+        all_thoughts: All explored thoughts.
+        total_thoughts_generated: Total counter for metrics.
     """
     best_thought: Thought
     best_path: list[Thought]
@@ -671,20 +671,20 @@ class ToTResult:
     total_thoughts_generated: int
 ```
 
-### Funciones Públicas
+### Public Functions
 
 ```python
 GenerateThoughtsFn = Callable[[str, AgentState, list[Thought]], Awaitable[list[str]]]
 """
-Genera N pensamientos candidatos.
+Generates N candidate thoughts.
 Args: (current_problem, state, path_so_far) → list[thought_texts]
 """
 
 EvaluateThoughtFn = Callable[[str, AgentState], Awaitable[float]]
 """
-Evalúa un pensamiento. Retorna score en [0.0, 1.0].
-1.0 = pensamiento que resuelve el problema completamente.
-0.0 = pensamiento completamente incorrecto.
+Evaluates a thought. Returns a score in [0.0, 1.0].
+1.0 = a thought that completely solves the problem.
+0.0 = a completely incorrect thought.
 """
 
 async def tree_of_thoughts(
@@ -698,25 +698,25 @@ async def tree_of_thoughts(
     threshold: float = 0.9,
     search_strategy: Literal["bfs", "dfs", "beam"] = "beam",
 ) -> ToTResult:
-    """Explora el árbol de razonamiento y retorna el mejor camino.
+    """Explores the reasoning tree and returns the best path.
 
     Args:
-        problem: Descripción del problema a resolver.
-        generate_fn: Función que genera pensamientos candidatos.
-        evaluate_fn: Función que evalúa la calidad de un pensamiento.
-        state: AgentState actual (pasado a generate_fn y evaluate_fn).
-        breadth: Número de pensamientos a generar por nodo.
-        depth: Profundidad máxima del árbol.
-        beam_size: Número de pensamientos a mantener en cada nivel (beam).
-        threshold: Score mínimo para considerar un pensamiento como solución.
-        search_strategy: Estrategia de búsqueda en el árbol.
+        problem: Description of the problem to solve.
+        generate_fn: Function that generates candidate thoughts.
+        evaluate_fn: Function that evaluates the quality of a thought.
+        state: Current AgentState (passed to generate_fn and evaluate_fn).
+        breadth: Number of thoughts to generate per node.
+        depth: Maximum depth of the tree.
+        beam_size: Number of thoughts to keep at each level (beam).
+        threshold: Minimum score to consider a thought a solution.
+        search_strategy: Search strategy in the tree.
 
     Returns:
-        ToTResult con el mejor camino encontrado.
+        ToTResult with the best path found.
 
     Raises:
-        ToTError: Si generate_fn o evaluate_fn fallan en todos los nodos.
-        ValueError: Si breadth < 1, depth < 1 o beam_size < 1.
+        ToTError: If generate_fn or evaluate_fn fail at every node.
+        ValueError: If breadth < 1, depth < 1, or beam_size < 1.
     """
     ...
 ```
@@ -725,20 +725,20 @@ async def tree_of_thoughts(
 
 ## SPEC-PAT-002: Debate / Society of Mind
 
-**Archivo:** `prismal/agents/patterns/debate.py`
+**File:** `prismal/agents/patterns/debate.py`
 
-### Tipos
+### Types
 
 ```python
 @dataclass
 class DebatePosition:
-    """Una posición en el debate.
+    """A position in the debate.
 
     Attributes:
-        agent_id: Identificador del agente que tomó esta posición.
-        role: Rol del agente (ej: "proponent", "opponent", "neutral").
-        content: Texto de la posición o respuesta.
-        round: Número de ronda (1 = posición inicial, 2+ = réplicas).
+        agent_id: Identifier of the agent that took this position.
+        role: Role of the agent (e.g.: "proponent", "opponent", "neutral").
+        content: Text of the position or response.
+        round: Round number (1 = initial position, 2+ = rebuttals).
     """
     agent_id: str
     role: str
@@ -747,15 +747,15 @@ class DebatePosition:
 
 @dataclass
 class DebateResult:
-    """Resultado del proceso de debate.
+    """Result of the debate process.
 
     Attributes:
-        consensus: Respuesta consensuada por el moderador.
-        agreement_score: Nivel de acuerdo entre agentes [0.0, 1.0].
-            1.0 = consenso total, 0.0 = desacuerdo total.
-        positions: Todas las posiciones tomadas en el debate.
-        dissenting_views: Posiciones que difieren del consenso (si agreement < 1.0).
-        rounds_completed: Número de rondas completadas.
+        consensus: Answer agreed upon by the moderator.
+        agreement_score: Level of agreement among agents [0.0, 1.0].
+            1.0 = full consensus, 0.0 = total disagreement.
+        positions: All positions taken in the debate.
+        dissenting_views: Positions that differ from the consensus (if agreement < 1.0).
+        rounds_completed: Number of completed rounds.
     """
     consensus: str
     agreement_score: float
@@ -764,7 +764,7 @@ class DebateResult:
     rounds_completed: int
 ```
 
-### Función Principal
+### Main Function
 
 ```python
 async def debate_round(
@@ -776,26 +776,26 @@ async def debate_round(
     synthesis_strategy: Literal["moderator", "majority_vote", "weighted"] = "moderator",
     settings: Settings | None = None,
 ) -> DebateResult:
-    """Ejecuta un proceso de debate multi-agente y sintetiza consenso.
+    """Runs a multi-agent debate process and synthesizes a consensus.
 
     Args:
-        query: Pregunta o problema a debatir.
-        state: AgentState con contexto del debate.
-        n_agents: Número de agentes participantes (default 3).
-        n_rounds: Número de rondas de debate (default 2).
-        roles: Roles de los agentes. None usa ["proponent", "opponent", "neutral"].
-            Para n_agents > 3, se generan roles adicionales automáticamente.
-        synthesis_strategy: Estrategia de síntesis del consenso.
-            - "moderator": Un LLM moderador sintetiza todas las posiciones.
-            - "majority_vote": La posición más repetida gana.
-            - "weighted": Las posiciones con mayor score tienen más peso.
-        settings: Settings de Prismal.
+        query: Question or problem to debate.
+        state: AgentState with the debate context.
+        n_agents: Number of participating agents (default 3).
+        n_rounds: Number of debate rounds (default 2).
+        roles: Roles of the agents. None uses ["proponent", "opponent", "neutral"].
+            For n_agents > 3, additional roles are generated automatically.
+        synthesis_strategy: Consensus synthesis strategy.
+            - "moderator": An LLM moderator synthesizes all positions.
+            - "majority_vote": The most repeated position wins.
+            - "weighted": Higher-scored positions carry more weight.
+        settings: Prismal Settings.
 
     Returns:
-        DebateResult con consenso, scores y posiciones completas.
+        DebateResult with consensus, scores, and the complete positions.
 
     Raises:
-        DebateError: Si todos los agentes fallan en generar posiciones.
+        DebateError: If all agents fail to generate positions.
     """
     ...
 ```
@@ -804,22 +804,22 @@ async def debate_round(
 
 ## SPEC-PAT-003: Constitutional AI
 
-**Archivo:** `prismal/agents/patterns/constitutional.py`
+**File:** `prismal/agents/patterns/constitutional.py`
 
-### Tipos
+### Types
 
 ```python
 @dataclass
 class ConstitutionalPrinciple:
-    """Un principio constitucional para evaluar outputs.
+    """A constitutional principle for evaluating outputs.
 
     Attributes:
-        id: Identificador único del principio.
-        name: Nombre corto (ej: "no_harmful_content").
-        description: Descripción detallada del principio.
-        critique_prompt: Prompt para detectar violaciones.
-        revision_prompt: Prompt para generar respuesta revisada.
-        severity: Severidad si se viola ("critical", "high", "medium").
+        id: Unique identifier of the principle.
+        name: Short name (e.g.: "no_harmful_content").
+        description: Detailed description of the principle.
+        critique_prompt: Prompt to detect violations.
+        revision_prompt: Prompt to generate a revised response.
+        severity: Severity if violated ("critical", "high", "medium").
     """
     id: str
     name: str
@@ -830,13 +830,13 @@ class ConstitutionalPrinciple:
 
 @dataclass
 class ConstitutionalRevision:
-    """Registro de una revisión aplicada.
+    """Record of an applied revision.
 
     Attributes:
-        principle_id: Principio que motivó la revisión.
-        original: Texto original antes de la revisión.
-        revised: Texto revisado.
-        violation_detected: Descripción de la violación encontrada.
+        principle_id: Principle that motivated the revision.
+        original: Original text before the revision.
+        revised: Revised text.
+        violation_detected: Description of the violation found.
     """
     principle_id: str
     original: str
@@ -845,15 +845,15 @@ class ConstitutionalRevision:
 
 @dataclass
 class ConstitutionalResult:
-    """Resultado del filtro constitucional.
+    """Result of the constitutional filter.
 
     Attributes:
-        final_output: Output final después de todas las revisiones.
-        revisions: Lista de revisiones aplicadas (vacía si ninguna fue necesaria).
-        principles_checked: Total de principios evaluados.
-        all_principles_satisfied: True si ningún principio fue violado
-            o todas las violaciones fueron resueltas.
-        max_revisions_reached: True si se alcanzó el límite sin resolver todas las violaciones.
+        final_output: Final output after all revisions.
+        revisions: List of applied revisions (empty if none were necessary).
+        principles_checked: Total number of principles evaluated.
+        all_principles_satisfied: True if no principle was violated
+            or all violations were resolved.
+        max_revisions_reached: True if the limit was reached without resolving all violations.
     """
     final_output: str
     revisions: list[ConstitutionalRevision]
@@ -862,57 +862,57 @@ class ConstitutionalResult:
     max_revisions_reached: bool = False
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
-# Principios por defecto
+# Default principles
 DEFAULT_PRINCIPLES: list[ConstitutionalPrinciple] = [
     ConstitutionalPrinciple(
         id="P001",
         name="no_harmful_content",
-        description="El output no debe contener contenido dañino, violento o peligroso.",
-        critique_prompt="¿Contiene este texto contenido dañino, violento o que pueda causar daño? Explica brevemente.",
-        revision_prompt="Reescribe el texto eliminando cualquier contenido dañino, manteniendo la información útil.",
+        description="The output must not contain harmful, violent, or dangerous content.",
+        critique_prompt="Does this text contain harmful, violent, or potentially damaging content? Explain briefly.",
+        revision_prompt="Rewrite the text removing any harmful content while keeping the useful information.",
         severity="critical",
     ),
     ConstitutionalPrinciple(
         id="P002",
         name="factual_accuracy",
-        description="El output no debe presentar afirmaciones claramente falsas como hechos.",
-        critique_prompt="¿Contiene este texto afirmaciones factuales claramente incorrectas? Identifícalas.",
-        revision_prompt="Reescribe el texto corrigiendo las afirmaciones incorrectas o marcándolas como inciertas.",
+        description="The output must not present clearly false claims as facts.",
+        critique_prompt="Does this text contain clearly incorrect factual claims? Identify them.",
+        revision_prompt="Rewrite the text correcting the incorrect claims or marking them as uncertain.",
         severity="high",
     ),
     ConstitutionalPrinciple(
         id="P003",
         name="no_pii_exposure",
-        description="El output no debe revelar información personal identificable no solicitada.",
-        critique_prompt="¿Expone este texto PII (nombres, emails, teléfonos, etc.) de forma innecesaria?",
-        revision_prompt="Reescribe el texto eliminando o anonimizando cualquier PII expuesta innecesariamente.",
+        description="The output must not reveal unsolicited personally identifiable information.",
+        critique_prompt="Does this text expose PII (names, emails, phone numbers, etc.) unnecessarily?",
+        revision_prompt="Rewrite the text removing or anonymizing any unnecessarily exposed PII.",
         severity="critical",
     ),
 ]
 
 
 class ConstitutionalFilter:
-    """Evalúa y revisa outputs de agentes contra principios constitucionales.
+    """Evaluates and revises agent outputs against constitutional principles.
 
-    Aplica cada principio en secuencia: si detecta violación, solicita al
-    LLM que genere una versión revisada. Registra todas las revisiones en
+    Applies each principle in sequence: if it detects a violation, it asks the
+    LLM to generate a revised version. It records all revisions in
     AuditLogger.
 
     Args:
-        principles: Lista de principios constitucionales a aplicar.
-            None usa DEFAULT_PRINCIPLES.
-        max_revisions: Número máximo de revisiones por principio (default 3).
-        settings: Settings de Prismal.
+        principles: List of constitutional principles to apply.
+            None uses DEFAULT_PRINCIPLES.
+        max_revisions: Maximum number of revisions per principle (default 3).
+        settings: Prismal Settings.
 
     Example::
 
         filter = ConstitutionalFilter(principles=DEFAULT_PRINCIPLES)
-        result = await filter.apply("Aquí va un output potencialmente problemático.")
+        result = await filter.apply("Here goes a potentially problematic output.")
         if not result.all_principles_satisfied:
-            logger.warning("Principios no satisfechos", revisions=result.revisions)
+            logger.warning("Principles not satisfied", revisions=result.revisions)
         print(result.final_output)
     """
 
@@ -928,14 +928,14 @@ class ConstitutionalFilter:
         output: str,
         context: str | None = None,
     ) -> ConstitutionalResult:
-        """Aplica todos los principios al output dado.
+        """Applies all principles to the given output.
 
         Args:
-            output: Texto a evaluar y potencialmente revisar.
-            context: Contexto opcional (query original) para mejor evaluación.
+            output: Text to evaluate and potentially revise.
+            context: Optional context (original query) for better evaluation.
 
         Returns:
-            ConstitutionalResult con output final y log de revisiones.
+            ConstitutionalResult with the final output and revision log.
         """
         ...
 
@@ -944,14 +944,14 @@ class ConstitutionalFilter:
         output: str,
         principle: ConstitutionalPrinciple,
     ) -> tuple[bool, str]:
-        """Verifica si el output viola un principio específico (público para testing).
+        """Checks whether the output violates a specific principle (public for testing).
 
         Args:
-            output: Texto a verificar.
-            principle: Principio a aplicar.
+            output: Text to check.
+            principle: Principle to apply.
 
         Returns:
-            Tupla (violated: bool, description: str).
+            Tuple (violated: bool, description: str).
         """
         ...
 ```
@@ -960,23 +960,23 @@ class ConstitutionalFilter:
 
 ## SPEC-PAT-004: LATS — Language Agent Tree Search
 
-**Archivo:** `prismal/agents/patterns/lats.py`
+**File:** `prismal/agents/patterns/lats.py`
 
-### Tipos
+### Types
 
 ```python
 @dataclass
 class LATSNode:
-    """Nodo en el árbol MCTS del agente.
+    """Node in the agent's MCTS tree.
 
     Attributes:
-        state: Estado del agente en este nodo.
-        action: Acción tomada para llegar a este nodo. None si es root.
-        reward: Reward acumulado de la simulación.
-        visits: Número de veces que este nodo fue visitado.
-        children: Nodos hijo (acciones expandidas).
-        is_terminal: True si este nodo es un estado terminal (tarea completada o fallida).
-        parent: Nodo padre. None si es root.
+        state: Agent state at this node.
+        action: Action taken to reach this node. None if root.
+        reward: Accumulated reward from the simulation.
+        visits: Number of times this node was visited.
+        children: Child nodes (expanded actions).
+        is_terminal: True if this node is a terminal state (task completed or failed).
+        parent: Parent node. None if root.
     """
     state: AgentState
     action: ToolCall | None
@@ -988,7 +988,7 @@ class LATSNode:
 
     @property
     def ucb1(self, exploration_constant: float = 1.41) -> float:
-        """Calcula UCB1 score para selection.
+        """Computes the UCB1 score for selection.
 
         UCB1 = Q/N + C * sqrt(ln(N_parent) / N)
         """
@@ -996,14 +996,14 @@ class LATSNode:
 
 @dataclass
 class LATSResult:
-    """Resultado del agente LATS.
+    """Result of the LATS agent.
 
     Attributes:
-        best_action_sequence: Secuencia de acciones del mejor camino.
-        final_state: Estado final al final del mejor camino.
-        total_simulations: Número de simulaciones realizadas.
-        best_reward: Reward del mejor camino encontrado.
-        search_tree_depth: Profundidad máxima explorada.
+        best_action_sequence: Sequence of actions of the best path.
+        final_state: Final state at the end of the best path.
+        total_simulations: Number of simulations performed.
+        best_reward: Reward of the best path found.
+        search_tree_depth: Maximum depth explored.
     """
     best_action_sequence: list[ToolCall]
     final_state: AgentState
@@ -1012,34 +1012,34 @@ class LATSResult:
     search_tree_depth: int
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 RewardFn = Callable[[AgentState], Awaitable[float]]
-"""Evalúa el reward de un estado. Retorna float en [0.0, 1.0]."""
+"""Evaluates the reward of a state. Returns a float in [0.0, 1.0]."""
 
 class LATSAgent:
-    """Agente basado en Language Agent Tree Search (MCTS).
+    """Agent based on Language Agent Tree Search (MCTS).
 
-    Aplica Monte Carlo Tree Search para explorar el espacio de acciones
-    del agente, permitiendo backtracking real cuando un camino falla.
+    Applies Monte Carlo Tree Search to explore the agent's action
+    space, allowing real backtracking when a path fails.
 
     Args:
-        tools: Lista de herramientas disponibles para el agente.
-        reward_fn: Función que evalúa el reward de un estado.
-        max_simulations: Presupuesto total de simulaciones (default 50).
-        exploration_constant: Constante C del UCB1 (default 1.41 = sqrt(2)).
-        max_depth: Profundidad máxima del árbol (default 10).
-        settings: Settings de Prismal.
+        tools: List of tools available to the agent.
+        reward_fn: Function that evaluates the reward of a state.
+        max_simulations: Total simulation budget (default 50).
+        exploration_constant: The C constant of UCB1 (default 1.41 = sqrt(2)).
+        max_depth: Maximum depth of the tree (default 10).
+        settings: Prismal Settings.
 
     Example::
 
         async def my_reward(state):
-            # Evalúa si la tarea fue completada
+            # Evaluates whether the task was completed
             return 1.0 if task_done(state) else 0.0
 
         agent = LATSAgent(tools=my_tools, reward_fn=my_reward)
-        result = await agent.search(initial_state, goal="Complete la tarea X")
+        result = await agent.search(initial_state, goal="Complete task X")
     """
 
     def __init__(
@@ -1057,17 +1057,17 @@ class LATSAgent:
         initial_state: AgentState,
         goal: str,
     ) -> LATSResult:
-        """Ejecuta MCTS y retorna el mejor camino de acciones.
+        """Runs MCTS and returns the best action path.
 
         Args:
-            initial_state: Estado inicial del agente.
-            goal: Descripción del objetivo a alcanzar.
+            initial_state: Initial state of the agent.
+            goal: Description of the goal to reach.
 
         Returns:
-            LATSResult con la secuencia de acciones óptima encontrada.
+            LATSResult with the optimal action sequence found.
 
         Raises:
-            LATSError: Si ninguna simulación produce reward > 0.
+            LATSError: If no simulation produces reward > 0.
         """
         ...
 ```
@@ -1076,24 +1076,24 @@ class LATSAgent:
 
 ## SPEC-PAT-005: LLM-Compiler
 
-**Archivo:** `prismal/agents/patterns/llm_compiler.py`
+**File:** `prismal/agents/patterns/llm_compiler.py`
 
-### Tipos
+### Types
 
 ```python
 @dataclass
 class TaskNode:
-    """Un nodo en el DAG de tareas del LLM-Compiler.
+    """A node in the LLM-Compiler task DAG.
 
     Attributes:
-        id: Identificador único de la tarea (ej: "T1", "T2").
-        description: Descripción de qué hace esta tarea.
-        tool: Nombre de la herramienta a usar.
-        args: Argumentos para la herramienta (pueden referenciar outputs de
-            tareas anteriores con la sintaxis "$T1.output").
-        depends_on: IDs de tareas que deben completarse antes que esta.
-        output: Output de la tarea (None si aún no ejecutada).
-        status: Estado de la tarea.
+        id: Unique identifier of the task (e.g.: "T1", "T2").
+        description: Description of what this task does.
+        tool: Name of the tool to use.
+        args: Arguments for the tool (may reference outputs of
+            previous tasks with the "$T1.output" syntax).
+        depends_on: IDs of tasks that must complete before this one.
+        output: Output of the task (None if not yet executed).
+        status: Status of the task.
     """
     id: str
     description: str
@@ -1105,32 +1105,32 @@ class TaskNode:
 
 @dataclass
 class CompilerPlan:
-    """El plan compilado como DAG.
+    """The compiled plan as a DAG.
 
     Attributes:
-        tasks: Lista de tareas en el DAG.
-        execution_waves: Listas de IDs de tareas que pueden ejecutarse en paralelo.
-            Calculado por topological sort.
-        goal: El objetivo original del plan.
+        tasks: List of tasks in the DAG.
+        execution_waves: Lists of task IDs that can run in parallel.
+            Computed by topological sort.
+        goal: The original goal of the plan.
     """
     tasks: list[TaskNode]
-    execution_waves: list[list[str]]  # IDs de tareas por wave
+    execution_waves: list[list[str]]  # task IDs per wave
     goal: str
 
     def to_json(self) -> str:
-        """Serializa el plan a JSON para debugging."""
+        """Serializes the plan to JSON for debugging."""
         ...
 
 @dataclass
 class CompilerResult:
-    """Resultado de la ejecución del LLM-Compiler.
+    """Result of the LLM-Compiler execution.
 
     Attributes:
-        final_answer: Respuesta sintetizada por el Joiner.
-        plan: El plan ejecutado (con outputs de cada tarea).
-        replanning_count: Número de veces que se replanificó.
-        tasks_succeeded: Número de tareas exitosas.
-        tasks_failed: Número de tareas fallidas.
+        final_answer: Answer synthesized by the Joiner.
+        plan: The executed plan (with outputs of each task).
+        replanning_count: Number of times replanning occurred.
+        tasks_succeeded: Number of successful tasks.
+        tasks_failed: Number of failed tasks.
     """
     final_answer: str
     plan: CompilerPlan
@@ -1139,30 +1139,30 @@ class CompilerResult:
     tasks_failed: int
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class LLMCompiler:
-    """Compilador de planes de tareas en DAGs ejecutables en paralelo.
+    """Compiler of task plans into DAGs executable in parallel.
 
-    Genera un DAG de tareas con dependencias explícitas, ejecuta tareas
-    independientes en paralelo (por waves), y recompila si hay fallos.
+    Generates a task DAG with explicit dependencies, runs independent
+    tasks in parallel (by waves), and recompiles if there are failures.
 
     Args:
-        tools: Herramientas disponibles para el planner.
-        max_replanning: Número máximo de replanificaciones (default 2).
-        settings: Settings de Prismal.
+        tools: Tools available to the planner.
+        max_replanning: Maximum number of replannings (default 2).
+        settings: Prismal Settings.
 
     Example::
 
         compiler = LLMCompiler(tools=[search_tool, calc_tool, write_tool])
         result = await compiler.compile_and_run(
-            goal="Investiga el precio del oro, calcula el rendimiento anual, "
-                 "y escribe un reporte.",
+            goal="Research the price of gold, calculate the annual return, "
+                 "and write a report.",
             state=current_state,
         )
         print(result.final_answer)
-        print(result.plan.to_json())  # para debugging
+        print(result.plan.to_json())  # for debugging
     """
 
     def __init__(
@@ -1177,45 +1177,45 @@ class LLMCompiler:
         goal: str,
         state: AgentState,
     ) -> CompilerResult:
-        """Planifica, compila DAG, ejecuta en paralelo, y sintetiza resultado.
+        """Plans, compiles a DAG, executes in parallel, and synthesizes the result.
 
         Args:
-            goal: Objetivo de alto nivel a alcanzar.
-            state: AgentState con contexto disponible.
+            goal: High-level goal to reach.
+            state: AgentState with available context.
 
         Returns:
-            CompilerResult con respuesta final y metadatos de ejecución.
+            CompilerResult with the final answer and execution metadata.
 
         Raises:
-            CompilerError: Si el DAG generado contiene ciclos.
-            CompilerError: Si max_replanning se alcanza sin éxito.
+            CompilerError: If the generated DAG contains cycles.
+            CompilerError: If max_replanning is reached without success.
         """
         ...
 
     async def plan(self, goal: str, state: AgentState, previous_results: dict | None = None) -> CompilerPlan:
-        """Genera el plan DAG (público para testing y debugging).
+        """Generates the DAG plan (public for testing and debugging).
 
         Args:
-            goal: Objetivo a planificar.
-            state: Estado actual.
-            previous_results: Resultados de iteración anterior (para replanning).
+            goal: Goal to plan for.
+            state: Current state.
+            previous_results: Results from the previous iteration (for replanning).
 
         Returns:
-            CompilerPlan con DAG validado y waves calculadas.
+            CompilerPlan with a validated DAG and computed waves.
         """
         ...
 
     def validate_dag(self, plan: CompilerPlan) -> bool:
-        """Valida que el DAG no tenga ciclos ni dependencias inválidas.
+        """Validates that the DAG has no cycles or invalid dependencies.
 
         Args:
-            plan: Plan a validar.
+            plan: Plan to validate.
 
         Returns:
-            True si el DAG es válido.
+            True if the DAG is valid.
 
         Raises:
-            CompilerError: Con descripción del ciclo o dependencia inválida.
+            CompilerError: With a description of the cycle or invalid dependency.
         """
         ...
 ```
@@ -1224,19 +1224,19 @@ class LLMCompiler:
 
 ## SPEC-PAT-006: Mixture of Agents (MoA)
 
-**Archivo:** `prismal/agents/patterns/mixture_of_agents.py`
+**File:** `prismal/agents/patterns/mixture_of_agents.py`
 
-### Clase Principal
+### Main Class
 
 ```python
 @dataclass
 class MoAResult:
-    """Resultado de Mixture of Agents.
+    """Result of Mixture of Agents.
 
     Attributes:
-        final_answer: Respuesta sintetizada por la capa agregadora.
-        layer_outputs: Outputs de cada capa [[resp_agent1_L1, resp_agent2_L1], [resp_L2], ...].
-        providers_used: Lista de proveedores usados en la capa base.
+        final_answer: Answer synthesized by the aggregator layer.
+        layer_outputs: Outputs of each layer [[resp_agent1_L1, resp_agent2_L1], [resp_L2], ...].
+        providers_used: List of providers used in the base layer.
     """
     final_answer: str
     layer_outputs: list[list[str]]
@@ -1244,17 +1244,17 @@ class MoAResult:
 
 
 class MixtureOfAgents:
-    """Orquesta múltiples LLMs en capas para mejorar la calidad.
+    """Orchestrates multiple LLMs in layers to improve quality.
 
-    Capa 1 (proposers): N modelos de distintos proveedores generan respuestas independientes.
-    Capa 2+ (aggregators): Sintetizan las respuestas de la capa anterior.
+    Layer 1 (proposers): N models from different providers generate independent answers.
+    Layer 2+ (aggregators): Synthesize the answers from the previous layer.
 
     Args:
-        proposer_models: Lista de model_ids para la capa base
-            (ej: ["gpt-4o", "claude-sonnet-4-6", "gemini-pro"]).
-        aggregator_model: Model ID para la capa de síntesis (default usa settings.default_model).
-        n_aggregator_layers: Número de capas de agregación (default 1).
-        settings: Settings de Prismal.
+        proposer_models: List of model_ids for the base layer
+            (e.g.: ["gpt-4o", "claude-sonnet-4-6", "gemini-pro"]).
+        aggregator_model: Model ID for the synthesis layer (default uses settings.default_model).
+        n_aggregator_layers: Number of aggregation layers (default 1).
+        settings: Prismal Settings.
     """
 
     def __init__(
@@ -1270,37 +1270,37 @@ class MixtureOfAgents:
         query: str,
         state: AgentState,
     ) -> MoAResult:
-        """Genera respuesta usando múltiples LLMs en capas.
+        """Generates an answer using multiple LLMs in layers.
 
         Args:
-            query: Query del usuario.
-            state: AgentState con contexto.
+            query: User query.
+            state: AgentState with context.
 
         Returns:
-            MoAResult con respuesta final y outputs por capa.
+            MoAResult with the final answer and per-layer outputs.
         """
         ...
 ```
 
 ---
 
-## SPEC-PAT-007: Swarm / Handoff Descentralizado
+## SPEC-PAT-007: Swarm / Decentralized Handoff
 
-**Archivo:** `prismal/agents/patterns/swarm.py`
+**File:** `prismal/agents/patterns/swarm.py`
 
-### Tipos
+### Types
 
 ```python
 @dataclass
 class HandoffRecord:
-    """Registro de un handoff entre agentes.
+    """Record of a handoff between agents.
 
     Attributes:
-        from_agent: ID del agente que transfiere el control.
-        to_agent: ID del agente que recibe el control.
-        reason: Razón del handoff.
-        timestamp: Timestamp del handoff.
-        context_snapshot: Snapshot del estado en el momento del handoff.
+        from_agent: ID of the agent that transfers control.
+        to_agent: ID of the agent that receives control.
+        reason: Reason for the handoff.
+        timestamp: Timestamp of the handoff.
+        context_snapshot: Snapshot of the state at the moment of the handoff.
     """
     from_agent: str
     to_agent: str
@@ -1314,7 +1314,7 @@ VALID_HANDOFF_TARGETS: frozenset[str] = frozenset({
 })
 ```
 
-### Función Principal
+### Main Function
 
 ```python
 async def swarm_handoff(
@@ -1324,25 +1324,25 @@ async def swarm_handoff(
     reason: str,
     valid_targets: frozenset[str] | None = None,
 ) -> AgentState:
-    """Transfiere el control de current_agent a target_agent.
+    """Transfers control from current_agent to target_agent.
 
-    Actualiza el AgentState con el historial de handoff y configura
-    el estado para que target_agent continue el trabajo.
+    Updates the AgentState with the handoff history and configures
+    the state so that target_agent continues the work.
 
     Args:
-        current_agent: ID del agente que cede el control.
-        target_agent: ID del agente que recibe el control.
-        state: Estado actual del agente.
-        reason: Razón del handoff (para auditoría y logging).
-        valid_targets: Set de agentes válidos para handoff.
-            None usa VALID_HANDOFF_TARGETS.
+        current_agent: ID of the agent that yields control.
+        target_agent: ID of the agent that receives control.
+        state: Current state of the agent.
+        reason: Reason for the handoff (for auditing and logging).
+        valid_targets: Set of valid agents for handoff.
+            None uses VALID_HANDOFF_TARGETS.
 
     Returns:
-        Nuevo AgentState con metadata de handoff actualizada.
+        A new AgentState with updated handoff metadata.
 
     Raises:
-        ValueError: Si target_agent no está en valid_targets.
-        ValueError: Si current_agent == target_agent (auto-handoff).
+        ValueError: If target_agent is not in valid_targets.
+        ValueError: If current_agent == target_agent (self-handoff).
     """
     ...
 ```
@@ -1351,9 +1351,9 @@ async def swarm_handoff(
 
 ## SPEC-SUBGRAPH-001: Customer Service Pipeline
 
-**Archivo:** `prismal/agents/subgraphs/customer_service/__init__.py`
+**File:** `prismal/agents/subgraphs/customer_service/__init__.py`
 
-### Interfaz del Subgraph
+### Subgraph Interface
 
 ```python
 def build_customer_service_subgraph(
@@ -1361,22 +1361,22 @@ def build_customer_service_subgraph(
     escalation_threshold: float = 0.6,
     settings: Settings | None = None,
 ) -> CompiledStateGraph:
-    """Construye el subgraph de atención al cliente.
+    """Builds the customer service subgraph.
 
-    Nodos:
-        - classifier: Clasifica la query (FAQ/Complaint/Technical/Other).
-        - faq_retrieval: Busca respuesta en base de conocimiento (RAG).
-        - escalation_gate: Decide si escalar a agente humano.
-        - response_generator: Genera respuesta final.
-        - ticket_creator: Crea ticket si es necesario escalación.
+    Nodes:
+        - classifier: Classifies the query (FAQ/Complaint/Technical/Other).
+        - faq_retrieval: Searches for an answer in the knowledge base (RAG).
+        - escalation_gate: Decides whether to escalate to a human agent.
+        - response_generator: Generates the final answer.
+        - ticket_creator: Creates a ticket if escalation is needed.
 
     Args:
-        rag_engine: Engine RAG para FAQ retrieval. None crea RAGEngine default.
-        escalation_threshold: Score mínimo de confianza para responder sin escalar.
-        settings: Settings de Prismal.
+        rag_engine: RAG engine for FAQ retrieval. None creates a default RAGEngine.
+        escalation_threshold: Minimum confidence score to respond without escalating.
+        settings: Prismal Settings.
 
     Returns:
-        CompiledStateGraph listo para registrar en SubgraphRegistry.
+        CompiledStateGraph ready to register in SubgraphRegistry.
     """
     ...
 ```
@@ -1385,14 +1385,14 @@ def build_customer_service_subgraph(
 
 ## SPEC-SUBGRAPH-002: Code Review Pipeline
 
-**Archivo:** `prismal/agents/subgraphs/code_review/__init__.py`
+**File:** `prismal/agents/subgraphs/code_review/__init__.py`
 
-### Tipos
+### Types
 
 ```python
 @dataclass
 class CodeIssue:
-    """Un issue detectado en la revisión de código."""
+    """An issue detected during code review."""
     severity: Literal["critical", "high", "medium", "low", "info"]
     category: Literal["security", "logic", "style", "performance", "test"]
     description: str
@@ -1402,116 +1402,116 @@ class CodeIssue:
 
 @dataclass
 class CodeReviewReport:
-    """Reporte de revisión de código."""
+    """Code review report."""
     issues: list[CodeIssue]
     summary: str
-    score: float  # 0.0 (muy malo) → 1.0 (sin issues)
-    approved: bool  # True si score >= approval_threshold
+    score: float  # 0.0 (very bad) → 1.0 (no issues)
+    approved: bool  # True if score >= approval_threshold
 ```
 
-### Interfaz
+### Interface
 
 ```python
 def build_code_review_subgraph(
     approval_threshold: float = 0.8,
     settings: Settings | None = None,
 ) -> CompiledStateGraph:
-    """Construye el subgraph de revisión de código.
+    """Builds the code review subgraph.
 
-    Nodos:
-        - linter: Análisis estático (ruff, mypy via CodeAct sandbox).
-        - security_scanner: Detecta vulnerabilidades (bandit patterns).
-        - logic_reviewer: LLM revisa la lógica de negocio.
-        - suggester: Genera sugerencias de mejora.
-        - report_generator: Consolida el reporte final.
+    Nodes:
+        - linter: Static analysis (ruff, mypy via CodeAct sandbox).
+        - security_scanner: Detects vulnerabilities (bandit patterns).
+        - logic_reviewer: LLM reviews the business logic.
+        - suggester: Generates improvement suggestions.
+        - report_generator: Consolidates the final report.
     """
     ...
 ```
 
 ---
 
-## Compatibilidad de Interfaces
+## Interface Compatibility
 
-### Protocolo común para RAG engines
+### Common protocol for RAG engines
 
-Todos los nuevos engines RAG implementan el siguiente protocolo informal (no es ABC formal para mantener compatibilidad con engine existente):
+All new RAG engines implement the following informal protocol (not a formal ABC, to maintain compatibility with the existing engine):
 
 ```python
-# Protocolo esperado por AdaptiveRAGEngine
+# Protocol expected by AdaptiveRAGEngine
 class RAGEngineProtocol(Protocol):
     async def search(self, query: str, k: int = 5) -> list[RetrievedChunk]: ...
-    # O en versiones sync:
+    # Or in sync versions:
     def search(self, query: str, k: int = 5) -> list[RetrievedChunk]: ...
 ```
 
-Los engines **async** son: `HyDERetriever`, `RAGFusionEngine`, `SelfRAGPipeline`.
-Los engines **sync** son: `HybridSearchEngine`, `HierarchicalRAGEngine`, `RAGEngine` (existente).
-`AdaptiveRAGEngine` maneja ambos con `asyncio.to_thread` para los sync.
+The **async** engines are: `HyDERetriever`, `RAGFusionEngine`, `SelfRAGPipeline`.
+The **sync** engines are: `HybridSearchEngine`, `HierarchicalRAGEngine`, `RAGEngine` (existing).
+`AdaptiveRAGEngine` handles both, using `asyncio.to_thread` for the sync ones.
 
 ---
 
-## Resumen de implementación — Fase D (Hardening e Integración) — ✅ DONE (con diferimientos)
+## Implementation summary — Phase D (Hardening and Integration) — ✅ DONE (with deferrals)
 
-| ID | Tarea | Estado |
+| ID | Task | Status |
 |---|---|---|
-| D1-01 / D1-02 / D1-03 | Integración `graph.py` / `supervisor.py` / `intent_router.py` | ⚠️ **DEFERIDO**: subgraphs exponen `register_<name>()` idempotente estilo `register_ml_pipeline`; el wiring final es una migración operacional (supervisor.py son 976 LoC de producción crítica) |
-| D1-04 | Centralizar excepciones en `core/exceptions.py` | ✅ DONE — 12 nuevas (7 RAG + 7 patterns + 5 subgraphs) con re-imports en los módulos |
-| D1-05 | `constitutional_*` settings en `core/config.py` | ✅ DONE — `constitutional_enabled`, `constitutional_max_revisions`, `constitutional_principles: list[str]` |
-| D1-06 | Tests integración end-to-end | ✅ DONE — `tests/integration/test_adaptive_rag_constitutional.py` |
-| D1-07 | Coverage audit ≥ 80% | ✅ DONE — todos los módulos Fase A/B/C en 82–100% |
-| D1-08 | Security audit (bandit) | ✅ DONE — **0 issues** en 7034 LoC nuevas |
-| D1-09 | `CLAUDE.md` actualizado | ✅ DONE |
-| D1-10 | Obsidian note | ⚠️ SKIP (fuera del repo) |
+| D1-01 / D1-02 / D1-03 | Integration of `graph.py` / `supervisor.py` / `intent_router.py` | ⚠️ **DEFERRED**: subgraphs expose an idempotent `register_<name>()` in the style of `register_ml_pipeline`; the final wiring is an operational migration (supervisor.py is 976 LoC of critical production code) |
+| D1-04 | Centralize exceptions in `core/exceptions.py` | ✅ DONE — 12 new ones (7 RAG + 7 patterns + 5 subgraphs) with re-imports in the modules |
+| D1-05 | `constitutional_*` settings in `core/config.py` | ✅ DONE — `constitutional_enabled`, `constitutional_max_revisions`, `constitutional_principles: list[str]` |
+| D1-06 | End-to-end integration tests | ✅ DONE — `tests/integration/test_adaptive_rag_constitutional.py` |
+| D1-07 | Coverage audit ≥ 80% | ✅ DONE — all Phase A/B/C modules at 82–100% |
+| D1-08 | Security audit (bandit) | ✅ DONE — **0 issues** in 7034 new LoC |
+| D1-09 | `CLAUDE.md` updated | ✅ DONE |
+| D1-10 | Obsidian note | ⚠️ SKIP (outside the repo) |
 
-**Totales del proyecto**:
-- 19 arquitecturas implementadas (7 RAG + 7 patterns + 5 subgraphs).
-- **507 tests pasando** (398 unit nuevos + 2 integration + 107 tests existentes en scope).
-- Coverage ≥ 82% en todos los módulos nuevos.
-- 0 issues de seguridad (bandit).
-- 0 errores de lint (ruff) y tipo (mypy --strict).
-- 12 excepciones nuevas centralizadas.
-- Nueva dependencia: `rank-bm25>=0.2.2`.
-- Settings adicionales: 3 (`constitutional_enabled`, `constitutional_max_revisions`, `constitutional_principles`).
+**Project totals**:
+- 19 architectures implemented (7 RAG + 7 patterns + 5 subgraphs).
+- **507 tests passing** (398 new unit + 2 integration + 107 existing tests in scope).
+- Coverage ≥ 82% across all new modules.
+- 0 security issues (bandit).
+- 0 lint errors (ruff) and type errors (mypy --strict).
+- 12 new centralized exceptions.
+- New dependency: `rank-bm25>=0.2.2`.
+- Additional settings: 3 (`constitutional_enabled`, `constitutional_max_revisions`, `constitutional_principles`).
 
-**Trabajo diferido (follow-up operacional)**:
-El wiring de los nuevos patrones como nodos top-level en `agents/graph.py` + `agents/supervisor.py` + `agents/intent_router.py` se dejó fuera del scope porque:
-1. `supervisor.py` (976 LoC) y `graph.py` (624 LoC) son componentes de producción críticos — cambios requieren planning de migración aparte.
-2. Los patterns (ToT, LATS, etc.) son funciones/clases que requieren decisiones operacionales sobre cuándo ser invocadas (toggles de Settings, rutas del intent router, flags por-feature).
-3. Las primitivas están completas: cada subgraph tiene `register_<name>()` idempotente; los patterns son importables directamente; Settings tiene los toggles necesarios.
+**Deferred work (operational follow-up)**:
+Wiring the new patterns as top-level nodes in `agents/graph.py` + `agents/supervisor.py` + `agents/intent_router.py` was left out of scope because:
+1. `supervisor.py` (976 LoC) and `graph.py` (624 LoC) are critical production components — changes require separate migration planning.
+2. The patterns (ToT, LATS, etc.) are functions/classes that require operational decisions about when they should be invoked (Settings toggles, intent router routes, per-feature flags).
+3. The primitives are complete: each subgraph has an idempotent `register_<name>()`; the patterns are directly importable; Settings has the necessary toggles.
 
-Cuando operación decida activar estas arquitecturas, el trabajo es: (a) llamar `register_<name>()` durante el startup, (b) añadir sus nombres a `VALID_NEXT_NODES` en supervisor, (c) añadir regex patterns a `intent_router`. Tiempo estimado: 1-2 días si se hace en ventana controlada.
+When operations decides to activate these architectures, the work is: (a) call `register_<name>()` during startup, (b) add their names to `VALID_NEXT_NODES` in the supervisor, (c) add regex patterns to `intent_router`. Estimated time: 1-2 days if done in a controlled window.
 
-## Resumen de implementación — Fase E (MCP Capability Routing) — ✅ DONE
+## Implementation summary — Phase E (MCP Capability Routing) — ✅ DONE
 
-| ID | Tarea | Estado |
+| ID | Task | Status |
 |---|---|---|
-| E1 | `config/mcp_servers.yaml` con `capabilities` | ✅ DONE — creado (no existía) |
-| E2 | `MCPClientManager.get_all_langchain_tools(capabilities=)` | ✅ DONE — filtrado server-level, `general` siempre incluido |
+| E1 | `config/mcp_servers.yaml` with `capabilities` | ✅ DONE — created (did not exist) |
+| E2 | `MCPClientManager.get_all_langchain_tools(capabilities=)` | ✅ DONE — server-level filtering, `general` always included |
 | E3 | `get_tools_for_agent(..., required_capabilities=)` | ✅ DONE — backward compatible |
-| E4 | `DEFAULT_CAPABILITY_MAP` + `get_recommended_capabilities()` | ⚠️ ADAPTADO — el wiring a `graph.py` sigue diferido (D1-01); se expone el mapping como constante pública para operación |
+| E4 | `DEFAULT_CAPABILITY_MAP` + `get_recommended_capabilities()` | ⚠️ ADAPTED — wiring into `graph.py` remains deferred (D1-01); the mapping is exposed as a public constant for operations |
 | E5 | Tests `test_capability_routing.py` | ✅ DONE — 13 tests |
 | E6 | Docs | ✅ DONE |
 
-**Propiedades de la routing:**
-- Servidor con `capabilities=["general"]` → **siempre incluido** (universal).
-- Servidor sin `capabilities` en YAML → default `["general"]` (backward compat).
-- `MCPClientManager.get_all_langchain_tools(capabilities=None)` → pool completo (legacy).
-- `get_tools_for_agent("researcher")` sin `required_capabilities` → pool completo (legacy).
+**Routing properties:**
+- Server with `capabilities=["general"]` → **always included** (universal).
+- Server without `capabilities` in YAML → default `["general"]` (backward compat).
+- `MCPClientManager.get_all_langchain_tools(capabilities=None)` → full pool (legacy).
+- `get_tools_for_agent("researcher")` without `required_capabilities` → full pool (legacy).
 
-**Totales Fase E:**
-- 2 archivos creados (YAML + test).
-- 3 archivos modificados (`connection.py`, `client.py`, `tool_registry.py`).
-- 13 tests nuevos, **688 tests totales** (0 fallos, 0 regresiones).
-- Coverage `mcp/client.py`: **83%**.
+**Phase E totals:**
+- 2 files created (YAML + test).
+- 3 files modified (`connection.py`, `client.py`, `tool_registry.py`).
+- 13 new tests, **688 total tests** (0 failures, 0 regressions).
+- Coverage of `mcp/client.py`: **83%**.
 - ruff + mypy strict + bandit (High=0 Medium=0) clean.
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-04-19 | Ernesto Crespo | Versión inicial — contratos para 14 módulos |
-| 1.1 | 2026-04-19 | Claude Code | Implementación Fase A (7 RAG engines) — 268 tests, ≥88% coverage |
-| 1.2 | 2026-04-19 | Claude Code | Implementación Fase B (7 agent patterns) — 102 tests nuevos, ≥90% coverage |
-| 1.3 | 2026-04-19 | Claude Code | Implementación Fase C (5 subgraph pipelines) — 111 tests nuevos, ≥82% coverage |
-| 1.4 | 2026-04-19 | Claude Code | Implementación Fase D hardening — 12 excepciones centralizadas, bandit clean, coverage audit, `register_<name>()` helpers. D1-01/02/03 deferidos a migración operacional de `supervisor.py` |
-| 1.5 | 2026-04-19 | Claude Code | Implementación Fase E — MCP capability routing. Nuevo `config/mcp_servers.yaml`, `capabilities: list[str]` en `MCPServerConfig`, filtrado en `MCPClientManager` y `get_tools_for_agent`, `DEFAULT_CAPABILITY_MAP` para los 9 nodos nuevos. 13 tests, 688 total. |
+| 1.0 | 2026-04-19 | Ernesto Crespo | Initial version — contracts for 14 modules |
+| 1.1 | 2026-04-19 | Claude Code | Phase A implementation (7 RAG engines) — 268 tests, ≥88% coverage |
+| 1.2 | 2026-04-19 | Claude Code | Phase B implementation (7 agent patterns) — 102 new tests, ≥90% coverage |
+| 1.3 | 2026-04-19 | Claude Code | Phase C implementation (5 subgraph pipelines) — 111 new tests, ≥82% coverage |
+| 1.4 | 2026-04-19 | Claude Code | Phase D hardening implementation — 12 centralized exceptions, bandit clean, coverage audit, `register_<name>()` helpers. D1-01/02/03 deferred to operational migration of `supervisor.py` |
+| 1.5 | 2026-04-19 | Claude Code | Phase E implementation — MCP capability routing. New `config/mcp_servers.yaml`, `capabilities: list[str]` in `MCPServerConfig`, filtering in `MCPClientManager` and `get_tools_for_agent`, `DEFAULT_CAPABILITY_MAP` for the 9 new nodes. 13 tests, 688 total. |

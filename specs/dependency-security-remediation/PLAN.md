@@ -1,229 +1,229 @@
-# Prismal — Remediación de Vulnerabilidades de Dependencias (Dependabot)
+# Prismal — Dependency Vulnerability Remediation (Dependabot)
 
 ## Strategic Plan / Product Requirements Document (PLAN)
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `IMPLEMENTED` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-06-05 |
+| **Author** | Ernesto Crespo |
+| **Status** | `IMPLEMENTED` |
+| **Version** | 1.0 |
+| **Date** | 2026-06-05 |
 | **Reviewers** | Tech Lead, Security Lead, AI Architect |
-| **Documentos relacionados** | `ARCHITECTURE.md`, `SPEC.md`, `TASKS.md` |
-| **Fuente** | GitHub Dependabot — `prismal-ai/prismal/security/dependabot` (18 alertas abiertas) |
-| **Prioridad** | **ALTA** |
+| **Related documents** | `ARCHITECTURE.md`, `SPEC.md`, `TASKS.md` |
+| **Source** | GitHub Dependabot — `prismal-ai/prismal/security/dependabot` (18 open alerts) |
+| **Priority** | **HIGH** |
 
 ---
 
-## 1. Resumen Ejecutivo
+## 1. Executive Summary
 
-El reporte de Dependabot lista **18 alertas abiertas** sobre el `uv.lock` y un workflow de CI: **3 Critical, 8 High, 6 Moderate, 1 Low**. Este plan las analiza una por una, las cruza con la versión efectivamente fijada hoy en `uv.lock` y con el *surface* real de prismal, y define una remediación priorizada por riesgo.
+The Dependabot report lists **18 open alerts** against `uv.lock` and one CI workflow: **3 Critical, 8 High, 6 Moderate, 1 Low**. This plan analyzes them one by one, cross-references them with the version actually pinned today in `uv.lock` and with prismal's real surface, and defines a risk-prioritized remediation.
 
-**Hallazgo principal:** la mayoría de las alertas **ya están resueltas en el `uv.lock` actual** — Dependabot escaneó un `uv.lock` anterior. De las 18:
+**Main finding:** most of the alerts **are already resolved in the current `uv.lock`** — Dependabot scanned a previous `uv.lock`. Of the 18:
 
-- **~11 ya resueltas en el lock actual** (la versión fijada ya es ≥ la parcheada): los 4 alerts de `litellm` (1.86.2 ≥ 1.83.10), los 2 de `urllib3` (2.7.0), los 2 de `langsmith` (0.8.7 ≥ 0.8.0), `idna` (3.17 ≥ 3.15), `starlette` (1.2.0 ≥ 1.0.1). → **Acción: push del lock + verificar/cerrar la alerta.**
-- **~3 requieren upgrade real**: `aiohttp` (2 alertas → ≥ 3.14.0), `transformers` (CVE-2026-1839), `prefect` (SSRF), y `pymdown-extensions` (regresión snippets, a verificar).
-- **2 sin fix upstream → mitigación**: `chromadb` (CVE-2026-45829, sin parche) y `ecdsa` (CVE-2024-23342, *won't-fix*). Ambas ya documentadas en `.trivyignore` con justificación.
-- **1 incidente de cadena de suministro**: `aquasecurity/trivy-action` (GHSA-69fq-xp46-6x23) en `.github/workflows/ci.yml`.
+- **~11 already resolved in the current lock** (the pinned version is already ≥ the patched one): the 4 `litellm` alerts (1.86.2 ≥ 1.83.10), the 2 `urllib3` alerts (2.7.0), the 2 `langsmith` alerts (0.8.7 ≥ 0.8.0), `idna` (3.17 ≥ 3.15), `starlette` (1.2.0 ≥ 1.0.1). → **Action: push the lock + verify/close the alert.**
+- **~3 require a real upgrade**: `aiohttp` (2 alerts → ≥ 3.14.0), `transformers` (CVE-2026-1839), `prefect` (SSRF), and `pymdown-extensions` (snippets regression, to be verified).
+- **2 with no upstream fix → mitigation**: `chromadb` (CVE-2026-45829, unpatched) and `ecdsa` (CVE-2024-23342, *won't-fix*). Both already documented in `.trivyignore` with justification.
+- **1 supply-chain incident**: `aquasecurity/trivy-action` (GHSA-69fq-xp46-6x23) in `.github/workflows/ci.yml`.
 
-**Contexto de exposición decisivo:** prismal es un **framework/librería**, no un despliegue que ejecute el *proxy server* de LiteLLM ni el *servidor HTTP* de ChromaDB. Por eso varias CVEs Critical/High de superficie de servidor (SQLi del proxy LiteLLM, SSTI en `/prompts/test`, endpoints MCP stdio de test, *sandbox escape* del *custom-code guardrail*, RCE pre-auth de ChromaDB) **no están en el surface de ejecución de prismal**. Dependabot alerta por versión, no por uso; el riesgo real es sustancialmente menor, pero igual se remedia subiendo a versiones parcheadas para mantener el árbol limpio.
-
----
-
-## 2. Contexto y Problema
-
-### 2.1 Situación Actual
-
-- El repo ya tiene una práctica de gestión de CVEs madura: `.trivyignore`, `pip-audit --ignore-vuln` en `.pre-commit-config.yaml` y `.github/workflows/ci.yml`, y triage vía `prismal doctor security-check` (Phase 30).
-- Sin embargo, **el `.trivyignore` y los ignores de CI no cubren todas las 18 alertas nuevas**: faltan `aiohttp` (CVE-2026-34993, CVE-2026-47265), `transformers` (CVE-2026-1839), `urllib3` (CVE-2026-21441, GHSA-qccp-gfcp-xxvc), `idna` (CVE-2026-45409), `starlette` (CVE-2026-48710), `langsmith` (CVE-2026-45134), `pymdown-extensions`, `prefect` (SSRF), y la mayoría de las CVEs nuevas de `litellm`.
-- El `uv.lock` ya fue bumpeado por encima de varias correcciones (litellm 1.86.2, urllib3 2.7.0, langsmith 0.8.7, idna 3.17, starlette 1.2.0), pero **las alertas de Dependabot siguen abiertas** porque reflejan un escaneo previo o esperan que se empuje el lock.
-
-### 2.2 Problema
-
-1. **Ruido vs señal:** 18 alertas abiertas ocultan cuáles requieren acción real (≈5) frente a las que solo necesitan empujar el lock (≈11) o mitigar sin fix (2).
-2. **Cobertura incompleta de los ignore-lists:** las CVEs sin fix (chromadb, ecdsa) deben quedar documentadas; las resueltas deben quitarse de los ignore-lists cuando el lock las supere.
-3. **Riesgo de cadena de suministro activo:** el incidente de `trivy-action` (mar-2026) exige verificar que el workflow no referencia tags comprometidos y, si se ejecutó en la ventana de compromiso, rotar secretos de CI.
-4. **Sin un artefacto de triage versionado:** no hay un documento que registre, por alerta, la decisión (upgrade / mitigar / aceptar) y su justificación de exposición.
-
-### 2.3 Oportunidad
-
-Convertir el reporte de Dependabot en un **artefacto de remediación versionado** (este spec) que: (a) cierre rápido las ~11 ya resueltas, (b) ejecute los ~5 upgrades reales con validación, (c) documente las 2 mitigaciones sin-fix, y (d) cierre el incidente de cadena de suministro. Esfuerzo bajo-medio, reduce el surface y deja trazabilidad de seguridad.
+**Decisive exposure context:** prismal is a **framework/library**, not a deployment that runs LiteLLM's *proxy server* or ChromaDB's *HTTP server*. Therefore several Critical/High CVEs in the server surface (LiteLLM proxy SQLi, SSTI in `/prompts/test`, MCP stdio test endpoints, *sandbox escape* of the *custom-code guardrail*, ChromaDB pre-auth RCE) **are not in prismal's execution surface**. Dependabot alerts by version, not by usage; the real risk is substantially lower, but it is still remediated by bumping to patched versions to keep the tree clean.
 
 ---
 
-## 3. Usuarios Objetivo
+## 2. Context and Problem
+
+### 2.1 Current Situation
+
+- The repo already has a mature CVE management practice: `.trivyignore`, `pip-audit --ignore-vuln` in `.pre-commit-config.yaml` and `.github/workflows/ci.yml`, and triage via `prismal doctor security-check` (Phase 30).
+- However, **the `.trivyignore` and the CI ignores do not cover all 18 new alerts**: missing are `aiohttp` (CVE-2026-34993, CVE-2026-47265), `transformers` (CVE-2026-1839), `urllib3` (CVE-2026-21441, GHSA-qccp-gfcp-xxvc), `idna` (CVE-2026-45409), `starlette` (CVE-2026-48710), `langsmith` (CVE-2026-45134), `pymdown-extensions`, `prefect` (SSRF), and most of the new `litellm` CVEs.
+- The `uv.lock` was already bumped above several fixes (litellm 1.86.2, urllib3 2.7.0, langsmith 0.8.7, idna 3.17, starlette 1.2.0), but **the Dependabot alerts remain open** because they reflect a previous scan or are waiting for the lock to be pushed.
+
+### 2.2 Problem
+
+1. **Noise vs signal:** 18 open alerts obscure which ones require real action (≈5) versus those that only need the lock pushed (≈11) or mitigation without a fix (2).
+2. **Incomplete ignore-list coverage:** the CVEs without a fix (chromadb, ecdsa) must remain documented; the resolved ones must be removed from the ignore-lists once the lock surpasses them.
+3. **Active supply-chain risk:** the `trivy-action` incident (Mar 2026) requires verifying that the workflow does not reference compromised tags and, if it ran during the compromise window, rotating CI secrets.
+4. **No versioned triage artifact:** there is no document that records, per alert, the decision (upgrade / mitigate / accept) and its exposure justification.
+
+### 2.3 Opportunity
+
+Turn the Dependabot report into a **versioned remediation artifact** (this spec) that: (a) quickly closes the ~11 already resolved, (b) executes the ~5 real upgrades with validation, (c) documents the 2 no-fix mitigations, and (d) closes the supply-chain incident. Low-to-medium effort, reduces the surface, and leaves a security audit trail.
+
+---
+
+## 3. Target Users
 
 ### Persona 1: Security Lead / Maintainer
-- **Necesidad:** Una decisión por alerta con justificación de exposición y criterio de cierre, no solo "subir versión".
-- **Frecuencia:** Por reporte / sprint de seguridad.
+- **Need:** A decision per alert with exposure justification and closure criteria, not just "bump the version".
+- **Frequency:** Per report / security sprint.
 
 ### Persona 2: Release Engineer
-- **Necesidad:** Comandos `uv` concretos y validación (`pip-audit`, `trivy`, suite de tests) para aplicar y verificar cada cambio sin romper el stack.
-- **Frecuencia:** Por release.
+- **Need:** Concrete `uv` commands and validation (`pip-audit`, `trivy`, test suite) to apply and verify each change without breaking the stack.
+- **Frequency:** Per release.
 
 ### Persona 3: Downstream Consumer (prismal-sdk / prismal-web)
-- **Necesidad:** Saber qué CVEs afectan realmente el runtime y cuáles son ruido de librería no usada (proxy LiteLLM, server ChromaDB).
-- **Frecuencia:** Por upgrade de dependencia.
+- **Need:** To know which CVEs actually affect the runtime and which are noise from an unused library (LiteLLM proxy, ChromaDB server).
+- **Frequency:** Per dependency upgrade.
 
 ---
 
-## 4. Objetivos y Métricas de Éxito
+## 4. Goals and Success Metrics
 
-### 4.1 Objetivos
+### 4.1 Goals
 
-| Objetivo | Métrica | Target | Plazo |
+| Goal | Metric | Target | Timeframe |
 |---|---|---|---|
-| Cerrar alertas ya resueltas en el lock | Alertas Dependabot cerradas tras push del lock | 11/11 | P0 (días) |
-| Remediar upgrades reales | aiohttp, transformers, prefect, pymdown remediadas o mitigadas | 100% | P1 (1 semana) |
-| Documentar mitigaciones sin-fix | chromadb + ecdsa con justificación en `.trivyignore` + este spec | 2/2 | P0 |
-| Cerrar incidente cadena de suministro | trivy-action verificado/pineado a SHA; secretos rotados si aplica | Hecho | P0 |
-| Higiene de ignore-lists | `.trivyignore`/CI sin ignores obsoletos; nuevos documentados | Sincronizado | P1 |
-| Sin regresiones | `uv run pytest -m "not live_api"` | 100% | Global |
+| Close alerts already resolved in the lock | Dependabot alerts closed after pushing the lock | 11/11 | P0 (days) |
+| Remediate real upgrades | aiohttp, transformers, prefect, pymdown remediated or mitigated | 100% | P1 (1 week) |
+| Document no-fix mitigations | chromadb + ecdsa with justification in `.trivyignore` + this spec | 2/2 | P0 |
+| Close supply-chain incident | trivy-action verified/pinned to SHA; secrets rotated if applicable | Done | P0 |
+| Ignore-list hygiene | `.trivyignore`/CI without obsolete ignores; new ones documented | Synced | P1 |
+| No regressions | `uv run pytest -m "not live_api"` | 100% | Global |
 
-### 4.2 No-objetivos (este ciclo)
+### 4.2 Non-goals (this cycle)
 
-- Migrar `python-jose` → `PyJWT` (mitigación de `ecdsa`): se documenta como deuda, no se ejecuta aquí.
-- Bump mayor de `transformers` a 5.x: se prefiere mitigación (`torch≥2.6`) salvo que se valide la 5.x estable.
+- Migrate `python-jose` → `PyJWT` (mitigation for `ecdsa`): documented as debt, not executed here.
+- Major bump of `transformers` to 5.x: mitigation (`torch≥2.6`) is preferred unless the stable 5.x is validated.
 
 ---
 
-## 5. Alcance
+## 5. Scope
 
 ### 5.1 In Scope
 
-- Triage y decisión por cada una de las 18 alertas (matriz completa en `SPEC.md`).
-- Upgrades en `pyproject.toml` / `uv.lock` para las alertas con fix disponible y compatible.
-- Mitigaciones documentadas para las 2 sin fix.
-- Verificación y pin del workflow de CI afectado por el incidente de `trivy-action`.
-- Sincronización de `.trivyignore`, `.pre-commit-config.yaml` y `.github/workflows/ci.yml`.
-- Validación: `pip-audit`, `trivy`, `bandit`, suite de tests.
+- Triage and decision for each of the 18 alerts (full matrix in `SPEC.md`).
+- Upgrades in `pyproject.toml` / `uv.lock` for the alerts with an available and compatible fix.
+- Documented mitigations for the 2 without a fix.
+- Verification and pinning of the CI workflow affected by the `trivy-action` incident.
+- Synchronization of `.trivyignore`, `.pre-commit-config.yaml`, and `.github/workflows/ci.yml`.
+- Validation: `pip-audit`, `trivy`, `bandit`, test suite.
 
 ### 5.2 Out of Scope
 
-- Reescritura de código de aplicación (las CVEs son de dependencias, no de código prismal).
-- Auditoría de seguridad del propio código de prismal (las capas L1–L5 ya existen; fuera de este ciclo).
-- Migración `python-jose`→`PyJWT` (deuda registrada).
-- Endurecimiento de despliegues de `prismal-web` (responsabilidad del host).
+- Rewriting application code (the CVEs are in dependencies, not in prismal code).
+- Security audit of prismal's own code (the L1–L5 layers already exist; out of scope for this cycle).
+- `python-jose`→`PyJWT` migration (recorded as debt).
+- Hardening of `prismal-web` deployments (host's responsibility).
 
-### 5.3 Futuras Consideraciones
+### 5.3 Future Considerations
 
-- Automatizar el flujo "Dependabot → matriz → uv upgrade → pip-audit" en `prismal doctor security-check`.
-- Pin de TODAS las GitHub Actions a SHA inmutable (no solo trivy).
-- Política de SLA por severidad (Critical: 48 h, High: 7 días, Moderate: 30 días).
+- Automate the "Dependabot → matrix → uv upgrade → pip-audit" flow in `prismal doctor security-check`.
+- Pin ALL GitHub Actions to an immutable SHA (not just trivy).
+- SLA policy by severity (Critical: 48 h, High: 7 days, Moderate: 30 days).
 
 ---
 
-## 6. Requisitos Funcionales (Resumen — detalle en `SPEC.md`)
+## 6. Functional Requirements (Summary — detail in `SPEC.md`)
 
-| ID | Requisito | Prioridad |
+| ID | Requirement | Priority |
 |---|---|---|
-| RF-SEC-001 | Cada alerta tiene decisión documentada: resuelta / upgrade / mitigar / supply-chain | `MUST` |
-| RF-SEC-002 | Las ~11 alertas ya resueltas en el lock se verifican y cierran tras push | `MUST` |
-| RF-SEC-003 | `aiohttp` se sube a ≥ 3.14.0 (CVE-2026-34993, CVE-2026-47265) | `MUST` |
-| RF-SEC-004 | `transformers` se mitiga (`torch≥2.6`) o se sube a 5.x estable (CVE-2026-1839) | `MUST` |
-| RF-SEC-005 | `prefect` se sube a la versión con fix del SSRF DNS-rebinding | `SHOULD` |
-| RF-SEC-006 | `pymdown-extensions` se verifica y remedia (regresión snippets) | `SHOULD` |
-| RF-SEC-007 | `chromadb` (sin fix) documentada como mitigación: uso embebido, sin server HTTP | `MUST` |
-| RF-SEC-008 | `ecdsa` (won't-fix) documentada: transitiva, deuda de migración a PyJWT | `MUST` |
-| RF-SEC-009 | Workflow CI verificado/pineado por el incidente `trivy-action`; secretos rotados si aplica | `MUST` |
-| RF-SEC-010 | `.trivyignore`/CI sincronizados; ignores obsoletos removidos, nuevos justificados | `MUST` |
-| RF-SEC-011 | Validación final: `pip-audit` + `trivy` + `bandit` + tests verdes | `MUST` |
-| RF-SEC-012 | Nota de exposición (library vs server surface) por CVE de superficie de servidor | `SHOULD` |
+| RF-SEC-001 | Each alert has a documented decision: resolved / upgrade / mitigate / supply-chain | `MUST` |
+| RF-SEC-002 | The ~11 alerts already resolved in the lock are verified and closed after the push | `MUST` |
+| RF-SEC-003 | `aiohttp` is bumped to ≥ 3.14.0 (CVE-2026-34993, CVE-2026-47265) | `MUST` |
+| RF-SEC-004 | `transformers` is mitigated (`torch≥2.6`) or bumped to stable 5.x (CVE-2026-1839) | `MUST` |
+| RF-SEC-005 | `prefect` is bumped to the version with the SSRF DNS-rebinding fix | `SHOULD` |
+| RF-SEC-006 | `pymdown-extensions` is verified and remediated (snippets regression) | `SHOULD` |
+| RF-SEC-007 | `chromadb` (no fix) documented as mitigation: embedded use, no HTTP server | `MUST` |
+| RF-SEC-008 | `ecdsa` (won't-fix) documented: transitive, debt to migrate to PyJWT | `MUST` |
+| RF-SEC-009 | CI workflow verified/pinned for the `trivy-action` incident; secrets rotated if applicable | `MUST` |
+| RF-SEC-010 | `.trivyignore`/CI synchronized; obsolete ignores removed, new ones justified | `MUST` |
+| RF-SEC-011 | Final validation: `pip-audit` + `trivy` + `bandit` + green tests | `MUST` |
+| RF-SEC-012 | Exposure note (library vs server surface) per server-surface CVE | `SHOULD` |
 
 ---
 
-## 7. Requisitos No Funcionales
+## 7. Non-Functional Requirements
 
-### Seguridad
-- Ninguna CVE Critical/High sin decisión explícita y justificada.
-- Las CVEs sin fix deben tener mitigación documentada y un *trigger* de re-evaluación (cuándo quitar el ignore).
-- El incidente de cadena de suministro se trata como P0 (potencial exfiltración de secretos de CI).
+### Security
+- No Critical/High CVE without an explicit and justified decision.
+- CVEs without a fix must have a documented mitigation and a re-evaluation *trigger* (when to remove the ignore).
+- The supply-chain incident is treated as P0 (potential exfiltration of CI secrets).
 
-### Compatibilidad
-- Ningún upgrade puede romper el stack pineado (Python 3.13+, `uv.lock` resoluble).
-- `filterwarnings=error` en tests: los upgrades no deben introducir `DeprecationWarning` propios.
+### Compatibility
+- No upgrade may break the pinned stack (Python 3.13+, resolvable `uv.lock`).
+- `filterwarnings=error` in tests: upgrades must not introduce our own `DeprecationWarning`s.
 
-### Trazabilidad
-- Cada decisión queda en `SPEC.md` con CVE, versión, acción y fecha.
-- `.trivyignore` referencia este spec para los ignores nuevos.
+### Traceability
+- Each decision is recorded in `SPEC.md` with CVE, version, action, and date.
+- `.trivyignore` references this spec for the new ignores.
 
-### Reversibilidad
-- Cada upgrade es un commit aislado y revertible; `uv.lock` permite rollback.
+### Reversibility
+- Each upgrade is an isolated, revertible commit; `uv.lock` allows rollback.
 
 ---
 
-## 8. Restricciones y Dependencias
+## 8. Constraints and Dependencies
 
-- `uv` como gestor; toda resolución pasa por `uv lock` / `uv sync`.
-- Algunas correcciones no tienen fix upstream (chromadb, ecdsa) → mitigación, no upgrade.
-- `transformers` 5.x es un bump mayor (breaking) → preferir mitigación por `torch≥2.6`.
-- Verificación de versiones parcheadas contra GitHub Advisory Database (GHSA) en el momento de remediar (las versiones aquí se basan en el estado a 2026-06-05).
+- `uv` as the manager; all resolution goes through `uv lock` / `uv sync`.
+- Some fixes have no upstream fix (chromadb, ecdsa) → mitigation, not upgrade.
+- `transformers` 5.x is a major (breaking) bump → prefer mitigation via `torch≥2.6`.
+- Verification of patched versions against the GitHub Advisory Database (GHSA) at remediation time (the versions here are based on the state as of 2026-06-05).
 
 ---
 
 ## 9. User Stories
 
-**US-SEC-001:** Como Security Lead, quiero saber cuáles de las 18 alertas requieren acción real para no perder tiempo en las ya resueltas.
-- [ ] La matriz separa "resuelta en lock" de "upgrade" de "mitigar".
+**US-SEC-001:** As a Security Lead, I want to know which of the 18 alerts require real action so I don't waste time on the ones already resolved.
+- [ ] The matrix separates "resolved in lock" from "upgrade" from "mitigate".
 
-**US-SEC-002:** Como Release Engineer, quiero los comandos `uv` exactos y la validación para cada upgrade.
-- [ ] `TASKS.md` lista el comando y el criterio de verificación por alerta.
+**US-SEC-002:** As a Release Engineer, I want the exact `uv` commands and validation for each upgrade.
+- [ ] `TASKS.md` lists the command and the verification criterion per alert.
 
-**US-SEC-003:** Como Maintainer, quiero cerrar el incidente de `trivy-action` con certeza de que no hubo exfiltración o, si la hubo, con rotación de secretos.
-- [ ] Verificación del workflow + checklist de rotación.
+**US-SEC-003:** As a Maintainer, I want to close the `trivy-action` incident with certainty that there was no exfiltration or, if there was, with secret rotation.
+- [ ] Workflow verification + rotation checklist.
 
-**US-SEC-004:** Como Downstream Consumer, quiero saber qué CVEs son ruido de librería no usada.
-- [ ] Nota de exposición por CVE de superficie de servidor (LiteLLM proxy, ChromaDB server).
+**US-SEC-004:** As a Downstream Consumer, I want to know which CVEs are noise from an unused library.
+- [ ] Exposure note per server-surface CVE (LiteLLM proxy, ChromaDB server).
 
 ---
 
-## 10. Riesgos y Mitigaciones
+## 10. Risks and Mitigations
 
-| Riesgo | Probabilidad | Impacto | Mitigación |
+| Risk | Probability | Impact | Mitigation |
 |---|---|---|---|
-| Upgrade de `aiohttp` 3.14 rompe transporte MCP SSE | Baja | Medio | Tests de integración MCP; cambio aislado y revertible |
-| Bump de `transformers` 5.x rompe `sentence-transformers` | Media | Alto | Preferir mitigación `torch≥2.6`; no subir a 5.x salvo validación |
-| Secretos de CI comprometidos por `trivy-action` (mar-2026) | Media | Crítico | Verificar ventana de ejecución; rotar tokens/secretos; pin a SHA |
-| `chromadb`/`ecdsa` sin fix se "olvidan" en el ignore-list | Media | Medio | Trigger de re-evaluación documentado + `prismal doctor security-check` |
-| Cerrar alertas resueltas pero el lock no se empuja | Media | Bajo | P0 explícito: push del `uv.lock` actual primero |
-| Versiones parcheadas cambian tras este spec | Media | Bajo | Verificar GHSA al ejecutar; SPEC fechado |
+| `aiohttp` 3.14 upgrade breaks the MCP SSE transport | Low | Medium | MCP integration tests; isolated and revertible change |
+| `transformers` 5.x bump breaks `sentence-transformers` | Medium | High | Prefer `torch≥2.6` mitigation; do not bump to 5.x without validation |
+| CI secrets compromised by `trivy-action` (Mar 2026) | Medium | Critical | Verify execution window; rotate tokens/secrets; pin to SHA |
+| `chromadb`/`ecdsa` without a fix get "forgotten" in the ignore-list | Medium | Medium | Documented re-evaluation trigger + `prismal doctor security-check` |
+| Close resolved alerts but the lock is not pushed | Medium | Low | Explicit P0: push the current `uv.lock` first |
+| Patched versions change after this spec | Medium | Low | Verify GHSA at execution time; SPEC is dated |
 
 ---
 
-## 11. Timeline Estimado (priorizado por riesgo)
+## 11. Estimated Timeline (risk-prioritized)
 
-| Ola | Duración | Entregable |
+| Wave | Duration | Deliverable |
 |---|---|---|
-| **P0 — Crítico/Supply-chain** | 1–2 días | Push del lock (cierra ~11), incidente trivy-action cerrado, chromadb/ecdsa documentadas |
-| **P1 — Upgrades reales** | 3–5 días | aiohttp ≥3.14, transformers mitigado, prefect, pymdown |
-| **P2 — Higiene** | 1–2 días | Sync de ignore-lists, validación final, cierre de alertas restantes |
-| **Total** | **~1.5 semanas** | 18/18 alertas resueltas o mitigadas con trazabilidad |
+| **P0 — Critical/Supply-chain** | 1–2 days | Push the lock (closes ~11), trivy-action incident closed, chromadb/ecdsa documented |
+| **P1 — Real upgrades** | 3–5 days | aiohttp ≥3.14, transformers mitigated, prefect, pymdown |
+| **P2 — Hygiene** | 1–2 days | Ignore-list sync, final validation, closure of remaining alerts |
+| **Total** | **~1.5 weeks** | 18/18 alerts resolved or mitigated with traceability |
 
 ---
 
-## 12. Definición de Done (Global)
+## 12. Definition of Done (Global)
 
-- [ ] Las 18 alertas tienen estado terminal: cerrada (resuelta), remediada (upgrade), o mitigada (sin fix, documentada).
-- [ ] `uv.lock` actualizado y empujado; alertas ya resueltas cerradas en Dependabot.
-- [ ] `aiohttp ≥ 3.14.0`; `transformers` mitigado o ≥ versión segura; `prefect`/`pymdown` remediados o con decisión documentada.
-- [ ] `chromadb` y `ecdsa` con mitigación y trigger de re-evaluación en `.trivyignore` + `SPEC.md`.
-- [ ] Workflow CI verificado/pineado por el incidente `trivy-action`; rotación de secretos ejecutada si aplica.
-- [ ] `.trivyignore`, `.pre-commit-config.yaml`, `.github/workflows/ci.yml` sincronizados.
-- [ ] `uv run pip-audit` (con ignores justificados) limpio; `trivy` y `bandit` limpios; `pytest -m "not live_api"` 100%.
-- [ ] `CHANGELOG.md` con entrada de seguridad; este spec marcado `IMPLEMENTED`.
+- [ ] The 18 alerts have a terminal state: closed (resolved), remediated (upgrade), or mitigated (no fix, documented).
+- [ ] `uv.lock` updated and pushed; already-resolved alerts closed in Dependabot.
+- [ ] `aiohttp ≥ 3.14.0`; `transformers` mitigated or ≥ safe version; `prefect`/`pymdown` remediated or with a documented decision.
+- [ ] `chromadb` and `ecdsa` with mitigation and re-evaluation trigger in `.trivyignore` + `SPEC.md`.
+- [ ] CI workflow verified/pinned for the `trivy-action` incident; secret rotation executed if applicable.
+- [ ] `.trivyignore`, `.pre-commit-config.yaml`, `.github/workflows/ci.yml` synchronized.
+- [ ] `uv run pip-audit` (with justified ignores) clean; `trivy` and `bandit` clean; `pytest -m "not live_api"` 100%.
+- [ ] `CHANGELOG.md` with a security entry; this spec marked `IMPLEMENTED`.
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-06-05 | Ernesto Crespo | Plan inicial — remediación de 18 alertas Dependabot |
+| 1.0 | 2026-06-05 | Ernesto Crespo | Initial plan — remediation of 18 Dependabot alerts |
 
-## Aprobaciones
+## Approvals
 
-| Rol | Nombre | Fecha | Estado |
+| Role | Name | Date | Status |
 |---|---|---|---|
-| Tech Lead | — | | ☐ Pendiente |
-| Security Lead | — | | ☐ Pendiente |
-| AI Architect | — | | ☐ Pendiente |
+| Tech Lead | — | | ☐ Pending |
+| Security Lead | — | | ☐ Pending |
+| AI Architect | — | | ☐ Pending |

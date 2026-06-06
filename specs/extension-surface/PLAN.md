@@ -2,261 +2,261 @@
 
 ## Strategic Plan / Product Requirements Document (PLAN)
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-05-27 |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` |
+| **Version** | 1.0 |
+| **Date** | 2026-05-27 |
 | **Reviewers** | Tech Lead, AI Architect, DX Lead |
-| **Documentos relacionados** | `ARCHITECTURE.md`, `SPEC.md`, `TASKS.md` |
+| **Related documents** | `ARCHITECTURE.md`, `SPEC.md`, `TASKS.md` |
 
 ---
 
-## 1. Resumen Ejecutivo
+## 1. Executive Summary
 
-Prismal envuelve LangGraph internamente: ofrece 26 agentes especialistas, 7 RAG engines, 9 patrones, 11 subgraphs y una capa multimodal planificada. Sin embargo, **no expone una API pública para que un usuario construya patrones nuevos directamente sobre LangGraph** beneficiándose de la infraestructura existente (security 5-layer, OTel, audit, `ProviderRegistry`, capability routing, checkpointing). Hoy, extender prismal requiere o bien forkear el repo, o duplicar wiring de cross-cutting concerns en cada nodo nuevo.
+Prismal wraps LangGraph internally: it offers 26 specialist agents, 7 RAG engines, 9 patterns, 11 subgraphs, and a planned multimodal layer. However, **it does not expose a public API for a user to build new patterns directly on top of LangGraph** while benefiting from the existing infrastructure (5-layer security, OTel, audit, `ProviderRegistry`, capability routing, checkpointing). Today, extending prismal requires either forking the repo or duplicating cross-cutting-concern wiring in each new node.
 
-Este documento define una **superficie de extensión deliberada** que convierte a prismal en "LangGraph con baterías incluidas, no LangGraph escondido". Cinco componentes:
+This document defines a **deliberate extension surface** that turns prismal into "LangGraph with batteries included, not LangGraph hidden". Five components:
 
-1. **Re-export oficial** (`prismal.langgraph`) — punto único, versionado, para `StateGraph`, `Send`, `interrupt`, `add_messages`.
-2. **`@prismal_node` decorator** — envuelve cualquier `async (state) → state_update` con security, OTel span, audit, registro de capabilities.
-3. **`PrismalStateGraphBuilder`** — fluent API sobre `StateGraph[AgentState]` que aplica defaults de prismal en `add_node()`.
-4. **Plugin discovery vía entry points** — `prismal.subgraphs` y `prismal.nodes` permiten que paquetes externos (`prismal-x-finance`, `prismal-x-healthcare`) se auto-registren.
-5. **`LangChainRunnableAdapter`** — convierte cualquier `Runnable` / `AgentExecutor` de LangChain en un nodo válido del grafo prismal.
+1. **Official re-export** (`prismal.langgraph`) — a single, versioned entry point for `StateGraph`, `Send`, `interrupt`, `add_messages`.
+2. **`@prismal_node` decorator** — wraps any `async (state) → state_update` with security, OTel span, audit, and capability registration.
+3. **`PrismalStateGraphBuilder`** — a fluent API over `StateGraph[AgentState]` that applies prismal defaults in `add_node()`.
+4. **Plugin discovery via entry points** — `prismal.subgraphs` and `prismal.nodes` allow external packages (`prismal-x-finance`, `prismal-x-healthcare`) to auto-register.
+5. **`LangChainRunnableAdapter`** — converts any LangChain `Runnable` / `AgentExecutor` into a valid prismal graph node.
 
-El entregable es **opt-in y aditivo**: ningún consumidor existente se ve afectado. Habilita un ecosistema de plugins externos sin tocar el core, y baja el costo de adopción para equipos con código LangChain previo.
-
----
-
-## 2. Contexto y Problema
-
-### 2.1 Situación Actual
-
-- **Extensibilidad implícita pero no documentada.** `SubgraphRegistry` (`agents/subgraphs/registry.py`) y la convención `register_<name>(registry)` ya permiten registrar subgraphs externos, pero no hay docs ni ejemplos ni un contrato versionado.
-- **Cross-cutting por convención, no por contrato.** Cada nodo escribe a mano sus OTel spans, su logger, sus llamadas a `SecurePromptBuilder`/`ActionInterceptor.check()`. Olvidar uno es un bug silencioso (no hay validación).
-- **Sin plugin discovery.** Un paquete externo no puede contribuir nodos al supervisor sin pedirle al operador que llame manualmente al register en el startup. No hay `entry_points`, no hay namespace de plugins.
-- **LangGraph "oculto" por convención.** Aunque `agents/graph.py` importa LangGraph y lo usa, el usuario externo no sabe qué versión es compatible, qué imports son seguros, ni cómo construir un `StateGraph` aprovechando `AgentState` y `add_messages`.
-- **LangChain `Runnable` no se puede usar como nodo** sin escribir el adapter cada vez.
-
-### 2.2 Problema
-
-Sin una superficie de extensión:
-
-1. **Forking es la única opción** para añadir un patrón nuevo no contemplado en Fase A/B/C/F.
-2. **Cada equipo reinventa** los wrappers de security/OTel/audit en su nodo custom — con riesgo de saltarse alguno.
-3. **No hay ecosistema.** No puede existir `prismal-x-healthcare` o `prismal-x-finance` como paquetes pip independientes.
-4. **Curva de adopción alta.** Un equipo que ya usa LangChain/LangGraph debe migrar todo a prismal en vez de adaptar incrementalmente.
-
-### 2.3 Oportunidad
-
-Las primitivas necesarias **ya existen casi todas** en el repo:
-- Callable injection (Fase B) ya prueba que los patrones aceptan extensión sin acoplamiento.
-- `SubgraphRegistry` + `register_<name>()` ya es el patrón canónico.
-- `ProviderRegistry`, `SecurePromptBuilder`, `ActionInterceptor`, `AuditLogger`, `OTelManager` son componentes ya disponibles.
-
-Lo que falta es **declarar el contrato y empaquetarlo** como una API pública. El esfuerzo es bajo (cinco módulos pequeños), el impacto en adopción y ecosistema es alto, y no rompe nada existente.
+The deliverable is **opt-in and additive**: no existing consumer is affected. It enables an ecosystem of external plugins without touching the core, and lowers the adoption cost for teams with prior LangChain code.
 
 ---
 
-## 3. Usuarios Objetivo
+## 2. Context and Problem
+
+### 2.1 Current Situation
+
+- **Implicit but undocumented extensibility.** `SubgraphRegistry` (`agents/subgraphs/registry.py`) and the `register_<name>(registry)` convention already allow registering external subgraphs, but there are no docs, examples, or a versioned contract.
+- **Cross-cutting by convention, not by contract.** Each node hand-writes its OTel spans, its logger, its calls to `SecurePromptBuilder`/`ActionInterceptor.check()`. Forgetting one is a silent bug (there is no validation).
+- **No plugin discovery.** An external package cannot contribute nodes to the supervisor without asking the operator to manually call register at startup. There are no `entry_points`, no plugin namespace.
+- **LangGraph "hidden" by convention.** Although `agents/graph.py` imports LangGraph and uses it, the external user does not know which version is compatible, which imports are safe, or how to build a `StateGraph` leveraging `AgentState` and `add_messages`.
+- **LangChain `Runnable` cannot be used as a node** without writing the adapter every time.
+
+### 2.2 Problem
+
+Without an extension surface:
+
+1. **Forking is the only option** to add a new pattern not contemplated in Phase A/B/C/F.
+2. **Each team reinvents** the security/OTel/audit wrappers in its custom node — with the risk of skipping one.
+3. **There is no ecosystem.** There cannot exist a `prismal-x-healthcare` or `prismal-x-finance` as independent pip packages.
+4. **High adoption curve.** A team already using LangChain/LangGraph must migrate everything to prismal instead of adapting incrementally.
+
+### 2.3 Opportunity
+
+The necessary primitives **already mostly exist** in the repo:
+- Callable injection (Phase B) already proves that the patterns accept extension without coupling.
+- `SubgraphRegistry` + `register_<name>()` is already the canonical pattern.
+- `ProviderRegistry`, `SecurePromptBuilder`, `ActionInterceptor`, `AuditLogger`, `OTelManager` are already-available components.
+
+What is missing is to **declare the contract and package it** as a public API. The effort is low (five small modules), the impact on adoption and ecosystem is high, and it breaks nothing existing.
+
+---
+
+## 3. Target Users
 
 ### Persona 1: Framework Integrator
-- **Descripción:** Ingeniero que integra prismal en un producto y necesita un patrón propietario (ej. workflow de dominio interno con reglas no comunes).
-- **Necesidad principal:** Construir nodos custom que participen del state machine sin perder security/observability.
-- **Frecuencia de uso:** Semanal/Mensual.
+- **Description:** Engineer who integrates prismal into a product and needs a proprietary pattern (e.g. an internal domain workflow with uncommon rules).
+- **Main need:** Build custom nodes that participate in the state machine without losing security/observability.
+- **Usage frequency:** Weekly/Monthly.
 
 ### Persona 2: Plugin Author
-- **Descripción:** Mantiene un paquete `prismal-x-<dominio>` distribuido en PyPI con nodos, subgraphs y skills específicos del dominio.
-- **Necesidad principal:** Que su paquete se auto-registre al instalar y no requiera modificar el core de prismal.
-- **Frecuencia de uso:** Diaria durante desarrollo del plugin.
+- **Description:** Maintains a `prismal-x-<domain>` package distributed on PyPI with domain-specific nodes, subgraphs, and skills.
+- **Main need:** That their package auto-registers on install and does not require modifying the prismal core.
+- **Usage frequency:** Daily during plugin development.
 
 ### Persona 3: LangChain Migrator
-- **Descripción:** Equipo con código LangChain (chains, `Runnable`, `AgentExecutor`) que quiere adoptar prismal sin reescribir todo.
-- **Necesidad principal:** Adapter de un solo paso que tome su `Runnable` y lo exponga como nodo válido.
-- **Frecuencia de uso:** Migración inicial + extensiones puntuales.
+- **Description:** Team with LangChain code (chains, `Runnable`, `AgentExecutor`) that wants to adopt prismal without rewriting everything.
+- **Main need:** A one-step adapter that takes their `Runnable` and exposes it as a valid node.
+- **Usage frequency:** Initial migration + occasional extensions.
 
 ### Persona 4: Researcher / Pattern Designer
-- **Descripción:** Quiere experimentar con un patrón nuevo (ej. una variante de MCTS, un router con clasificador propio) sin esperar a que entre en el roadmap de prismal.
-- **Necesidad principal:** Acceso a `StateGraph`, `Send`, `interrupt` con docs explícitas y `AgentState` reutilizable.
+- **Description:** Wants to experiment with a new pattern (e.g. a variant of MCTS, a router with a custom classifier) without waiting for it to enter the prismal roadmap.
+- **Main need:** Access to `StateGraph`, `Send`, `interrupt` with explicit docs and reusable `AgentState`.
 
 ---
 
-## 4. Objetivos y Métricas de Éxito
+## 4. Objectives and Success Metrics
 
-### 4.1 Objetivos del Negocio
+### 4.1 Business Objectives
 
-| Objetivo | Métrica | Target | Plazo |
+| Objective | Metric | Target | Timeframe |
 |---|---|---|---|
-| Cobertura de cross-cutting automatizado | % de nodos custom que reciben security+OTel+audit sin escribir código | 100% vía `@prismal_node` | Fase X |
-| Ecosistema de plugins | Paquetes `prismal-x-*` en PyPI | ≥ 2 paquetes piloto | 3 meses post-merge |
-| Tiempo de "hello world" extensión | Minutos desde `pip install prismal` a primer nodo custom funcionando | ≤ 15 min | Fase X |
-| Backward compatibility | Tests existentes (~688) pasando sin cambios | 100% | Global |
-| Onboarding LangChain | Demo migrando un `AgentExecutor` a nodo prismal | ≤ 30 LoC | Fase X |
-| Cobertura de tests | Branch coverage módulos nuevos | ≥ 85% | Global |
+| Automated cross-cutting coverage | % of custom nodes that get security+OTel+audit without writing code | 100% via `@prismal_node` | Phase X |
+| Plugin ecosystem | `prismal-x-*` packages on PyPI | ≥ 2 pilot packages | 3 months post-merge |
+| Extension "hello world" time | Minutes from `pip install prismal` to first working custom node | ≤ 15 min | Phase X |
+| Backward compatibility | Existing tests (~688) passing without changes | 100% | Global |
+| LangChain onboarding | Demo migrating an `AgentExecutor` to a prismal node | ≤ 30 LoC | Phase X |
+| Test coverage | Branch coverage of new modules | ≥ 85% | Global |
 
-### 4.2 Objetivos de Usuario
+### 4.2 User Objectives
 
-| Objetivo del Usuario | Indicador |
+| User Objective | Indicator |
 |---|---|
-| Construir un nodo custom en minutos | `@prismal_node` documentado con ejemplo ejecutable |
-| Auto-registro de plugin sin tocar core | Entry points `prismal.subgraphs` funcionan via `importlib.metadata` |
-| Reutilizar `Runnable` existente | `LangChainRunnableAdapter(runnable).as_node()` |
-| Construir un subgraph propio con security/audit gratis | `PrismalStateGraphBuilder` aplica defaults sin pedir nada al usuario |
-| Saber qué versión de LangGraph usa prismal | `prismal.langgraph.VERSION` + docstring del módulo |
+| Build a custom node in minutes | `@prismal_node` documented with a runnable example |
+| Auto-register a plugin without touching core | Entry points `prismal.subgraphs` work via `importlib.metadata` |
+| Reuse an existing `Runnable` | `LangChainRunnableAdapter(runnable).as_node()` |
+| Build a custom subgraph with free security/audit | `PrismalStateGraphBuilder` applies defaults without asking anything of the user |
+| Know which LangGraph version prismal uses | `prismal.langgraph.VERSION` + module docstring |
 
 ---
 
-## 5. Alcance
+## 5. Scope
 
-### 5.1 In Scope (Incluido — Fase X)
+### 5.1 In Scope (Included — Phase X)
 
-**X1 — Re-export oficial (`prismal/langgraph.py`):**
-- [ ] Módulo `prismal.langgraph` que re-exporta `StateGraph`, `START`, `END`, `Send`, `interrupt`, `add_messages`, `CompiledStateGraph`.
-- [ ] Constante `VERSION` con la versión de `langgraph` resuelta vía `importlib.metadata`.
-- [ ] Docstring que documente compatibilidad y deprecación.
+**X1 — Official re-export (`prismal/langgraph.py`):**
+- [ ] Module `prismal.langgraph` that re-exports `StateGraph`, `START`, `END`, `Send`, `interrupt`, `add_messages`, `CompiledStateGraph`.
+- [ ] `VERSION` constant with the `langgraph` version resolved via `importlib.metadata`.
+- [ ] Docstring that documents compatibility and deprecation.
 
-**X2 — Decorator `@prismal_node` (`prismal/agents/extension/decorators.py`):**
-- [ ] Decorator que envuelve `async (state: AgentState) → dict` con OTel span, logger estructurado, audit hook, manejo de errores → `PrismalError`.
-- [ ] Parámetros: `name`, `capabilities`, `security`, `audit`, `retry`, `timeout_s`.
-- [ ] Registro automático en `DEFAULT_CAPABILITY_MAP` del `tool_registry` cuando el módulo se importa.
+**X2 — `@prismal_node` decorator (`prismal/agents/extension/decorators.py`):**
+- [ ] Decorator that wraps `async (state: AgentState) → dict` with an OTel span, structured logger, audit hook, error handling → `PrismalError`.
+- [ ] Parameters: `name`, `capabilities`, `security`, `audit`, `retry`, `timeout_s`.
+- [ ] Automatic registration in the `tool_registry`'s `DEFAULT_CAPABILITY_MAP` when the module is imported.
 
-**X3 — Builder fluent (`prismal/agents/extension/builder.py`):**
-- [ ] `PrismalStateGraphBuilder` que envuelve `StateGraph[AgentState]` con métodos `.add_node()`, `.add_edge()`, `.add_conditional_edges()`, `.add_supervisor()`, `.add_security_layer()`, `.compile()`.
-- [ ] Cada `.add_node()` aplica el equivalente a `@prismal_node` si el callable no lo está ya.
+**X3 — Fluent builder (`prismal/agents/extension/builder.py`):**
+- [ ] `PrismalStateGraphBuilder` that wraps `StateGraph[AgentState]` with methods `.add_node()`, `.add_edge()`, `.add_conditional_edges()`, `.add_supervisor()`, `.add_security_layer()`, `.compile()`.
+- [ ] Each `.add_node()` applies the equivalent of `@prismal_node` if the callable is not already.
 
 **X4 — Plugin discovery (`prismal/agents/extension/plugins.py`):**
 - [ ] Entry point groups: `prismal.subgraphs`, `prismal.nodes`, `prismal.tools`, `prismal.rag_engines`.
-- [ ] `discover_plugins()` que itera vía `importlib.metadata.entry_points()` y llama a la función `register(registry)` declarada por cada plugin.
-- [ ] Toggle `settings.plugins_autodiscover` (default `True`) para deshabilitar en entornos sandboxed.
-- [ ] CLI helper (opcional): `python -m prismal.plugins list`.
+- [ ] `discover_plugins()` that iterates via `importlib.metadata.entry_points()` and calls the `register(registry)` function declared by each plugin.
+- [ ] Toggle `settings.plugins_autodiscover` (default `True`) to disable in sandboxed environments.
+- [ ] CLI helper (optional): `python -m prismal.plugins list`.
 
 **X5 — `LangChainRunnableAdapter` (`prismal/agents/extension/adapters.py`):**
-- [ ] Wrapper que toma un `Runnable` o `AgentExecutor` de LangChain y retorna una función async `(state) → state_update`.
-- [ ] `as_node(name=..., capabilities=...)` para registro directo.
-- [ ] Mapeo automático de `state["messages"]` ↔ input/output del Runnable.
+- [ ] Wrapper that takes a LangChain `Runnable` or `AgentExecutor` and returns an async function `(state) → state_update`.
+- [ ] `as_node(name=..., capabilities=...)` for direct registration.
+- [ ] Automatic mapping of `state["messages"]` ↔ the Runnable's input/output.
 
-**X6 — Ports y Adapters formalizados (`prismal/agents/extension/ports.py`):**
-- [ ] `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort` como `Protocol` explícitos.
-- [ ] Adaptadores existentes (SqliteSaver, AuditLogger, etc.) declaran cumplimiento.
-- [ ] Permite que usuarios sustituyan implementaciones sin tocar el core.
+**X6 — Formalized ports and adapters (`prismal/agents/extension/ports.py`):**
+- [ ] `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort` as explicit `Protocol`s.
+- [ ] Existing adapters (SqliteSaver, AuditLogger, etc.) declare conformance.
+- [ ] Allows users to substitute implementations without touching the core.
 
-**X7 — Documentación y ejemplos:**
-- [ ] `docs/extension.md` con quickstart + recetas.
-- [ ] `examples/custom_node.py` — nodo custom con `@prismal_node`.
-- [ ] `examples/custom_subgraph.py` — subgraph custom con `PrismalStateGraphBuilder`.
-- [ ] `examples/plugin_template/` — esqueleto de paquete `prismal-x-<name>` listo para PyPI.
-- [ ] `examples/langchain_migration.py` — migración de `AgentExecutor` a nodo prismal.
+**X7 — Documentation and examples:**
+- [ ] `docs/extension.md` with quickstart + recipes.
+- [ ] `examples/custom_node.py` — custom node with `@prismal_node`.
+- [ ] `examples/custom_subgraph.py` — custom subgraph with `PrismalStateGraphBuilder`.
+- [ ] `examples/plugin_template/` — skeleton of a `prismal-x-<name>` package ready for PyPI.
+- [ ] `examples/langchain_migration.py` — migration of an `AgentExecutor` to a prismal node.
 
-**X8 — Settings y observabilidad:**
+**X8 — Settings and observability:**
 - [ ] `settings.plugins_autodiscover: bool = True`.
-- [ ] `settings.plugins_allowlist: list[str] = []` (vacío = todos los descubiertos).
+- [ ] `settings.plugins_allowlist: list[str] = []` (empty = all discovered).
 - [ ] `settings.plugins_denylist: list[str] = []`.
-- [ ] Métricas: `prismal_plugins_discovered_total`, `prismal_plugins_loaded_total{status="success|error"}`, `prismal_custom_nodes_invocations_total{node}`.
+- [ ] Metrics: `prismal_plugins_discovered_total`, `prismal_plugins_loaded_total{status="success|error"}`, `prismal_custom_nodes_invocations_total{node}`.
 
-### 5.2 Out of Scope (Excluido)
+### 5.2 Out of Scope (Excluded)
 
-- **Contenedor DI completo** (estilo `dependency-injector`) — overhead alto vs beneficio actual; el patrón "inject `settings: Settings | None = None`" basta.
-- **DSL propio sobre LangGraph** — rompería el principio "es LangGraph estándar"; el usuario debe poder leer docs de LangGraph y aplicarlas tal cual.
-- **Hot reload de plugins** — requiere infraestructura compleja; reinicio del proceso es aceptable.
-- **Marketplace de plugins** — fuera del scope del framework; se delegaría a una propiedad externa (`plugins.prismal.dev`) en fases posteriores.
-- **Migración automatizada de chains LangChain** — el adapter resuelve `Runnable`; transformaciones más profundas son responsabilidad del usuario.
-- **Firma criptográfica de plugins** — Fase Y; en X confiamos en el ecosistema PyPI estándar + allowlist/denylist por nombre.
+- **Full DI container** (in the style of `dependency-injector`) — high overhead vs current benefit; the "inject `settings: Settings | None = None`" pattern suffices.
+- **Custom DSL over LangGraph** — would break the "it's standard LangGraph" principle; the user must be able to read LangGraph docs and apply them as-is.
+- **Hot reload of plugins** — requires complex infrastructure; restarting the process is acceptable.
+- **Plugin marketplace** — outside the framework's scope; would be delegated to an external property (`plugins.prismal.dev`) in later phases.
+- **Automated migration of LangChain chains** — the adapter resolves `Runnable`; deeper transformations are the user's responsibility.
+- **Cryptographic signing of plugins** — Phase Y; in X we trust the standard PyPI ecosystem + allowlist/denylist by name.
 
-### 5.3 Futuras Consideraciones (Fase Y+)
+### 5.3 Future Considerations (Phase Y+)
 
-- Plugin signing + verificación opcional.
-- Hot reload vía `watchdog`.
+- Plugin signing + optional verification.
+- Hot reload via `watchdog`.
 - Plugin marketplace UI.
-- Schema validation declarativa de inputs/outputs de nodos (con Pydantic models opcionales).
-- Cuotas/sandboxing por plugin (CPU/memoria/red).
-- Telemetría agregada por plugin (latencia, errores, uso).
+- Declarative schema validation of node inputs/outputs (with optional Pydantic models).
+- Quotas/sandboxing per plugin (CPU/memory/network).
+- Aggregated telemetry per plugin (latency, errors, usage).
 
 ---
 
-## 6. Requisitos Funcionales (Resumen — detalle en `SPEC.md`)
+## 6. Functional Requirements (Summary — detail in `SPEC.md`)
 
-| ID | Requisito | Prioridad |
+| ID | Requirement | Priority |
 |---|---|---|
-| RF-EXT-001 | `prismal.langgraph` re-exporta símbolos de LangGraph con versión declarada | `MUST` |
-| RF-EXT-002 | `@prismal_node` envuelve callables con OTel span + logger + audit + error handling | `MUST` |
-| RF-EXT-003 | `@prismal_node` registra capabilities automáticamente al import | `SHOULD` |
-| RF-EXT-004 | `PrismalStateGraphBuilder` provee fluent API sobre `StateGraph[AgentState]` | `MUST` |
-| RF-EXT-005 | `discover_plugins()` itera entry points y llama `register(registry)` | `MUST` |
-| RF-EXT-006 | Toggle `plugins_autodiscover` + allowlist/denylist por settings | `MUST` |
-| RF-EXT-007 | `LangChainRunnableAdapter` convierte `Runnable`/`AgentExecutor` a nodo válido | `SHOULD` |
-| RF-EXT-008 | `Protocol`s explícitos para `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort` | `SHOULD` |
-| RF-EXT-009 | Ejemplos ejecutables: nodo custom, subgraph custom, plugin template, migración LangChain | `MUST` |
-| RF-EXT-010 | Métricas de plugins: `discovered_total`, `loaded_total`, `custom_nodes_invocations_total` | `SHOULD` |
+| RF-EXT-001 | `prismal.langgraph` re-exports LangGraph symbols with a declared version | `MUST` |
+| RF-EXT-002 | `@prismal_node` wraps callables with OTel span + logger + audit + error handling | `MUST` |
+| RF-EXT-003 | `@prismal_node` registers capabilities automatically on import | `SHOULD` |
+| RF-EXT-004 | `PrismalStateGraphBuilder` provides a fluent API over `StateGraph[AgentState]` | `MUST` |
+| RF-EXT-005 | `discover_plugins()` iterates entry points and calls `register(registry)` | `MUST` |
+| RF-EXT-006 | Toggle `plugins_autodiscover` + allowlist/denylist via settings | `MUST` |
+| RF-EXT-007 | `LangChainRunnableAdapter` converts `Runnable`/`AgentExecutor` to a valid node | `SHOULD` |
+| RF-EXT-008 | Explicit `Protocol`s for `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort` | `SHOULD` |
+| RF-EXT-009 | Runnable examples: custom node, custom subgraph, plugin template, LangChain migration | `MUST` |
+| RF-EXT-010 | Plugin metrics: `discovered_total`, `loaded_total`, `custom_nodes_invocations_total` | `SHOULD` |
 
 ---
 
-## 7. Requisitos No Funcionales
+## 7. Non-Functional Requirements
 
-### Rendimiento
-- Overhead del decorator `@prismal_node` ≤ 5 ms por invocación (excluyendo OTel exporter, que es async).
-- Plugin discovery al startup: ≤ 500 ms para 50 plugins instalados.
-- `PrismalStateGraphBuilder.compile()` no debe ser más lento que `StateGraph.compile()` + 50 ms (overhead de wrapping).
+### Performance
+- `@prismal_node` decorator overhead ≤ 5 ms per invocation (excluding the OTel exporter, which is async).
+- Plugin discovery at startup: ≤ 500 ms for 50 installed plugins.
+- `PrismalStateGraphBuilder.compile()` must not be slower than `StateGraph.compile()` + 50 ms (wrapping overhead).
 
-### Seguridad
-- Plugin allowlist/denylist enforcement antes de invocar `register()` del plugin.
-- Cada nodo registrado vía `@prismal_node` debe pasar por `ActionInterceptor` si declara `tool_calls`.
-- `LangChainRunnableAdapter` aplica `SecurePromptBuilder` al input antes de invocar el `Runnable`.
-- Audit log registra carga de cada plugin con su versión, hash del wheel (cuando disponible vía `importlib.metadata`), y entry point usado.
+### Security
+- Plugin allowlist/denylist enforcement before invoking the plugin's `register()`.
+- Each node registered via `@prismal_node` must go through `ActionInterceptor` if it declares `tool_calls`.
+- `LangChainRunnableAdapter` applies `SecurePromptBuilder` to the input before invoking the `Runnable`.
+- Audit log records the load of each plugin with its version, the wheel hash (when available via `importlib.metadata`), and the entry point used.
 
-### Disponibilidad
-- Falla en carga de un plugin **no impide** el startup del resto: log estructurado de error + métrica `plugins_loaded_total{status="error"}`, continuación normal.
-- Plugin con error en runtime no debe tumbar el grafo principal — el `@prismal_node` wrapper captura excepciones y emite `state_update` con flag `error=True`.
+### Availability
+- Failure loading one plugin **does not prevent** the startup of the rest: structured error log + metric `plugins_loaded_total{status="error"}`, normal continuation.
+- A plugin with a runtime error must not bring down the main graph — the `@prismal_node` wrapper captures exceptions and emits a `state_update` with the `error=True` flag.
 
-### Escalabilidad
-- Soportar ≥ 50 plugins instalados sin degradación apreciable.
-- Soportar ≥ 200 nodos custom registrados con `@prismal_node`.
+### Scalability
+- Support ≥ 50 installed plugins without appreciable degradation.
+- Support ≥ 200 custom nodes registered with `@prismal_node`.
 
-### Observabilidad
+### Observability
 - OTel spans: `prismal.ext.discover`, `prismal.ext.load_plugin{name}`, `prismal.ext.node{name}`, `prismal.ext.adapter.langchain`.
-- Métricas Prometheus-compatibles ya listadas en X8.
-- Logs estructurados con `plugin_name`, `node_name`, `entry_point`.
+- Prometheus-compatible metrics already listed in X8.
+- Structured logs with `plugin_name`, `node_name`, `entry_point`.
 
-### Mantenibilidad
-- Coverage ≥ 85% por módulo nuevo (target más alto que el 80% global por ser API pública).
+### Maintainability
+- Coverage ≥ 85% per new module (a higher target than the 80% global, since it is public API).
 - `ruff` + `mypy --strict` + `bandit` clean.
-- API versionada: cambios breaking de la superficie de extensión requieren bump de minor en SemVer y deprecation warning 1 release antes.
+- Versioned API: breaking changes to the extension surface require a minor bump in SemVer and a deprecation warning 1 release ahead.
 
-### Documentación
-- Quickstart de 1 página.
-- Recetario de patrones comunes (router custom, gate condicional, post-processor, etc.).
-- Plantilla de plugin lista para `cookiecutter` o `copier`.
-- Migration guide desde LangChain.
+### Documentation
+- A 1-page quickstart.
+- Cookbook of common patterns (custom router, conditional gate, post-processor, etc.).
+- Plugin template ready for `cookiecutter` or `copier`.
+- Migration guide from LangChain.
 
 ---
 
-## 8. Restricciones y Dependencias
+## 8. Constraints and Dependencies
 
-### Restricciones Técnicas
-- Python 3.13+, `uv` como gestor.
-- Mantener `prismal/` como namespace package PEP 420.
-- Compatibilidad: el contrato de `@prismal_node` debe funcionar con LangGraph ≥ 0.4 (versión actual del repo).
-- Sin nuevas dependencias obligatorias para el core (todo nuevo debe ser stdlib o ya presente).
+### Technical Constraints
+- Python 3.13+, `uv` as the manager.
+- Keep `prismal/` as a PEP 420 namespace package.
+- Compatibility: the `@prismal_node` contract must work with LangGraph ≥ 0.4 (the repo's current version).
+- No new mandatory dependencies for the core (everything new must be stdlib or already present).
 
-### Dependencias Externas
+### External Dependencies
 
-| Dependencia | Tipo | Uso | Estado |
+| Dependency | Type | Use | Status |
 |---|---|---|---|
-| `langgraph` | Existente | Re-export y builder | ✅ Ya incluida |
-| `langchain-core` | Existente | `Runnable` interface para adapter | ✅ Ya incluida |
+| `langgraph` | Existing | Re-export and builder | ✅ Already included |
+| `langchain-core` | Existing | `Runnable` interface for the adapter | ✅ Already included |
 | `importlib.metadata` | Stdlib | Plugin discovery | ✅ Stdlib |
-| `opentelemetry-api` | Existente | Spans en decorator | ✅ Ya incluida |
-| `structlog` | Existente | Logging | ✅ Ya incluida |
+| `opentelemetry-api` | Existing | Spans in the decorator | ✅ Already included |
+| `structlog` | Existing | Logging | ✅ Already included |
 
-**Sin nuevas dependencias** — todo el trabajo es sobre stack ya instalado.
+**No new dependencies** — all the work is on the already-installed stack.
 
 ---
 
 ## 9. User Stories
 
-### Épica X: Build Your Own Node
+### Epic X: Build Your Own Node
 
-**US-EXT-001:** Como Framework Integrator, quiero decorar mi función async como nodo prismal para recibir security, OTel y audit sin escribir el wiring.
+**US-EXT-001:** As a Framework Integrator, I want to decorate my async function as a prismal node to get security, OTel, and audit without writing the wiring.
 ```python
 from prismal.agents.extension import prismal_node
 
@@ -264,112 +264,112 @@ from prismal.agents.extension import prismal_node
 async def my_classifier(state):
     return {"messages": [...], "metadata": {"my_node": {"score": 0.8}}}
 ```
-- [ ] Funciona sin más config.
-- [ ] OTel span aparece en el trace export con `node.name="my_classifier"`.
-- [ ] Audit log contiene una entrada por invocación.
+- [ ] Works without further config.
+- [ ] OTel span appears in the trace export with `node.name="my_classifier"`.
+- [ ] Audit log contains an entry per invocation.
 
-### Épica X: Build Your Own Subgraph
+### Epic X: Build Your Own Subgraph
 
-**US-EXT-002:** Como Framework Integrator, quiero ensamblar un subgraph con fluent API que aplique defaults.
+**US-EXT-002:** As a Framework Integrator, I want to assemble a subgraph with a fluent API that applies defaults.
 ```python
 from prismal.agents.extension import PrismalStateGraphBuilder
 
 builder = PrismalStateGraphBuilder("my_pipeline")
-builder.add_node("classify", classify_fn)        # se auto-wrapea con @prismal_node
+builder.add_node("classify", classify_fn)        # auto-wrapped with @prismal_node
 builder.add_node("respond", respond_fn)
 builder.add_edge("classify", "respond")
 subgraph = builder.compile()
 ```
-- [ ] `subgraph` es un `SubgraphDefinition` registrable.
+- [ ] `subgraph` is a registrable `SubgraphDefinition`.
 
-### Épica X: Plugin Ecosystem
+### Epic X: Plugin Ecosystem
 
-**US-EXT-003:** Como Plugin Author, quiero publicar `prismal-x-healthcare` que se auto-registre al instalar.
+**US-EXT-003:** As a Plugin Author, I want to publish `prismal-x-healthcare` that auto-registers on install.
 ```toml
-# pyproject.toml del plugin
+# the plugin's pyproject.toml
 [project.entry-points."prismal.subgraphs"]
 healthcare_triage = "prismal_x_healthcare:register_healthcare_pipeline"
 ```
-- [ ] Tras `pip install prismal-x-healthcare`, al hacer `discover_plugins()` el subgraph queda registrado.
-- [ ] Operador puede desactivarlo vía `settings.plugins_denylist=["prismal_x_healthcare"]`.
+- [ ] After `pip install prismal-x-healthcare`, calling `discover_plugins()` leaves the subgraph registered.
+- [ ] The operator can disable it via `settings.plugins_denylist=["prismal_x_healthcare"]`.
 
-### Épica X: LangChain Bridge
+### Epic X: LangChain Bridge
 
-**US-EXT-004:** Como LangChain Migrator, quiero usar mi `AgentExecutor` como nodo prismal sin reescribirlo.
+**US-EXT-004:** As a LangChain Migrator, I want to use my `AgentExecutor` as a prismal node without rewriting it.
 ```python
 from prismal.agents.extension import LangChainRunnableAdapter
 
 adapter = LangChainRunnableAdapter(my_agent_executor)
 node = adapter.as_node(name="legacy_agent", capabilities=["research"])
 ```
-- [ ] El nodo participa del state machine prismal.
-- [ ] Input/output `state["messages"]` se mapean correctamente.
+- [ ] The node participates in the prismal state machine.
+- [ ] Input/output `state["messages"]` are mapped correctly.
 
 ---
 
-## 10. Riesgos y Mitigaciones
+## 10. Risks and Mitigations
 
-| Riesgo | Probabilidad | Impacto | Mitigación |
+| Risk | Probability | Impact | Mitigation |
 |---|---|---|---|
-| Plugin malicioso ejecuta código arbitrario al carga | Media | Crítico | Allowlist/denylist por settings; audit log de cada carga; documentar que entry points son confianza explícita del operador |
-| Decorator overhead suma latencia perceptible | Baja | Medio | Benchmark en CI (target ≤ 5 ms); cache de spans; opt-out via `@prismal_node(otel=False)` |
-| Drift entre versión de LangGraph documentada y real | Media | Alto | `prismal.langgraph.VERSION` se resuelve dinámicamente; tests de compatibilidad en CI por cada upgrade |
-| Adapter LangChain rompe con cambio de API en `Runnable` | Media | Medio | Pin de versión mínima en `pyproject.toml`; tests de smoke por release de LangChain |
-| `discover_plugins()` falla y bloquea startup | Baja | Alto | Cada plugin se carga en try/except aislado; falla individual no afecta al resto |
-| Conflicto de nombres entre plugins | Media | Medio | Registry detecta duplicados y rechaza con error claro; namespace recomendado `<vendor>_<name>` |
-| Plugins instalados sin saberlo (autodiscover default `True`) | Media | Alto | Toggle disponible; log de plugins cargados visible en startup; allowlist como modo strict |
-| Backward compat de `@prismal_node` se rompe entre versiones | Baja | Alto | API congelada con `@frozen_api` decorator interno; deprecation cycle de 1 minor mínimo |
+| Malicious plugin executes arbitrary code on load | Medium | Critical | Allowlist/denylist via settings; audit log of each load; document that entry points are the operator's explicit trust |
+| Decorator overhead adds perceptible latency | Low | Medium | Benchmark in CI (target ≤ 5 ms); span caching; opt-out via `@prismal_node(otel=False)` |
+| Drift between the documented and actual LangGraph version | Medium | High | `prismal.langgraph.VERSION` is resolved dynamically; compatibility tests in CI on each upgrade |
+| LangChain adapter breaks with an API change in `Runnable` | Medium | Medium | Minimum version pin in `pyproject.toml`; smoke tests per LangChain release |
+| `discover_plugins()` fails and blocks startup | Low | High | Each plugin is loaded in an isolated try/except; individual failure does not affect the rest |
+| Name conflict between plugins | Medium | Medium | Registry detects duplicates and rejects with a clear error; recommended namespace `<vendor>_<name>` |
+| Plugins installed unknowingly (autodiscover default `True`) | Medium | High | Toggle available; log of loaded plugins visible at startup; allowlist as strict mode |
+| `@prismal_node` backward compat breaks between versions | Low | High | API frozen with internal `@frozen_api` decorator; deprecation cycle of 1 minor minimum |
 
 ---
 
-## 11. Timeline Estimado
+## 11. Estimated Timeline
 
-| Fase | Duración | Entregable |
+| Phase | Duration | Deliverable |
 |---|---|---|
-| X1 — Re-export oficial | 0.2 semana | `prismal.langgraph` |
-| X2 — Decorator `@prismal_node` | 1 semana | Decorator + registro automático + tests |
-| X3 — Builder fluent | 0.8 semana | `PrismalStateGraphBuilder` + tests |
-| X4 — Plugin discovery | 1 semana | Entry points + `discover_plugins()` + CLI + tests |
-| X5 — Adapter LangChain | 0.5 semana | `LangChainRunnableAdapter` + tests |
-| X6 — Ports formalizados | 0.5 semana | `Protocol`s + smoke tests |
-| X7 — Docs + ejemplos | 1 semana | 4 ejemplos ejecutables + `docs/extension.md` |
-| X8 — Settings + métricas | 0.2 semana | Toggles + counters |
-| Hardening | 0.8 semana | Coverage ≥ 85%, security audit, ejemplo de plugin externo en TestPyPI |
-| **Total** | **~6 semanas** | Superficie de extensión completa + ecosistema piloto |
+| X1 — Official re-export | 0.2 week | `prismal.langgraph` |
+| X2 — `@prismal_node` decorator | 1 week | Decorator + automatic registration + tests |
+| X3 — Fluent builder | 0.8 week | `PrismalStateGraphBuilder` + tests |
+| X4 — Plugin discovery | 1 week | Entry points + `discover_plugins()` + CLI + tests |
+| X5 — LangChain adapter | 0.5 week | `LangChainRunnableAdapter` + tests |
+| X6 — Formalized ports | 0.5 week | `Protocol`s + smoke tests |
+| X7 — Docs + examples | 1 week | 4 runnable examples + `docs/extension.md` |
+| X8 — Settings + metrics | 0.2 week | Toggles + counters |
+| Hardening | 0.8 week | Coverage ≥ 85%, security audit, external plugin example on TestPyPI |
+| **Total** | **~6 weeks** | Complete extension surface + pilot ecosystem |
 
 ---
 
-## 12. Definición de Done (Global de Fase X)
+## 12. Definition of Done (Phase X Global)
 
-- [ ] `prismal.langgraph` re-exporta los 7 símbolos clave + `VERSION`.
-- [ ] `@prismal_node` documentado y testeado con ejemplos.
-- [ ] `PrismalStateGraphBuilder` con fluent API funcional.
-- [ ] `discover_plugins()` carga plugins desde entry points + respeta allow/denylist.
-- [ ] `LangChainRunnableAdapter` convierte `Runnable` y `AgentExecutor` a nodos válidos.
-- [ ] 4 `Protocol`s de ports declarados + adapters existentes conformes.
-- [ ] 4 ejemplos ejecutables en `examples/`.
-- [ ] `docs/extension.md` publicado.
-- [ ] Plugin template (`examples/plugin_template/`) listo para `cookiecutter` o `copier`.
-- [ ] Coverage ≥ 85% en `prismal/agents/extension/` y `prismal/langgraph.py`.
-- [ ] Benchmark de overhead del decorator ≤ 5 ms documentado.
-- [ ] 2 plugins piloto publicados en TestPyPI (ej. `prismal-x-hello`, `prismal-x-financial-extra`).
-- [ ] `uv run pytest -m "not live_api"` pasa al 100%.
+- [ ] `prismal.langgraph` re-exports the 7 key symbols + `VERSION`.
+- [ ] `@prismal_node` documented and tested with examples.
+- [ ] `PrismalStateGraphBuilder` with a functional fluent API.
+- [ ] `discover_plugins()` loads plugins from entry points + respects the allow/denylist.
+- [ ] `LangChainRunnableAdapter` converts `Runnable` and `AgentExecutor` to valid nodes.
+- [ ] 4 port `Protocol`s declared + existing adapters conforming.
+- [ ] 4 runnable examples in `examples/`.
+- [ ] `docs/extension.md` published.
+- [ ] Plugin template (`examples/plugin_template/`) ready for `cookiecutter` or `copier`.
+- [ ] Coverage ≥ 85% in `prismal/agents/extension/` and `prismal/langgraph.py`.
+- [ ] Decorator overhead benchmark ≤ 5 ms documented.
+- [ ] 2 pilot plugins published on TestPyPI (e.g. `prismal-x-hello`, `prismal-x-financial-extra`).
+- [ ] `uv run pytest -m "not live_api"` passes at 100%.
 - [ ] `ruff` + `mypy --strict` + `bandit` clean.
-- [ ] `CLAUDE.md` y `README.md` actualizados.
-- [ ] PR mergeado a `main` con code review aprobado.
+- [ ] `CLAUDE.md` and `README.md` updated.
+- [ ] PR merged to `main` with code review approved.
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-05-27 | Ernesto Crespo | Versión inicial — superficie de extensión LangGraph + plugin SDK |
+| 1.0 | 2026-05-27 | Ernesto Crespo | Initial version — LangGraph extension surface + plugin SDK |
 
-## Aprobaciones
+## Approvals
 
-| Rol | Nombre | Fecha | Estado |
+| Role | Name | Date | Status |
 |---|---|---|---|
-| Tech Lead | — | | ☐ Pendiente |
-| AI Architect | — | | ☐ Pendiente |
-| DX Lead | — | | ☐ Pendiente |
+| Tech Lead | — | | ☐ Pending |
+| AI Architect | — | | ☐ Pending |
+| DX Lead | — | | ☐ Pending |

@@ -1,289 +1,289 @@
-# Prismal — A2A / Agent Cards Interoperability (protocolo agente-a-agente)
+# Prismal — A2A / Agent Cards Interoperability (agent-to-agent protocol)
 
 ## Strategic Plan / Product Requirements Document (PLAN)
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-06-06 |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` |
+| **Version** | 1.0 |
+| **Date** | 2026-06-06 |
 | **Reviewers** | Tech Lead, AI Architect, Security Lead |
-| **Documentos relacionados** | `ARCHITECTURE.md`, `SPEC.md`, `TASKS.md` |
-| **Fase** | I — Interop (A2A / Agent Cards) |
-| **Relacionado con** | Fase X (Extension Surface), Fase Y (Tool Provider Injection), `specs/agent-identity-governance/` |
+| **Related documents** | `ARCHITECTURE.md`, `SPEC.md`, `TASKS.md` |
+| **Phase** | I — Interop (A2A / Agent Cards) |
+| **Related to** | Phase X (Extension Surface), Phase Y (Tool Provider Injection), `specs/agent-identity-governance/` |
 
 ---
 
-## 1. Resumen Ejecutivo
+## 1. Executive Summary
 
-Prismal habla **MCP** (interoperabilidad de *herramientas*) pero **no habla A2A** (interoperabilidad *agente-a-agente*). A2A (Agent2Agent), creado por Google y donado a la Linux Foundation (Apache 2.0), es el estándar de 2026 para que agentes de distintos vendors y frameworks se **descubran, deleguen tareas y coordinen trabajo** vía **JSON-RPC sobre HTTP(S) + SSE**, publicando un **Agent Card** en `/.well-known/agent-card.json` (nombre, *skills*, endpoint, formatos I/O, métodos de auth) e identidad por **W3C DID**. Lo soportan ya 150+ organizaciones (Google, Microsoft, AWS, Salesforce, SAP, ServiceNow, IBM…). Frameworks rivales (Microsoft Agent Framework, Google ADK) lo traen nativo.
+Prismal speaks **MCP** (*tool* interoperability) but **does not speak A2A** (*agent-to-agent* interoperability). A2A (Agent2Agent), created by Google and donated to the Linux Foundation (Apache 2.0), is the 2026 standard for agents from different vendors and frameworks to **discover each other, delegate tasks, and coordinate work** via **JSON-RPC over HTTP(S) + SSE**, publishing an **Agent Card** at `/.well-known/agent-card.json` (name, *skills*, endpoint, I/O formats, auth methods) and identity via **W3C DID**. It is already supported by 150+ organizations (Google, Microsoft, AWS, Salesforce, SAP, ServiceNow, IBM…). Rival frameworks (Microsoft Agent Framework, Google ADK) ship it natively.
 
-Esta fase añade **interoperabilidad A2A bidireccional**, reusando los patrones ya establecidos en prismal:
+This phase adds **bidirectional A2A interoperability**, reusing the patterns already established in prismal:
 
-- **Inbound (A2A Server):** exponer el grafo/supervisor de prismal como un agente A2A — publicar su **Agent Card** (derivado del registro de agentes y subgrafos), aceptar tareas JSON-RPC, transmitir resultados por SSE, y aplicar auth + las capas de seguridad L1–L5.
-- **Outbound (A2A Client):** consumir agentes A2A remotos como **nodos del grafo** (`A2AAgentNode`, análogo a `LangChainRunnableAdapter`) y/o como **herramientas** vía un `A2AToolProvider` que conforma el `ToolProviderPort` (Fase Y). Descubrimiento por Agent Card, delegación de tarea, *streaming* de resultados al estado.
+- **Inbound (A2A Server):** expose prismal's graph/supervisor as an A2A agent — publish its **Agent Card** (derived from the agent and subgraph registry), accept JSON-RPC tasks, stream results over SSE, and apply auth + the L1–L5 security layers.
+- **Outbound (A2A Client):** consume remote A2A agents as **graph nodes** (`A2AAgentNode`, analogous to `LangChainRunnableAdapter`) and/or as **tools** via an `A2AToolProvider` that conforms to the `ToolProviderPort` (Phase Y). Discovery via Agent Card, task delegation, *streaming* of results to the state.
 
-Es **opt-in, aditivo y gated por settings**: sin habilitar A2A, el núcleo se comporta idéntico. Cierra la brecha de interop más visible frente a MS Agent Framework / Google ADK y posiciona a prismal como **ciudadano del ecosistema multi-agente**, no como una isla.
-
----
-
-## 2. Contexto y Problema
-
-### 2.1 Situación Actual
-
-- Prismal integra herramientas externas vía **MCP** (`prismal/mcp/`) y orquesta agentes **internos** vía el supervisor LangGraph. No hay forma de:
-  - exponer prismal a **otros** sistemas agénticos como un agente invocable estándar, ni
-  - delegar a **agentes remotos** de terceros como parte de un flujo.
-- La Fase X (Extension Surface) ya da el patrón para envolver ejecutables como nodos (`LangChainRunnableAdapter`), y la Fase Y da el `ToolProviderPort`. A2A encaja como un nuevo adaptador/proveedor sobre esa base.
-- El registro de agentes (`tool_registry`, `DEFAULT_CAPABILITY_MAP`) ya enumera capacidades por agente — material directo para generar *skills* del Agent Card.
-
-### 2.2 Problema
-
-1. **Aislamiento del ecosistema.** Sin A2A, prismal no participa en redes multi-vendor de agentes; no puede ser orquestado por, ni orquestar a, agentes de Google/MS/Salesforce/etc.
-2. **Sin descubrimiento estándar.** No hay Agent Card; otros agentes no pueden descubrir las capacidades de prismal de forma interoperable.
-3. **Delegación remota imposible.** Un flujo de prismal no puede delegar un sub-objetivo a un agente especializado externo (p. ej. un agente de facturación de un ERP).
-4. **Brecha competitiva.** Es una casilla que MS Agent Framework y Google ADK ya marcan; su ausencia descalifica a prismal en RFPs enterprise multi-agente.
-
-### 2.3 Oportunidad
-
-- A2A es **complementario a MCP** (MCP = tools; A2A = agentes), y prismal ya tiene MCP — el modelo mental y la infraestructura HTTP/SSE/auth se reutilizan.
-- Los **patrones de Fase X/Y** (adaptadores, puertos, `@prismal_node`, seguridad downstream) hacen el outbound casi mecánico.
-- El **Agent Card** se autogenera del registro de agentes — bajo esfuerzo, alto valor.
-- Sienta la base de **identidad de agente (DID)**, que enlaza con `specs/agent-identity-governance/`.
+It is **opt-in, additive, and gated by settings**: without enabling A2A, the core behaves identically. It closes the most visible interop gap versus MS Agent Framework / Google ADK and positions prismal as a **citizen of the multi-agent ecosystem**, not as an island.
 
 ---
 
-## 3. Usuarios Objetivo
+## 2. Context and Problem
+
+### 2.1 Current Situation
+
+- Prismal integrates external tools via **MCP** (`prismal/mcp/`) and orchestrates **internal** agents via the LangGraph supervisor. There is no way to:
+  - expose prismal to **other** agentic systems as a standard invokable agent, nor
+  - delegate to third-party **remote agents** as part of a flow.
+- Phase X (Extension Surface) already provides the pattern for wrapping executables as nodes (`LangChainRunnableAdapter`), and Phase Y provides the `ToolProviderPort`. A2A fits as a new adapter/provider on top of that base.
+- The agent registry (`tool_registry`, `DEFAULT_CAPABILITY_MAP`) already enumerates capabilities per agent — direct material for generating Agent Card *skills*.
+
+### 2.2 Problem
+
+1. **Ecosystem isolation.** Without A2A, prismal does not participate in multi-vendor agent networks; it cannot be orchestrated by, nor orchestrate, agents from Google/MS/Salesforce/etc.
+2. **No standard discovery.** There is no Agent Card; other agents cannot discover prismal's capabilities interoperably.
+3. **Remote delegation impossible.** A prismal flow cannot delegate a sub-goal to a specialized external agent (e.g. a billing agent from an ERP).
+4. **Competitive gap.** It is a box that MS Agent Framework and Google ADK already check; its absence disqualifies prismal in enterprise multi-agent RFPs.
+
+### 2.3 Opportunity
+
+- A2A is **complementary to MCP** (MCP = tools; A2A = agents), and prismal already has MCP — the mental model and the HTTP/SSE/auth infrastructure are reused.
+- The **Phase X/Y patterns** (adapters, ports, `@prismal_node`, downstream security) make the outbound side almost mechanical.
+- The **Agent Card** is auto-generated from the agent registry — low effort, high value.
+- It lays the foundation for **agent identity (DID)**, which links to `specs/agent-identity-governance/`.
+
+---
+
+## 3. Target Users
 
 ### Persona 1: Ecosystem Integrator
-- **Necesidad:** Que un orquestador externo (MS/Google/ERP) descubra e invoque a prismal como un agente A2A estándar.
-- **Frecuencia:** Por integración.
+- **Need:** Have an external orchestrator (MS/Google/ERP) discover and invoke prismal as a standard A2A agent.
+- **Frequency:** Per integration.
 
-### Persona 2: Flow Author (interno)
-- **Necesidad:** Delegar un sub-objetivo a un agente A2A remoto especializado dentro de un grafo de prismal.
-- **Frecuencia:** Por diseño de flujo.
+### Persona 2: Flow Author (internal)
+- **Need:** Delegate a sub-goal to a specialized remote A2A agent within a prismal graph.
+- **Frequency:** Per flow design.
 
 ### Persona 3: Platform Host (`prismal-server`)
-- **Necesidad:** Servir el endpoint A2A (Agent Card + JSON-RPC + SSE) con auth y multi-tenant, reusando el composition root (Fase R).
-- **Frecuencia:** Arranque.
+- **Need:** Serve the A2A endpoint (Agent Card + JSON-RPC + SSE) with auth and multi-tenancy, reusing the composition root (Phase R).
+- **Frequency:** Startup.
 
 ### Persona 4: Security/Compliance Lead
-- **Necesidad:** Allowlist de agentes remotos, auth (OAuth/mTLS/DID), y auditoría de toda delegación entrante/saliente.
-- **Frecuencia:** Configuración + revisión.
+- **Need:** Allowlist of remote agents, auth (OAuth/mTLS/DID), and auditing of all inbound/outbound delegation.
+- **Frequency:** Configuration + review.
 
 ---
 
-## 4. Objetivos y Métricas de Éxito
+## 4. Goals and Success Metrics
 
-| Objetivo | Métrica | Target | Plazo |
+| Goal | Metric | Target | Timeframe |
 |---|---|---|---|
-| Inbound A2A | prismal publica Agent Card válido + responde JSON-RPC/SSE | Conforme a A2A v0.3.x | Fase I |
-| Outbound A2A | delegar a agente remoto como nodo del grafo | `A2AAgentNode` funcional | Fase I |
-| Interop como tools | agentes remotos como tools vía `ToolProviderPort` | `A2AToolProvider` conforme | Fase I |
-| Seguridad | auth (OAuth/mTLS) + allowlist + auditoría de delegaciones | 100% de delegaciones auditadas | Fase I |
-| Backward-compat | sin habilitar A2A, comportamiento idéntico | 100% | Global |
-| Cobertura | branch coverage módulos nuevos | ≥ 85% | Global |
+| Inbound A2A | prismal publishes a valid Agent Card + responds to JSON-RPC/SSE | Compliant with A2A v0.3.x | Phase I |
+| Outbound A2A | delegate to a remote agent as a graph node | `A2AAgentNode` functional | Phase I |
+| Interop as tools | remote agents as tools via `ToolProviderPort` | `A2AToolProvider` conformant | Phase I |
+| Security | auth (OAuth/mTLS) + allowlist + delegation auditing | 100% of delegations audited | Phase I |
+| Backward-compat | without enabling A2A, identical behavior | 100% | Global |
+| Coverage | branch coverage of new modules | ≥ 85% | Global |
 
 ---
 
-## 5. Alcance
+## 5. Scope
 
-### 5.1 In Scope (Fase I)
+### 5.1 In Scope (Phase I)
 
-**I1 — Modelo de dominio A2A (`prismal/a2a/types.py`):**
-- [ ] `AgentCard`, `AgentSkill`, `A2ATask`, `A2AMessage`, `A2AArtifact` (Pydantic), conformes a la spec A2A.
+**I1 — A2A domain model (`prismal/a2a/types.py`):**
+- [ ] `AgentCard`, `AgentSkill`, `A2ATask`, `A2AMessage`, `A2AArtifact` (Pydantic), compliant with the A2A spec.
 
-**I2 — Generación del Agent Card:**
-- [ ] `build_agent_card(settings, registry)` deriva *skills* del registro de agentes/subgrafos + `DEFAULT_CAPABILITY_MAP`; declara endpoint, formatos I/O, auth, y DID.
+**I2 — Agent Card generation:**
+- [ ] `build_agent_card(settings, registry)` derives *skills* from the agent/subgraph registry + `DEFAULT_CAPABILITY_MAP`; declares endpoint, I/O formats, auth, and DID.
 
 **I3 — Inbound (A2A Server adapter, `prismal/a2a/server.py`):**
-- [ ] Handler JSON-RPC (`message/send`, `tasks/get`, `tasks/cancel`) + streaming SSE.
-- [ ] Mapea una tarea A2A entrante → invocación del grafo compilado (o de un subgrafo/skill concreto) → artefactos A2A.
-- [ ] El endpoint HTTP lo monta el host (`prismal-server`); el core provee el handler.
+- [ ] JSON-RPC handler (`message/send`, `tasks/get`, `tasks/cancel`) + SSE streaming.
+- [ ] Maps an incoming A2A task → invocation of the compiled graph (or a specific subgraph/skill) → A2A artifacts.
+- [ ] The HTTP endpoint is mounted by the host (`prismal-server`); the core provides the handler.
 
 **I4 — Outbound (A2A Client, `prismal/a2a/client.py`):**
-- [ ] `A2AClient` (descubre Agent Card, envía tarea, consume SSE, maneja auth).
-- [ ] `A2AAgentNode(card_url, ...).as_node(name=...)` — envuelve un agente remoto como nodo prismal (`@prismal_node`, security downstream).
-- [ ] `A2AConnectionManager` (allowlist, pool, reintentos) — espejo conceptual de `mcp/connection.py`.
+- [ ] `A2AClient` (discovers Agent Card, sends task, consumes SSE, handles auth).
+- [ ] `A2AAgentNode(card_url, ...).as_node(name=...)` — wraps a remote agent as a prismal node (`@prismal_node`, downstream security).
+- [ ] `A2AConnectionManager` (allowlist, pool, retries) — conceptual mirror of `mcp/connection.py`.
 
-**I5 — Interop como herramientas (`prismal/a2a/provider.py`):**
-- [ ] `A2AToolProvider` que expone agentes remotos (sus skills) como `BaseTool`, conformando el `ToolProviderPort` (Fase Y) → el host puede componerlo en el `CompositeToolProvider`.
+**I5 — Interop as tools (`prismal/a2a/provider.py`):**
+- [ ] `A2AToolProvider` that exposes remote agents (their skills) as `BaseTool`, conforming to the `ToolProviderPort` (Phase Y) → the host can compose it into the `CompositeToolProvider`.
 
-**I6 — Seguridad e identidad:**
-- [ ] Auth saliente y entrante: OAuth2 / mTLS; identidad por **DID** (enlaza con `agent-identity-governance`).
-- [ ] Allowlist/denylist de agentes remotos por settings; toda respuesta remota es **contenido no confiable** → pasa por L1 (`InputSanitizer`/`SecurePromptBuilder`) y `ActionInterceptor`.
-- [ ] `AuditLogger.log_event` por cada tarea A2A entrante/saliente (sin contenido sensible).
+**I6 — Security and identity:**
+- [ ] Outbound and inbound auth: OAuth2 / mTLS; identity via **DID** (links to `agent-identity-governance`).
+- [ ] Allowlist/denylist of remote agents via settings; every remote response is **untrusted content** → goes through L1 (`InputSanitizer`/`SecurePromptBuilder`) and `ActionInterceptor`.
+- [ ] `AuditLogger.log_event` for every inbound/outbound A2A task (without sensitive content).
 
-**I7 — Settings + ciclo de vida:**
+**I7 — Settings + lifecycle:**
 - [ ] `settings.a2a_enabled: bool = False`, `a2a_inbound_enabled`, `a2a_outbound_enabled`, allowlist, auth config.
-- [ ] Integración con el composition root (Fase R): `build_runtime` puede componer el `A2AToolProvider` y exponer el handler inbound.
+- [ ] Integration with the composition root (Phase R): `build_runtime` can compose the `A2AToolProvider` and expose the inbound handler.
 
-**I8 — Docs, ejemplos, tests:**
-- [ ] `docs/a2a.md` (exponer prismal como A2A; consumir agentes remotos).
+**I8 — Docs, examples, tests:**
+- [ ] `docs/a2a.md` (expose prismal as A2A; consume remote agents).
 - [ ] `examples/a2a_server.py`, `examples/a2a_remote_node.py`.
-- [ ] Tests con un servidor A2A *fake* (sin red real).
+- [ ] Tests with a *fake* A2A server (no real network).
 
 ### 5.2 Out of Scope
 
-- Implementar el HTTP server en sí (lo monta `prismal-server`; el core provee handler + tipos).
-- Registro/descubrimiento federado de agentes (catálogo A2A) — futuro.
-- A2A *push notifications* / webhooks de tareas de larga duración — fase 2.
-- Emisión/gestión completa de DIDs (vive en `agent-identity-governance`; aquí se consume).
+- Implementing the HTTP server itself (mounted by `prismal-server`; the core provides handler + types).
+- Federated agent registry/discovery (A2A catalog) — future.
+- A2A *push notifications* / webhooks for long-running tasks — phase 2.
+- Full DID issuance/management (lives in `agent-identity-governance`; consumed here).
 
-### 5.3 Futuras Consideraciones
+### 5.3 Future Considerations
 
-- A2A push notifications para tareas largas.
-- Catálogo/registro de agentes (discovery federado).
-- Negociación de modalidades (texto/imagen/audio) con la capa multimodal.
-- Telemetría de delegaciones (latencia, coste) → enlaza con `cost-budget-governance`.
+- A2A push notifications for long tasks.
+- Agent catalog/registry (federated discovery).
+- Modality negotiation (text/image/audio) with the multimodal layer.
+- Delegation telemetry (latency, cost) → links to `cost-budget-governance`.
 
 ---
 
-## 6. Requisitos Funcionales (Resumen — detalle en `SPEC.md`)
+## 6. Functional Requirements (Summary — detail in `SPEC.md`)
 
-| ID | Requisito | Prioridad |
+| ID | Requirement | Priority |
 |---|---|---|
-| RF-A2A-001 | Modelo de dominio A2A (AgentCard, AgentSkill, Task, Message, Artifact) | `MUST` |
-| RF-A2A-002 | `build_agent_card` deriva skills del registro de agentes + capability map | `MUST` |
-| RF-A2A-003 | Inbound: handler JSON-RPC (`message/send`, `tasks/get`, `tasks/cancel`) + SSE | `MUST` |
-| RF-A2A-004 | Inbound mapea tarea → grafo/subgrafo → artefactos A2A | `MUST` |
+| RF-A2A-001 | A2A domain model (AgentCard, AgentSkill, Task, Message, Artifact) | `MUST` |
+| RF-A2A-002 | `build_agent_card` derives skills from the agent registry + capability map | `MUST` |
+| RF-A2A-003 | Inbound: JSON-RPC handler (`message/send`, `tasks/get`, `tasks/cancel`) + SSE | `MUST` |
+| RF-A2A-004 | Inbound maps task → graph/subgraph → A2A artifacts | `MUST` |
 | RF-A2A-005 | Outbound: `A2AClient` (discover card, send task, consume SSE, auth) | `MUST` |
-| RF-A2A-006 | `A2AAgentNode.as_node()` envuelve agente remoto como nodo del grafo | `MUST` |
-| RF-A2A-007 | `A2AToolProvider` conforma `ToolProviderPort` (Fase Y) | `SHOULD` |
-| RF-A2A-008 | Auth OAuth2/mTLS + identidad DID (in/out) | `MUST` |
-| RF-A2A-009 | Allowlist/denylist de agentes remotos; respuestas remotas pasan por L1–L5 | `MUST` |
-| RF-A2A-010 | Auditoría de toda tarea A2A (entrante/saliente) | `MUST` |
-| RF-A2A-011 | Settings `a2a_enabled`/inbound/outbound/allowlist/auth; integración con Fase R | `MUST` |
-| RF-A2A-012 | Fake A2A server para tests; docs + ejemplos | `SHOULD` |
+| RF-A2A-006 | `A2AAgentNode.as_node()` wraps a remote agent as a graph node | `MUST` |
+| RF-A2A-007 | `A2AToolProvider` conforms to `ToolProviderPort` (Phase Y) | `SHOULD` |
+| RF-A2A-008 | OAuth2/mTLS auth + DID identity (in/out) | `MUST` |
+| RF-A2A-009 | Allowlist/denylist of remote agents; remote responses go through L1–L5 | `MUST` |
+| RF-A2A-010 | Auditing of every A2A task (inbound/outbound) | `MUST` |
+| RF-A2A-011 | Settings `a2a_enabled`/inbound/outbound/allowlist/auth; Phase R integration | `MUST` |
+| RF-A2A-012 | Fake A2A server for tests; docs + examples | `SHOULD` |
 
 ---
 
-## 7. Requisitos No Funcionales
+## 7. Non-Functional Requirements
 
-### Rendimiento
-- Overhead del Agent Card: generación cacheada (1 vez por arranque/tenant).
-- Streaming SSE sin bloquear el event loop; backpressure razonable.
+### Performance
+- Agent Card overhead: cached generation (once per startup/tenant).
+- SSE streaming without blocking the event loop; reasonable backpressure.
 
-### Seguridad
-- Toda respuesta de agente remoto es **no confiable** → L1 + `ActionInterceptor` antes de inyectar al estado/prompt.
-- Auth obligatoria para inbound en producción; mTLS/OAuth; rechazo de Agent Cards sin auth declarada en modo estricto.
-- Allowlist por defecto deny-all en outbound estricto.
-- Auditoría inmutable de delegaciones (hash-chained, como el resto de `AuditLogger`).
+### Security
+- Every remote agent response is **untrusted** → L1 + `ActionInterceptor` before injecting into the state/prompt.
+- Mandatory auth for inbound in production; mTLS/OAuth; reject Agent Cards without declared auth in strict mode.
+- Default deny-all allowlist in strict outbound.
+- Immutable delegation auditing (hash-chained, like the rest of `AuditLogger`).
 
-### Compatibilidad
-- Conforme a A2A v0.3.x (JSON-RPC over HTTP(S) + SSE, Agent Card en `/.well-known/agent-card.json`).
-- `prismal/` namespace PEP 420; A2A gated por `a2a_enabled=False` por defecto.
-- `filterwarnings=error`: deps A2A/HTTP opcionales, imports diferidos, extra `[a2a]`.
+### Compatibility
+- Compliant with A2A v0.3.x (JSON-RPC over HTTP(S) + SSE, Agent Card at `/.well-known/agent-card.json`).
+- `prismal/` PEP 420 namespace; A2A gated by `a2a_enabled=False` by default.
+- `filterwarnings=error`: optional A2A/HTTP deps, deferred imports, `[a2a]` extra.
 
-### Escalabilidad
-- Multi-tenant: Agent Card y auth por `org_id` (vía Fase R); aislamiento de delegaciones por tenant.
+### Scalability
+- Multi-tenant: Agent Card and auth per `org_id` (via Phase R); per-tenant delegation isolation.
 
-### Observabilidad
-- Spans `prismal.a2a.inbound`, `prismal.a2a.outbound`; métricas de tareas/errores/latencia por agente remoto.
+### Observability
+- Spans `prismal.a2a.inbound`, `prismal.a2a.outbound`; task/error/latency metrics per remote agent.
 
 ---
 
-## 8. Restricciones y Dependencias
+## 8. Constraints and Dependencies
 
-| Dependencia | Tipo | Uso |
+| Dependency | Type | Use |
 |---|---|---|
-| Fase X (Extension Surface) | Pre-requisito | `@prismal_node`, adaptador-como-nodo |
-| Fase Y (Tool Provider) | Recomendado | `A2AToolProvider` conforma `ToolProviderPort` |
-| Fase R (Composition Root) | Recomendado | Componer A2A en el runtime + multi-tenant |
-| `specs/agent-identity-governance/` | Acoplado | DID / identidad de agente |
-| `mcp/connection.py` | Referencia | Patrón de connection manager (pool/allowlist/retry) |
-| Lib A2A / httpx / sse | Nueva (opcional) | Cliente/servidor A2A; extra `[a2a]` |
+| Phase X (Extension Surface) | Prerequisite | `@prismal_node`, adapter-as-node |
+| Phase Y (Tool Provider) | Recommended | `A2AToolProvider` conforms to `ToolProviderPort` |
+| Phase R (Composition Root) | Recommended | Compose A2A into the runtime + multi-tenant |
+| `specs/agent-identity-governance/` | Coupled | DID / agent identity |
+| `mcp/connection.py` | Reference | Connection manager pattern (pool/allowlist/retry) |
+| A2A lib / httpx / sse | New (optional) | A2A client/server; `[a2a]` extra |
 
 ---
 
 ## 9. User Stories
 
-**US-A2A-001:** Como Ecosystem Integrator, descubro e invoco prismal vía su Agent Card.
+**US-A2A-001:** As an Ecosystem Integrator, I discover and invoke prismal via its Agent Card.
 ```
 GET https://prismal.example.com/.well-known/agent-card.json
 POST /a2a  {jsonrpc, method:"message/send", params:{...}}  -> SSE artifacts
 ```
 
-**US-A2A-002:** Como Flow Author, delego a un agente remoto como nodo.
+**US-A2A-002:** As a Flow Author, I delegate to a remote agent as a node.
 ```python
 from prismal.a2a import A2AAgentNode
 node = A2AAgentNode("https://billing.acme/.well-known/agent-card.json").as_node(name="billing_agent")
 builder.add_node("billing_agent", node)
 ```
 
-**US-A2A-003:** Como Host, expongo prismal como A2A en el lifespan.
+**US-A2A-003:** As a Host, I expose prismal as A2A in the lifespan.
 ```python
 from prismal.a2a import build_agent_card, A2AServerHandler
 card = build_agent_card(settings, registry)
-handler = A2AServerHandler(graph)   # montar en FastAPI: /.well-known/agent-card.json + /a2a
+handler = A2AServerHandler(graph)   # mount in FastAPI: /.well-known/agent-card.json + /a2a
 ```
 
-**US-A2A-004:** Como Security Lead, restrinjo y audito.
+**US-A2A-004:** As a Security Lead, I restrict and audit.
 ```python
 settings.a2a_outbound_allowlist = ["billing.acme", "*.trusted.org"]
-# toda delegación -> AuditLogger; respuestas remotas -> InputSanitizer
+# every delegation -> AuditLogger; remote responses -> InputSanitizer
 ```
 
 ---
 
-## 10. Riesgos y Mitigaciones
+## 10. Risks and Mitigations
 
-| Riesgo | Prob. | Impacto | Mitigación |
+| Risk | Prob. | Impact | Mitigation |
 |---|---|---|---|
-| Respuesta de agente remoto maliciosa (prompt injection) | Alta | Alto | L1 `InputSanitizer`/`SecurePromptBuilder` + `ActionInterceptor` antes de inyectar |
-| Endpoint inbound sin auth expuesto | Media | Crítico | Auth obligatoria en prod; modo estricto rechaza cards sin auth; default disabled |
-| Delegación a agente no autorizado | Media | Alto | Allowlist deny-all por defecto en outbound estricto |
-| Spec A2A evoluciona (v0.x) | Media | Medio | Pin de versión; tipos versionados; tests de conformidad |
-| Tareas largas bloquean recursos | Media | Medio | Timeouts + cancel (`tasks/cancel`); push notifications (fase 2) |
-| Coste de delegaciones descontrolado | Media | Medio | Enlazar con `cost-budget-governance` (cap por run) |
+| Malicious remote agent response (prompt injection) | High | High | L1 `InputSanitizer`/`SecurePromptBuilder` + `ActionInterceptor` before injecting |
+| Inbound endpoint exposed without auth | Medium | Critical | Mandatory auth in prod; strict mode rejects cards without auth; default disabled |
+| Delegation to an unauthorized agent | Medium | High | Default deny-all allowlist in strict outbound |
+| A2A spec evolves (v0.x) | Medium | Medium | Version pinning; versioned types; conformance tests |
+| Long tasks block resources | Medium | Medium | Timeouts + cancel (`tasks/cancel`); push notifications (phase 2) |
+| Uncontrolled delegation cost | Medium | Medium | Link to `cost-budget-governance` (per-run cap) |
 
 ---
 
-## 11. Timeline Estimado
+## 11. Estimated Timeline
 
-| Fase | Duración | Entregable |
+| Phase | Duration | Deliverable |
 |---|---|---|
-| I1 — Tipos A2A | 0.4 sem | Modelo de dominio |
-| I2 — Agent Card | 0.4 sem | `build_agent_card` |
-| I3 — Inbound handler | 1.0 sem | JSON-RPC + SSE + mapeo a grafo |
-| I4 — Outbound client/node | 1.0 sem | `A2AClient`, `A2AAgentNode`, connection manager |
-| I5 — A2AToolProvider | 0.4 sem | conforma `ToolProviderPort` |
-| I6 — Seguridad/identidad | 0.6 sem | auth + DID + allowlist + audit |
-| I7 — Settings + Fase R | 0.3 sem | toggles + composición |
-| I8 — Docs + ejemplos + tests | 0.6 sem | fake server + ejemplos |
-| Hardening | 0.5 sem | coverage, conformidad, mypy/bandit |
-| **Total** | **~5.2 sem** | Interop A2A bidireccional |
+| I1 — A2A types | 0.4 wk | Domain model |
+| I2 — Agent Card | 0.4 wk | `build_agent_card` |
+| I3 — Inbound handler | 1.0 wk | JSON-RPC + SSE + graph mapping |
+| I4 — Outbound client/node | 1.0 wk | `A2AClient`, `A2AAgentNode`, connection manager |
+| I5 — A2AToolProvider | 0.4 wk | conforms to `ToolProviderPort` |
+| I6 — Security/identity | 0.6 wk | auth + DID + allowlist + audit |
+| I7 — Settings + Phase R | 0.3 wk | toggles + composition |
+| I8 — Docs + examples + tests | 0.6 wk | fake server + examples |
+| Hardening | 0.5 wk | coverage, conformance, mypy/bandit |
+| **Total** | **~5.2 wk** | Bidirectional A2A interop |
 
 ---
 
-## 12. Definición de Done (Global de Fase I)
+## 12. Definition of Done (Global for Phase I)
 
-- [ ] Modelo de dominio A2A conforme a v0.3.x.
-- [ ] `build_agent_card` genera card válido desde el registro.
-- [ ] Inbound: handler JSON-RPC + SSE mapea tareas al grafo; montable por `prismal-server`.
+- [ ] A2A domain model compliant with v0.3.x.
+- [ ] `build_agent_card` generates a valid card from the registry.
+- [ ] Inbound: JSON-RPC handler + SSE maps tasks to the graph; mountable by `prismal-server`.
 - [ ] Outbound: `A2AClient` + `A2AAgentNode` + connection manager (allowlist/retry).
-- [ ] `A2AToolProvider` conforma `ToolProviderPort`.
-- [ ] Auth (OAuth/mTLS) + DID + allowlist + auditoría de delegaciones.
-- [ ] Respuestas remotas pasan por L1–L5.
-- [ ] Settings `a2a_*` (default off); integración con Fase R.
-- [ ] `docs/a2a.md` + 2 ejemplos + tests con fake server; coverage ≥ 85%.
+- [ ] `A2AToolProvider` conforms to `ToolProviderPort`.
+- [ ] Auth (OAuth/mTLS) + DID + allowlist + delegation auditing.
+- [ ] Remote responses go through L1–L5.
+- [ ] Settings `a2a_*` (default off); Phase R integration.
+- [ ] `docs/a2a.md` + 2 examples + tests with a fake server; coverage ≥ 85%.
 - [ ] `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
-- [ ] `CLAUDE.md` + `README.md` + notas Obsidian actualizadas.
-- [ ] PR mergeado con review.
+- [ ] `CLAUDE.md` + `README.md` + Obsidian notes updated.
+- [ ] PR merged with review.
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-06-06 | Ernesto Crespo | Versión inicial — interoperabilidad A2A / Agent Cards |
+| 1.0 | 2026-06-06 | Ernesto Crespo | Initial version — A2A / Agent Cards interoperability |
 
-## Aprobaciones
+## Approvals
 
-| Rol | Nombre | Fecha | Estado |
+| Role | Name | Date | Status |
 |---|---|---|---|
-| Tech Lead | — | | ☐ Pendiente |
-| AI Architect | — | | ☐ Pendiente |
-| Security Lead | — | | ☐ Pendiente |
+| Tech Lead | — | | ☐ Pending |
+| AI Architect | — | | ☐ Pending |
+| Security Lead | — | | ☐ Pending |

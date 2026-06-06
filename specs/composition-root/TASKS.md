@@ -2,112 +2,112 @@
 
 ## Metadata
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-06-05 |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` |
+| **Version** | 1.0 |
+| **Date** | 2026-06-05 |
 | **PLAN** | `specs/composition-root/PLAN.md` |
 | **Architecture** | `specs/composition-root/ARCHITECTURE.md` |
 | **SPEC** | `specs/composition-root/SPEC.md` |
-| **Depende de** | Fase Y (`specs/tool-provider-injection/`), Fase Z (`specs/vector-store-port/`) |
+| **Depends on** | Phase Y (`specs/tool-provider-injection/`), Phase Z (`specs/vector-store-port/`) |
 
 ---
 
-## 1. Resumen de Implementación
+## 1. Implementation Summary
 
-Fase R añade un *facade* de composición (`build_runtime`) que orquesta los puertos ya provistos por Y y Z más embeddings/checkpoint/audit, con loaders de config y resolución de tenant. **Aditivo y opt-in**: no cambia firmas de nodos ni los defaults; quien no lo use sigue con la inyección individual.
+Phase R adds a composition *facade* (`build_runtime`) that orchestrates the ports already provided by Y and Z plus embeddings/checkpoint/audit, with config loaders and tenant resolution. **Additive and opt-in**: it does not change the signatures of nodes or the defaults; anyone who does not use it keeps the individual injection.
 
-Principio rector: **orquestar, no reimplementar**. Los puntos de verdad son `build_default_tool_provider` (Y) y `VectorStoreFactory`/provider (Z).
-
----
-
-## 2. Pre-requisitos
-
-- Fase Y implementada: `ToolProviderPort`, `build_default_tool_provider`, `set_tool_provider`. (Estado en `specs/tool-provider-injection/TASKS.md`.)
-- Fase Z implementada: `VectorStorePort`, `VectorStoreFactory`, `set_vector_store_provider`, `get_async_compiled_graph(vector_store_provider=...)`.
-- Existentes: `EmbeddingsFactory`, `build_checkpointer`, `AuditLogger`, `get_settings()`.
-
-> Si Y/Z aún no están al 100%, R se especifica ahora pero su implementación va detrás.
+Guiding principle: **orchestrate, do not reimplement**. The sources of truth are `build_default_tool_provider` (Y) and `VectorStoreFactory`/provider (Z).
 
 ---
 
-## 3. Fases de Implementación
+## 2. Prerequisites
 
-### FASE R1 — `RuntimeConfig` / `RuntimeContext`
-#### R1-01 — Tipos
-- [ ] Crear `prismal/composition.py` con `RuntimeConfig` (frozen) y `RuntimeContext` (dataclass + `aclose` + async context manager).
-- **Done:** `RuntimeContext` agrupa los 5 puertos + `org_id`; `aclose` idempotente.
+- Phase Y implemented: `ToolProviderPort`, `build_default_tool_provider`, `set_tool_provider`. (Status in `specs/tool-provider-injection/TASKS.md`.)
+- Phase Z implemented: `VectorStorePort`, `VectorStoreFactory`, `set_vector_store_provider`, `get_async_compiled_graph(vector_store_provider=...)`.
+- Existing: `EmbeddingsFactory`, `build_checkpointer`, `AuditLogger`, `get_settings()`.
 
-### FASE R2 — `build_runtime`
-#### R2-01 — Composición global
-- [ ] Implementar `build_runtime(settings, *, org_id, overrides, mode)` reutilizando builders de Y/Z + EmbeddingsFactory + build_checkpointer + AuditLogger.
-- [ ] Modo global: `set_tool_provider` + `set_vector_store_provider`.
-- [ ] En fallo: `aclose()` de lo creado + `RuntimeCompositionError`.
-#### R2-02 — Modo context
-- [ ] Modo context: no toca globals; el contexto se pasa a `get_async_compiled_graph(...)`.
-- [ ] `build_test_runtime(...)` con fakes.
-- **Done:** `ctx = await build_runtime(settings)` retorna contexto con 5 puertos no nulos.
+> If Y/Z are not yet 100% done, R is specified now but its implementation comes after.
 
-### FASE R3 — Config loaders
+---
+
+## 3. Implementation Phases
+
+### PHASE R1 — `RuntimeConfig` / `RuntimeContext`
+#### R1-01 — Types
+- [ ] Create `prismal/composition.py` with `RuntimeConfig` (frozen) and `RuntimeContext` (dataclass + `aclose` + async context manager).
+- **Done:** `RuntimeContext` groups the 5 ports + `org_id`; `aclose` idempotent.
+
+### PHASE R2 — `build_runtime`
+#### R2-01 — Global composition
+- [ ] Implement `build_runtime(settings, *, org_id, overrides, mode)` reusing the Y/Z builders + EmbeddingsFactory + build_checkpointer + AuditLogger.
+- [ ] Global mode: `set_tool_provider` + `set_vector_store_provider`.
+- [ ] On failure: `aclose()` of what was created + `RuntimeCompositionError`.
+#### R2-02 — Context mode
+- [ ] Context mode: does not touch globals; the context is passed to `get_async_compiled_graph(...)`.
+- [ ] `build_test_runtime(...)` with fakes.
+- **Done:** `ctx = await build_runtime(settings)` returns a context with 5 non-null ports.
+
+### PHASE R3 — Config loaders
 #### R3-01 — `config_sources.py`
 - [ ] `load_mcp_config`, `resolve_skills_source`, `resolve_vector_store`, `apply_org_overrides`, `collection_for`.
-- **Done:** loaders puros (sync), sin conexión, testeados.
+- **Done:** pure loaders (sync), no connection, tested.
 
-### FASE R4 — Resolución de tenant
-#### R4-01 — collection_for en RAG y memoria
-- [ ] `collection_for(base, org_id)` aplicado consistentemente al construir RAG (`RAGEngine`) y memoria (`LongTermMemory`) desde el runtime.
-- **Done:** mismo tenant → misma colección en RAG y memoria; distinto tenant → distinta.
+### PHASE R4 — Tenant resolution
+#### R4-01 — collection_for in RAG and memory
+- [ ] `collection_for(base, org_id)` applied consistently when building RAG (`RAGEngine`) and memory (`LongTermMemory`) from the runtime.
+- **Done:** same tenant → same collection in RAG and memory; different tenant → different.
 
-### FASE R5 — Settings (modo unificado)
+### PHASE R5 — Settings (unified mode)
 #### R5-01 — `runtime_mode`
-- [ ] `settings.runtime_mode: Literal["global","context"] = "global"`; `build_runtime` lo propaga a Y y Z.
-- [ ] Retrocompat: derivar de `tool_provider_mode` si está seteado.
+- [ ] `settings.runtime_mode: Literal["global","context"] = "global"`; `build_runtime` propagates it to Y and Z.
+- [ ] Backward-compat: derive from `tool_provider_mode` if set.
 
-### FASE R6 — Ciclo de vida
+### PHASE R6 — Lifecycle
 #### R6-01 — aclose + context manager
-- [ ] `aclose()` cierra MCP/vstore/checkpointer; `async with build_runtime(...)`.
-- **Done:** test de teardown verifica las llamadas de cierre.
+- [ ] `aclose()` closes MCP/vstore/checkpointer; `async with build_runtime(...)`.
+- **Done:** teardown test verifies the close calls.
 
-### FASE R7 — Excepción + integración grafo
+### PHASE R7 — Exception + graph integration
 #### R7-01 — `RuntimeCompositionError`
-- [ ] En `core/exceptions.py`.
-#### R7-02 — graph acepta providers del contexto
-- [ ] Confirmar/ajustar `get_async_compiled_graph(tool_provider=, vector_store_provider=)` (consistencia con Z).
+- [ ] In `core/exceptions.py`.
+#### R7-02 — graph accepts context providers
+- [ ] Confirm/adjust `get_async_compiled_graph(tool_provider=, vector_store_provider=)` (consistency with Z).
 
-### FASE R8 — Tests + Docs + Ejemplo
+### PHASE R8 — Tests + Docs + Example
 #### R8-01 — Tests
-- [ ] Composición (5 puertos), no-duplicación (usa builders Y/Z), tenant (collection_for), aislamiento context (`asyncio.gather`), lifecycle (aclose), backward-compat (sin build_runtime).
-#### R8-02 — Docs + ejemplo
-- [ ] `docs/composition-root.md` (lifespan server + contrato dashboard); `examples/composition_root.py`.
+- [ ] Composition (5 ports), non-duplication (uses Y/Z builders), tenant (collection_for), context isolation (`asyncio.gather`), lifecycle (aclose), backward-compat (without build_runtime).
+#### R8-02 — Docs + example
+- [ ] `docs/composition-root.md` (server lifespan + dashboard contract); `examples/composition_root.py`.
 
 ### HARDENING
-- [ ] Coverage ≥ 85% en `composition*`; `ruff`/`mypy --strict`/`bandit` clean; `pytest -m "not live_api"` 100%.
-- [ ] `CLAUDE.md` + `README.md` + notas Obsidian actualizadas con el composition root.
+- [ ] Coverage ≥ 85% in `composition*`; `ruff`/`mypy --strict`/`bandit` clean; `pytest -m "not live_api"` 100%.
+- [ ] `CLAUDE.md` + `README.md` + Obsidian notes updated with the composition root.
 
 ---
 
-## 4. Dependencias Inter-Tareas
+## 4. Inter-Task Dependencies
 
 ```
-(Fase Y + Fase Z implementadas)
-   └─▶ R1 (tipos)
+(Phase Y + Phase Z implemented)
+   └─▶ R1 (types)
          └─▶ R2 (build_runtime)  ──┬─▶ R4 (tenant)   ──▶ R8 (tests)
                                    ├─▶ R5 (runtime_mode)
                                    └─▶ R6 (lifecycle)
-   R3 (loaders) ──▶ R2 (build_runtime los usa)
-   R7 (excepción + graph) ──▶ R2/R8
-   R8 (docs/ejemplo) [último]
+   R3 (loaders) ──▶ R2 (build_runtime uses them)
+   R7 (exception + graph) ──▶ R2/R8
+   R8 (docs/example) [last]
 ```
 
-Ruta crítica: **Y+Z → R1 → R3 → R2 → R8**.
+Critical path: **Y+Z → R1 → R3 → R2 → R8**.
 
 ---
 
-## 5. Matriz Tareas ↔ Requisitos
+## 5. Tasks ↔ Requirements Matrix
 
-| Tarea | RF cubiertos |
+| Task | RF covered |
 |---|---|
 | R1 | RF-CR-001 |
 | R2 | RF-CR-002, RF-CR-003, RF-CR-004, RF-CR-009, RF-CR-010 |
@@ -115,58 +115,58 @@ Ruta crítica: **Y+Z → R1 → R3 → R2 → R8**.
 | R4 | RF-CR-006 |
 | R5 | RF-CR-004, RF-CR-008 |
 | R6 | RF-CR-007 |
-| R7 | RF-CR-002 (errores), RF-CR-008 |
+| R7 | RF-CR-002 (errors), RF-CR-008 |
 | R8 | RF-CR-009, RF-CR-011, RF-CR-012 |
 
-Cobertura: RF-CR-001..012 mapeados.
+Coverage: RF-CR-001..012 mapped.
 
 ---
 
-## 6. Matriz de Riesgos
+## 6. Risk Matrix
 
-| Riesgo | Mitigación | Tarea |
+| Risk | Mitigation | Task |
 |---|---|---|
-| Duplicar lógica de Y/Z | Orquestar builders; test de no-duplicación | R2, R8 |
-| Fuga entre tenants | Modo context sin globals; aislamiento por colección; test | R2, R4, R8 |
-| Recursos colgados | aclose + context manager; test teardown | R6, R8 |
-| Acople con server inexistente | Feature en core; server solo llama; contrato documentado | R8 |
-| Y/Z incompletas | Especificar ahora, implementar detrás de Y/Z | Pre-requisitos |
+| Duplicate Y/Z logic | Orchestrate builders; non-duplication test | R2, R8 |
+| Leakage between tenants | Context mode without globals; per-collection isolation; test | R2, R4, R8 |
+| Hanging resources | aclose + context manager; teardown test | R6, R8 |
+| Coupling with non-existent server | Feature in core; server only calls; documented contract | R8 |
+| Incomplete Y/Z | Specify now, implement behind Y/Z | Prerequisites |
 
 ---
 
-## 7. Definición de Done (Global de Fase R)
+## 7. Definition of Done (Global for Phase R)
 
-- [ ] `RuntimeContext`/`RuntimeConfig`/`build_runtime` implementados; compone 5 puertos sin duplicar Y/Z.
-- [ ] Modo global y context; `runtime_mode` en settings; `collection_for` por `org_id` en RAG+memoria.
+- [ ] `RuntimeContext`/`RuntimeConfig`/`build_runtime` implemented; composes 5 ports without duplicating Y/Z.
+- [ ] Global and context modes; `runtime_mode` in settings; `collection_for` per `org_id` in RAG+memory.
 - [ ] `aclose()` + async context manager; `RuntimeCompositionError`.
-- [ ] `build_test_runtime` con fakes; backward-compat (inyección individual sigue válida).
-- [ ] Contrato host (`prismal-server` lifespan) y dashboard documentados.
+- [ ] `build_test_runtime` with fakes; backward-compat (individual injection still valid).
+- [ ] Host contract (`prismal-server` lifespan) and dashboard documented.
 - [ ] `docs/composition-root.md` + `examples/composition_root.py`.
 - [ ] Coverage ≥ 85%; `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
-- [ ] `CLAUDE.md` + `README.md` + notas Obsidian actualizadas.
-- [ ] PR mergeado con review.
+- [ ] `CLAUDE.md` + `README.md` + Obsidian notes updated.
+- [ ] PR merged with review.
 
 ---
 
-## 8. Estimación de Esfuerzo
+## 8. Effort Estimate
 
-| Sub-fase | Esfuerzo |
+| Sub-phase | Effort |
 |---|---|
-| R1 Tipos | 0.4 sem |
-| R2 build_runtime | 0.6 sem |
-| R3 Loaders | 0.5 sem |
-| R4 Tenant | 0.3 sem |
-| R5 Settings | 0.2 sem |
-| R6 Lifecycle | 0.3 sem |
-| R7 Excepción + grafo | 0.3 sem |
-| R8 Tests + docs | 0.5 sem |
-| Hardening | 0.4 sem |
-| **Total** | **~3.5 sem** |
+| R1 Types | 0.4 wk |
+| R2 build_runtime | 0.6 wk |
+| R3 Loaders | 0.5 wk |
+| R4 Tenant | 0.3 wk |
+| R5 Settings | 0.2 wk |
+| R6 Lifecycle | 0.3 wk |
+| R7 Exception + graph | 0.3 wk |
+| R8 Tests + docs | 0.5 wk |
+| Hardening | 0.4 wk |
+| **Total** | **~3.5 wk** |
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-06-05 | Ernesto Crespo | Plan de implementación inicial — composition root |
+| 1.0 | 2026-06-05 | Ernesto Crespo | Initial implementation plan — composition root |

@@ -1,116 +1,116 @@
 # Prismal — Cost & Budget Governance
 
-## Strategic Plan / Product Requirements Document (PLAN) — *PRD semilla*
+## Strategic Plan / Product Requirements Document (PLAN) — *seed PRD*
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` (PRD semilla; faltan ARCHITECTURE/SPEC/TASKS) |
-| **Versión** | 0.1 |
-| **Fecha** | 2026-06-06 |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` (seed PRD; ARCHITECTURE/SPEC/TASKS missing) |
+| **Version** | 0.1 |
+| **Date** | 2026-06-06 |
 | **Reviewers** | Tech Lead, AI Architect, FinOps |
-| **Prioridad** | P2 (predictibilidad de coste) |
-| **Relacionado** | `agents/tool_registry.py` (`react_loop`), `agents/patterns/`, `monitoring/`, `providers/` |
+| **Priority** | P2 (cost predictability) |
+| **Related** | `agents/tool_registry.py` (`react_loop`), `agents/patterns/`, `monitoring/`, `providers/` |
 
 ---
 
-## 1. Resumen Ejecutivo
+## 1. Executive Summary
 
-Los patrones avanzados de prismal son **caros por diseño**: debate (N agentes × M rondas), Tree-of-Thoughts, LATS (MCTS), Mixture-of-Agents y parallel dispatch multiplican las llamadas al LLM (un debate 4×5 = 20+ llamadas mínimo). Hoy no hay **presupuesto por ejecución** ni **circuit-breakers de coste/llamadas/tokens**: un flujo mal configurado o un bucle pueden disparar el gasto sin tope. Esta feature añade **gobernanza de coste**: presupuesto por run/sesión/tenant, medición de coste/tokens en tiempo real, y cortes (soft/hard) cuando se exceden los límites — convirtiendo "funciona" en "funciona dentro de un presupuesto predecible".
-
----
-
-## 2. Contexto y Problema
-
-- **Sin tope por ejecución:** `react_loop` limita iteraciones (`_MAX_REACT_ITERATIONS`) y el supervisor enruta, pero no hay un presupuesto agregado de **tokens/coste/llamadas** por turno o por sesión.
-- **Patrones multiplicadores:** debate/ToT/LATS/MoA/parallel pueden explotar el número de llamadas; el coste no se acota ni se reporta por adelantado.
-- **Sin atribución de coste:** no se mide coste por agente/patrón/tenant; FinOps no tiene visibilidad.
-- **Sin circuit-breakers:** ante un bucle o un agente remoto (A2A) costoso, no hay corte automático.
-- **Multi-tenant:** sin cuota por `org_id`, un tenant puede consumir el presupuesto de otros.
+Prismal's advanced patterns are **expensive by design**: debate (N agents × M rounds), Tree-of-Thoughts, LATS (MCTS), Mixture-of-Agents, and parallel dispatch multiply the LLM calls (a 4×5 debate = 20+ calls minimum). Today there is no **per-execution budget** nor **cost/call/token circuit-breakers**: a misconfigured flow or a loop can blow up spending without a cap. This feature adds **cost governance**: a budget per run/session/tenant, real-time cost/token measurement, and cutoffs (soft/hard) when limits are exceeded — turning "it works" into "it works within a predictable budget".
 
 ---
 
-## 3. Usuarios Objetivo
+## 2. Context and Problem
 
-- **FinOps / Operator:** fijar presupuestos por tenant/sesión; ver coste atribuido; alertas.
-- **Flow Author:** declarar un `budget` por patrón costoso (debate/ToT) y degradar con gracia al excederlo.
-- **Platform Host (`prismal-server`):** enforcement de cuota por `org_id` (vía Fase R); rechazo/cola al exceder.
-- **SRE:** circuit-breakers ante bucles/coste runaway.
+- **No per-execution cap:** `react_loop` limits iterations (`_MAX_REACT_ITERATIONS`) and the supervisor routes, but there is no aggregate budget of **tokens/cost/calls** per turn or per session.
+- **Multiplier patterns:** debate/ToT/LATS/MoA/parallel can explode the number of calls; the cost is neither bounded nor reported up front.
+- **No cost attribution:** cost is not measured per agent/pattern/tenant; FinOps has no visibility.
+- **No circuit-breakers:** in the face of a loop or an expensive remote (A2A) agent, there is no automatic cutoff.
+- **Multi-tenant:** without a quota per `org_id`, one tenant can consume others' budget.
 
 ---
 
-## 4. Objetivos y Métricas de Éxito
+## 3. Target Users
 
-| Objetivo | Métrica | Target |
+- **FinOps / Operator:** set budgets per tenant/session; see attributed cost; alerts.
+- **Flow Author:** declare a `budget` per expensive pattern (debate/ToT) and degrade gracefully when exceeding it.
+- **Platform Host (`prismal-server`):** quota enforcement per `org_id` (via Phase R); reject/queue on exceeding.
+- **SRE:** circuit-breakers against loops/runaway cost.
+
+---
+
+## 4. Goals and Success Metrics
+
+| Goal | Metric | Target |
 |---|---|---|
-| Presupuesto por run | Cap de tokens/coste/llamadas por turno/sesión | Configurable |
-| Medición en tiempo real | Coste/tokens acumulados por run (vía `monitoring/`) | Disponible |
-| Circuit-breakers | Corte soft (avisa/degrada) y hard (aborta) al exceder | Implementado |
-| Atribución | Coste por agente/patrón/tenant | Reportado |
-| Cuota multi-tenant | Límite por `org_id` (Fase R) | Soportado |
-| Backward-compat | Sin límites configurados, comportamiento actual | 100% |
+| Per-run budget | Cap of tokens/cost/calls per turn/session | Configurable |
+| Real-time measurement | Accumulated cost/tokens per run (via `monitoring/`) | Available |
+| Circuit-breakers | Soft cutoff (warns/degrades) and hard (aborts) on exceeding | Implemented |
+| Attribution | Cost per agent/pattern/tenant | Reported |
+| Multi-tenant quota | Limit per `org_id` (Phase R) | Supported |
+| Backward-compat | Without configured limits, current behavior | 100% |
 
 ---
 
-## 5. Alcance (propuesto)
+## 5. Scope (proposed)
 
 ### In Scope
-- **`Budget`** (tokens, coste USD estimado, nº de llamadas LLM, wall-clock) por **scope** (turn / session / tenant).
-- **`CostMeter`** que acumula uso desde los callbacks de `providers/` (LiteLLM usage) y `react_loop`; estimación de coste por modelo (tabla de precios configurable).
-- **`BudgetGuard`** integrado en `react_loop` y en los patrones costosos: chequeo pre-llamada; **soft cap** (degradar: menos rondas/ramas, modelo más barato, terminar con mejor-esfuerzo) y **hard cap** (`BudgetExceeded` → abort con respuesta parcial auditada).
-- **Atribución** por agente/patrón/tenant en spans/métricas (`monitoring/`).
-- **Cuota por tenant** vía Fase R (presupuesto resuelto por `org_id`).
-- Settings `budget_*`; degradación configurable por patrón.
+- **`Budget`** (tokens, estimated USD cost, number of LLM calls, wall-clock) per **scope** (turn / session / tenant).
+- **`CostMeter`** that accumulates usage from the `providers/` callbacks (LiteLLM usage) and `react_loop`; cost estimation per model (configurable pricing table).
+- **`BudgetGuard`** integrated into `react_loop` and the expensive patterns: pre-call check; **soft cap** (degrade: fewer rounds/branches, cheaper model, terminate with best-effort) and **hard cap** (`BudgetExceeded` → abort with an audited partial response).
+- **Attribution** per agent/pattern/tenant in spans/metrics (`monitoring/`).
+- **Per-tenant quota** via Phase R (budget resolved per `org_id`).
+- Settings `budget_*`; configurable degradation per pattern.
 
 ### Out of Scope
-- Facturación/chargeback real (se exportan métricas; la facturación es del host).
-- Precios en tiempo real de proveedores (tabla configurable; actualización manual/periódica).
-- Optimización automática de prompts para reducir coste (futuro).
+- Real billing/chargeback (metrics are exported; billing is the host's).
+- Real-time provider pricing (configurable table; manual/periodic update).
+- Automatic prompt optimization to reduce cost (future).
 
 ---
 
-## 6. Requisitos Funcionales (resumen)
+## 6. Functional Requirements (summary)
 
-| ID | Requisito | Prioridad |
+| ID | Requirement | Priority |
 |---|---|---|
-| RF-CST-001 | `Budget` por scope (turn/session/tenant) con límites de tokens/coste/llamadas | `MUST` |
-| RF-CST-002 | `CostMeter` acumula uso real desde `providers/` + estimación por tabla de precios | `MUST` |
-| RF-CST-003 | `BudgetGuard` con soft cap (degradar) y hard cap (`BudgetExceeded`) en `react_loop` y patrones | `MUST` |
-| RF-CST-004 | Atribución de coste por agente/patrón/tenant (métricas/spans) | `SHOULD` |
-| RF-CST-005 | Cuota por `org_id` vía Fase R | `SHOULD` |
-| RF-CST-006 | Settings `budget_*`; degradación configurable por patrón | `MUST` |
-| RF-CST-007 | Auditoría de cortes (qué se abortó/degradó y por qué) | `SHOULD` |
+| RF-CST-001 | `Budget` per scope (turn/session/tenant) with token/cost/call limits | `MUST` |
+| RF-CST-002 | `CostMeter` accumulates real usage from `providers/` + pricing-table estimation | `MUST` |
+| RF-CST-003 | `BudgetGuard` with soft cap (degrade) and hard cap (`BudgetExceeded`) in `react_loop` and patterns | `MUST` |
+| RF-CST-004 | Cost attribution per agent/pattern/tenant (metrics/spans) | `SHOULD` |
+| RF-CST-005 | Quota per `org_id` via Phase R | `SHOULD` |
+| RF-CST-006 | Settings `budget_*`; configurable degradation per pattern | `MUST` |
+| RF-CST-007 | Auditing of cutoffs (what was aborted/degraded and why) | `SHOULD` |
 
 ---
 
-## 7. Riesgos y Mitigaciones (resumen)
+## 7. Risks and Mitigations (summary)
 
-| Riesgo | Mitigación |
+| Risk | Mitigation |
 |---|---|
-| Estimación de coste imprecisa | Usar usage real de LiteLLM; tabla de precios versionada; marcar estimaciones |
-| Hard cap corta respuestas útiles | Soft cap primero (degradar); hard cap con respuesta parcial + aviso claro |
-| Overhead de medición | Acumulación O(1) por llamada; sin I/O en el hot path |
-| Patrones que ignoran el guard | `BudgetGuard` inyectado en el factory de patrones; test de enforcement |
+| Imprecise cost estimation | Use real LiteLLM usage; versioned pricing table; mark estimates |
+| Hard cap cuts useful responses | Soft cap first (degrade); hard cap with partial response + clear notice |
+| Measurement overhead | O(1) accumulation per call; no I/O on the hot path |
+| Patterns that ignore the guard | `BudgetGuard` injected into the pattern factory; enforcement test |
 
 ---
 
-## 8. Dependencias
+## 8. Dependencies
 
-- `agents/tool_registry.py::react_loop` (punto de chequeo principal).
-- `agents/patterns/` (debate, ToT, LATS, MoA, parallel) — integrar el guard.
-- `providers/` (usage real de LiteLLM), `monitoring/` (métricas/spans), `core/config.py`.
-- `specs/composition-root/` (cuota por tenant), `specs/a2a-interop/` (coste de delegaciones remotas).
-
----
-
-## 9. Próximos Pasos
-
-Expandir a set SDD completo: diseño de `CostMeter`/`BudgetGuard`, puntos de integración exactos en `react_loop` y en el factory de patrones, tabla de precios, estrategias de degradación por patrón, y enforcement multi-tenant.
+- `agents/tool_registry.py::react_loop` (main checkpoint).
+- `agents/patterns/` (debate, ToT, LATS, MoA, parallel) — integrate the guard.
+- `providers/` (real LiteLLM usage), `monitoring/` (metrics/spans), `core/config.py`.
+- `specs/composition-root/` (per-tenant quota), `specs/a2a-interop/` (cost of remote delegations).
 
 ---
 
-## Historial de Cambios
+## 9. Next Steps
 
-| Versión | Fecha | Autor | Cambios |
+Expand to the full SDD set: design of `CostMeter`/`BudgetGuard`, exact integration points in `react_loop` and the pattern factory, pricing table, per-pattern degradation strategies, and multi-tenant enforcement.
+
+---
+
+## Change History
+
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 0.1 | 2026-06-06 | Ernesto Crespo | PRD semilla — gobernanza de coste y presupuesto |
+| 0.1 | 2026-06-06 | Ernesto Crespo | Seed PRD — cost and budget governance |
