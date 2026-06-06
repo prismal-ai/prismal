@@ -120,7 +120,7 @@ A public extension API exposes LangGraph as a first-class build target for users
 - `agents/extension/builder.py` — `PrismalStateGraphBuilder` fluent API over `StateGraph[AgentState]`. `add_node()` auto-wraps callables with `@prismal_node` if they lack the `__prismal_node__` attribute. `compile()` returns a `SubgraphDefinition` ready for `SubgraphRegistry`; `compile_raw()` is the escape hatch returning `CompiledStateGraph`.
 - `agents/extension/plugins.py` — `discover_plugins(settings)` iterates `importlib.metadata.entry_points()` across four groups (`prismal.subgraphs`, `prismal.nodes`, `prismal.tools`, `prismal.rag_engines`), applies allowlist/denylist, and registers each plugin in isolation (failures don't abort startup). `prismal/plugins.py` is a `python -m prismal.plugins` CLI (`list`, `info`, `doctor`).
 - `agents/extension/adapters.py` — `LangChainRunnableAdapter(runnable).as_node(name=..., capabilities=...)` converts any `Runnable` or `AgentExecutor` into a prismal node, with auto input/output mapping between `state["messages"]` and the Runnable's signature.
-- `agents/extension/ports.py` — formal `Protocol`s for `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort`. Existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, `BaseTool`) conform structurally; users substitute with their own adapters without modifying the core.
+- `agents/extension/ports.py` — formal `Protocol`s for `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort`, `ToolProviderPort`. Existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, `BaseTool`) conform structurally; users substitute with their own adapters without modifying the core.
 
 Plugin authors declare entry points in their `pyproject.toml` (e.g. `[project.entry-points."prismal.subgraphs"] my_pipeline = "my_pkg:register_my_pipeline"`); after `pip install`, `discover_plugins()` auto-registers them. Allowlist/denylist via `settings.plugins_allowlist` / `plugins_denylist`. Recommended convention: namespace plugins as `prismal-x-<domain>`.
 
@@ -130,6 +130,15 @@ Plugin authors declare entry points in their `pyproject.toml` (e.g. `[project.en
 - `builder.compile()` returns the **real** `SubgraphDefinition` (`nodes`/`edges`/`conditional_edges`/`entry_point`), not a `compiled_graph`; `compile_raw()` returns a `CompiledStateGraph`.
 - Subgraph plugins register via the new **sync** `SubgraphRegistry.register_sync()` (the existing `register_<name>()` functions remain async and use the singleton). `discover_plugins()` is sync; a subgraph entry point either self-registers via `register_sync` or returns a `SubgraphDefinition`.
 - The 8th SPEC middleware "validation" is folded into `error_mapping` (`NodeValidationError` available for callers that validate explicitly).
+
+### Tool provider injection (Fase Y — `specs/tool-provider-injection/`, implemented)
+
+Tool resolution is inverted as a hexagonal port: the agent core asks an injected `ToolProviderPort` (`get_tools(*, agent_name, capabilities) -> list[BaseTool]`, sync, must not raise) and **no longer imports `prismal.mcp` / `prismal.skills`** — enforced by an AST architecture test (`tests/unit/agents/extension/test_no_mcp_skills_imports.py`; exemptions: `extension/providers.py` and `skill_manager.py`). User guide: `docs/tool-providers.md`; runnable examples: `examples/tool_provider_{host,custom}.py`.
+
+- `agents/extension/providers.py` — host-facing adapters (allowed to lazy-import mcp/skills): `McpToolProvider` (cap 60), `SkillToolProvider` (fresh `SkillsManager` per call), `StubToolProvider` (the old `stub_map`), `CompositeToolProvider` (exact merge parity: MCP→Skills→stubs priority, name dedupe, `max_total=120`, fixed-tool agents `{cron_manager, critic}` get stubs only), `FakeToolProvider` (tests), and async `build_default_tool_provider(settings)` for the host lifespan.
+- `agents/tool_registry.py` — `set_tool_provider()` / `get_tool_provider()` (variante A, global); `get_tools_for_agent()` keeps its signature and delegates; **no provider → stub-only fallback + `tool_registry.no_provider` warning** (behaviour change: skills are no longer loaded implicitly), or `ToolProviderNotConfigured` when `settings.tool_provider_strict`. Variante B (multi-tenant): `get_async_compiled_graph(tool_provider=...)` + `tool_provider_mode="context"` binds a per-session provider via `with_config`; nodes resolve with `get_tools_for_agent_ctx(name, config)` / `resolve_provider(config)`.
+- Deprecated shims (`init_mcp`, `get_mcp_tools`, `get_skill_tools`) delegate to the injected provider, emit `DeprecationWarning`, and are removed in the next minor. The policy caps live in `providers.py`; `tool_registry` keeps equal legacy constants (a parity test asserts both stay in sync).
+- Observability: span `prismal.tools.resolve` + counters `prismal.tool_provider_resolved_total{provider}`, `prismal.tools_injected_total{agent}`, `prismal.tool_provider_fallback_total`, `prismal.tool_provider_subprovider_errors_total{provider}` (registered in `OTelManager`).
 
 ### Security (5-layer defense-in-depth)
 
@@ -170,6 +179,7 @@ All LLM calls go through `prismal/providers/` (LiteLLM wrapper + per-provider co
 6. **Always** validate incoming media with `MediaValidator.validate()` before passing it to a multimodal agent — `AuditLogger.log_media()` records hash + modality, never content.
 7. **Always** run FFmpeg via `SandboxExecutor` in `VideoAgent` and `VideoLoader` — never in-process.
 8. **Never** add `__init__.py` to `prismal/` — it must remain a PEP 420 namespace package. (The repo-local `lightagent/__init__.py` shim is a deliberate, temporary migration exception and is not shipped.)
+9. **Never** import `prismal.mcp` / `prismal.skills` from `prismal/agents/**` (Fase Y inversion; enforced by `test_no_mcp_skills_imports.py`). The only exemptions are `agents/extension/providers.py` (the adapters) and `agents/skill_manager.py` (the skills-administration agent). Tools reach agents only through the injected `ToolProviderPort` — in tests, inject `FakeToolProvider` instead of patching registry internals.
 
 ## Testing notes
 

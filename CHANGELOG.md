@@ -10,6 +10,38 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security — Dependabot remediation (18 alerts, 2026-06)
+
+Full triage and remediation of the 2026-06-05 Dependabot report
+(3 Critical, 8 High, 6 Moderate, 1 Low). Decision matrix, exposure
+analysis (library vs server surface) and per-alert closure criteria in
+`specs/dependency-security-remediation/`.
+
+- **Already fixed by the current lock (12 alerts)** — litellm 1.86.2
+  (CVE-2026-42208, CVE-2026-40217 + proxy-surface cluster), urllib3 2.7.0
+  (CVE-2026-21441, GHSA-qccp-gfcp-xxvc), langsmith 0.8.7 /
+  langchain-classic 1.0.7 (CVE-2026-45134), idna 3.17 (CVE-2026-45409),
+  starlette 1.2.0 (CVE-2026-48710), pymdown-extensions 10.21.3
+  (CVE-2026-46338). Closed by pushing the lock to the scanned branch.
+- **Upgraded** — `aiohttp >= 3.14.0` (CVE-2026-34993 RCE via
+  `CookieJar.load()` pickle, CVE-2026-47265 cross-origin cookie leak);
+  `prefect >= 3.6.28` (CVE-2026-7724 SSRF DNS-rebinding TOCTOU in
+  `validate_restricted_url`; lock resolves 3.7.4); transitives
+  pip 26.1.2 (PYSEC-2026-196) and pyjwt 2.13.0 (PYSEC-2026-175/177/178/179).
+- **Mitigated (no upstream fix)** — transformers CVE-2026-1839 neutralized
+  by `torch >= 2.6` constraint (PyTorch `safe_globals()`; prismal never
+  uses `Trainer`); chromadb CVE-2026-45829 (embedded-only usage, no HTTP
+  server); ecdsa CVE-2024-23342 (won't-fix; python-jose → PyJWT migration
+  registered as debt). All documented in `.trivyignore` with re-evaluation
+  triggers.
+- **Supply chain** — trivy-action compromise (GHSA-69fq-xp46-6x23) closed:
+  no CI run in the compromise window (workflows exist since 2026-05-22);
+  trivy binary download now sha256-verified; **all GitHub Actions pinned
+  to immutable commit SHAs**.
+- **Hygiene** — `.trivyignore`, pre-commit `pip-audit` hook and
+  `ci.yml` `PIP_AUDIT_IGNORES` reduced to an exact 3-way mirror of the
+  4 no-fix CVEs only (18 obsolete ignores removed).
+
 ### Added — Graph visualization
 
 A reusable way to visualize any graph-based architecture (the compiled

@@ -1,47 +1,50 @@
 # .trivyignore — Prismal
 # ============================================================
-# CVEs/GHSAs en dependencias pineadas que NO se pueden actualizar sin
-# romper el stack (Reflex 0.7.x + sqlmodel<0.0.25 + pydantic<2.11).
+# CVEs/GHSAs aceptadas/mitigadas en dependencias SIN fix upstream
+# aplicable. Cada entrada exige: razon, surface, referencia al spec
+# y TRIGGER de re-evaluacion.
 #
-# Mismos IDs que `pip-audit --ignore-vuln` en `.gitlab-ci.yml` y en
-# `.pre-commit-config.yaml` -> hook `pip-audit`.
+# Mismos IDs que `pip-audit --ignore-vuln` en `.github/workflows/ci.yml`
+# y en `.pre-commit-config.yaml` -> hook `pip-audit`. Mantener los tres
+# espejados (regla de oro).
 #
 # Triage activo: `prismal doctor security-check` (Phase 30 maintenance).
-# Cualquier nuevo ignore debe documentarse aqui Y en .gitlab-ci.yml/pip-audit.
+# Remediacion 2026-06: specs/dependency-security-remediation/ (18 alertas
+# Dependabot; las resueltas por el lock se retiraron de esta lista).
 # ============================================================
-
-# --- langchain-openai 1.1.12 -> fix 1.1.14 -------------------
-GHSA-r7w7-9xr2-qq2r
-
-# --- langchain-text-splitters 1.1.1 -> fix 1.1.2 -------------
-GHSA-fv5p-p927-qmxr
-
-# --- langsmith 0.7.30 -> fix 0.7.31 --------------------------
-GHSA-rr7j-v2q5-chgv
-
-# --- mcp 1.12.4 -> fix 1.23.0 (DNS rebinding HIGH) -----------
-CVE-2025-66416
-
-# --- pillow 11.3.0 -> fix 12.1.1 / 12.2.0 --------------------
-CVE-2026-25990
-CVE-2026-40192
-
-# --- pypdf 6.10.0 -> fix 6.10.1 / 6.10.2 ---------------------
-GHSA-jj6c-8h6c-hppx
-GHSA-4pxv-j86v-mhcw
-GHSA-7gw9-cf7v-778f
-GHSA-x284-j5p8-9c5p
-
-# --- reflex 0.7.14 -> CVE-2025-62379 (sin fix upstream aun) --
-CVE-2025-62379
 
 # --- ecdsa 0.19.2 -> CVE-2024-23342 (Minerva timing attack) --
 # Transitiva (python-jose -> ecdsa). El mantenedor de python-ecdsa
 # declaro publicamente que NO habra fix (GHSA-wj6h-64fc-37mp): la
 # mitigacion completa requiere criptografia en C. Recomienda migrar
 # a `cryptography`. Ya usamos python-jose[cryptography] pero python-jose
-# arrastra `ecdsa` como dep regular. TODO: evaluar migracion a PyJWT.
+# arrastra `ecdsa` como dep regular. Surface: prismal no realiza firmas
+# ECDSA P-256 sensibles en caliente -> riesgo residual aceptado.
+# Spec: specs/dependency-security-remediation/SPEC.md (SEC-A05, alerta #1).
+# TRIGGER de re-evaluacion: migracion python-jose -> PyJWT (deuda
+# registrada en el spec) o fix upstream en python-ecdsa -> quitar ignore.
 CVE-2024-23342
+
+# --- transformers 4.57.6 (marker py>=3.14) -> CVE-2026-1839 --
+# RCE en Trainer._load_rng_state() via torch.load() sin weights_only
+# (GHSA-69w3-r845-3855, fix transformers 5.0.0rc3). MITIGADO:
+# (1) pyproject fija torch>=2.6 (lock: 2.11.0) -> safe_globals() de
+#     PyTorch >=2.6 neutraliza el vector de deserializacion;
+# (2) prismal no usa la clase Trainer (solo inferencia/embeddings via
+#     sentence-transformers);
+# (3) en py<3.14 el lock ya resuelve transformers 5.5.4 (>=5.0.0rc3);
+#     solo la rama del lock para py>=3.14 conserva 4.57.6.
+# Spec: specs/dependency-security-remediation/SPEC.md (SEC-A10, alerta #2).
+# TRIGGER de re-evaluacion: release estable de transformers 5.x soportado
+# por sentence-transformers en py>=3.14 -> subir y quitar este ignore.
+CVE-2026-1839
+
+# --- pip 26.0.1 -> CVE-2026-3219 (sin fix upstream aun) ------
+# pip 26.0.1 es el ultimo release publicado y CVE-2026-3219 no tiene
+# first_patched_version. Dependencia del toolchain (pip-audit), no del
+# runtime de prismal.
+# TRIGGER de re-evaluacion: pip publica release con fix -> quitar ignore.
+CVE-2026-3219
 
 # --- chromadb 1.5.8 -> CVE-2026-45829 (sin fix upstream) -----
 # CRITICAL — pre-authentication code injection (GHSA-f4j7-r4q5-qw2c). El rango
@@ -49,39 +52,10 @@ CVE-2024-23342
 # parcheada (1.5.9 sigue afectada) y el stack langchain-chroma no admite
 # downgrade a <1.0.0. ChromaDB se usa aqui como vector store local/embebido
 # (SQLite + Chroma), no como servidor HTTP expuesto, lo que limita la
-# explotabilidad pre-auth. Mismo ignore en pip-audit (.pre-commit-config.yaml
-# + ci.yml). Quitar en cuanto chromadb publique fix. Triage: `prismal doctor
-# security-check`.
+# explotabilidad pre-auth (verificado: solo `Chroma(persist_directory=...)`
+# en rag/vector_store.py, sin HttpClient ni `chroma run`). Mismo ignore en
+# pip-audit (.pre-commit-config.yaml + ci.yml).
+# Spec: specs/dependency-security-remediation/SPEC.md (SEC-A02, alerta #15).
+# TRIGGER de re-evaluacion: chromadb publica first_patched_version ->
+# quitar ignore y subir. Triage: `prismal doctor security-check`.
 CVE-2026-45829
-
-# ============================================================
-# TODO: TRIAGE — detectados por Trivy (mas reciente que pip-audit DB).
-# Pendientes de revisar via `prismal doctor security-check` (Phase 30).
-# Son upgrades minor con constraints abiertas, pero NO se auto-aplican
-# sin aprobacion explicita. Quitar de aqui en cuanto se actualice uv.lock.
-# ============================================================
-
-# --- litellm 1.81.16 -> fix 1.83.0 (auth bypass + RCE) -------
-# litellm>=1.58.0 (sin tope) — upgrade compatible pero requiere validacion
-CVE-2026-35030  # CRITICAL — OIDC userinfo cache key auth bypass
-CVE-2026-35029  # HIGH — RCE via unrestricted proxy config
-GHSA-69x8-hrgq-fjj8  # HIGH — password hash exposure / pass-the-hash
-
-# --- litellm 1.83.0 -> fix 1.83.7 (no aplicado) --------------
-# Subir a 1.83.7 downgradearia aiohttp/python-dotenv y abriria 11 CVEs nuevas.
-# Net negative — staying on 1.83.0. Mismos ignores en pip-audit.
-CVE-2026-42203
-CVE-2026-42208
-CVE-2026-42271
-
-# --- pyasn1 0.6.2 -> fix 0.6.3 (DoS via recursion) -----------
-# Transitiva (cryptography / python-jose). Patch upgrade.
-CVE-2026-30922
-
-# --- pyjwt 2.11.0 -> fix 2.12.0 (RFC 7515 crit header) -------
-# Transitiva (python-jose). Patch upgrade.
-CVE-2026-32597
-
-# --- simpleeval 1.0.3 -> fix 1.0.5 (sandbox escape) ----------
-# Transitiva (langchain). Patch upgrade.
-CVE-2026-32640

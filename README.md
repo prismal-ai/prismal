@@ -29,7 +29,8 @@ This package is the **agent framework layer** extracted from the larger monorepo
 - **Long-term memory** — PII-sanitized cross-session store (SQLite + ChromaDB; optional MongoDB)
 - **Observability** — Langfuse traces, OpenTelemetry spans, structlog
 - **Deterministic intent routing** — regex-based `match_intent()` ahead of LLM supervision
-- **120-tool global cap** enforced by `tool_registry.py`
+- **Tool provider injection (implemented)** — `ToolProviderPort` hexagonal port: the host composes MCP/Skills/stub providers and injects them (`set_tool_provider` or per-session via graph config); the agent core no longer imports `prismal.mcp`/`prismal.skills` — see [`docs/tool-providers.md`](./docs/tool-providers.md) and [`specs/tool-provider-injection/`](./specs/tool-provider-injection/)
+- **120-tool global cap** enforced by the official `CompositeToolProvider` (legacy constants kept in `tool_registry.py`)
 - **Graph visualization** — `to_mermaid()` / `visualize()` / `save_graph_image()` (from `prismal.langgraph`) render any compiled graph or `SubgraphDefinition`; `SubgraphDefinition.to_mermaid()` and `visualize_supervisor_graph()` are one-line shortcuts (see `examples/visualize_graphs.py`)
 
 ---
@@ -247,9 +248,65 @@ Automatically maps `state["messages"]` ↔ the Runnable's input/output. Supports
 
 #### Formal ports (hexagonal)
 
-`prismal/agents/extension/ports.py` declares `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort` as `Protocol`s. Existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, `BaseTool`) conform structurally; users substitute their own (Redis checkpointer, Splunk audit, etc.) without modifying the core.
+`prismal/agents/extension/ports.py` declares `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort`, `ToolProviderPort` as `Protocol`s. Existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, `BaseTool`, the Fase Y tool providers) conform structurally; users substitute their own (Redis checkpointer, Splunk audit, custom tool source, etc.) without modifying the core.
 
 See [`specs/extension-surface/SPEC.md`](./specs/extension-surface/SPEC.md) for the full interface contracts of Fase X.
+
+### Tool provider injection (Fase Y — implemented)
+
+Tool resolution is a hexagonal port (user guide: [`docs/tool-providers.md`](./docs/tool-providers.md); contracts: [`specs/tool-provider-injection/`](./specs/tool-provider-injection/)): the agent core asks an injected `ToolProviderPort` for tools and never imports `prismal.mcp` / `prismal.skills` (enforced by an architecture test). The host composes the providers and injects them at startup:
+
+```python
+from prismal.agents.extension import build_default_tool_provider
+from prismal.agents.tool_registry import set_tool_provider
+
+async def on_startup() -> None:                       # FastAPI lifespan or equivalent
+    set_tool_provider(await build_default_tool_provider())   # MCP + Skills + stubs
+```
+
+- **Providers** (`prismal.agents.extension`): `McpToolProvider`, `SkillToolProvider`, `StubToolProvider`, `CompositeToolProvider` (merge with MCP→Skills→stubs priority, name dedupe, 60/120 tool caps, fixed-tool-agent exemption — exact parity with the historical registry) and `FakeToolProvider` for tests.
+- **Variante A (global)** — `set_tool_provider()` once per process; nodes keep calling `get_tools_for_agent(name)` unchanged.
+- **Variante B (multi-tenant)** — `get_async_compiled_graph(tool_provider=provider)` with `tool_provider_mode="context"` binds a per-session provider; nodes resolve via `get_tools_for_agent_ctx(name, config)`. No shared global state.
+- **No provider?** The registry degrades to static stubs with a warning (`tool_provider_strict=True` raises `ToolProviderNotConfigured` instead).
+- **Legacy shims** — `init_mcp()` / `get_mcp_tools()` / `get_skill_tools()` still work, emit `DeprecationWarning`, and will be removed in the next minor.
+
+Runnable examples: [`examples/tool_provider_host.py`](./examples/tool_provider_host.py), [`examples/tool_provider_custom.py`](./examples/tool_provider_custom.py).
+
+---
+
+## Roadmap — features por desarrollar
+
+Ya implementadas: extension surface (Fase X), advanced architectures (Fase A/B/C), multimodal (Fase F), y la remediación de dependencias (18/18 alertas en estado terminal).
+
+Lo que falta, **ordenado de implementación rápida y necesaria → compleja y menos necesaria**. Cada feature tiene su contrato SDD en [`specs/`](./specs/). Estado: `spec ready` = listo para construir (PLAN/ARCHITECTURE/SPEC/TASKS); `PRD seed` = solo PRD, requiere expandir antes de construir.
+
+1. **Terminar Tool Provider Injection (Fase Y)** — *rápido · necesario · en curso* — [`specs/tool-provider-injection/`](./specs/tool-provider-injection/). El código de Y1–Y5 ya aterrizó; falta cerrar Y6–Y8 (settings/observabilidad, docs/ejemplos, tests de paridad) y marcar el spec `IMPLEMENTED`.
+2. **Vector Store Port (Fase Z)** — *moderado · necesario · spec ready* — [`specs/vector-store-port/`](./specs/vector-store-port/). Quita el lock-in de ChromaDB tras un `VectorStorePort` con adaptadores (Chroma default + LanceDB, sqlite-vec, Qdrant, pgvector). Reduce superficie de seguridad y abre backends embebidos.
+3. **Runtime Composition Root (Fase R)** — *moderado · necesario · spec ready* — [`specs/composition-root/`](./specs/composition-root/). `build_runtime()` compone e inyecta todos los puertos (tools, vector store, embeddings, checkpoint, audit) en una llamada; **desbloquea `prismal-server` / `prismal-dashboard`**. Depende de Fase Y + Z.
+4. **Cost & Budget Governance** — *rápido-moderado · útil · PRD seed* — [`specs/cost-budget-governance/`](./specs/cost-budget-governance/). Presupuesto por run/sesión/tenant + circuit-breakers de coste/tokens/llamadas en `react_loop` y los patrones caros (debate, ToT, LATS, MoA). Seguro barato contra gasto runaway.
+5. **A2A / Agent Cards interop (Fase I)** — *complejo · necesario (ecosistema) · spec ready* — [`specs/a2a-interop/`](./specs/a2a-interop/). Interop agente-a-agente bidireccional: exponer prismal como agente A2A (Agent Card en `/.well-known/agent-card.json`, JSON-RPC + SSE) y consumir agentes remotos como nodos/tools. Complementa MCP; cierra la brecha frente a MS Agent Framework / Google ADK.
+6. **Agent Identity & Access Governance** — *complejo · necesario (enterprise) · PRD seed* — [`specs/agent-identity-governance/`](./specs/agent-identity-governance/). Identidad por agente (W3C DID), credenciales acotadas, OAuth-on-behalf y un `PolicyEngine`. Es la base de confianza que consume A2A; production-blocker enterprise.
+7. **Agent Evaluation & Reliability Harness** — *moderado-complejo · útil (fiabilidad) · PRD seed* — [`specs/agent-eval-harness/`](./specs/agent-eval-harness/). Eval a nivel de sistema del grafo (trayectorias, tool-usage, groundedness RAG), regresión con gate en CI y suite adversaria. Cierra el "scaffold gap".
+8. **Pulido (sin spec aún)** — *variable · menos urgente* — UI de observabilidad de primera parte (o integración profunda LangSmith/Langfuse) y type-safety por nodo (validación Pydantic del I/O de nodos; evolución de `AgentState`).
+
+### ¿Framework o host? (dónde vive cada feature)
+
+Regla: **contrato/lógica → framework (`prismal/`); servir HTTP, autenticar, mostrar, persistir config → host (`prismal-server` / `prismal-dashboard`).** Por eso A2A e Identity quedan partidos.
+
+| # | Feature | Framework (`prismal/`) | Host (`prismal-server` / `dashboard`) |
+|---|---|---|---|
+| 1 | Tool Provider (Fase Y) | ✅ ports/providers (`agents/extension`) | compone e inyecta al arranque |
+| 2 | Vector Store Port (Fase Z) | ✅ `rag/stores/` + `VectorStorePort` | elige backend por config |
+| 3 | Composition Root (Fase R) | ✅ `composition.py` / `build_runtime()` | lo llama en el lifespan |
+| 4 | Cost & Budget Governance | ✅ guard en `react_loop` + patrones | cuotas por tenant |
+| 5 | A2A / Agent Cards (Fase I) | ✅ tipos · card · client · `A2AToolProvider` · handler | **endpoint HTTP (`/a2a`, `/.well-known/agent-card.json`) + auth** |
+| 6 | Agent Identity & Governance | ✅ `PolicyEngine` + puerto de identidad (`security/`) | **IdP/OAuth + bóveda de credenciales + emisión/rotación de DID** |
+| 7 | Agent Eval Harness | motor de eval (módulo) | corre como herramienta dev/CI (o paquete aparte) |
+| 8 | Pulido | type-safety por nodo (`AgentState`) | observabilidad UI |
+
+El framework define puertos y lógica; el host los compone y expone. Detalle en [`docs/competitive-analysis.md`](./docs/competitive-analysis.md).
+
+Análisis completo y comparativa con frameworks 2026 en [`docs/competitive-analysis.md`](./docs/competitive-analysis.md).
 
 ---
 
@@ -301,7 +358,7 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 │   ├── supervisor.py      ← Central router
 │   ├── state.py           ← AgentState (TypedDict; messages uses add_messages reducer)
 │   ├── intent_router.py   ← Deterministic regex routing
-│   ├── tool_registry.py   ← MAX 120 tools global cap; capability-based MCP filtering
+│   ├── tool_registry.py   ← stable facade: delegates to the injected ToolProviderPort (Fase Y)
 │   ├── patterns/
 │   │   ├── reflection.py           ← reflection_loop()
 │   │   ├── parallel.py             ← make_parallel_dispatcher() via Send()

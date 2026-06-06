@@ -239,39 +239,22 @@ repos:
         name: "sca: pip-audit (CVEs en deps)"
         language: system
         # Triage activo de CVEs en `prismal doctor security-check` (Phase 30).
-        # Las CVEs en paquetes pineados aqui no se pueden actualizar sin romper
-        # el stack Reflex 0.7.x + sqlmodel<0.0.25 + pydantic<2.11. Se ignoran
-        # explicitamente en pre-commit y se revisan manualmente.
+        # Solo CVEs SIN fix upstream aplicable, espejo exacto de `.trivyignore`
+        # (ver justificacion + trigger por entrada alli) y de ci.yml
+        # (PIP_AUDIT_IGNORES). Remediacion 2026-06:
+        # specs/dependency-security-remediation/.
         # Path al venv en vez de `uv run ...` para no depender de `uv` en el PATH del IDE.
         entry: .venv/bin/pip-audit
         args:
-          - --ignore-vuln=GHSA-r7w7-9xr2-qq2r
-          - --ignore-vuln=GHSA-fv5p-p927-qmxr
-          - --ignore-vuln=GHSA-rr7j-v2q5-chgv
-          - --ignore-vuln=CVE-2025-66416
-          - --ignore-vuln=CVE-2026-25990
-          - --ignore-vuln=CVE-2026-40192
-          - --ignore-vuln=GHSA-jj6c-8h6c-hppx
-          - --ignore-vuln=GHSA-4pxv-j86v-mhcw
-          - --ignore-vuln=GHSA-7gw9-cf7v-778f
-          - --ignore-vuln=GHSA-x284-j5p8-9c5p
-          - --ignore-vuln=CVE-2025-62379
+          # ecdsa (won't-fix, Minerva) — GHSA + alias CVE
           - --ignore-vuln=GHSA-wj6h-64fc-37mp
-          # litellm bumped 1.83.0 -> 1.86.2 (clean resolve, no stack downgrade),
-          # which fixes CVE-2026-40217 plus the earlier GHSA-xqmj-j6mv-4862 +
-          # CVE-2026-42203 + CVE-2026-42208 + CVE-2026-42271. Ignores kept as a
-          # backstop in case the floor (>=1.58.0) ever resolves lower again.
-          - --ignore-vuln=GHSA-xqmj-j6mv-4862
-          - --ignore-vuln=CVE-2026-42203
-          - --ignore-vuln=CVE-2026-42208
-          - --ignore-vuln=CVE-2026-42271
-          # pip 26.0.1 is the latest release; CVE-2026-3219 has no fix version yet.
+          - --ignore-vuln=CVE-2024-23342
+          # transformers 4.57.6 (solo rama lock py>=3.14) — mitigado torch>=2.6
+          - --ignore-vuln=CVE-2026-1839
+          # pip 26.0.1: CVE-2026-3219 sin fix publicado aun
           - --ignore-vuln=CVE-2026-3219
-          # chromadb 1.5.8: CVE-2026-45829 has no fix version published yet.
+          # chromadb 1.5.8: CVE-2026-45829 sin first_patched_version
           - --ignore-vuln=CVE-2026-45829
-          # prefect 3.6.27: CVE-2026-7724 fix lands only in 3.6.28.dev2 (a
-          # pre-release); ignore until a stable 3.6.28 ships.
-          - --ignore-vuln=CVE-2026-7724
           - --skip-editable
         pass_filenames: false
         files: ^(pyproject\.toml|uv\.lock)$

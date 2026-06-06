@@ -37,6 +37,8 @@ if TYPE_CHECKING:
 
     from langgraph.graph.state import CompiledStateGraph
 
+    from prismal.agents.extension.ports import ToolProviderPort
+
 from prismal.agents.codeact_agent import codeact_node
 from prismal.agents.coder import coder_node
 from prismal.agents.critic import critic_node
@@ -56,6 +58,7 @@ from prismal.agents.researcher import researcher_node
 from prismal.agents.skill_manager import skill_manager_node
 from prismal.agents.state import AgentState
 from prismal.agents.supervisor import supervisor_node, supervisor_router
+from prismal.agents.tool_registry import resolve_provider
 from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 
@@ -541,7 +544,10 @@ def get_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any, Any]:
 _async_graph: CompiledStateGraph[AgentState, Any, Any, Any] | None = None
 
 
-async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any, Any]:
+async def get_async_compiled_graph(
+    *,
+    tool_provider: ToolProviderPort | None = None,
+) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Return the compiled LangGraph supervisor graph with an async checkpointer.
 
@@ -551,12 +557,22 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     The graph is built once and cached as a module-level singleton; subsequent
     calls return the same object without reopening the database.
 
+    Args:
+        tool_provider: Variante B (Fase Y4, SPEC-TPI-009) — when provided and
+            ``settings.tool_provider_mode == "context"``, the shared compiled
+            graph is returned bound (``with_config``) to
+            ``configurable.tool_provider``, so nodes using
+            ``get_tools_for_agent_ctx``/``resolve_provider`` see this
+            session's provider without touching global state. Ignored (with a
+            warning) in ``global`` mode.
+
     Returns:
-        A compiled graph backed by :class:`AsyncSqliteSaver`.
+        A compiled graph backed by :class:`AsyncSqliteSaver` — per-session
+        bound when a context ``tool_provider`` is given.
     """
     global _async_graph
     if _async_graph is not None:
-        return _async_graph
+        return _bind_tool_provider(_async_graph, tool_provider)
 
     # Phase 40 / SPEC-042 AC-042-4: flat mode is the default; hierarchical
     # mode is opt-in via ``PRISMAL_HIERARCHICAL_MODE=true``. The two
@@ -564,7 +580,7 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     # mechanism so callers never need to care which one is active.
     if get_settings().hierarchical_mode:
         _async_graph = await _build_hierarchical_graph()
-        return _async_graph
+        return _bind_tool_provider(_async_graph, tool_provider)
 
     # Phase 36: the checkpointer backend is now selected from
     # ``settings.db_url`` via ``build_checkpointer()``. For the default
@@ -615,7 +631,35 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
         multimodal_nodes=multimodal_nodes,
     )
     logger.debug("async_graph_initialized")
-    return _async_graph
+    return _bind_tool_provider(_async_graph, tool_provider)
+
+
+def _bind_tool_provider(
+    graph: CompiledStateGraph[AgentState, Any, Any, Any],
+    tool_provider: ToolProviderPort | None,
+) -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    """Bind *tool_provider* into the graph config (variante B helper).
+
+    Returns *graph* unchanged when no provider is given or the platform runs
+    in ``global`` mode. In ``context`` mode the shared compiled graph is
+    wrapped via ``with_config`` — a lightweight per-session view; the
+    underlying graph (and its checkpointer) stays a singleton.
+    """
+    if tool_provider is None:
+        return graph
+    if get_settings().tool_provider_mode != "context":
+        logger.warning(
+            "tool_provider_ignored_global_mode",
+            hint=(
+                "get_async_compiled_graph(tool_provider=...) requires "
+                "settings.tool_provider_mode='context'; use "
+                "set_tool_provider(...) in global mode."
+            ),
+        )
+        return graph
+    # ``with_config`` returns a lightweight per-session view of the shared
+    # compiled graph; the underlying graph and checkpointer stay a singleton.
+    return graph.with_config({"configurable": {"tool_provider": tool_provider}})
 
 
 # ---------------------------------------------------------------------------
@@ -758,4 +802,5 @@ __all__ = [
     "get_async_compiled_graph",
     "get_compiled_graph",
     "list_session_ids",
+    "resolve_provider",
 ]

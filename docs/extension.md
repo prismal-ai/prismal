@@ -160,6 +160,7 @@ substitute your own implementations for:
 | `AuditPort` | `prismal.security.AuditLogger` |
 | `EmbeddingsPort` | any `langchain_core.embeddings.Embeddings` |
 | `ToolPort` | `langchain_core.tools.BaseTool` |
+| `ToolProviderPort` | `Mcp/Skill/Stub/Composite/FakeToolProvider` — see [tool-providers.md](tool-providers.md) (Fase Y) |
 
 ```python
 from prismal.agents.extension import conforms_to, CheckpointPort

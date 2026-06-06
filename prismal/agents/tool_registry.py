@@ -1,22 +1,24 @@
-"""Dynamic tool registry for Prismal sub-agents.
+"""Dynamic tool registry for Prismal sub-agents (Fase Y — provider injection).
 
-Merges three tool sources at call time:
-
-1. **MCP tools** — from connected MCP servers via ``MCPClientManager``
-   (initialised once as a module-level singleton).
-2. **Skill tools** — from active skills via ``SkillsManager.get_active_tools()``.
-3. **Fallback stubs** — the static tools from ``tools.py``, used only when
-   no real tool with the same name is available from MCP or skills.
+Tool resolution is delegated to an injected :class:`ToolProviderPort`
+(SPEC-TPI-008). The host (prismal-sdk / prismal-web) composes the providers
+(MCP, Skills, stubs) and injects them once at startup; this module — and the
+whole agent core — no longer imports ``prismal.mcp`` or ``prismal.skills``.
 
 Usage::
 
-    from prismal.agents.tool_registry import get_tools_for_agent, init_mcp
+    # Host startup (FastAPI lifespan or equivalent)
+    from prismal.agents.extension import build_default_tool_provider
+    from prismal.agents.tool_registry import set_tool_provider
 
-    # Call once at app startup (e.g. FastAPI lifespan or graph init)
-    await init_mcp()
+    set_tool_provider(await build_default_tool_provider(settings))
 
-    # Call inside each agent node to get live tools
+    # Inside each agent node (unchanged API)
     tools = get_tools_for_agent("researcher")
+
+Without an injected provider the registry degrades to the static stubs from
+``tools.py`` with a structured warning (or raises ``ToolProviderNotConfigured``
+when ``settings.tool_provider_strict`` is True).
 """
 
 from __future__ import annotations
@@ -24,131 +26,210 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from pathlib import Path
+import warnings
 from typing import TYPE_CHECKING
 
 from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from pathlib import Path
 
+    from langchain_core.runnables import RunnableConfig
     from langchain_core.tools import BaseTool
+
+    from prismal.agents.extension.ports import ToolProviderPort
+    from prismal.agents.extension.providers import StubToolProvider
 
 logger = get_logger("prismal.agents.tool_registry")
 
 # ---------------------------------------------------------------------------
-# MCP singleton
+# Injected tool provider (variante A — SPEC-TPI-008)
 # ---------------------------------------------------------------------------
 
-_mcp_manager: object | None = None  # MCPClientManager | None
-_mcp_initialized: bool = False
-_mcp_lock = asyncio.Lock()
+_provider: ToolProviderPort | None = None
 
-_DEFAULT_MCP_CONFIG = Path("config/mcp_servers.yaml")
+# Lazy fallback used when no provider was injected (non-strict mode).
+_default_stub_provider: StubToolProvider | None = None
+
+
+def set_tool_provider(provider: ToolProviderPort) -> None:
+    """Inject the global tool provider.
+
+    Idempotent — the host calls it once at startup; calling it again simply
+    replaces the previous provider (last one wins).
+    """
+    global _provider  # module-level injection point (variante A)
+    _provider = provider
+    logger.info("tool_registry.provider_set", provider=type(provider).__name__)
+
+
+def get_tool_provider() -> ToolProviderPort | None:
+    """Return the injected global provider, or ``None`` when not configured."""
+    return _provider
+
+
+def _get_default_stub_provider() -> StubToolProvider:
+    """Return the lazily-created stub-only fallback provider."""
+    global _default_stub_provider  # lazy module-level singleton
+    if _default_stub_provider is None:
+        from prismal.agents.extension.providers import StubToolProvider
+
+        _default_stub_provider = StubToolProvider()
+    return _default_stub_provider
+
+
+# ---------------------------------------------------------------------------
+# Observability (Fase Y6 — span prismal.tools.resolve + counters)
+# ---------------------------------------------------------------------------
+
+# Short metric labels per provider class (ARCHITECTURE §7.2). Unknown
+# (host-supplied) providers are labelled with their class name.
+_PROVIDER_LABELS: dict[str, str] = {
+    "CompositeToolProvider": "composite",
+    "McpToolProvider": "mcp",
+    "SkillToolProvider": "skill",
+    "StubToolProvider": "stub",
+    "FakeToolProvider": "fake",
+}
+
+
+def _provider_label(provider: ToolProviderPort) -> str:
+    """Return the metric label for *provider* (``composite|mcp|skill|stub|fake``)."""
+    name = type(provider).__name__
+    return _PROVIDER_LABELS.get(name, name)
+
+
+def _observed_get_tools(
+    provider: ToolProviderPort,
+    agent_name: str,
+    capabilities: list[str] | None,
+    *,
+    fallback: bool = False,
+) -> list[BaseTool]:
+    """Resolve tools through *provider* inside the ``prismal.tools.resolve`` span.
+
+    Emits the Fase Y counters: ``tool_provider_resolved{provider}``,
+    ``tools_injected{agent}`` and — when *fallback* is set —
+    ``tool_provider_fallback``.
+    """
+    from prismal.monitoring.otel import OTelManager
+
+    otel = OTelManager()
+    label = _provider_label(provider)
+    with otel.start_span(
+        "prismal.tools.resolve",
+        attributes={"prismal.agent": agent_name},
+    ) as span:
+        tools = provider.get_tools(agent_name=agent_name, capabilities=capabilities)
+        span.set_attribute("prismal.tool_provider", label)
+        span.set_attribute("prismal.n_tools", len(tools))
+        span.set_attribute("prismal.fallback", fallback)
+        if capabilities:
+            span.set_attribute("prismal.capabilities", ",".join(capabilities))
+
+    otel.increment_counter("tool_provider_resolved", attributes={"provider": label})
+    otel.increment_counter("tools_injected", value=len(tools), attributes={"agent": agent_name})
+    if fallback:
+        otel.increment_counter("tool_provider_fallback")
+    return tools
+
+
+# ---------------------------------------------------------------------------
+# Deprecated shims (1 minor release of deprecation — DD-TPI-006)
+# ---------------------------------------------------------------------------
 
 
 async def init_mcp(config_path: Path | None = None) -> None:
-    """Initialise the module-level MCPClientManager singleton.
+    """DEPRECATED — build and inject a provider from the host instead.
 
-    Safe to call multiple times — subsequent calls are no-ops.
-    Should be awaited once at application startup.
+    Delegates to ``set_tool_provider(await build_default_tool_provider(...))``
+    so legacy startups keep working. No-op when a provider is already
+    injected.
 
     Args:
-        config_path: Override config path (defaults to
+        config_path: Override MCP config path (defaults to
             ``config/mcp_servers.yaml``).
     """
-    global _mcp_manager, _mcp_initialized  # globals needed for module-level singleton
+    warnings.warn(
+        "init_mcp() is deprecated; compose and inject a provider at startup: "
+        "set_tool_provider(await build_default_tool_provider(settings)).",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    if _provider is not None:
+        return
+    from prismal.agents.extension.providers import build_default_tool_provider
 
-    async with _mcp_lock:
-        if _mcp_initialized:
-            return
-
-        try:
-            from prismal.mcp.client import MCPClientManager
-
-            mgr = MCPClientManager(config_path or _DEFAULT_MCP_CONFIG)
-            await mgr.load_from_config()
-            _mcp_manager = mgr
-            connected = [s.name for s in mgr.get_server_status() if s.connected]
-            logger.info(
-                "tool_registry.mcp_initialized",
-                servers=connected,
-                count=len(connected),
-            )
-        except Exception as exc:
-            logger.warning(
-                "tool_registry.mcp_init_failed",
-                error=str(exc),
-                hint="MCP tools will not be available",
-            )
-        finally:
-            _mcp_initialized = True
+    set_tool_provider(await build_default_tool_provider(mcp_config_path=config_path))
 
 
 def get_mcp_tools(
     capabilities: list[str] | None = None,
 ) -> list[BaseTool]:
-    """Return all tools currently available from connected MCP servers.
+    """DEPRECATED — MCP tools are resolved by the injected provider.
 
-    Args:
-        capabilities: Fase E capability filter forwarded to
-            :meth:`MCPClientManager.get_all_langchain_tools`. ``None``
-            (default) preserves the legacy behaviour and returns every
-            connected server's tools. A non-empty list restricts the result
-            to servers whose ``capabilities`` intersect the request; servers
-            tagged ``"general"`` are always included.
-
-    Returns:
-        Empty list when MCP has not been initialised or no servers are
-        connected.
+    Delegates to the ``McpToolProvider`` inside the injected provider (when
+    present). Returns ``[]`` when no provider is configured or it has no MCP
+    sub-provider.
     """
-    if _mcp_manager is None:
-        return []
-    try:
-        from prismal.mcp.client import MCPClientManager
+    warnings.warn(
+        "get_mcp_tools() is deprecated; tools are resolved by the injected "
+        "ToolProviderPort (see set_tool_provider).",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    from prismal.agents.extension.providers import (
+        CompositeToolProvider,
+        McpToolProvider,
+    )
 
-        if isinstance(_mcp_manager, MCPClientManager):
-            return _mcp_manager.get_all_langchain_tools(capabilities=capabilities)
-    except Exception as exc:
-        logger.warning("tool_registry.get_mcp_tools_error", error=str(exc))
+    provider = get_tool_provider()
+    candidates = provider.providers if isinstance(provider, CompositeToolProvider) else (provider,)
+    for candidate in candidates:
+        if isinstance(candidate, McpToolProvider):
+            return candidate.get_tools(agent_name="__legacy__", capabilities=capabilities)
     return []
 
 
 def get_skill_tools() -> list[BaseTool]:
-    """Return all tools from currently active skills.
+    """DEPRECATED — skill tools are resolved by the injected provider.
 
-    Returns:
-        Empty list when no skills are active or the SkillsManager fails.
+    Delegates to the ``SkillToolProvider`` inside the injected provider (when
+    present). Returns ``[]`` when no provider is configured or it has no
+    skill sub-provider.
     """
-    try:
-        from prismal.skills.manager import SkillsManager
+    warnings.warn(
+        "get_skill_tools() is deprecated; tools are resolved by the injected "
+        "ToolProviderPort (see set_tool_provider).",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    from prismal.agents.extension.providers import (
+        CompositeToolProvider,
+        SkillToolProvider,
+    )
 
-        return SkillsManager().get_active_tools()
-    except Exception as exc:
-        logger.warning("tool_registry.get_skill_tools_error", error=str(exc))
+    provider = get_tool_provider()
+    candidates = provider.providers if isinstance(provider, CompositeToolProvider) else (provider,)
+    for candidate in candidates:
+        if isinstance(candidate, SkillToolProvider):
+            return candidate.get_tools(agent_name="__legacy__")
     return []
 
 
-# Maximum number of MCP tools injected per agent call.
-# The cap is applied globally across all connected MCP servers.  Setting it
-# too low silently drops tools from servers that appear later in the list
-# (e.g. playwright browser_navigate being cut out when filesystem already
-# consumes 10+ slots out of 20).  Claude Sonnet 4.6 handles 60 tool schemas
-# (~15 k tokens) without issue.
+# Legacy aliases of the platform tool-policy caps.  The merge itself now
+# lives in extension/providers.py (CompositeToolProvider — DD-TPI-004); these
+# constants are kept here, in sync, for backward compatibility with existing
+# callers and tests (a parity test asserts both sides stay equal).
+#
+# _MAX_MCP_TOOLS — global cap across all connected MCP servers per call.
+# _MAX_TOTAL_TOOLS — hard upper bound on the merged list (OpenAI rejects
+#   ``tools`` arrays longer than 128 entries).
+# _FIXED_TOOL_AGENTS — agents that receive only their stub set (their prompts
+#   must stay small to avoid rate-limit errors).
 _MAX_MCP_TOOLS: int = 60
-
-# Hard upper bound on the total tool list handed to the LLM.  OpenAI rejects
-# any ``tools`` array longer than 128 entries with a BadRequestError; this
-# constant leaves a small safety margin so the merged list (MCP + skills +
-# stubs) never reaches the provider limit.  When the merged list exceeds
-# this cap the tail (lowest-priority entries — typically extra skill tools
-# and unused stubs) is dropped.
 _MAX_TOTAL_TOOLS: int = 120
-
-# Agents that operate on a fixed, minimal tool set and must NOT receive MCP
-# or skill tools.  Loading 60+ MCP schemas + unbounded skill schemas into
-# these agents causes the prompt to exceed Anthropic's 30 k token/min rate
-# limit.  These agents only need their own stub tools to function correctly.
 _FIXED_TOOL_AGENTS: frozenset[str] = frozenset({"cron_manager", "critic"})
 
 
@@ -196,120 +277,94 @@ def get_tools_for_agent(
     agent_name: str,
     required_capabilities: list[str] | None = None,
 ) -> list[BaseTool]:
-    """Return the merged tool list for a named agent.
+    """Return the tool list for a named agent (stable facade — SPEC-TPI-008).
 
-    Merge strategy (highest priority first):
+    Delegates to the injected :class:`ToolProviderPort`. With the default
+    composite (``build_default_tool_provider``) the result is identical to
+    the historical merge: MCP → Skills → stubs, name-based dedupe, token
+    caps, and the fixed-tool-agent exemption.
 
-    1. MCP tools — real tools from connected servers.
-    2. Skill tools — real tools from active skills.
-    3. Stub fallbacks — static stubs filtered to the agent's relevant subset,
-       only included when no live tool with the same name exists.
+    Without an injected provider the call degrades to the static stubs from
+    ``tools.py`` (with a ``tool_registry.no_provider`` warning), or raises
+    :class:`ToolProviderNotConfigured` when ``settings.tool_provider_strict``
+    is True.
 
     Args:
         agent_name: One of the known agent names (``"researcher"``,
             ``"coder"``, etc.).
-        required_capabilities: Fase E capability filter for MCP servers.
-            ``None`` (default) preserves the legacy full pool — zero
-            regressions for pre-Fase-E callers. A non-empty list restricts
-            MCP tools to servers whose ``capabilities`` overlap the
-            requested set; servers tagged ``"general"`` are always kept.
-            Skill tools and stubs are **not** filtered — only the MCP pool.
+        required_capabilities: Fase E capability filter forwarded to the
+            provider as ``capabilities``. ``None`` (default) preserves the
+            legacy full pool — zero regressions for pre-Fase-E callers.
 
     Returns:
         Deduplicated list of ``BaseTool`` instances.
     """
-    from prismal.agents.subgraphs.ml_pipeline.tools_ml import (
-        ML_PIPELINE_TOOLS,
-    )
-    from prismal.agents.tools import (
-        CODER_TOOLS,
-        CRITIC_TOOLS,
-        CRON_MANAGER_TOOLS,
-        DATA_ANALYST_TOOLS,
-        FILE_MANAGER_TOOLS,
-        RAG_AGENT_TOOLS,
-        RESEARCHER_TOOLS,
-        read_file,
-        write_file,
-    )
-    from prismal.sandbox.tools import SANDBOX_TOOLS
+    provider = get_tool_provider()
+    if provider is None:
+        from prismal.core.config import get_settings
 
-    stub_map: dict[str, list[BaseTool]] = {
-        "researcher": RESEARCHER_TOOLS,
-        "coder": CODER_TOOLS + SANDBOX_TOOLS,
-        "rag_agent": RAG_AGENT_TOOLS,
-        "critic": CRITIC_TOOLS,
-        "data_analyst": DATA_ANALYST_TOOLS + SANDBOX_TOOLS,
-        "file_manager": FILE_MANAGER_TOOLS,
-        # Planner needs file I/O to persist generated specs to disk;
-        # SDD skill tools (guide, read_reference, validate_specs) are
-        # injected automatically via get_skill_tools() when activated.
-        # Cron management tools are also available to the planner so it
-        # can schedule recurring agent tasks on behalf of the user.
-        "planner": [read_file, write_file, *CRON_MANAGER_TOOLS],
-        "cron_manager": CRON_MANAGER_TOOLS,
-        # ml_pipeline subgraph agents share the same ML tool set.
-        "data_ingester": ML_PIPELINE_TOOLS,
-        "eda_analyst": ML_PIPELINE_TOOLS,
-        "feature_engineer": ML_PIPELINE_TOOLS,
-        "model_trainer": ML_PIPELINE_TOOLS,
-        "model_evaluator": ML_PIPELINE_TOOLS,
-        "model_exporter": ML_PIPELINE_TOOLS,
-        # financial_analyst subgraph agents — LLM-only nodes (no dedicated tools)
-        "market_data_collector": [],
-        "technical_analyst": [],
-        "fundamental_analyst": [],
-        "risk_sentiment_analyst": [],
-        "report_generator": [],
-    }
+        if get_settings().tool_provider_strict:
+            from prismal.core.exceptions import ToolProviderNotConfigured
 
-    stubs = stub_map.get(agent_name, [])
+            raise ToolProviderNotConfigured(agent_name)
+        logger.warning("tool_registry.no_provider", agent=agent_name)
+        return _observed_get_tools(_get_default_stub_provider(), agent_name, None, fallback=True)
+    return _observed_get_tools(provider, agent_name, required_capabilities)
 
-    # Fixed-tool-set agents skip MCP and skill loading entirely.
-    # Their prompts must stay small to avoid rate-limit errors.
-    if agent_name in _FIXED_TOOL_AGENTS:
-        logger.debug(
-            "tool_registry.tools_resolved",
-            agent=agent_name,
-            live=0,
-            stubs_kept=len(stubs),
-            total=len(stubs),
-        )
-        return stubs
 
-    # Cap MCP pool to avoid token explosion.
-    mcp_tools = get_mcp_tools(capabilities=required_capabilities)[:_MAX_MCP_TOOLS]
-    skill_tools = get_skill_tools()
-    live_tools: list[BaseTool] = mcp_tools + skill_tools
-    live_names = {t.name for t in live_tools}
+# ---------------------------------------------------------------------------
+# Variante B — per-context provider resolution (Fase Y4, SPEC-TPI-009)
+# ---------------------------------------------------------------------------
 
-    filtered_stubs = [t for t in stubs if t.name not in live_names]
 
-    merged = live_tools + filtered_stubs
+def resolve_provider(config: RunnableConfig | None = None) -> ToolProviderPort | None:
+    """Resolve the tool provider for the current invocation context.
 
-    # Enforce the global provider cap (OpenAI rejects > 128 tool schemas).
-    # The merge order above is priority-ordered (MCP → skills → stubs), so
-    # truncating from the tail drops the lowest-value entries first.
-    if len(merged) > _MAX_TOTAL_TOOLS:
-        dropped = len(merged) - _MAX_TOTAL_TOOLS
-        merged = merged[:_MAX_TOTAL_TOOLS]
-        logger.warning(
-            "tool_registry.tools_truncated",
-            agent=agent_name,
-            cap=_MAX_TOTAL_TOOLS,
-            dropped=dropped,
-            live=len(live_tools),
-            stubs=len(filtered_stubs),
-        )
+    Reads ``config["configurable"]["tool_provider"]`` (set by
+    ``get_async_compiled_graph(tool_provider=...)`` in ``context`` mode) and
+    falls back to the injected global provider. No lock is taken — resolution
+    is a pair of dict lookups, safe under concurrent sessions.
 
-    logger.debug(
-        "tool_registry.tools_resolved",
-        agent=agent_name,
-        live=len(live_tools),
-        stubs_kept=len(filtered_stubs),
-        total=len(merged),
-    )
-    return merged
+    Args:
+        config: The ``RunnableConfig`` LangGraph hands to a node, or ``None``.
+
+    Returns:
+        The session provider, the global provider, or ``None`` when neither
+        is configured.
+    """
+    if config is not None:
+        candidate = config.get("configurable", {}).get("tool_provider")
+        if candidate is not None:
+            return candidate  # type: ignore[no-any-return]
+    return get_tool_provider()
+
+
+def get_tools_for_agent_ctx(
+    agent_name: str,
+    config: RunnableConfig | None = None,
+    required_capabilities: list[str] | None = None,
+) -> list[BaseTool]:
+    """Context-aware variant of :func:`get_tools_for_agent` (variante B).
+
+    Nodes running in ``tool_provider_mode="context"`` call this with the
+    ``RunnableConfig`` they receive from LangGraph so each session resolves
+    its own provider. Without a session provider the behaviour is identical
+    to :func:`get_tools_for_agent` (global provider → stub fallback/strict).
+
+    Args:
+        agent_name: One of the known agent names.
+        config: The node's ``RunnableConfig`` (or ``None``).
+        required_capabilities: Fase E capability filter.
+
+    Returns:
+        Deduplicated list of ``BaseTool`` instances.
+    """
+    provider: ToolProviderPort | None = None
+    if config is not None:
+        provider = config.get("configurable", {}).get("tool_provider")
+    if provider is None:
+        return get_tools_for_agent(agent_name, required_capabilities)
+    return _observed_get_tools(provider, agent_name, required_capabilities)
 
 
 # ---------------------------------------------------------------------------
@@ -922,7 +977,11 @@ __all__ = [
     "get_mcp_tools",
     "get_recommended_capabilities",
     "get_skill_tools",
+    "get_tool_provider",
     "get_tools_for_agent",
+    "get_tools_for_agent_ctx",
     "init_mcp",
     "react_loop",
+    "resolve_provider",
+    "set_tool_provider",
 ]

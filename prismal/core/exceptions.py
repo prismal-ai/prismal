@@ -496,6 +496,24 @@ class PluginConflictError(ExtensionError):
         super().__init__(f"Plugin name conflict on '{conflicting_name}': {plugins}")
 
 
+# Name mandated by SPEC-TPI-010 (public API) — kept without the Error suffix.
+class ToolProviderNotConfigured(ExtensionError):  # noqa: N818
+    """No ``ToolProviderPort`` injected and ``settings.tool_provider_strict`` is True.
+
+    Args:
+        agent_name: Agent whose tool resolution found no provider.
+    """
+
+    def __init__(self, agent_name: str) -> None:
+        """Initialize ToolProviderNotConfigured."""
+        self.agent_name = agent_name
+        super().__init__(
+            f"No tool provider configured for agent '{agent_name}'. "
+            "Call set_tool_provider(...) at startup, or set "
+            "settings.tool_provider_strict=False to fall back to stubs."
+        )
+
+
 class AdapterError(ExtensionError):
     """Base for adapter errors."""
 
@@ -640,6 +658,7 @@ __all__ = [
     "SwarmError",
     "TTSError",
     "ToTError",
+    "ToolProviderNotConfigured",
     "VideoAgentError",
     "VisionAgentError",
 ]
