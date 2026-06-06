@@ -2,298 +2,298 @@
 
 ## Product Requirements Document (PRD)
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-04-19 |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` |
+| **Version** | 1.0 |
+| **Date** | 2026-04-19 |
 | **Reviewers** | Tech Lead, AI Architect |
-| **Última actualización** | 2026-04-19 |
+| **Last updated** | 2026-04-19 |
 
 ---
 
-## 1. Resumen Ejecutivo
+## 1. Executive Summary
 
-Prismal v2.0.0 implementa un framework de agentes IA robusto con Supervisor/Hub-and-Spoke, CRAG, Reflection Loop, MapReduce y un conjunto de pipelines de producción. Sin embargo, el ecosistema de arquitecturas de agentes y RAG ha evolucionado significativamente: existen patrones probados en producción — Self-RAG, HyDE, RAG-Fusion, GraphRAG, Tree of Thoughts, LLM-Compiler, entre otros — que hoy no están disponibles en el sistema.
+Prismal v2.0.0 implements a robust AI agent framework with Supervisor/Hub-and-Spoke, CRAG, Reflection Loop, MapReduce, and a set of production pipelines. However, the agent and RAG architecture ecosystem has evolved significantly: there are production-proven patterns — Self-RAG, HyDE, RAG-Fusion, GraphRAG, Tree of Thoughts, LLM-Compiler, among others — that are not available in the system today.
 
-Este PRD define los requisitos para implementar **16 nuevas arquitecturas** agrupadas en tres dominios: (A) RAG avanzado, (B) patrones de agente, y (C) subgraph pipelines de dominio. La implementación se realizará por fases iterativas sobre el código existente en `prismal/`, reutilizando la infraestructura de seguridad, observabilidad y providers ya establecida.
+This PRD defines the requirements to implement **16 new architectures** grouped into three domains: (A) advanced RAG, (B) agent patterns, and (C) domain subgraph pipelines. The implementation will be carried out in iterative phases over the existing code in `prismal/`, reusing the already-established security, observability, and provider infrastructure.
 
-El resultado esperado es que Prismal ofrezca paridad arquitectónica con el estado del arte (2024-2025), permitiendo a los equipos que lo usen acceder a estrategias de retrieval más precisas y patrones de razonamiento más sofisticados sin cambiar la interfaz pública del framework.
+The expected result is for Prismal to offer architectural parity with the state of the art (2024-2025), allowing the teams that use it to access more precise retrieval strategies and more sophisticated reasoning patterns without changing the framework's public interface.
 
 ---
 
-## 2. Contexto y Problema
+## 2. Context and Problem
 
-### 2.1 Situación Actual
+### 2.1 Current Situation
 
-Prismal-agents implementa:
-- **RAG**: Standard RAG (ChromaDB), CRAG (5-step pipeline), Federated RAG (multi-nodo), RAG+Reflection.
-- **Agentes**: Supervisor, ReAct, Reflection, Parallel Fan-out, HITL, Plan-Execute, CodeAct, CUA, Meta-Learning.
+Prismal-agents implements:
+- **RAG**: Standard RAG (ChromaDB), CRAG (5-step pipeline), Federated RAG (multi-node), RAG+Reflection.
+- **Agents**: Supervisor, ReAct, Reflection, Parallel Fan-out, HITL, Plan-Execute, CodeAct, CUA, Meta-Learning.
 - **Pipelines**: dev_pipeline, ml_pipeline, financial, analysis/engineering/research orchestrators.
 
-### 2.2 Problema
+### 2.2 Problem
 
-Las siguientes capacidades críticas no están disponibles:
+The following critical capabilities are not available:
 
 **RAG:**
-- No existe forma de decidir *si* recuperar (Self-RAG) — CRAG siempre recupera.
-- No existe mejora de query antes del retrieval (HyDE, RAG-Fusion) — el embedding de la query directa tiene baja precisión en preguntas abstractas.
-- No existe búsqueda léxica (BM25) combinada con semántica — falla en nombres propios y términos técnicos sin contexto previo.
-- No existe razonamiento multi-hop sobre grafos de conocimiento (GraphRAG).
-- No existe indexación jerárquica (Parent-Child) — el contexto recuperado puede ser demasiado pequeño.
+- There is no way to decide *whether* to retrieve (Self-RAG) — CRAG always retrieves.
+- There is no query enhancement before retrieval (HyDE, RAG-Fusion) — the embedding of the direct query has low precision on abstract questions.
+- There is no lexical search (BM25) combined with semantic search — it fails on proper nouns and technical terms without prior context.
+- There is no multi-hop reasoning over knowledge graphs (GraphRAG).
+- There is no hierarchical indexing (Parent-Child) — the retrieved context can be too small.
 
-**Patrones de agente:**
-- No existe razonamiento ramificado con backtracking (Tree of Thoughts, LATS) — el sistema solo tiene razonamiento lineal.
-- No existe mecanismo de consenso entre perspectivas múltiples (Debate) — las respuestas de alta incertidumbre no tienen segunda opinión.
-- No existe aplicación sistemática de principios éticos/operacionales a los outputs (Constitutional AI).
-- No existe compilación de DAGs de tareas con paralelismo óptimo (LLM-Compiler) — el planner actual es secuencial.
-- No existe coordinación descentralizada sin supervisor (Swarm/Handoff).
+**Agent patterns:**
+- There is no branching reasoning with backtracking (Tree of Thoughts, LATS) — the system only has linear reasoning.
+- There is no consensus mechanism across multiple perspectives (Debate) — high-uncertainty answers have no second opinion.
+- There is no systematic application of ethical/operational principles to outputs (Constitutional AI).
+- There is no compilation of task DAGs with optimal parallelism (LLM-Compiler) — the current planner is sequential.
+- There is no decentralized coordination without a supervisor (Swarm/Handoff).
 
 **Subgraph Pipelines:**
-- Faltan pipelines para casos de uso de alto valor: atención al cliente, generación documental, ETL de datos, revisión de código, consenso de debate.
+- Pipelines are missing for high-value use cases: customer service, document generation, data ETL, code review, debate consensus.
 
-### 2.3 Oportunidad
+### 2.3 Opportunity
 
-La implementación de estas arquitecturas posiciona a Prismal como framework de referencia para producción, con capacidades que hoy solo están disponibles en implementaciones de investigación o en frameworks propietarios. El costo de implementación es acotado dado que la infraestructura base (providers, security, monitoring, LangGraph) ya existe.
+Implementing these architectures positions Prismal as a reference framework for production, with capabilities that today are only available in research implementations or proprietary frameworks. The implementation cost is bounded given that the base infrastructure (providers, security, monitoring, LangGraph) already exists.
 
 ---
 
-## 3. Usuarios Objetivo
+## 3. Target Users
 
 ### Persona 1: AI/ML Engineer
-- **Descripción:** Ingeniero que integra Prismal en productos de IA, construye pipelines de procesamiento de documentos o sistemas de Q&A.
-- **Necesidad principal:** Acceder a estrategias RAG de alta precisión sin implementarlas desde cero; combinar estrategias según el tipo de query.
-- **Frecuencia de uso:** Diario.
-- **Nivel técnico:** Alto.
+- **Description:** Engineer who integrates Prismal into AI products, builds document-processing pipelines or Q&A systems.
+- **Primary need:** Access high-precision RAG strategies without implementing them from scratch; combine strategies according to query type.
+- **Usage frequency:** Daily.
+- **Technical level:** High.
 
-### Persona 2: Arquitecto de Soluciones IA
-- **Descripción:** Diseña la arquitectura de sistemas multi-agente para empresas; selecciona patrones según el dominio (servicio al cliente, análisis financiero, generación de código).
-- **Necesidad principal:** Disponer de patrones de razonamiento probados que pueda componer en subgraphs sin escribir código de orquestación.
-- **Frecuencia de uso:** Semanal (diseño) / Diario (validación).
-- **Nivel técnico:** Alto.
+### Persona 2: AI Solutions Architect
+- **Description:** Designs the architecture of multi-agent systems for enterprises; selects patterns according to the domain (customer service, financial analysis, code generation).
+- **Primary need:** Have proven reasoning patterns that can be composed into subgraphs without writing orchestration code.
+- **Usage frequency:** Weekly (design) / Daily (validation).
+- **Technical level:** High.
 
-### Persona 3: Investigador / Experimentador
-- **Descripción:** Evalúa distintas estrategias de RAG y razonamiento sobre benchmarks propios. Necesita intercambiar estrategias fácilmente.
-- **Necesidad principal:** API uniforme entre estrategias; capacidad de configurar y comparar.
-- **Frecuencia de uso:** Diario.
-- **Nivel técnico:** Muy alto.
+### Persona 3: Researcher / Experimenter
+- **Description:** Evaluates different RAG and reasoning strategies over their own benchmarks. Needs to swap strategies easily.
+- **Primary need:** A uniform API across strategies; the ability to configure and compare.
+- **Usage frequency:** Daily.
+- **Technical level:** Very high.
 
 ---
 
-## 4. Objetivos y Métricas de Éxito
+## 4. Objectives and Success Metrics
 
-### 4.1 Objetivos del Negocio
+### 4.1 Business Objectives
 
-| Objetivo | Métrica | Target | Plazo |
+| Objective | Metric | Target | Timeframe |
 |---|---|---|---|
-| Cobertura arquitectónica | Arquitecturas implementadas / Total identificadas | 16/16 | Fase C |
-| Calidad RAG | Recall@5 en benchmark interno | ≥ +15% vs CRAG base | Fase A |
-| Reducción de alucinaciones | Groundedness score (Constitutional AI) | ≥ 0.90 p50 | Fase B |
-| Adopción interna | Agentes usando nuevas arquitecturas | ≥ 3 casos de uso en producción | Fase C |
-| Cobertura de tests | Branch coverage nuevos módulos | ≥ 80% | Global |
+| Architectural coverage | Architectures implemented / Total identified | 16/16 | Phase C |
+| RAG quality | Recall@5 on internal benchmark | ≥ +15% vs CRAG baseline | Phase A |
+| Hallucination reduction | Groundedness score (Constitutional AI) | ≥ 0.90 p50 | Phase B |
+| Internal adoption | Agents using new architectures | ≥ 3 production use cases | Phase C |
+| Test coverage | Branch coverage of new modules | ≥ 80% | Global |
 
-### 4.2 Objetivos de Usuario
+### 4.2 User Objectives
 
-| Objetivo del Usuario | Indicador |
+| User Objective | Indicator |
 |---|---|
-| Seleccionar estrategia RAG según tipo de query | `AdaptiveRAGEngine` enruta correctamente ≥ 90% de queries en test set |
-| Obtener respuestas más precisas en dominios técnicos | HyDE y RAG-Fusion mejoran MRR vs Standard RAG |
-| Razonar sobre problemas complejos con backtracking | ToT y LATS resuelven problemas de planificación que ReAct falla |
-| Garantizar outputs seguros y éticos | Constitutional AI bloquea respuestas que violan principios |
-| Ejecutar tareas complejas en paralelo optimizado | LLM-Compiler reduce latencia en ≥ 30% vs Plan-Execute secuencial |
+| Select a RAG strategy by query type | `AdaptiveRAGEngine` routes ≥ 90% of queries in the test set correctly |
+| Get more precise answers in technical domains | HyDE and RAG-Fusion improve MRR vs Standard RAG |
+| Reason about complex problems with backtracking | ToT and LATS solve planning problems that ReAct fails |
+| Guarantee safe and ethical outputs | Constitutional AI blocks responses that violate principles |
+| Execute complex tasks in optimized parallel | LLM-Compiler reduces latency by ≥ 30% vs sequential Plan-Execute |
 
 ---
 
-## 5. Alcance
+## 5. Scope
 
-### 5.1 In Scope (Incluido)
+### 5.1 In Scope (Included)
 
-**Fase A — RAG Avanzado:**
-- [x] Self-RAG (`rag/self_rag.py`) — decisión dinámica de recuperación
-- [x] HyDE (`rag/hyde.py`) — embeddings de documentos hipotéticos
+**Phase A — Advanced RAG:**
+- [x] Self-RAG (`rag/self_rag.py`) — dynamic retrieval decision
+- [x] HyDE (`rag/hyde.py`) — hypothetical document embeddings
 - [x] RAG-Fusion (`rag/fusion.py`) — multi-query + Reciprocal Rank Fusion
-- [x] Hybrid Search (`rag/hybrid.py`) — BM25 + embeddings con score fusion
-- [x] Parent-Child RAG (`rag/hierarchical.py`) — indexación jerárquica
-- [x] Adaptive RAG (`rag/adaptive.py`) — selección dinámica de estrategia
-- [x] Multi-Vector RAG (`rag/multi_vector.py`) — múltiples representaciones por doc
+- [x] Hybrid Search (`rag/hybrid.py`) — BM25 + embeddings with score fusion
+- [x] Parent-Child RAG (`rag/hierarchical.py`) — hierarchical indexing
+- [x] Adaptive RAG (`rag/adaptive.py`) — dynamic strategy selection
+- [x] Multi-Vector RAG (`rag/multi_vector.py`) — multiple representations per doc
 
-**Fase B — Patrones de Agente:**
+**Phase B — Agent Patterns:**
 - [x] Tree of Thoughts (`agents/patterns/tree_of_thoughts.py`)
 - [x] Debate / Society of Mind (`agents/patterns/debate.py`)
 - [x] Constitutional AI (`agents/patterns/constitutional.py`)
 - [x] LATS / Monte Carlo Tree Search (`agents/patterns/lats.py`)
 - [x] LLM-Compiler (`agents/patterns/llm_compiler.py`)
 - [x] Mixture of Agents (`agents/patterns/mixture_of_agents.py`)
-- [x] Swarm / Handoff Descentralizado (`agents/patterns/swarm.py`)
+- [x] Decentralized Swarm / Handoff (`agents/patterns/swarm.py`)
 
-**Fase C — Subgraph Pipelines:**
+**Phase C — Subgraph Pipelines:**
 - [x] Customer Service Pipeline (`agents/subgraphs/customer_service/`)
 - [x] Document Generation Pipeline (`agents/subgraphs/document_generation/`)
 - [x] Data ETL Pipeline (`agents/subgraphs/data_etl/`)
 - [x] Code Review Pipeline (`agents/subgraphs/code_review/`)
 - [x] Debate/Consensus Subgraph (`agents/subgraphs/debate_consensus/`)
 
-**Transversal:**
-- [x] Integración con `agents/graph.py` (registro de nuevos nodos)
-- [x] Integración con `security/` (todos los patrones pasan por guardrails)
-- [x] Integración con `monitoring/` (OTel spans + métricas por arquitectura)
-- [x] Tests unitarios e integración (≥ 80% coverage)
+**Cross-cutting:**
+- [x] Integration with `agents/graph.py` (registration of new nodes)
+- [x] Integration with `security/` (all patterns pass through guardrails)
+- [x] Integration with `monitoring/` (OTel spans + metrics per architecture)
+- [x] Unit and integration tests (≥ 80% coverage)
 
-### 5.2 Out of Scope (Excluido)
+### 5.2 Out of Scope (Excluded)
 
-- **Fine-tuning de modelos (TALM)** — requiere infraestructura GPU dedicada, fuera del scope del framework.
-- **ColBERT / PLAID** — requiere servidor de inferencia dedicado (ColBERT-live); se evalúa en Fase D.
-- **LongRAG** — depende de LLMs con contexto >100K tokens; se integra cuando el provider lo soporte nativamente.
-- **Neo4j en producción para GraphRAG** — la Fase A usa NetworkX (in-process); la integración Neo4j es Fase D.
-- **UI/Dashboard** — este PRD es exclusivo del framework layer (`prismal`).
-- **APIs REST públicas** — los módulos son bibliotecas Python, no servicios HTTP.
+- **Model fine-tuning (TALM)** — requires dedicated GPU infrastructure, outside the framework's scope.
+- **ColBERT / PLAID** — requires a dedicated inference server (ColBERT-live); evaluated in Phase D.
+- **LongRAG** — depends on LLMs with >100K token context; integrated when the provider supports it natively.
+- **Neo4j in production for GraphRAG** — Phase A uses NetworkX (in-process); the Neo4j integration is Phase D.
+- **UI/Dashboard** — this PRD is exclusive to the framework layer (`prismal`).
+- **Public REST APIs** — the modules are Python libraries, not HTTP services.
 
-### 5.3 Futuras Consideraciones
+### 5.3 Future Considerations
 
-- GraphRAG con Neo4j en producción (Fase D).
-- ColBERT/PLAID como retriever alternativo.
+- GraphRAG with Neo4j in production (Phase D).
+- ColBERT/PLAID as an alternative retriever.
 - Self-Discover pattern.
-- Episodic Memory store estructurado (extensión de `memory/`).
-- Evaluación automática en benchmarks públicos (BEIR, RAGAS).
+- Structured Episodic Memory store (extension of `memory/`).
+- Automated evaluation on public benchmarks (BEIR, RAGAS).
 
 ---
 
-## 6. Requisitos Funcionales
+## 6. Functional Requirements
 
-### RF-001: Self-RAG — Recuperación Condicional
-- **Descripción:** El sistema debe decidir dinámicamente si recuperar contexto externo antes de generar una respuesta, usando un LLM para emitir tokens de control (`RETRIEVE` / `NO_RETRIEVE`).
-- **Actor:** `SelfRAGPipeline` invocado desde `rag_agent_node`.
-- **Precondiciones:** Vector store inicializado; LLM provider configurado.
-- **Flujo principal:**
-  1. LLM recibe la query y decide si necesita recuperación.
-  2. Si `RETRIEVE`: ejecuta similarity search → Grade → Filter → Generate con contexto.
-  3. Si `NO_RETRIEVE`: genera directamente desde conocimiento paramétrico.
-  4. LLM emite token `[Supported]` / `[Unsupported]` / `[Utility:N]` para auto-evaluación.
-- **Flujo alternativo:** Si el LLM falla en emitir token de control → fallback a CRAG estándar.
-- **Postcondiciones:** Respuesta generada con metadatos de decisión (retrieved: bool, tokens emitidos).
-- **Prioridad:** `MUST`
+### RF-001: Self-RAG — Conditional Retrieval
+- **Description:** The system must dynamically decide whether to retrieve external context before generating a response, using an LLM to emit control tokens (`RETRIEVE` / `NO_RETRIEVE`).
+- **Actor:** `SelfRAGPipeline` invoked from `rag_agent_node`.
+- **Preconditions:** Vector store initialized; LLM provider configured.
+- **Main flow:**
+  1. The LLM receives the query and decides whether it needs retrieval.
+  2. If `RETRIEVE`: runs similarity search → Grade → Filter → Generate with context.
+  3. If `NO_RETRIEVE`: generates directly from parametric knowledge.
+  4. The LLM emits a token `[Supported]` / `[Unsupported]` / `[Utility:N]` for self-evaluation.
+- **Alternative flow:** If the LLM fails to emit a control token → fallback to standard CRAG.
+- **Postconditions:** Response generated with decision metadata (retrieved: bool, tokens emitted).
+- **Priority:** `MUST`
 
 ### RF-002: HyDE — Hypothetical Document Embeddings
-- **Descripción:** El sistema debe generar un documento hipotético para una query y usar su embedding como vector de búsqueda, mejorando el recall en preguntas abstractas.
-- **Actor:** `HyDERetriever` llamado desde `RAGEngine.search_hyde()`.
-- **Flujo principal:**
-  1. LLM genera documento hipotético que respondería la query (sin contexto real).
-  2. Se embebe el documento hipotético (no la query original).
-  3. Se ejecuta similarity search con ese embedding.
-  4. Se retornan los chunks encontrados para uso en pipeline downstream.
-- **Prioridad:** `MUST`
+- **Description:** The system must generate a hypothetical document for a query and use its embedding as the search vector, improving recall on abstract questions.
+- **Actor:** `HyDERetriever` called from `RAGEngine.search_hyde()`.
+- **Main flow:**
+  1. The LLM generates a hypothetical document that would answer the query (without real context).
+  2. The hypothetical document (not the original query) is embedded.
+  3. A similarity search is run with that embedding.
+  4. The found chunks are returned for use in the downstream pipeline.
+- **Priority:** `MUST`
 
-### RF-003: RAG-Fusion — Multi-Query con RRF
-- **Descripción:** El sistema debe generar N reformulaciones de la query (default 4), ejecutar N búsquedas en paralelo, y fusionar los resultados con Reciprocal Rank Fusion.
-- **Actor:** `RAGFusionEngine` desde `rag_agent_node`.
-- **Flujo principal:**
-  1. LLM genera N variantes de la query original.
-  2. Búsquedas paralelas (`asyncio.gather`) para cada variante.
-  3. RRF: `score(d,q) = Σ 1/(k + rank(d,qi))` con k=60.
-  4. Rerank final y retorno de top-k chunks fusionados.
-- **Prioridad:** `MUST`
+### RF-003: RAG-Fusion — Multi-Query with RRF
+- **Description:** The system must generate N reformulations of the query (default 4), run N searches in parallel, and fuse the results with Reciprocal Rank Fusion.
+- **Actor:** `RAGFusionEngine` from `rag_agent_node`.
+- **Main flow:**
+  1. The LLM generates N variants of the original query.
+  2. Parallel searches (`asyncio.gather`) for each variant.
+  3. RRF: `score(d,q) = Σ 1/(k + rank(d,qi))` with k=60.
+  4. Final rerank and return of fused top-k chunks.
+- **Priority:** `MUST`
 
 ### RF-004: Hybrid Search — BM25 + Embeddings
-- **Descripción:** El sistema debe combinar búsqueda léxica (BM25) con búsqueda semántica (embeddings) mediante fusion de scores, con peso configurable (alpha).
-- **Actor:** `HybridSearchEngine` como extensión de `RAGEngine`.
-- **Flujo principal:**
-  1. Búsqueda BM25 sobre corpus indexado (rank_bm25).
-  2. Búsqueda semántica en ChromaDB.
+- **Description:** The system must combine lexical search (BM25) with semantic search (embeddings) through score fusion, with a configurable weight (alpha).
+- **Actor:** `HybridSearchEngine` as an extension of `RAGEngine`.
+- **Main flow:**
+  1. BM25 search over the indexed corpus (rank_bm25).
+  2. Semantic search in ChromaDB.
   3. Score fusion: `final = alpha * semantic_score + (1-alpha) * bm25_score`.
-  4. Deduplicación y rerank.
-- **Prioridad:** `MUST`
+  4. Deduplication and rerank.
+- **Priority:** `MUST`
 
-### RF-005: Parent-Child RAG — Indexación Jerárquica
-- **Descripción:** El sistema debe indexar chunks pequeños (child, ~100 tokens) para retrieval preciso, pero devolver el contexto del chunk padre (~500 tokens) al LLM para mayor contexto.
+### RF-005: Parent-Child RAG — Hierarchical Indexing
+- **Description:** The system must index small chunks (child, ~100 tokens) for precise retrieval, but return the parent chunk's context (~500 tokens) to the LLM for greater context.
 - **Actor:** `HierarchicalRAGEngine`.
-- **Flujo principal:**
-  1. Indexación: divide documentos en chunks padre e hijo; almacena relación parent_id.
-  2. Retrieval: busca por similitud en chunks hijo.
-  3. Expansión: recupera el chunk padre correspondiente a cada hijo encontrado.
-  4. Genera respuesta con contexto padre (más rico).
-- **Prioridad:** `MUST`
+- **Main flow:**
+  1. Indexing: splits documents into parent and child chunks; stores the parent_id relation.
+  2. Retrieval: searches by similarity in child chunks.
+  3. Expansion: retrieves the parent chunk corresponding to each found child.
+  4. Generates a response with the (richer) parent context.
+- **Priority:** `MUST`
 
-### RF-006: Adaptive RAG — Selección Dinámica de Estrategia
-- **Descripción:** El sistema debe clasificar la query entrante y seleccionar automáticamente la estrategia RAG más adecuada (Simple, CRAG, Self-RAG, GraphRAG, Fusion).
-- **Actor:** `AdaptiveRAGEngine` como facade sobre todos los engines.
-- **Flujo principal:**
-  1. Clasificar query: factual simple / abstracta / multi-hop / ambigua.
-  2. Seleccionar engine según clasificación y configuración.
-  3. Ejecutar pipeline seleccionado.
-  4. Retornar resultado con metadatos de estrategia usada.
-- **Prioridad:** `SHOULD`
+### RF-006: Adaptive RAG — Dynamic Strategy Selection
+- **Description:** The system must classify the incoming query and automatically select the most appropriate RAG strategy (Simple, CRAG, Self-RAG, GraphRAG, Fusion).
+- **Actor:** `AdaptiveRAGEngine` as a facade over all engines.
+- **Main flow:**
+  1. Classify the query: simple factual / abstract / multi-hop / ambiguous.
+  2. Select the engine based on the classification and configuration.
+  3. Execute the selected pipeline.
+  4. Return the result with metadata on the strategy used.
+- **Priority:** `SHOULD`
 
-### RF-007: Multi-Vector RAG — Múltiples Representaciones
-- **Descripción:** El sistema debe indexar cada documento con múltiples vectores: resumen, chunks, y preguntas hipotéticas generadas por LLM, mejorando el recall para distintos tipos de query.
+### RF-007: Multi-Vector RAG — Multiple Representations
+- **Description:** The system must index each document with multiple vectors: summary, chunks, and LLM-generated hypothetical questions, improving recall for different query types.
 - **Actor:** `MultiVectorRAGEngine`.
-- **Prioridad:** `SHOULD`
+- **Priority:** `SHOULD`
 
-### RF-008: Tree of Thoughts — Razonamiento Ramificado
-- **Descripción:** El sistema debe explorar múltiples "pensamientos" (branches) en paralelo, evaluar cada rama, y podar las menos prometedoras, permitiendo backtracking en problemas complejos.
-- **Actor:** `tree_of_thoughts()` en `agents/patterns/tree_of_thoughts.py`.
-- **Flujo principal:**
-  1. Generar N pensamientos candidatos para el paso actual (breadth-first o depth-first).
-  2. Evaluar cada pensamiento con LLM (score 0-1).
-  3. Seleccionar top-k pensamientos (beam search) o podar por threshold.
-  4. Expandir pensamientos seleccionados hasta alcanzar solución o profundidad máxima.
-  5. Retornar mejor camino encontrado.
-- **Prioridad:** `MUST`
+### RF-008: Tree of Thoughts — Branching Reasoning
+- **Description:** The system must explore multiple "thoughts" (branches) in parallel, evaluate each branch, and prune the least promising ones, allowing backtracking on complex problems.
+- **Actor:** `tree_of_thoughts()` in `agents/patterns/tree_of_thoughts.py`.
+- **Main flow:**
+  1. Generate N candidate thoughts for the current step (breadth-first or depth-first).
+  2. Evaluate each thought with the LLM (score 0-1).
+  3. Select the top-k thoughts (beam search) or prune by threshold.
+  4. Expand the selected thoughts until reaching a solution or maximum depth.
+  5. Return the best path found.
+- **Priority:** `MUST`
 
 ### RF-009: Debate / Society of Mind
-- **Descripción:** El sistema debe instanciar múltiples agentes con perspectivas distintas, hacer que debatan sobre una respuesta, y sintetizar consenso o majority vote.
-- **Actor:** `debate_round()` en `agents/patterns/debate.py`.
-- **Flujo principal:**
-  1. Generar N posiciones iniciales (default 3: proponent, opponent, neutral).
-  2. Ejecutar M rondas de debate: cada agente responde a las posiciones anteriores.
-  3. Moderador sintetiza el consenso o aplica majority vote.
-  4. Retornar respuesta consensuada con nivel de acuerdo (agreement_score).
-- **Prioridad:** `MUST`
+- **Description:** The system must instantiate multiple agents with distinct perspectives, have them debate a response, and synthesize consensus or majority vote.
+- **Actor:** `debate_round()` in `agents/patterns/debate.py`.
+- **Main flow:**
+  1. Generate N initial positions (default 3: proponent, opponent, neutral).
+  2. Run M debate rounds: each agent responds to the previous positions.
+  3. A moderator synthesizes the consensus or applies majority vote.
+  4. Return a consensus response with the agreement level (agreement_score).
+- **Priority:** `MUST`
 
-### RF-010: Constitutional AI — Principios Constitucionales
-- **Descripción:** El sistema debe evaluar cualquier output del agente contra un conjunto configurable de principios constitucionales y revisar automáticamente respuestas que los violen.
-- **Actor:** `ConstitutionalFilter` en `agents/patterns/constitutional.py`.
-- **Flujo principal:**
-  1. Recibir draft de respuesta del agente.
-  2. Para cada principio constitucional: LLM evalúa si el draft lo viola.
-  3. Si hay violaciones: LLM genera respuesta revisada que cumple el principio.
-  4. Iterar hasta que todos los principios se cumplan o se alcance max_revisions.
-  5. Retornar respuesta final con log de revisiones aplicadas.
-- **Prioridad:** `MUST`
+### RF-010: Constitutional AI — Constitutional Principles
+- **Description:** The system must evaluate any agent output against a configurable set of constitutional principles and automatically revise responses that violate them.
+- **Actor:** `ConstitutionalFilter` in `agents/patterns/constitutional.py`.
+- **Main flow:**
+  1. Receive the agent's draft response.
+  2. For each constitutional principle: the LLM evaluates whether the draft violates it.
+  3. If there are violations: the LLM generates a revised response that complies with the principle.
+  4. Iterate until all principles are satisfied or max_revisions is reached.
+  5. Return the final response with a log of applied revisions.
+- **Priority:** `MUST`
 
 ### RF-011: LATS — Language Agent Tree Search
-- **Descripción:** El sistema debe aplicar Monte Carlo Tree Search sobre el espacio de acciones del agente, permitiendo exploración profunda con backtracking real cuando un camino de herramientas falla.
-- **Actor:** `LATSAgent` en `agents/patterns/lats.py`.
-- **Flujo principal:**
-  1. Selection: seleccionar nodo del árbol con mejor UCB1 score.
-  2. Expansion: expandir con N acciones candidatas (tool calls).
-  3. Simulation: ejecutar acción y evaluar resultado (reward).
-  4. Backpropagation: actualizar scores en el árbol.
-  5. Retornar mejor camino encontrado al alcanzar terminal state.
-- **Prioridad:** `SHOULD`
+- **Description:** The system must apply Monte Carlo Tree Search over the agent's action space, allowing deep exploration with real backtracking when a tool path fails.
+- **Actor:** `LATSAgent` in `agents/patterns/lats.py`.
+- **Main flow:**
+  1. Selection: select the tree node with the best UCB1 score.
+  2. Expansion: expand with N candidate actions (tool calls).
+  3. Simulation: execute the action and evaluate the result (reward).
+  4. Backpropagation: update scores in the tree.
+  5. Return the best path found upon reaching a terminal state.
+- **Priority:** `SHOULD`
 
-### RF-012: LLM-Compiler — DAG de Tareas Paralelas
-- **Descripción:** El sistema debe compilar un plan de alto nivel en un DAG de tareas con dependencias explícitas, ejecutar tareas independientes en paralelo, y recompilar el plan si alguna tarea falla o retorna datos inesperados.
-- **Actor:** `LLMCompiler` en `agents/patterns/llm_compiler.py`.
-- **Flujo principal:**
-  1. Planner LLM genera lista de tareas con dependencias (`{"task": ..., "depends_on": [...], "tool": ...}`).
-  2. Compiler construye DAG y valida ausencia de ciclos.
-  3. Executor ejecuta tareas en paralelo según topological sort.
-  4. Joiner sintetiza resultados y decide si replanning es necesario.
-  5. Si replanning: volver a paso 1 con contexto actualizado.
-- **Prioridad:** `MUST`
+### RF-012: LLM-Compiler — Parallel Task DAG
+- **Description:** The system must compile a high-level plan into a task DAG with explicit dependencies, execute independent tasks in parallel, and recompile the plan if any task fails or returns unexpected data.
+- **Actor:** `LLMCompiler` in `agents/patterns/llm_compiler.py`.
+- **Main flow:**
+  1. The Planner LLM generates a list of tasks with dependencies (`{"task": ..., "depends_on": [...], "tool": ...}`).
+  2. The Compiler builds the DAG and validates the absence of cycles.
+  3. The Executor runs tasks in parallel according to topological sort.
+  4. The Joiner synthesizes results and decides whether replanning is necessary.
+  5. If replanning: return to step 1 with updated context.
+- **Priority:** `MUST`
 
 ### RF-013: Mixture of Agents (MoA)
-- **Descripción:** El sistema debe orquestar múltiples LLMs (de proveedores distintos) en capas, donde los modelos de la capa N generan respuestas independientes y la capa N+1 las sintetiza.
-- **Actor:** `MixtureOfAgents` en `agents/patterns/mixture_of_agents.py`.
-- **Prioridad:** `SHOULD`
+- **Description:** The system must orchestrate multiple LLMs (from different providers) in layers, where the models in layer N generate independent responses and layer N+1 synthesizes them.
+- **Actor:** `MixtureOfAgents` in `agents/patterns/mixture_of_agents.py`.
+- **Priority:** `SHOULD`
 
-### RF-014: Swarm / Handoff Descentralizado
-- **Descripción:** El sistema debe permitir que agentes se transfieran el control directamente entre sí (sin supervisor central) mediante un protocolo de handoff con contexto compartido.
-- **Actor:** `swarm_handoff()` en `agents/patterns/swarm.py`.
-- **Prioridad:** `SHOULD`
+### RF-014: Decentralized Swarm / Handoff
+- **Description:** The system must allow agents to transfer control directly between each other (without a central supervisor) through a handoff protocol with shared context.
+- **Actor:** `swarm_handoff()` in `agents/patterns/swarm.py`.
+- **Priority:** `SHOULD`
 
-### RF-015 — RF-019: Subgraph Pipelines de Dominio
+### RF-015 — RF-019: Domain Subgraph Pipelines
 - **RF-015:** Customer Service Pipeline (Classifier → FAQ RAG → Escalation → Response → Ticket). `MUST`
 - **RF-016:** Document Generation Pipeline (Planner → Researcher → Writer → Editor → Formatter). `MUST`
 - **RF-017:** Data ETL Pipeline (Extractor → Validator → Transformer → Loader → Auditor). `SHOULD`
@@ -302,144 +302,144 @@ La implementación de estas arquitecturas posiciona a Prismal como framework de 
 
 ---
 
-## 7. Requisitos No Funcionales
+## 7. Non-Functional Requirements
 
-### Rendimiento
+### Performance
 - `HyDERetriever.search()` ≤ 3s p95 (1 LLM call + 1 vector search).
-- `RAGFusionEngine.search()` ≤ 5s p95 con N=4 queries paralelas.
-- `HybridSearchEngine.search()` ≤ 1s p95 (BM25 es local in-process).
-- `LLMCompiler` reduce latencia ≥ 30% vs Plan-Execute secuencial para tareas independientes paralelas.
-- `tree_of_thoughts()` ≤ 30s p95 con breadth=3, depth=3.
+- `RAGFusionEngine.search()` ≤ 5s p95 with N=4 parallel queries.
+- `HybridSearchEngine.search()` ≤ 1s p95 (BM25 is local in-process).
+- `LLMCompiler` reduces latency by ≥ 30% vs sequential Plan-Execute for parallel independent tasks.
+- `tree_of_thoughts()` ≤ 30s p95 with breadth=3, depth=3.
 
-### Seguridad
-- Todos los prompts de nuevas arquitecturas deben pasar por `SecurePromptBuilder`.
-- `ConstitutionalFilter` debe registrar revisiones en `AuditLogger`.
-- Ninguna nueva arquitectura puede importar providers directamente (solo vía `prismal/providers/`).
-- `LLMCompiler` debe validar tool names contra `tool_registry` antes de ejecutar.
+### Security
+- All prompts of the new architectures must pass through `SecurePromptBuilder`.
+- `ConstitutionalFilter` must record revisions in `AuditLogger`.
+- No new architecture may import providers directly (only via `prismal/providers/`).
+- `LLMCompiler` must validate tool names against `tool_registry` before executing.
 
-### Disponibilidad
-- Todas las nuevas arquitecturas deben tener fallback graceful: si falla el LLM en pasos intermedios, retornar resultado parcial con flag `partial_result=True`.
+### Availability
+- All new architectures must have graceful fallback: if the LLM fails in intermediate steps, return a partial result with the flag `partial_result=True`.
 
-### Escalabilidad
-- RAG engines nuevos deben soportar colecciones ChromaDB de ≥ 1M vectores.
-- `MixtureOfAgents` debe soportar ≥ 5 proveedores en paralelo.
+### Scalability
+- New RAG engines must support ChromaDB collections of ≥ 1M vectors.
+- `MixtureOfAgents` must support ≥ 5 providers in parallel.
 
-### Observabilidad
-- Cada nueva arquitectura debe crear OTel spans con `OTelManager().start_span("arquitectura.operacion")`.
-- Métricas mínimas por arquitectura: `{name}_requests_total`, `{name}_latency_seconds`, `{name}_errors_total`.
-- Logs estructurados con `get_logger()` en cada paso significativo.
+### Observability
+- Each new architecture must create OTel spans with `OTelManager().start_span("architecture.operation")`.
+- Minimum metrics per architecture: `{name}_requests_total`, `{name}_latency_seconds`, `{name}_errors_total`.
+- Structured logs with `get_logger()` at each significant step.
 
-### Mantenibilidad
-- Coverage de tests ≥ 80% por módulo nuevo.
-- Todas las clases públicas con docstrings siguiendo el estilo existente en el repo.
-- `ruff check` y `mypy --strict` deben pasar sin errores.
-- `bandit` sin findings HIGH/CRITICAL.
+### Maintainability
+- Test coverage ≥ 80% per new module.
+- All public classes with docstrings following the existing style in the repo.
+- `ruff check` and `mypy --strict` must pass with no errors.
+- `bandit` with no HIGH/CRITICAL findings.
 
 ---
 
-## 8. Restricciones y Dependencias
+## 8. Constraints and Dependencies
 
-### Restricciones Técnicas
-- Python 3.13+, uv como gestor de paquetes.
-- LangGraph `StateGraph` como motor de orquestación — no introducir frameworks de orquestación alternativos.
-- `prismal/` es namespace package (sin `__init__.py`); no romper esta convención.
-- `_MAX_TOTAL_TOOLS = 120` — los nuevos nodos no deben registrar herramientas excesivas.
+### Technical Constraints
+- Python 3.13+, uv as the package manager.
+- LangGraph `StateGraph` as the orchestration engine — do not introduce alternative orchestration frameworks.
+- `prismal/` is a namespace package (no `__init__.py`); do not break this convention.
+- `_MAX_TOTAL_TOOLS = 120` — the new nodes must not register excessive tools.
 
-### Dependencias Externas
+### External Dependencies
 
-| Dependencia | Tipo | Uso | Estado |
+| Dependency | Type | Use | Status |
 |---|---|---|---|
-| `rank_bm25` | Nueva PyPI | Hybrid Search BM25 | ☐ Añadir a pyproject.toml |
-| `networkx` | Nueva PyPI | GraphRAG (grafo in-process) | ☐ Añadir a pyproject.toml |
-| `chromadb` | Existente | Vector store (todos RAG) | ✅ Ya incluida |
-| `langchain-core` | Existente | Mensajes, documentos | ✅ Ya incluida |
-| `langgraph` | Existente | StateGraph, Send, interrupt | ✅ Ya incluida |
-| `litellm` | Existente | Provider abstraction | ✅ Ya incluida |
+| `rank_bm25` | New PyPI | Hybrid Search BM25 | ☐ Add to pyproject.toml |
+| `networkx` | New PyPI | GraphRAG (in-process graph) | ☐ Add to pyproject.toml |
+| `chromadb` | Existing | Vector store (all RAG) | ✅ Already included |
+| `langchain-core` | Existing | Messages, documents | ✅ Already included |
+| `langgraph` | Existing | StateGraph, Send, interrupt | ✅ Already included |
+| `litellm` | Existing | Provider abstraction | ✅ Already included |
 
 ---
 
 ## 9. User Stories
 
-### Épica A: RAG de Alta Precisión
+### Epic A: High-Precision RAG
 
-**US-001:** Como AI Engineer, quiero usar HyDE para mejorar el recall en preguntas abstractas, para obtener mejores respuestas en dominios donde el corpus es técnico y denso.
-- [ ] `RAGEngine.search_hyde(query)` genera documento hipotético y busca por su embedding.
-- [ ] El resultado incluye metadatos con `retrieval_method: "hyde"`.
-- [ ] Tests demuestran ≥ 10% mejor recall vs búsqueda directa en corpus de prueba.
+**US-001:** As an AI Engineer, I want to use HyDE to improve recall on abstract questions, to get better answers in domains where the corpus is technical and dense.
+- [ ] `RAGEngine.search_hyde(query)` generates a hypothetical document and searches by its embedding.
+- [ ] The result includes metadata with `retrieval_method: "hyde"`.
+- [ ] Tests demonstrate ≥ 10% better recall vs direct search on the test corpus.
 
-**US-002:** Como AI Engineer, quiero usar RAG-Fusion para queries ambiguas, para que distintas formulaciones de la misma pregunta produzcan resultados complementarios.
-- [ ] `RAGFusionEngine.search(query, n_queries=4)` genera variantes y fusiona con RRF.
-- [ ] Los resultados incluyen el rank position de cada chunk en cada sub-búsqueda.
+**US-002:** As an AI Engineer, I want to use RAG-Fusion for ambiguous queries, so that different formulations of the same question produce complementary results.
+- [ ] `RAGFusionEngine.search(query, n_queries=4)` generates variants and fuses with RRF.
+- [ ] The results include the rank position of each chunk in each sub-search.
 
-**US-003:** Como AI Engineer, quiero Hybrid Search para términos técnicos y nombres propios, para que el sistema no falle cuando el embedding no captura bien el término exacto.
-- [ ] `HybridSearchEngine.search(query, alpha=0.5)` combina BM25 y semántico.
-- [ ] `alpha` es configurable en runtime para ajustar el balance léxico/semántico.
+**US-003:** As an AI Engineer, I want Hybrid Search for technical terms and proper nouns, so that the system does not fail when the embedding does not capture the exact term well.
+- [ ] `HybridSearchEngine.search(query, alpha=0.5)` combines BM25 and semantic.
+- [ ] `alpha` is configurable at runtime to adjust the lexical/semantic balance.
 
-**US-004:** Como AI Engineer, quiero Self-RAG para evitar recuperaciones innecesarias, para reducir latencia y costos en preguntas que el LLM puede responder directamente.
-- [ ] `SelfRAGPipeline.run(query)` decide automáticamente si recuperar.
-- [ ] El log muestra la decisión tomada y los tokens de control emitidos.
+**US-004:** As an AI Engineer, I want Self-RAG to avoid unnecessary retrievals, to reduce latency and cost on questions the LLM can answer directly.
+- [ ] `SelfRAGPipeline.run(query)` automatically decides whether to retrieve.
+- [ ] The log shows the decision made and the control tokens emitted.
 
-### Épica B: Razonamiento Avanzado
+### Epic B: Advanced Reasoning
 
-**US-005:** Como Arquitecto IA, quiero Tree of Thoughts para problemas de planificación complejos, para que el agente explore múltiples estrategias y elija la óptima con backtracking.
-- [ ] `tree_of_thoughts(generate_fn, eval_fn, state, breadth=3, depth=3)` funciona en async.
-- [ ] Soporta modos `bfs` (breadth-first) y `dfs` (depth-first).
+**US-005:** As an AI Architect, I want Tree of Thoughts for complex planning problems, so that the agent explores multiple strategies and chooses the optimal one with backtracking.
+- [ ] `tree_of_thoughts(generate_fn, eval_fn, state, breadth=3, depth=3)` works in async.
+- [ ] Supports `bfs` (breadth-first) and `dfs` (depth-first) modes.
 
-**US-006:** Como Arquitecto IA, quiero Constitutional AI para garantizar outputs seguros, para que el sistema revise automáticamente respuestas que violen principios de seguridad o precisión.
-- [ ] `ConstitutionalFilter` acepta lista de principios como strings.
-- [ ] Cada revisión queda registrada en `AuditLogger`.
+**US-006:** As an AI Architect, I want Constitutional AI to guarantee safe outputs, so that the system automatically revises responses that violate safety or accuracy principles.
+- [ ] `ConstitutionalFilter` accepts a list of principles as strings.
+- [ ] Each revision is recorded in `AuditLogger`.
 
-**US-007:** Como Arquitecto IA, quiero LLM-Compiler para reducir latencia en tareas complejas, para que el sistema ejecute tareas independientes en paralelo sin coordinación manual.
-- [ ] `LLMCompiler.compile_and_run(goal, tools)` retorna resultados dentro del tiempo objetivo.
-- [ ] El DAG generado es serializable para debugging.
+**US-007:** As an AI Architect, I want LLM-Compiler to reduce latency on complex tasks, so that the system executes independent tasks in parallel without manual coordination.
+- [ ] `LLMCompiler.compile_and_run(goal, tools)` returns results within the target time.
+- [ ] The generated DAG is serializable for debugging.
 
-### Épica C: Pipelines de Dominio
+### Epic C: Domain Pipelines
 
-**US-008:** Como AI Engineer, quiero el Customer Service Pipeline listo para conectar al supervisor, para atender consultas de usuarios con escalación automática.
-- [ ] Pipeline completo: Classifier → FAQ RAG → Escalation Gate → Response → Ticket.
-- [ ] Registrado en `SubgraphRegistry`.
+**US-008:** As an AI Engineer, I want the Customer Service Pipeline ready to connect to the supervisor, to handle user queries with automatic escalation.
+- [ ] Full pipeline: Classifier → FAQ RAG → Escalation Gate → Response → Ticket.
+- [ ] Registered in `SubgraphRegistry`.
 
-**US-009:** Como AI Engineer, quiero el Code Review Pipeline como subgraph reutilizable, para integrar revisión de código automatizada en flujos CI/CD via agente.
+**US-009:** As an AI Engineer, I want the Code Review Pipeline as a reusable subgraph, to integrate automated code review into CI/CD flows via an agent.
 - [ ] Pipeline: Linter → Security Scanner → Logic Reviewer → Suggester.
-- [ ] Retorna reporte estructurado con issues agrupados por severidad.
+- [ ] Returns a structured report with issues grouped by severity.
 
 ---
 
-## 10. Riesgos y Mitigaciones
+## 10. Risks and Mitigations
 
-| Riesgo | Probabilidad | Impacto | Mitigación |
+| Risk | Probability | Impact | Mitigation |
 |---|---|---|---|
-| LLM no emite tokens de control correctamente (Self-RAG) | Media | Alto | Fallback a CRAG; regex parsing permisivo; prompt engineering extenso |
-| BM25 en memoria no escala para corpus >10M docs (Hybrid) | Baja | Alto | Implementar con soporte de índice en disco (pickle); documentar límite |
-| GraphRAG con NetworkX lento en grafos >100K nodos | Media | Medio | Limitar a grafos locales; Neo4j en Fase D como extensión |
-| ToT genera demasiadas llamadas LLM (costo) | Alta | Medio | Cap `breadth * depth` ≤ 9 por defecto; configurable con advertencia |
-| LLM-Compiler genera DAGs con ciclos | Baja | Alto | Validación topológica estricta; rechazar plan si hay ciclo |
-| Constitutional AI en loop infinito | Baja | Alto | `max_revisions` = 3 por defecto; retornar con flag de warning |
-| LATS requiere muchas simulaciones (latencia) | Alta | Medio | Limitar simulaciones por nodo; timeout configurable |
+| LLM does not emit control tokens correctly (Self-RAG) | Medium | High | Fallback to CRAG; permissive regex parsing; extensive prompt engineering |
+| In-memory BM25 does not scale for corpora >10M docs (Hybrid) | Low | High | Implement with on-disk index support (pickle); document the limit |
+| GraphRAG with NetworkX slow on graphs >100K nodes | Medium | Medium | Limit to local graphs; Neo4j in Phase D as an extension |
+| ToT generates too many LLM calls (cost) | High | Medium | Cap `breadth * depth` ≤ 9 by default; configurable with a warning |
+| LLM-Compiler generates DAGs with cycles | Low | High | Strict topological validation; reject the plan if there is a cycle |
+| Constitutional AI in an infinite loop | Low | High | `max_revisions` = 3 by default; return with a warning flag |
+| LATS requires many simulations (latency) | High | Medium | Limit simulations per node; configurable timeout |
 
 ---
 
-## 11. Timeline Estimado
+## 11. Estimated Timeline
 
-| Fase | Duración Estimada | Entregable |
+| Phase | Estimated Duration | Deliverable |
 |---|---|---|
-| Fase A — RAG Avanzado | 3 semanas | 7 engines RAG funcionales con tests |
-| Fase B — Patrones de Agente | 3 semanas | 7 patrones de agente con tests |
-| Fase C — Subgraph Pipelines | 2 semanas | 5 pipelines registrados y testeados |
-| Hardening & Docs | 1 semana | Coverage ≥ 80%, docs actualizadas |
-| **Total** | **9 semanas** | 19 nuevas arquitecturas en producción |
+| Phase A — Advanced RAG | 3 weeks | 7 functional RAG engines with tests |
+| Phase B — Agent Patterns | 3 weeks | 7 agent patterns with tests |
+| Phase C — Subgraph Pipelines | 2 weeks | 5 registered and tested pipelines |
+| Hardening & Docs | 1 week | Coverage ≥ 80%, updated docs |
+| **Total** | **9 weeks** | 19 new architectures in production |
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-04-19 | Ernesto Crespo | Versión inicial — 19 arquitecturas, 3 fases |
+| 1.0 | 2026-04-19 | Ernesto Crespo | Initial version — 19 architectures, 3 phases |
 
-## Aprobaciones
+## Approvals
 
-| Rol | Nombre | Fecha | Estado |
+| Role | Name | Date | Status |
 |---|---|---|---|
-| Tech Lead | — | | ☐ Pendiente |
-| AI Architect | — | | ☐ Pendiente |
+| Tech Lead | — | | ☐ Pending |
+| AI Architect | — | | ☐ Pending |

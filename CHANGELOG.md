@@ -145,6 +145,36 @@ LangGraph without forking the repo. See `docs/extension.md` and
 
 ---
 
+## [3.0.2] — 2026-06-06
+
+PyPI distribution rename, an automated release pipeline, and a full
+English-language pass over the documentation.
+
+### Changed
+- **Distribution renamed** `prismal` → `prismal-ai`. PyPI rejected `prismal`
+  as too similar to an existing project, so the published distribution is now
+  `prismal-ai` (`pip install prismal-ai`). The **import namespace is
+  unchanged** — code keeps using `from prismal. …` — and the wheel still
+  targets `packages = ["prismal"]`.
+- Self-referential extras (`ml-dl`, `all`) updated from `prismal[…]` to
+  `prismal-ai[…]`; `uv.lock` regenerated for the new project name.
+- `README.md` install instructions, badges, and title updated to the
+  `prismal-ai` distribution name.
+
+### Added
+- **Automated PyPI release workflow** (`.github/workflows/release.yml`):
+  builds and publishes on push to `main` or a `prismal/v*` tag, using an API
+  token from the `PYPI_API_TOKEN` GitHub secret (`TEST_PYPI_API_TOKEN` for the
+  manual TestPyPI dry run). `skip-existing` makes unchanged-version runs a
+  no-op.
+
+### Documentation
+- **Full English translation** of all documentation: `README.md`, every file
+  under `docs/`, and every spec under `specs/` (PLAN/SPEC/ARCHITECTURE/TASKS
+  across all phases) are now entirely in English. "Fase" → "Phase" throughout.
+
+---
+
 ## [3.0.0] — 2026-05-22
 
 Rebrand of the framework from **LightAgent** to **Prismal**

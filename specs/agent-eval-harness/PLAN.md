@@ -1,113 +1,113 @@
 # Prismal — Agent Evaluation & Reliability Harness
 
-## Strategic Plan / Product Requirements Document (PLAN) — *PRD semilla*
+## Strategic Plan / Product Requirements Document (PLAN) — *seed PRD*
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` (PRD semilla; faltan ARCHITECTURE/SPEC/TASKS) |
-| **Versión** | 0.1 |
-| **Fecha** | 2026-06-06 |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` (seed PRD; ARCHITECTURE/SPEC/TASKS missing) |
+| **Version** | 0.1 |
+| **Date** | 2026-06-06 |
 | **Reviewers** | Tech Lead, AI Architect, QA Lead |
-| **Prioridad** | P2 (fiabilidad) |
-| **Relacionado** | `skill-creator` (evals de skills), `monitoring/`, `agents/graph.py` |
+| **Priority** | P2 (reliability) |
+| **Related** | `skill-creator` (skill evals), `monitoring/`, `agents/graph.py` |
 
 ---
 
-## 1. Resumen Ejecutivo
+## 1. Executive Summary
 
-La investigación de 2026 identifica el **"scaffold gap"**: evaluar el modelo aislado (API directa) **no predice** el comportamiento del sistema agéntico compuesto (con tools, RAG, memoria, multi-turno). Prismal tiene evals a nivel de *skill* (`skill-creator`) pero **no un harness de evaluación a nivel de sistema** del grafo completo: trayectorias, uso de tools, fidelidad de RAG, robustez ante adversario, y **regresión** entre versiones. Esta feature añade un harness de evaluación reproducible para medir y proteger la fiabilidad del agente como sistema.
-
----
-
-## 2. Contexto y Problema
-
-- **Sin medición de sistema:** no hay forma estándar de correr un conjunto de casos contra el grafo y obtener métricas (tasa de éxito por tarea, pasos, tool-error rate, groundedness de RAG, coste/latencia).
-- **Sin regresión:** un cambio (prompt, modelo, patrón, dependencia) puede degradar la calidad sin que ningún test lo detecte (los tests actuales son unitarios/estructurales, no de comportamiento del agente).
-- **Sin evaluación adversaria a nivel sistema:** la seguridad L1–L5 se testea unitariamente, pero no hay un *red-team* automatizado de inyección/abuso de tools sobre flujos reales.
-- **Sin trazabilidad de calidad por versión:** no hay *scorecards* por release.
+2026 research identifies the **"scaffold gap"**: evaluating the model in isolation (direct API) **does not predict** the behavior of the composed agentic system (with tools, RAG, memory, multi-turn). Prismal has evals at the *skill* level (`skill-creator`) but **no system-level evaluation harness** for the full graph: trajectories, tool usage, RAG fidelity, adversarial robustness, and **regression** between versions. This feature adds a reproducible evaluation harness to measure and protect the reliability of the agent as a system.
 
 ---
 
-## 3. Usuarios Objetivo
+## 2. Context and Problem
 
-- **AI Engineer:** correr un eval-set y ver métricas/fallos por caso; comparar dos versiones.
-- **QA / Release Manager:** gate de release por umbral de calidad/regresión.
-- **Security Lead:** suite adversaria (inyección, exfiltración, tool-abuse) sobre flujos reales.
-- **Maintainer:** scorecards por release; detección de drift al subir deps/modelos.
+- **No system measurement:** there is no standard way to run a set of cases against the graph and obtain metrics (per-task success rate, steps, tool-error rate, RAG groundedness, cost/latency).
+- **No regression:** a change (prompt, model, pattern, dependency) can degrade quality without any test detecting it (current tests are unit/structural, not agent behavior).
+- **No system-level adversarial evaluation:** L1–L5 security is tested at the unit level, but there is no automated *red-team* of injection/tool-abuse over real flows.
+- **No quality traceability by version:** there are no *scorecards* per release.
 
 ---
 
-## 4. Objetivos y Métricas de Éxito
+## 3. Target Users
 
-| Objetivo | Métrica | Target |
+- **AI Engineer:** run an eval-set and see metrics/failures per case; compare two versions.
+- **QA / Release Manager:** release gate by quality/regression threshold.
+- **Security Lead:** adversarial suite (injection, exfiltration, tool-abuse) over real flows.
+- **Maintainer:** scorecards per release; drift detection when bumping deps/models.
+
+---
+
+## 4. Goals and Success Metrics
+
+| Goal | Metric | Target |
 |---|---|---|
-| Eval de sistema | Correr eval-set contra el grafo y producir métricas | Implementado |
-| Métricas de trayectoria | success rate, steps, tool-error rate, RAG groundedness, coste/latencia | Reportadas por caso |
-| Regresión | Comparar run vs baseline; gate por umbral | Integrable en CI |
-| Suite adversaria | red-team automatizado de seguridad sobre flujos | ≥ N escenarios |
-| Reproducibilidad | seeds + fakes; sin no-determinismo evitable | Deterministic donde aplique |
-| Backward-compat | aditivo; no toca runtime de agentes | 100% |
+| System eval | Run an eval-set against the graph and produce metrics | Implemented |
+| Trajectory metrics | success rate, steps, tool-error rate, RAG groundedness, cost/latency | Reported per case |
+| Regression | Compare run vs baseline; gate by threshold | CI-integrable |
+| Adversarial suite | automated security red-team over flows | ≥ N scenarios |
+| Reproducibility | seeds + fakes; no avoidable non-determinism | Deterministic where applicable |
+| Backward-compat | additive; does not touch agent runtime | 100% |
 
 ---
 
-## 5. Alcance (propuesto)
+## 5. Scope (proposed)
 
 ### In Scope
-- **`EvalCase` / `EvalSet`** (entrada, criterios de éxito, asserts: exact/semantic/LLM-judge/tool-usage/groundedness).
-- **`EvalRunner`** que ejecuta el grafo (o subgrafo) por caso, captura la **trayectoria** (mensajes, tool-calls, nodos visitados, coste/latencia vía `monitoring/`) y evalúa.
-- **Métricas y scorecard** (JSON + Markdown); comparación contra **baseline** (regresión) con gate por umbral.
-- **Suite adversaria**: catálogo de escenarios (prompt injection, tool-abuse, exfiltración, jailbreak) ejecutados contra flujos reales; assert de que L1–L5 contiene.
-- **Integración CI** (`pytest -m eval` y/o CLI `prismal eval`), con fakes (sin `live_api`) y modo `live_api` opcional.
-- LLM-as-judge con rúbricas; reutiliza `providers/` (model-agnostic).
+- **`EvalCase` / `EvalSet`** (input, success criteria, asserts: exact/semantic/LLM-judge/tool-usage/groundedness).
+- **`EvalRunner`** that executes the graph (or subgraph) per case, captures the **trajectory** (messages, tool-calls, visited nodes, cost/latency via `monitoring/`) and evaluates.
+- **Metrics and scorecard** (JSON + Markdown); comparison against a **baseline** (regression) with a threshold gate.
+- **Adversarial suite**: a catalog of scenarios (prompt injection, tool-abuse, exfiltration, jailbreak) executed against real flows; assert that L1–L5 contains them.
+- **CI integration** (`pytest -m eval` and/or CLI `prismal eval`), with fakes (no `live_api`) and an optional `live_api` mode.
+- LLM-as-judge with rubrics; reuses `providers/` (model-agnostic).
 
 ### Out of Scope
-- Plataforma de anotación humana / UI de eval (futuro; o integración con LangSmith/Langfuse evals).
-- Benchmark público propio (se pueden importar datasets existentes).
-- Fine-tuning a partir de resultados.
+- Human annotation platform / eval UI (future; or integration with LangSmith/Langfuse evals).
+- An in-house public benchmark (existing datasets can be imported).
+- Fine-tuning from results.
 
 ---
 
-## 6. Requisitos Funcionales (resumen)
+## 6. Functional Requirements (summary)
 
-| ID | Requisito | Prioridad |
+| ID | Requirement | Priority |
 |---|---|---|
-| RF-EVL-001 | Modelo `EvalCase`/`EvalSet` con criterios componibles | `MUST` |
-| RF-EVL-002 | `EvalRunner` ejecuta el grafo y captura trayectoria + coste/latencia | `MUST` |
+| RF-EVL-001 | `EvalCase`/`EvalSet` model with composable criteria | `MUST` |
+| RF-EVL-002 | `EvalRunner` executes the graph and captures trajectory + cost/latency | `MUST` |
 | RF-EVL-003 | Asserts: exact, semantic, LLM-judge, tool-usage, RAG groundedness | `MUST` |
-| RF-EVL-004 | Scorecard (JSON+MD) + comparación vs baseline (regresión) con gate | `MUST` |
-| RF-EVL-005 | Suite adversaria de seguridad sobre flujos reales | `SHOULD` |
-| RF-EVL-006 | CLI `prismal eval` + marcador `pytest -m eval`; fakes por defecto | `MUST` |
-| RF-EVL-007 | Reproducibilidad (seeds, fakes); modo `live_api` opcional | `SHOULD` |
+| RF-EVL-004 | Scorecard (JSON+MD) + comparison vs baseline (regression) with gate | `MUST` |
+| RF-EVL-005 | Adversarial security suite over real flows | `SHOULD` |
+| RF-EVL-006 | CLI `prismal eval` + `pytest -m eval` marker; fakes by default | `MUST` |
+| RF-EVL-007 | Reproducibility (seeds, fakes); optional `live_api` mode | `SHOULD` |
 
 ---
 
-## 7. Riesgos y Mitigaciones (resumen)
+## 7. Risks and Mitigations (summary)
 
-| Riesgo | Mitigación |
+| Risk | Mitigation |
 |---|---|
-| No-determinismo del LLM falsea regresión | Seeds + fakes + umbrales con tolerancia; LLM-judge con rúbrica estable |
-| Coste de correr evals con modelos reales | Default fakes; `live_api` opt-in; muestreo |
-| Evals que no representan producción (scaffold gap) | Ejecutar contra el **grafo real**, no la API directa |
-| Mantener eval-sets actualizados | Versionar eval-sets junto al código; gate en CI |
+| LLM non-determinism falsifies regression | Seeds + fakes + thresholds with tolerance; LLM-judge with a stable rubric |
+| Cost of running evals with real models | Default fakes; `live_api` opt-in; sampling |
+| Evals that do not represent production (scaffold gap) | Run against the **real graph**, not the direct API |
+| Keeping eval-sets up to date | Version eval-sets alongside the code; gate in CI |
 
 ---
 
-## 8. Dependencias
+## 8. Dependencies
 
-- `agents/graph.py` (ejecutar el grafo), `monitoring/` (coste/latencia/trazas), `providers/` (judge model-agnostic), `security/` (assert de contención adversaria).
-- Opcional: integración con Langfuse/LangSmith evals.
-
----
-
-## 9. Próximos Pasos
-
-Expandir a set SDD completo: diseño de `EvalRunner` y captura de trayectoria desde el *stream* de LangGraph, formato de eval-set, rúbricas de LLM-judge, gate de regresión en CI, y catálogo adversario.
+- `agents/graph.py` (execute the graph), `monitoring/` (cost/latency/traces), `providers/` (model-agnostic judge), `security/` (adversarial containment assert).
+- Optional: integration with Langfuse/LangSmith evals.
 
 ---
 
-## Historial de Cambios
+## 9. Next Steps
 
-| Versión | Fecha | Autor | Cambios |
+Expand to the full SDD set: design of `EvalRunner` and trajectory capture from the LangGraph *stream*, eval-set format, LLM-judge rubrics, regression gate in CI, and adversarial catalog.
+
+---
+
+## Change History
+
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 0.1 | 2026-06-06 | Ernesto Crespo | PRD semilla — harness de evaluación de sistema |
+| 0.1 | 2026-06-06 | Ernesto Crespo | Seed PRD — system evaluation harness |

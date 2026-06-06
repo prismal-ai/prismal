@@ -2,104 +2,104 @@
 
 ## Metadata
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-06-06 |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` |
+| **Version** | 1.0 |
+| **Date** | 2026-06-06 |
 | **PLAN** | `specs/a2a-interop/PLAN.md` |
 | **Architecture** | `specs/a2a-interop/ARCHITECTURE.md` |
 | **SPEC** | `specs/a2a-interop/SPEC.md` |
-| **Relacionado** | Fase X, Fase Y, Fase R, `specs/agent-identity-governance/` |
+| **Related** | Phase X, Phase Y, Phase R, `specs/agent-identity-governance/` |
 
 ---
 
-## 1. Resumen de Implementación
+## 1. Implementation Summary
 
-Fase I añade interop A2A bidireccional en un subpaquete nuevo `prismal/a2a/` (extra `[a2a]`), reutilizando el adaptador-como-nodo (Fase X), el `ToolProviderPort` (Fase Y) y el connection-manager de `mcp/`. **Aditivo, gated (`a2a_enabled=False`), todo lo remoto pasa por L1–L5.** El HTTP lo monta `prismal-server`; el core provee handler + tipos + cliente.
-
----
-
-## 2. Pre-requisitos
-
-- Fase X: `@prismal_node`, patrón adaptador-como-nodo. (extension implementado)
-- Fase Y: `ToolProviderPort` + `CompositeToolProvider` (para `A2AToolProvider`).
-- Fase R: `build_runtime` (para componer A2A + multi-tenant) — recomendado.
-- `specs/agent-identity-governance/`: DID (mínimo para el card) — coordinar.
-- Decisión: usar SDK A2A oficial vs subset propio (ver PA-2).
+Phase I adds bidirectional A2A interop in a new subpackage `prismal/a2a/` (`[a2a]` extra), reusing the adapter-as-node (Phase X), the `ToolProviderPort` (Phase Y), and the connection manager from `mcp/`. **Additive, gated (`a2a_enabled=False`), everything remote goes through L1–L5.** The HTTP is mounted by `prismal-server`; the core provides handler + types + client.
 
 ---
 
-## 3. Fases de Implementación
+## 2. Prerequisites
 
-### FASE I1 — Tipos de dominio
-- [ ] `prismal/a2a/types.py`: `AgentCard`, `AgentSkill`, `A2ATask`, `A2AMessage`, `A2AArtifact`, `A2APart` (Pydantic v2, conformes v0.3.x).
-- **Done:** round-trip `model_dump`/`model_validate` contra ejemplos de la spec.
+- Phase X: `@prismal_node`, adapter-as-node pattern. (extension implemented)
+- Phase Y: `ToolProviderPort` + `CompositeToolProvider` (for `A2AToolProvider`).
+- Phase R: `build_runtime` (to compose A2A + multi-tenant) — recommended.
+- `specs/agent-identity-governance/`: DID (minimum for the card) — coordinate.
+- Decision: use the official A2A SDK vs our own subset (see PA-2).
 
-### FASE I2 — Agent Card
-- [ ] `card.py::build_agent_card(settings, registry, org_id=)` deriva skills del registro + allowlist `a2a_published_skills`; auth + did + modalidades; cache por org.
-- **Done:** card válido (conformidad) para un registro de prueba.
+---
 
-### FASE I3 — Inbound (server handler)
+## 3. Implementation Phases
+
+### PHASE I1 — Domain types
+- [ ] `prismal/a2a/types.py`: `AgentCard`, `AgentSkill`, `A2ATask`, `A2AMessage`, `A2AArtifact`, `A2APart` (Pydantic v2, compliant with v0.3.x).
+- **Done:** `model_dump`/`model_validate` round-trip against spec examples.
+
+### PHASE I2 — Agent Card
+- [ ] `card.py::build_agent_card(settings, registry, org_id=)` derives skills from the registry + `a2a_published_skills` allowlist; auth + did + modalities; cache per org.
+- **Done:** valid card (conformance) for a test registry.
+
+### PHASE I3 — Inbound (server handler)
 - [ ] `server.py::A2AServerHandler.handle_rpc` (`message/send`, `tasks/get`, `tasks/cancel`).
 - [ ] `_run_task`: sanitize -> invoke graph(thread=task_id) -> SSE artifacts -> audit.
-- [ ] Mapeo skill_id -> subgrafo/entrada.
-- **Done:** fake JSON-RPC -> SSE artifacts esperados; auth obligatoria en estricto.
+- [ ] skill_id -> subgraph/entry mapping.
+- **Done:** fake JSON-RPC -> expected SSE artifacts; mandatory auth in strict.
 
-### FASE I4 — Outbound (client + node)
+### PHASE I4 — Outbound (client + node)
 - [ ] `client.py::A2AClient` (discover, send_task SSE, cancel, auth).
-- [ ] `A2AConnectionManager` (allowlist, pool, retry) — espejo de `mcp/connection.py`.
-- [ ] `A2AAgentNode.as_node()` (@prismal_node; map state<->task; error=True sin romper).
-- **Done:** fake A2A server -> nodo integra artifacts en el estado; allowlist enforced.
+- [ ] `A2AConnectionManager` (allowlist, pool, retry) — mirror of `mcp/connection.py`.
+- [ ] `A2AAgentNode.as_node()` (@prismal_node; map state<->task; error=True without breaking).
+- **Done:** fake A2A server -> node integrates artifacts into the state; allowlist enforced.
 
-### FASE I5 — A2AToolProvider (Fase Y)
-- [ ] `provider.py::A2AToolProvider.get_tools` expone skills remotas como `BaseTool`; conforma `ToolProviderPort`; import diferido; captura -> [].
-- **Done:** componible en `CompositeToolProvider`; `react_loop` ejecuta una skill remota.
+### PHASE I5 — A2AToolProvider (Phase Y)
+- [ ] `provider.py::A2AToolProvider.get_tools` exposes remote skills as `BaseTool`; conforms to `ToolProviderPort`; deferred import; capture -> [].
+- **Done:** composable in `CompositeToolProvider`; `react_loop` executes a remote skill.
 
-### FASE I6 — Seguridad e identidad
-- [ ] Auth out (OAuth client-credentials / mTLS / bearer) + in (validación de llamante).
-- [ ] DID en el card (consume `agent-identity-governance`).
-- [ ] Allowlist deny-all en estricto; todo artefacto remoto -> `InputSanitizer`/`SecurePromptBuilder`; tool-calls -> `ActionInterceptor`.
-- [ ] `AuditLogger.log_event` por tarea (in/out), sin secretos.
-- **Done:** test de inyección remota neutralizada; test de tool peligrosa bloqueada.
+### PHASE I6 — Security and identity
+- [ ] Auth out (OAuth client-credentials / mTLS / bearer) + in (caller validation).
+- [ ] DID in the card (consumes `agent-identity-governance`).
+- [ ] Deny-all allowlist in strict; every remote artifact -> `InputSanitizer`/`SecurePromptBuilder`; tool-calls -> `ActionInterceptor`.
+- [ ] `AuditLogger.log_event` per task (in/out), without secrets.
+- **Done:** test of neutralized remote injection; test of blocked dangerous tool.
 
-### FASE I7 — Settings + Fase R
+### PHASE I7 — Settings + Phase R
 - [ ] Settings `a2a_*` (default off).
 - [ ] `A2AError` / `A2AAgentUnavailable`.
-- [ ] `build_runtime`: compone `A2AToolProvider` (si outbound) y expone `A2AServerHandler` (si inbound) en `RuntimeContext`; card por org.
+- [ ] `build_runtime`: composes `A2AToolProvider` (if outbound) and exposes `A2AServerHandler` (if inbound) in `RuntimeContext`; card per org.
 
-### FASE I8 — Docs + ejemplos + tests
-- [ ] `docs/a2a.md` (exponer prismal; consumir remotos; seguridad).
+### PHASE I8 — Docs + examples + tests
+- [ ] `docs/a2a.md` (expose prismal; consume remotes; security).
 - [ ] `examples/a2a_server.py`, `examples/a2a_remote_node.py`.
-- [ ] Fake A2A server para tests (httpx mock); conformidad de card/handler.
+- [ ] Fake A2A server for tests (httpx mock); card/handler conformance.
 
 ### HARDENING
-- [ ] Coverage ≥ 85% en `prismal/a2a/**`.
+- [ ] Coverage ≥ 85% in `prismal/a2a/**`.
 - [ ] `ruff`/`mypy --strict`/`bandit` clean; `pytest -m "not live_api"` 100%.
-- [ ] Extra `[a2a]` en `pyproject.toml`; imports diferidos.
-- [ ] `CLAUDE.md` + `README.md` + notas Obsidian.
+- [ ] `[a2a]` extra in `pyproject.toml`; deferred imports.
+- [ ] `CLAUDE.md` + `README.md` + Obsidian notes.
 
 ---
 
-## 4. Dependencias Inter-Tareas
+## 4. Inter-Task Dependencies
 
 ```
 I1 (types)
  ├─▶ I2 (card) ──────────────▶ I3 (inbound)
- └─▶ I4 (client/node) ─▶ I5 (provider, needs Fase Y)
+ └─▶ I4 (client/node) ─▶ I5 (provider, needs Phase Y)
 I6 (security/identity) ─▶ I3, I4, I5
-I7 (settings + Fase R) ─▶ compose all
+I7 (settings + Phase R) ─▶ compose all
 I8 (docs/tests) [last]
 ```
 
-Ruta crítica: **I1 → I4 → I6 → I8** (outbound primero, sin exponer nada). Inbound (I3) tras tener host.
+Critical path: **I1 → I4 → I6 → I8** (outbound first, without exposing anything). Inbound (I3) after having a host.
 
 ---
 
-## 5. Matriz Tareas ↔ Requisitos
+## 5. Tasks ↔ Requirements Matrix
 
-| Tarea | RF cubiertos |
+| Task | RF covered |
 |---|---|
 | I1 | RF-A2A-001 |
 | I2 | RF-A2A-002 |
@@ -110,56 +110,56 @@ Ruta crítica: **I1 → I4 → I6 → I8** (outbound primero, sin exponer nada).
 | I7 | RF-A2A-011 |
 | I8 | RF-A2A-012 |
 
-Cobertura: RF-A2A-001..012 mapeados.
+Coverage: RF-A2A-001..012 mapped.
 
 ---
 
-## 6. Matriz de Riesgos
+## 6. Risk Matrix
 
-| Riesgo | Mitigación | Tarea |
+| Risk | Mitigation | Task |
 |---|---|---|
-| Inyección desde agente remoto | L1 + ActionInterceptor sobre artefactos | I6 |
-| Inbound sin auth expuesto | Auth obligatoria; default off; estricto | I6, I7 |
-| Delegación a agente no autorizado | Allowlist deny-all (estricto) | I4, I6 |
-| Drift de la spec A2A (v0.x) | Pin v0.3.x; tests de conformidad | I1, I3 |
-| Tareas largas bloquean | Timeout + tasks/cancel | I3, I4 |
-| Coste descontrolado de delegaciones | Enlazar `cost-budget-governance` | (cross) |
+| Injection from a remote agent | L1 + ActionInterceptor over artifacts | I6 |
+| Inbound exposed without auth | Mandatory auth; default off; strict | I6, I7 |
+| Delegation to an unauthorized agent | Deny-all allowlist (strict) | I4, I6 |
+| A2A spec drift (v0.x) | Pin v0.3.x; conformance tests | I1, I3 |
+| Long tasks block | Timeout + tasks/cancel | I3, I4 |
+| Uncontrolled delegation cost | Link `cost-budget-governance` | (cross) |
 
 ---
 
-## 7. Definición de Done (Global de Fase I)
+## 7. Definition of Done (Global for Phase I)
 
-- [ ] Tipos A2A conformes v0.3.x; `build_agent_card` válido.
-- [ ] Inbound (handler JSON-RPC + SSE) montable por `prismal-server`.
+- [ ] A2A types compliant with v0.3.x; `build_agent_card` valid.
+- [ ] Inbound (JSON-RPC handler + SSE) mountable by `prismal-server`.
 - [ ] Outbound (`A2AClient` + `A2AAgentNode` + connection manager).
-- [ ] `A2AToolProvider` conforma `ToolProviderPort`.
-- [ ] Auth + DID + allowlist + auditoría; remoto pasa por L1–L5.
-- [ ] Settings `a2a_*` (default off); integración con Fase R.
-- [ ] `docs/a2a.md` + 2 ejemplos + fake server tests; coverage ≥ 85%.
+- [ ] `A2AToolProvider` conforms to `ToolProviderPort`.
+- [ ] Auth + DID + allowlist + auditing; remote goes through L1–L5.
+- [ ] Settings `a2a_*` (default off); Phase R integration.
+- [ ] `docs/a2a.md` + 2 examples + fake server tests; coverage ≥ 85%.
 - [ ] `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
-- [ ] `CLAUDE.md` + `README.md` + Obsidian actualizados; PR mergeado.
+- [ ] `CLAUDE.md` + `README.md` + Obsidian updated; PR merged.
 
 ---
 
-## 8. Estimación de Esfuerzo
+## 8. Effort Estimate
 
-| Sub-fase | Esfuerzo |
+| Sub-phase | Effort |
 |---|---|
-| I1 Tipos | 0.4 sem |
-| I2 Card | 0.4 sem |
-| I3 Inbound | 1.0 sem |
-| I4 Outbound | 1.0 sem |
-| I5 Provider | 0.4 sem |
-| I6 Seguridad/identidad | 0.6 sem |
-| I7 Settings + Fase R | 0.3 sem |
-| I8 Docs + tests | 0.6 sem |
-| Hardening | 0.5 sem |
-| **Total** | **~5.2 sem** |
+| I1 Types | 0.4 wk |
+| I2 Card | 0.4 wk |
+| I3 Inbound | 1.0 wk |
+| I4 Outbound | 1.0 wk |
+| I5 Provider | 0.4 wk |
+| I6 Security/identity | 0.6 wk |
+| I7 Settings + Phase R | 0.3 wk |
+| I8 Docs + tests | 0.6 wk |
+| Hardening | 0.5 wk |
+| **Total** | **~5.2 wk** |
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-06-06 | Ernesto Crespo | Plan de implementación inicial — A2A interop |
+| 1.0 | 2026-06-06 | Ernesto Crespo | Initial implementation plan — A2A interop |

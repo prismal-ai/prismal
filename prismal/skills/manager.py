@@ -80,7 +80,9 @@ def _zip_detect_prefix(names: list[str]) -> str | None:
         return ""
     top_dirs = {n.split("/")[0] for n in names if "/" in n}
     for top in sorted(top_dirs):
-        if f"{top}/skill.md" in names_lower:
+        # Match case-insensitively on both the directory and the filename, but
+        # return the original-case prefix so extraction preserves real paths.
+        if f"{top.lower()}/skill.md" in names_lower:
             return f"{top}/"
     return None
 

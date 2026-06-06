@@ -1,263 +1,263 @@
-# Prismal — Tool Provider Injection (MCP & Skills como puerto inyectable)
+# Prismal — Tool Provider Injection (MCP & Skills as an injectable port)
 
 ## Strategic Plan / Product Requirements Document (PLAN)
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-06-05 |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` |
+| **Version** | 1.0 |
+| **Date** | 2026-06-05 |
 | **Reviewers** | Tech Lead, AI Architect, DX Lead |
-| **Documentos relacionados** | `ARCHITECTURE.md`, `SPEC.md`, `TASKS.md` |
-| **Fase** | Y — Tool Provider Injection (sucesora natural de Fase X — Extension Surface) |
+| **Related documents** | `ARCHITECTURE.md`, `SPEC.md`, `TASKS.md` |
+| **Phase** | Y — Tool Provider Injection (natural successor to Phase X — Extension Surface) |
 
 ---
 
-## 1. Resumen Ejecutivo
+## 1. Executive Summary
 
-Hoy las herramientas que consumen los agentes provienen de tres fuentes (servidores **MCP**, **Skills** activas y *stubs* estáticos) y se fusionan en un único *facade*: `prismal/agents/tool_registry.py`. El problema es la **dirección de la dependencia**: la capa de agentes (el núcleo de orquestación) construye y conoce directamente a sus subsistemas de integración — importa `prismal.mcp.client.MCPClientManager` y `prismal.skills.manager.SkillsManager`, mantiene el ciclo de vida en *singletons* de módulo (`_mcp_manager`, `_mcp_initialized`, `_mcp_lock`) y decide la configuración (`init_mcp(config_path)`).
+Today the tools that agents consume come from three sources (**MCP** servers, active **Skills**, and static *stubs*) and are merged into a single *facade*: `prismal/agents/tool_registry.py`. The problem is the **direction of the dependency**: the agents layer (the orchestration core) builds and directly knows its integration subsystems — it imports `prismal.mcp.client.MCPClientManager` and `prismal.skills.manager.SkillsManager`, maintains the lifecycle in module *singletons* (`_mcp_manager`, `_mcp_initialized`, `_mcp_lock`), and decides the configuration (`init_mcp(config_path)`).
 
-Esto es incoherente con el diseño establecido en la **Fase X (Extension Surface)**, donde `CheckpointPort`, `AuditPort` y `EmbeddingsPort` ya están invertidos como puertos hexagonales: el host compone e inyecta, el núcleo solo consume. **MCP y Skills son la excepción que falta normalizar.**
+This is inconsistent with the design established in **Phase X (Extension Surface)**, where `CheckpointPort`, `AuditPort`, and `EmbeddingsPort` are already inverted as hexagonal ports: the host composes and injects, the core only consumes. **MCP and Skills are the exception that remains to be normalized.**
 
-Esta fase define un **`ToolProviderPort`** y mueve la *construcción* de MCP/Skills fuera del núcleo, hacia el componente que compone la aplicación (`prismal-sdk`, `prismal-web`). El núcleo deja de importar `prismal.mcp` y `prismal.skills`; el host instancia los proveedores y los inyecta vía `set_tool_provider()`. El cambio es **opt-in, aditivo y retrocompatible**: los 20+ nodos-agente siguen llamando `get_tools_for_agent("coder")` sin cambios, y si nadie inyecta un proveedor el sistema degrada a *stubs* con un *warning* estructurado (igual que hoy `get_mcp_tools()` devuelve `[]` cuando MCP no se inicializó).
+This phase defines a **`ToolProviderPort`** and moves the *construction* of MCP/Skills out of the core, toward the component that composes the application (`prismal-sdk`, `prismal-web`). The core stops importing `prismal.mcp` and `prismal.skills`; the host instantiates the providers and injects them via `set_tool_provider()`. The change is **opt-in, additive, and backward-compatible**: the 20+ agent nodes keep calling `get_tools_for_agent("coder")` unchanged, and if no one injects a provider the system degrades to *stubs* with a structured *warning* (just as `get_mcp_tools()` returns `[]` today when MCP was not initialized).
 
-El entregable habilita tres capacidades que hoy son imposibles sin parchear el núcleo: (1) **toolsets por sesión/usuario** para `prismal-web` multi-tenant; (2) **núcleo `prismal` publicable y testeable** sin servidores MCP ni skills en disco; (3) **ciclo de vida de integraciones en el host**, donde corresponde.
-
----
-
-## 2. Contexto y Problema
-
-### 2.1 Situación Actual
-
-- **`tool_registry.py` es el único punto de integración.** Mezcla MCP + Skills + stubs por llamada (`get_tools_for_agent`), aplicando prioridad (MCP → Skills → stubs), dedupe por nombre y caps de tokens (`_MAX_MCP_TOOLS = 60`, `_MAX_TOTAL_TOOLS = 120`).
-- **El núcleo baja a sus periféricos.** `get_mcp_tools()` importa `prismal.mcp.client.MCPClientManager`; `get_skill_tools()` instancia `prismal.skills.manager.SkillsManager()`. La capa de agentes depende de las capas de integración.
-- **Estado global mutable de módulo.** El *singleton* `_mcp_manager` y sus flags/lock viven dentro del núcleo. El llamador no puede sustituir el *manager* (uno con auth de usuario, uno *mock* en tests) sin parchear el módulo.
-- **Construcción no inyectable.** `init_mcp()` instancia `MCPClientManager(config_path or _DEFAULT_MCP_CONFIG)` internamente; la elección de config y el momento de conexión los decide el núcleo.
-- **Activación de skills opaca.** `SkillsManager().get_active_tools()` lee estado de disco/proceso; el host no puede decidir qué skills ve cada usuario/sesión.
-- **El límite ya existe a medias.** `grep` confirma que **ningún módulo dentro de `prismal/` llama a `init_mcp()`**: ya se asume que el arranque lo dispara un componente externo. La frontera está implícita pero no formalizada.
-
-### 2.2 Problema
-
-Sin un puerto de proveedor de herramientas:
-
-1. **El núcleo no es publicable de forma limpia**: arrastra dependencias e imports de MCP y Skills que un consumidor del framework podría no querer.
-2. **No hay multi-tenant real**: el *singleton* global impide que dos usuarios de `prismal-web` vean *toolsets* distintos (allowlist de servidores, skills por plan).
-3. **Tests acoplados**: probar un agente requiere o bien MCP/skills reales, o parchear globals de módulo.
-4. **El host no controla el ciclo de vida**: cuándo conectar, con qué credenciales, qué servidores — todo está enterrado en el núcleo.
-
-### 2.3 Oportunidad
-
-Las primitivas ya existen casi todas:
-
-- **`ToolPort`** (`prismal/agents/extension/ports.py`, Fase X) ya modela una herramienta ejecutable (`name`, `description`, `ainvoke`) — la unidad que MCP y Skills producen.
-- El patrón "**puerto + implementación externa que conforma la forma**" ya está probado con `CheckpointPort`/`AuditPort`/`EmbeddingsPort`.
-- **`discover_plugins()`** (Fase X) ya establece el precedente "el host descubre/registra, el núcleo consume".
-- **`DEFAULT_CAPABILITY_MAP`** y el parámetro `required_capabilities` (Fase E) ya enrutan capacidades por agente; solo hay que hacerlos fluir hasta el proveedor.
-
-Lo que falta es **declarar el contrato del proveedor y mover la construcción al host**. Esfuerzo bajo (un puerto nuevo + refactor de un único archivo + extracción de proveedores), impacto alto en publicabilidad, testabilidad y multi-tenant, sin romper nada.
+The deliverable enables three capabilities that are impossible today without patching the core: (1) **per-session/per-user toolsets** for multi-tenant `prismal-web`; (2) a **publishable and testable `prismal` core** without MCP servers or skills on disk; (3) **integration lifecycle in the host**, where it belongs.
 
 ---
 
-## 3. Usuarios Objetivo
+## 2. Context and Problem
+
+### 2.1 Current Situation
+
+- **`tool_registry.py` is the single integration point.** It mixes MCP + Skills + stubs per call (`get_tools_for_agent`), applying priority (MCP → Skills → stubs), name dedupe, and token caps (`_MAX_MCP_TOOLS = 60`, `_MAX_TOTAL_TOOLS = 120`).
+- **The core reaches down into its peripherals.** `get_mcp_tools()` imports `prismal.mcp.client.MCPClientManager`; `get_skill_tools()` instantiates `prismal.skills.manager.SkillsManager()`. The agents layer depends on the integration layers.
+- **Mutable global module state.** The `_mcp_manager` *singleton* and its flags/lock live inside the core. The caller cannot substitute the *manager* (one with user auth, a *mock* one in tests) without patching the module.
+- **Non-injectable construction.** `init_mcp()` instantiates `MCPClientManager(config_path or _DEFAULT_MCP_CONFIG)` internally; the core decides the config choice and the moment of connection.
+- **Opaque skill activation.** `SkillsManager().get_active_tools()` reads disk/process state; the host cannot decide which skills each user/session sees.
+- **The boundary already half exists.** `grep` confirms that **no module inside `prismal/` calls `init_mcp()`**: it is already assumed that startup is triggered by an external component. The boundary is implicit but not formalized.
+
+### 2.2 Problem
+
+Without a tool provider port:
+
+1. **The core cannot be published cleanly**: it drags along dependencies and imports of MCP and Skills that a framework consumer might not want.
+2. **There is no real multi-tenancy**: the global *singleton* prevents two `prismal-web` users from seeing distinct *toolsets* (server allowlist, skills by plan).
+3. **Coupled tests**: testing an agent requires either real MCP/skills or patching module globals.
+4. **The host does not control the lifecycle**: when to connect, with which credentials, which servers — all of it is buried in the core.
+
+### 2.3 Opportunity
+
+Almost all the primitives already exist:
+
+- **`ToolPort`** (`prismal/agents/extension/ports.py`, Phase X) already models an executable tool (`name`, `description`, `ainvoke`) — the unit that MCP and Skills produce.
+- The "**port + external implementation that conforms to the shape**" pattern is already proven with `CheckpointPort`/`AuditPort`/`EmbeddingsPort`.
+- **`discover_plugins()`** (Phase X) already establishes the precedent "the host discovers/registers, the core consumes".
+- **`DEFAULT_CAPABILITY_MAP`** and the `required_capabilities` parameter (Phase E) already route capabilities per agent; they just need to flow down to the provider.
+
+What is missing is **declaring the provider contract and moving the construction to the host**. Low effort (one new port + refactor of a single file + provider extraction), high impact on publishability, testability, and multi-tenancy, without breaking anything.
+
+---
+
+## 3. Target Users
 
 ### Persona 1: Platform Host (prismal-sdk / prismal-web)
-- **Descripción:** El componente que compone y arranca la aplicación sobre el núcleo `prismal`.
-- **Necesidad principal:** Construir e inyectar los proveedores de herramientas (MCP, Skills) con el ciclo de vida, credenciales y configuración que el host decida.
-- **Frecuencia de uso:** Una vez por arranque (variante global) o una vez por sesión/usuario (variante por contexto).
+- **Description:** The component that composes and starts the application on top of the `prismal` core.
+- **Main need:** Build and inject the tool providers (MCP, Skills) with the lifecycle, credentials, and configuration the host decides.
+- **Usage frequency:** Once per startup (global variant) or once per session/user (context variant).
 
 ### Persona 2: Multi-Tenant Web Operator
-- **Descripción:** Opera `prismal-web` con múltiples usuarios/organizaciones.
-- **Necesidad principal:** Que cada sesión vea un *toolset* propio (servidores MCP autorizados, skills habilitadas por plan) sin estado global compartido.
-- **Frecuencia de uso:** Por request/sesión.
+- **Description:** Operates `prismal-web` with multiple users/organizations.
+- **Main need:** That each session sees its own *toolset* (authorized MCP servers, skills enabled by plan) without shared global state.
+- **Usage frequency:** Per request/session.
 
 ### Persona 3: Framework Consumer / Library User
-- **Descripción:** Importa `prismal` como librería para construir su propio agente, sin necesitar MCP ni Skills.
-- **Necesidad principal:** Que el núcleo funcione (degradado a stubs) sin obligar a instalar/configurar MCP ni Skills.
-- **Frecuencia de uso:** Continua.
+- **Description:** Imports `prismal` as a library to build their own agent, without needing MCP or Skills.
+- **Main need:** That the core works (degraded to stubs) without forcing them to install/configure MCP or Skills.
+- **Usage frequency:** Continuous.
 
 ### Persona 4: Core Maintainer / Test Author
-- **Descripción:** Escribe tests del núcleo de agentes.
-- **Necesidad principal:** Inyectar un `FakeToolProvider` determinista sin parchear *singletons* de módulo ni levantar servicios.
-- **Frecuencia de uso:** Diaria.
+- **Description:** Writes tests for the agents core.
+- **Main need:** Inject a deterministic `FakeToolProvider` without patching module *singletons* or standing up services.
+- **Usage frequency:** Daily.
 
 ---
 
-## 4. Objetivos y Métricas de Éxito
+## 4. Objectives and Success Metrics
 
-### 4.1 Objetivos del Negocio
+### 4.1 Business Objectives
 
-| Objetivo | Métrica | Target | Plazo |
+| Objective | Metric | Target | Timeframe |
 |---|---|---|---|
-| Inversión de dependencia | Imports de `prismal.mcp` / `prismal.skills` dentro de `prismal/agents/**` | 0 | Fase Y |
-| Núcleo publicable aislado | `import prismal.agents.graph` sin `prismal.mcp`/`prismal.skills` instalados | OK (degrada a stubs) | Fase Y |
-| Multi-tenant | Proveedor distinto por sesión sin estado global | Soportado (variante B) | Fase Y fase 2 |
-| Backward compatibility | Tests existentes pasando sin cambios | 100% | Global |
-| Testabilidad | Tests de agentes que requieren MCP/skills reales | 0 (vía `FakeToolProvider`) | Fase Y |
-| Cobertura de tests | Branch coverage módulos nuevos | ≥ 85% | Global |
+| Dependency inversion | Imports of `prismal.mcp` / `prismal.skills` within `prismal/agents/**` | 0 | Phase Y |
+| Isolated publishable core | `import prismal.agents.graph` without `prismal.mcp`/`prismal.skills` installed | OK (degrades to stubs) | Phase Y |
+| Multi-tenant | Distinct provider per session without global state | Supported (variant B) | Phase Y stage 2 |
+| Backward compatibility | Existing tests passing without changes | 100% | Global |
+| Testability | Agent tests requiring real MCP/skills | 0 (via `FakeToolProvider`) | Phase Y |
+| Test coverage | Branch coverage of new modules | ≥ 85% | Global |
 
-### 4.2 Objetivos de Usuario
+### 4.2 User Objectives
 
-| Objetivo del Usuario | Indicador |
+| User Objective | Indicator |
 |---|---|
-| Inyectar proveedores desde el host en 1 llamada | `set_tool_provider(CompositeToolProvider([...]))` |
-| Toolset por sesión/usuario | Proveedor resoluble desde config del grafo (variante B) |
-| Núcleo sin MCP/Skills funciona | Fallback a `StubToolProvider` + warning, sin excepción |
-| Sustituir el merge por uno propio | Implementar `ToolProviderPort` y conformar la forma |
-| Tests deterministas | `FakeToolProvider` reemplaza el cableado real |
+| Inject providers from the host in 1 call | `set_tool_provider(CompositeToolProvider([...]))` |
+| Per-session/per-user toolset | Provider resolvable from the graph config (variant B) |
+| Core without MCP/Skills works | Fallback to `StubToolProvider` + warning, no exception |
+| Replace the merge with a custom one | Implement `ToolProviderPort` and conform to the shape |
+| Deterministic tests | `FakeToolProvider` replaces the real wiring |
 
 ---
 
-## 5. Alcance
+## 5. Scope
 
-### 5.1 In Scope (Incluido — Fase Y)
+### 5.1 In Scope (Included — Phase Y)
 
 **Y1 — `ToolProviderPort` (`prismal/agents/extension/ports.py`):**
-- [x] `Protocol` `ToolProviderPort` con `get_tools(*, agent_name, capabilities) -> list[ToolPort]`.
-- [x] Re-export desde `prismal/agents/extension/__init__.py`.
-- [x] Helper de conformidad reutilizando `conforms_to(obj, port)`.
+- [x] `Protocol` `ToolProviderPort` with `get_tools(*, agent_name, capabilities) -> list[ToolPort]`.
+- [x] Re-export from `prismal/agents/extension/__init__.py`.
+- [x] Conformance helper reusing `conforms_to(obj, port)`.
 
-**Y2 — Proveedores concretos (`prismal/agents/extension/providers.py`):**
-- [x] `McpToolProvider` — envuelve `MCPClientManager`; mueve la lógica de `get_mcp_tools()` + cap `_MAX_MCP_TOOLS`.
-- [x] `SkillToolProvider` — envuelve `SkillsManager.get_active_tools()`.
-- [x] `StubToolProvider` — *fallbacks* de `tools.py` por agente (default del núcleo).
-- [x] `CompositeToolProvider` — fusiona N proveedores con prioridad + dedupe + cap `_MAX_TOTAL_TOOLS` + respeto de `_FIXED_TOOL_AGENTS`.
+**Y2 — Concrete providers (`prismal/agents/extension/providers.py`):**
+- [x] `McpToolProvider` — wraps `MCPClientManager`; moves the logic of `get_mcp_tools()` + cap `_MAX_MCP_TOOLS`.
+- [x] `SkillToolProvider` — wraps `SkillsManager.get_active_tools()`.
+- [x] `StubToolProvider` — per-agent *fallbacks* from `tools.py` (the core default).
+- [x] `CompositeToolProvider` — merges N providers with priority + dedupe + cap `_MAX_TOTAL_TOOLS` + respect for `_FIXED_TOOL_AGENTS`.
 
-**Y3 — Inyección global (variante A — retrocompatible):**
-- [x] `tool_registry.set_tool_provider(p: ToolProviderPort)` y `get_tool_provider()`.
-- [x] `get_tools_for_agent()` delega en el proveedor inyectado; si no hay, usa `StubToolProvider` + warning.
-- [x] `tool_registry` deja de importar `prismal.mcp` y `prismal.skills`.
-- [x] `init_mcp()` / `get_mcp_tools()` / `get_skill_tools()` se conservan como *shims* deprecados que delegan en proveedores (1 release de deprecación).
+**Y3 — Global injection (variant A — backward-compatible):**
+- [x] `tool_registry.set_tool_provider(p: ToolProviderPort)` and `get_tool_provider()`.
+- [x] `get_tools_for_agent()` delegates to the injected provider; if there is none, uses `StubToolProvider` + warning.
+- [x] `tool_registry` stops importing `prismal.mcp` and `prismal.skills`.
+- [x] `init_mcp()` / `get_mcp_tools()` / `get_skill_tools()` are kept as deprecated *shims* that delegate to providers (1 deprecation release).
 
-**Y4 — Inyección por contexto (variante B — multi-tenant, fase 2):**
-- [x] El proveedor puede pasarse en la config del grafo (`get_async_compiled_graph(..., tool_provider=...)`) y resolverse por sesión.
-- [x] Resolución por nodo desde `RunnableConfig` sin global (`resolve_provider` + `get_tools_for_agent_ctx`).
+**Y4 — Context injection (variant B — multi-tenant, stage 2):**
+- [x] The provider can be passed in the graph config (`get_async_compiled_graph(..., tool_provider=...)`) and resolved per session.
+- [x] Per-node resolution from `RunnableConfig` without globals (`resolve_provider` + `get_tools_for_agent_ctx`).
 
-**Y5 — Composición en el host:**
-- [x] Función `build_default_tool_provider(settings)` que arma el `CompositeToolProvider` estándar (MCP + Skills + stubs).
-- [x] Documentado para que `prismal-sdk` / `prismal-web` lo invoquen en su *lifespan* (`docs/tool-providers.md` §1).
+**Y5 — Composition in the host:**
+- [x] Function `build_default_tool_provider(settings)` that assembles the standard `CompositeToolProvider` (MCP + Skills + stubs).
+- [x] Documented so that `prismal-sdk` / `prismal-web` invoke it in their *lifespan* (`docs/tool-providers.md` §1).
 
-**Y6 — Settings y observabilidad:**
+**Y6 — Settings and observability:**
 - [x] `settings.tool_provider_mode: Literal["global","context"] = "global"`.
-- [x] `settings.tool_provider_strict: bool = False` (si `True`, ausencia de proveedor es error en vez de fallback silencioso).
-- [x] Métricas: `prismal_tool_provider_resolved_total{provider}`, `prismal_tools_injected_total{agent}`, `prismal_tool_provider_fallback_total` (+ `subprovider_errors_total`).
+- [x] `settings.tool_provider_strict: bool = False` (if `True`, absence of a provider is an error instead of a silent fallback).
+- [x] Metrics: `prismal_tool_provider_resolved_total{provider}`, `prismal_tools_injected_total{agent}`, `prismal_tool_provider_fallback_total` (+ `subprovider_errors_total`).
 - [x] OTel spans: `prismal.tools.resolve{agent}`.
 
-**Y7 — Documentación y ejemplos:**
-- [x] `docs/tool-providers.md` — quickstart de composición + recetas (allowlist por usuario, mock en tests).
-- [x] `examples/tool_provider_custom.py` — proveedor propio.
-- [x] `examples/tool_provider_host.py` — composición tipo host (MCP + Skills + stubs) + inyección.
+**Y7 — Documentation and examples:**
+- [x] `docs/tool-providers.md` — composition quickstart + recipes (per-user allowlist, mock in tests).
+- [x] `examples/tool_provider_custom.py` — custom provider.
+- [x] `examples/tool_provider_host.py` — host-style composition (MCP + Skills + stubs) + injection.
 
 **Y8 — Tests:**
-- [x] `FakeToolProvider` para fixtures.
-- [x] Tests de paridad: la salida de `get_tools_for_agent` antes/después del refactor es idéntica con el proveedor por defecto.
+- [x] `FakeToolProvider` for fixtures.
+- [x] Parity tests: the output of `get_tools_for_agent` before/after the refactor is identical with the default provider.
 
-### 5.2 Out of Scope (Excluido)
+### 5.2 Out of Scope (Excluded)
 
-- **Reescribir `MCPClientManager` o `SkillsManager`** — solo se envuelven; su API interna no cambia.
-- **Contenedor DI completo** — el patrón "inyectar proveedor + `settings: Settings | None = None`" basta (coherente con DD-EXT-005).
-- **Cambiar la firma de los 20+ nodos-agente en la variante A** — los nodos siguen llamando `get_tools_for_agent(name)`.
-- **Persistencia/caché distribuida de toolsets por usuario** — responsabilidad del host.
-- **Hot reload de proveedores** — reinicio del proceso (o nueva sesión en variante B) es aceptable.
-- **Mover `_MAX_MCP_TOOLS`/`_MAX_TOTAL_TOOLS` fuera de la política de plataforma** — los caps permanecen en el `CompositeToolProvider` oficial para que un host no los rompa por accidente.
+- **Rewriting `MCPClientManager` or `SkillsManager`** — they are only wrapped; their internal API does not change.
+- **Full DI container** — the "inject provider + `settings: Settings | None = None`" pattern is enough (consistent with DD-EXT-005).
+- **Changing the signature of the 20+ agent nodes in variant A** — the nodes keep calling `get_tools_for_agent(name)`.
+- **Distributed persistence/cache of per-user toolsets** — the host's responsibility.
+- **Hot reload of providers** — restarting the process (or a new session in variant B) is acceptable.
+- **Moving `_MAX_MCP_TOOLS`/`_MAX_TOTAL_TOOLS` out of the platform policy** — the caps remain in the official `CompositeToolProvider` so a host cannot break them by accident.
 
-### 5.3 Futuras Consideraciones (Fase Y+)
+### 5.3 Future Considerations (Phase Y+)
 
-- Proveedores con caché TTL por sesión.
-- Telemetría agregada por servidor MCP / skill (latencia, errores, uso por usuario).
-- Cuotas por tenant (nº de tools, nº de llamadas).
-- Negociación dinámica de capacidades (el agente declara, el proveedor resuelve el mínimo set).
-- Proveedor remoto (gRPC/HTTP) para toolsets servidos por un servicio externo.
+- Providers with per-session TTL cache.
+- Aggregated telemetry per MCP server / skill (latency, errors, per-user usage).
+- Per-tenant quotas (number of tools, number of calls).
+- Dynamic capability negotiation (the agent declares, the provider resolves the minimal set).
+- Remote provider (gRPC/HTTP) for toolsets served by an external service.
 
 ---
 
-## 6. Requisitos Funcionales (Resumen — detalle en `SPEC.md`)
+## 6. Functional Requirements (Summary — detail in `SPEC.md`)
 
-| ID | Requisito | Prioridad |
+| ID | Requirement | Priority |
 |---|---|---|
-| RF-TPI-001 | `ToolProviderPort` declara `get_tools(*, agent_name, capabilities)` como `Protocol` | `MUST` |
-| RF-TPI-002 | `McpToolProvider` envuelve `MCPClientManager` y aplica el cap `_MAX_MCP_TOOLS` | `MUST` |
-| RF-TPI-003 | `SkillToolProvider` envuelve `SkillsManager.get_active_tools()` | `MUST` |
-| RF-TPI-004 | `StubToolProvider` provee los fallbacks de `tools.py` por agente | `MUST` |
-| RF-TPI-005 | `CompositeToolProvider` fusiona con prioridad MCP→Skills→stubs, dedupe y cap total | `MUST` |
-| RF-TPI-006 | `set_tool_provider()` / `get_tool_provider()` inyectan/leen el proveedor (variante A) | `MUST` |
-| RF-TPI-007 | `get_tools_for_agent()` delega en el proveedor; fallback a stubs si no hay proveedor | `MUST` |
-| RF-TPI-008 | `prismal/agents/**` no importa `prismal.mcp` ni `prismal.skills` | `MUST` |
-| RF-TPI-009 | `_FIXED_TOOL_AGENTS` (cron_manager, critic) siguen recibiendo solo stubs | `MUST` |
-| RF-TPI-010 | `required_capabilities` fluye hasta `provider.get_tools(capabilities=...)` | `MUST` |
-| RF-TPI-011 | Shims deprecados `init_mcp/get_mcp_tools/get_skill_tools` delegan en proveedores | `SHOULD` |
-| RF-TPI-012 | Variante B: proveedor resoluble por sesión vía config del grafo | `SHOULD` |
-| RF-TPI-013 | `build_default_tool_provider(settings)` arma el composite estándar para el host | `MUST` |
+| RF-TPI-001 | `ToolProviderPort` declares `get_tools(*, agent_name, capabilities)` as a `Protocol` | `MUST` |
+| RF-TPI-002 | `McpToolProvider` wraps `MCPClientManager` and applies the `_MAX_MCP_TOOLS` cap | `MUST` |
+| RF-TPI-003 | `SkillToolProvider` wraps `SkillsManager.get_active_tools()` | `MUST` |
+| RF-TPI-004 | `StubToolProvider` provides the `tools.py` fallbacks per agent | `MUST` |
+| RF-TPI-005 | `CompositeToolProvider` merges with MCP→Skills→stubs priority, dedupe, and total cap | `MUST` |
+| RF-TPI-006 | `set_tool_provider()` / `get_tool_provider()` inject/read the provider (variant A) | `MUST` |
+| RF-TPI-007 | `get_tools_for_agent()` delegates to the provider; falls back to stubs if there is no provider | `MUST` |
+| RF-TPI-008 | `prismal/agents/**` does not import `prismal.mcp` or `prismal.skills` | `MUST` |
+| RF-TPI-009 | `_FIXED_TOOL_AGENTS` (cron_manager, critic) keep receiving stubs only | `MUST` |
+| RF-TPI-010 | `required_capabilities` flows down to `provider.get_tools(capabilities=...)` | `MUST` |
+| RF-TPI-011 | Deprecated shims `init_mcp/get_mcp_tools/get_skill_tools` delegate to providers | `SHOULD` |
+| RF-TPI-012 | Variant B: provider resolvable per session via the graph config | `SHOULD` |
+| RF-TPI-013 | `build_default_tool_provider(settings)` assembles the standard composite for the host | `MUST` |
 | RF-TPI-014 | Settings `tool_provider_mode` / `tool_provider_strict` | `SHOULD` |
-| RF-TPI-015 | Métricas y spans de resolución de tools | `SHOULD` |
-| RF-TPI-016 | Ejemplos ejecutables: proveedor custom + composición de host | `MUST` |
+| RF-TPI-015 | Metrics and spans for tool resolution | `SHOULD` |
+| RF-TPI-016 | Runnable examples: custom provider + host composition | `MUST` |
 
 ---
 
-## 7. Requisitos No Funcionales
+## 7. Non-Functional Requirements
 
-### Rendimiento
-- Resolución de tools por nodo (`get_tools`) ≤ 5 ms adicionales sobre el merge actual.
-- La variante B no debe añadir > 1 ms por nodo al leer el proveedor desde la config.
-- La composición del host (`build_default_tool_provider`) corre una vez por arranque (variante A) — sin impacto por request.
+### Performance
+- Per-node tool resolution (`get_tools`) ≤ 5 ms of overhead over the current merge.
+- Variant B must not add > 1 ms per node when reading the provider from the config.
+- Host composition (`build_default_tool_provider`) runs once per startup (variant A) — no per-request impact.
 
-### Seguridad
-- El proveedor inyectado **no puede saltarse** las capas L1–L5: la ejecución sigue pasando por `react_loop` + el *middleware* de `@prismal_node` (`SecurePromptBuilder`, `ActionInterceptor`, `AuditLogger`).
-- Los caps de tokens (`_MAX_MCP_TOOLS`, `_MAX_TOTAL_TOOLS`) permanecen en el composite oficial; un host no debe poder superarlos.
-- En multi-tenant (variante B), el proveedor de un usuario no debe exponer tools de otro (aislamiento por sesión, sin estado global).
+### Security
+- The injected provider **cannot bypass** the L1–L5 layers: execution still passes through `react_loop` + the `@prismal_node` *middleware* (`SecurePromptBuilder`, `ActionInterceptor`, `AuditLogger`).
+- The token caps (`_MAX_MCP_TOOLS`, `_MAX_TOTAL_TOOLS`) remain in the official composite; a host must not be able to exceed them.
+- In multi-tenant (variant B), one user's provider must not expose another user's tools (per-session isolation, no global state).
 
-### Disponibilidad
-- Ausencia de proveedor (modo no estricto) degrada a stubs con warning — nunca excepción.
-- Falla de un sub-proveedor (p. ej. MCP caído) en el composite no impide devolver el resto (skills + stubs), igual que hoy `get_mcp_tools()` devuelve `[]` ante error.
+### Availability
+- Absence of a provider (non-strict mode) degrades to stubs with a warning — never an exception.
+- Failure of a sub-provider (e.g. MCP down) in the composite does not prevent returning the rest (skills + stubs), just as `get_mcp_tools()` returns `[]` on error today.
 
-### Escalabilidad
-- Soportar N proveedores en el composite sin degradación apreciable.
-- Variante B: soportar miles de sesiones concurrentes con proveedores independientes (sin lock global por resolución).
+### Scalability
+- Support N providers in the composite without appreciable degradation.
+- Variant B: support thousands of concurrent sessions with independent providers (no global lock per resolution).
 
-### Observabilidad
-- OTel span `prismal.tools.resolve{agent}` con `provider`, `n_tools`, `fallback`.
-- Métricas listadas en Y6.
-- Log estructurado por resolución: `agent`, `provider`, `live`, `stubs_kept`, `total` (paridad con el log `tool_registry.tools_resolved` actual).
+### Observability
+- OTel span `prismal.tools.resolve{agent}` with `provider`, `n_tools`, `fallback`.
+- Metrics listed in Y6.
+- Structured log per resolution: `agent`, `provider`, `live`, `stubs_kept`, `total` (parity with the current `tool_registry.tools_resolved` log).
 
-### Mantenibilidad
-- Coverage ≥ 85% en módulos nuevos.
+### Maintainability
+- Coverage ≥ 85% in new modules.
 - `ruff` + `mypy --strict` + `bandit` clean.
-- Imports diferidos: el núcleo no debe importar MCP/Skills en tiempo de import del módulo (respeta `filterwarnings=error`).
+- Deferred imports: the core must not import MCP/Skills at module import time (respects `filterwarnings=error`).
 
-### Compatibilidad
-- `prismal/` sigue siendo namespace package PEP 420 (no añadir `__init__.py`).
-- API pública (`ToolProviderPort`, providers) versionada; breaking requiere bump minor + deprecation 1 release.
+### Compatibility
+- `prismal/` remains a PEP 420 namespace package (do not add `__init__.py`).
+- Public API (`ToolProviderPort`, providers) versioned; breaking requires a minor bump + 1-release deprecation.
 
 ---
 
-## 8. Restricciones y Dependencias
+## 8. Constraints and Dependencies
 
-### Restricciones Técnicas
+### Technical Constraints
 - Python 3.13+, `uv`.
-- No añadir dependencias obligatorias nuevas al core.
-- Los proveedores que tocan SDKs externos (MCP, skills) deben mantener los imports **diferidos** (dentro de métodos), no a nivel de módulo del núcleo.
+- Do not add new mandatory dependencies to the core.
+- Providers that touch external SDKs (MCP, skills) must keep imports **deferred** (inside methods), not at the core module level.
 
-### Dependencias Externas
+### External Dependencies
 
-| Dependencia | Tipo | Uso | Estado |
+| Dependency | Type | Use | Status |
 |---|---|---|---|
-| `prismal/agents/extension/ports.py` | Existente (Fase X) | Base para `ToolProviderPort` (extiende `ToolPort`) | ✅ Presente |
-| `prismal.mcp.client.MCPClientManager` | Existente | Envuelto por `McpToolProvider` | ✅ Presente |
-| `prismal.skills.manager.SkillsManager` | Existente | Envuelto por `SkillToolProvider` | ✅ Presente |
-| `langchain_core.tools.BaseTool` | Existente | Conforma `ToolPort` | ✅ Presente |
-| `opentelemetry-api` / `structlog` | Existente | Spans + logs de resolución | ✅ Presente |
+| `prismal/agents/extension/ports.py` | Existing (Phase X) | Base for `ToolProviderPort` (extends `ToolPort`) | ✅ Present |
+| `prismal.mcp.client.MCPClientManager` | Existing | Wrapped by `McpToolProvider` | ✅ Present |
+| `prismal.skills.manager.SkillsManager` | Existing | Wrapped by `SkillToolProvider` | ✅ Present |
+| `langchain_core.tools.BaseTool` | Existing | Conforms to `ToolPort` | ✅ Present |
+| `opentelemetry-api` / `structlog` | Existing | Resolution spans + logs | ✅ Present |
 
-**Sin nuevas dependencias** — todo sobre stack ya instalado.
+**No new dependencies** — all on the already-installed stack.
 
 ---
 
 ## 9. User Stories
 
-### Épica Y: Inyectar el toolset desde el host
+### Epic Y: Inject the toolset from the host
 
-**US-TPI-001:** Como Platform Host, quiero componer e inyectar los proveedores de herramientas en el arranque sin que el núcleo conozca MCP ni Skills.
+**US-TPI-001:** As a Platform Host, I want to compose and inject the tool providers at startup without the core knowing about MCP or Skills.
 ```python
-# en prismal-sdk / prismal-web (NO en prismal/agents)
+# in prismal-sdk / prismal-web (NOT in prismal/agents)
 from prismal.agents.extension.providers import (
     McpToolProvider, SkillToolProvider, StubToolProvider, CompositeToolProvider,
 )
@@ -272,99 +272,99 @@ provider = CompositeToolProvider([
 ])
 set_tool_provider(provider)
 ```
-- [ ] Los nodos siguen llamando `get_tools_for_agent("coder")` sin cambios.
-- [ ] `prismal/agents/**` no importa `prismal.mcp` ni `prismal.skills`.
+- [ ] The nodes keep calling `get_tools_for_agent("coder")` unchanged.
+- [ ] `prismal/agents/**` does not import `prismal.mcp` or `prismal.skills`.
 
-### Épica Y: Núcleo sin MCP/Skills
+### Epic Y: Core without MCP/Skills
 
-**US-TPI-002:** Como Framework Consumer, quiero usar el núcleo de agentes sin instalar MCP ni Skills.
-- [ ] Sin proveedor inyectado, `get_tools_for_agent` devuelve stubs + emite warning.
-- [ ] Ninguna excepción de import por MCP/Skills ausentes.
+**US-TPI-002:** As a Framework Consumer, I want to use the agents core without installing MCP or Skills.
+- [ ] With no provider injected, `get_tools_for_agent` returns stubs + emits a warning.
+- [ ] No import exception from MCP/Skills being absent.
 
-### Épica Y: Multi-tenant por sesión
+### Epic Y: Multi-tenant per session
 
-**US-TPI-003:** Como Multi-Tenant Web Operator, quiero que cada usuario vea un toolset propio.
+**US-TPI-003:** As a Multi-Tenant Web Operator, I want each user to see their own toolset.
 ```python
 provider = CompositeToolProvider([
-    McpToolProvider(mgr_for_user(user)),   # allowlist de servidores del usuario
+    McpToolProvider(mgr_for_user(user)),   # allowlist of the user's servers
     SkillToolProvider(skills_for_plan(user.plan)),
     StubToolProvider(),
 ])
-graph = await get_async_compiled_graph(tool_provider=provider)  # variante B
+graph = await get_async_compiled_graph(tool_provider=provider)  # variant B
 ```
-- [ ] Dos usuarios concurrentes ven toolsets distintos sin estado global.
+- [ ] Two concurrent users see distinct toolsets with no global state.
 
-### Épica Y: Tests deterministas
+### Epic Y: Deterministic tests
 
-**US-TPI-004:** Como Core Maintainer, quiero inyectar un proveedor falso en tests.
+**US-TPI-004:** As a Core Maintainer, I want to inject a fake provider in tests.
 ```python
 set_tool_provider(FakeToolProvider({"researcher": [echo_tool]}))
 ```
-- [ ] El test del agente no requiere MCP ni skills reales.
+- [ ] The agent test does not require real MCP or skills.
 
 ---
 
-## 10. Riesgos y Mitigaciones
+## 10. Risks and Mitigations
 
-| Riesgo | Probabilidad | Impacto | Mitigación |
+| Risk | Probability | Impact | Mitigation |
 |---|---|---|---|
-| Regresión silenciosa si nadie inyecta proveedor | Media | Alto | Fallback a `StubToolProvider` + warning estructurado; `tool_provider_strict=True` para entornos que exijan proveedor |
-| Cambio de paridad en el merge (orden/dedupe/caps) | Media | Alto | Tests de paridad byte-a-byte de `get_tools_for_agent` antes/después; los caps quedan en el composite oficial |
-| Orden de arranque: nodo corre antes de inyectar | Baja | Alto | Documentar inyección en el lifespan del host; en variante B la resolución es perezosa por nodo |
-| Import accidental de MCP/Skills a nivel de módulo rompe `filterwarnings=error` | Media | Medio | Imports diferidos; test de arquitectura que prohíbe `prismal.mcp`/`prismal.skills` en `prismal/agents/**` |
-| Multi-tenant: fuga de tools entre sesiones | Baja | Crítico | Variante B sin estado global; proveedor por sesión; test de aislamiento |
-| Shims deprecados se usan indefinidamente | Media | Bajo | `DeprecationWarning` + remoción anunciada a 1 minor |
-| Sobre-ingeniería del puerto | Baja | Medio | Mantener `get_tools` como único método; sin DI container (DD-EXT-005) |
+| Silent regression if no one injects a provider | Medium | High | Fallback to `StubToolProvider` + structured warning; `tool_provider_strict=True` for environments that require a provider |
+| Parity change in the merge (order/dedupe/caps) | Medium | High | Byte-for-byte parity tests of `get_tools_for_agent` before/after; the caps stay in the official composite |
+| Startup order: a node runs before injection | Low | High | Document injection in the host's lifespan; in variant B resolution is lazy per node |
+| Accidental import of MCP/Skills at module level breaks `filterwarnings=error` | Medium | Medium | Deferred imports; architecture test that forbids `prismal.mcp`/`prismal.skills` in `prismal/agents/**` |
+| Multi-tenant: tool leakage between sessions | Low | Critical | Variant B without global state; per-session provider; isolation test |
+| Deprecated shims used indefinitely | Medium | Low | `DeprecationWarning` + removal announced for 1 minor |
+| Over-engineering of the port | Low | Medium | Keep `get_tools` as the only method; no DI container (DD-EXT-005) |
 
 ---
 
-## 11. Timeline Estimado
+## 11. Estimated Timeline
 
-| Fase | Duración | Entregable |
+| Phase | Duration | Deliverable |
 |---|---|---|
-| Y1 — `ToolProviderPort` | 0.2 semana | Protocol + re-export |
-| Y2 — Proveedores concretos | 1 semana | McpToolProvider, SkillToolProvider, StubToolProvider, CompositeToolProvider + tests |
-| Y3 — Inyección global (variante A) | 0.8 semana | `set_tool_provider`, refactor `tool_registry`, shims deprecados |
-| Y4 — Inyección por contexto (variante B) | 1 semana | Resolución por sesión vía config del grafo + tests de aislamiento |
-| Y5 — Composición del host | 0.3 semana | `build_default_tool_provider(settings)` |
-| Y6 — Settings + métricas | 0.3 semana | Toggles + counters + spans |
-| Y7 — Docs + ejemplos | 0.6 semana | `docs/tool-providers.md` + 2 ejemplos |
-| Y8 — Tests + paridad | 0.5 semana | `FakeToolProvider` + tests de paridad |
-| Hardening | 0.5 semana | Coverage ≥ 85%, test de arquitectura, security audit |
-| **Total** | **~5 semanas** | MCP/Skills inyectables desde el host + multi-tenant opcional |
+| Y1 — `ToolProviderPort` | 0.2 week | Protocol + re-export |
+| Y2 — Concrete providers | 1 week | McpToolProvider, SkillToolProvider, StubToolProvider, CompositeToolProvider + tests |
+| Y3 — Global injection (variant A) | 0.8 week | `set_tool_provider`, `tool_registry` refactor, deprecated shims |
+| Y4 — Context injection (variant B) | 1 week | Per-session resolution via graph config + isolation tests |
+| Y5 — Host composition | 0.3 week | `build_default_tool_provider(settings)` |
+| Y6 — Settings + metrics | 0.3 week | Toggles + counters + spans |
+| Y7 — Docs + examples | 0.6 week | `docs/tool-providers.md` + 2 examples |
+| Y8 — Tests + parity | 0.5 week | `FakeToolProvider` + parity tests |
+| Hardening | 0.5 week | Coverage ≥ 85%, architecture test, security audit |
+| **Total** | **~5 weeks** | MCP/Skills injectable from the host + optional multi-tenant |
 
 ---
 
-## 12. Definición de Done (Global de Fase Y)
+## 12. Definition of Done (Global for Phase Y)
 
-- [x] `ToolProviderPort` declarado y re-exportado.
-- [x] `McpToolProvider`, `SkillToolProvider`, `StubToolProvider`, `CompositeToolProvider` implementados y testeados.
-- [x] `set_tool_provider()` / `get_tool_provider()` funcionando; `get_tools_for_agent()` delega.
-- [x] `prismal/agents/**` sin imports de `prismal.mcp` / `prismal.skills` (verificado por test de arquitectura; exenciones documentadas: `extension/providers.py`, `skill_manager.py`).
-- [x] Paridad: salida idéntica de `get_tools_for_agent` con el proveedor por defecto (test).
-- [x] `_FIXED_TOOL_AGENTS` y caps de tokens preservados.
-- [x] Variante B opcional disponible y con test de aislamiento por sesión.
-- [x] `build_default_tool_provider(settings)` documentado para el host.
-- [x] Shims `init_mcp/get_mcp_tools/get_skill_tools` deprecados con `DeprecationWarning`.
-- [x] `docs/tool-providers.md` + 2 ejemplos ejecutables.
-- [x] Coverage ≥ 85% en módulos nuevos (providers 100%, tool_registry 85%).
-- [x] Suite verde en el alcance de la fase (2604 passed; ~50 fallos preexistentes ajenos a Fase Y, idénticos en baseline).
-- [x] `ruff` + `mypy --strict` + `bandit` clean (en `prismal/` y `tests/`; 20 issues ruff preexistentes en `examples/` multimodal/rag/subgraphs quedan fuera de scope).
-- [x] `CLAUDE.md` y `README.md` actualizados.
-- [ ] PR mergeado a `main` con code review aprobado.
+- [x] `ToolProviderPort` declared and re-exported.
+- [x] `McpToolProvider`, `SkillToolProvider`, `StubToolProvider`, `CompositeToolProvider` implemented and tested.
+- [x] `set_tool_provider()` / `get_tool_provider()` working; `get_tools_for_agent()` delegates.
+- [x] `prismal/agents/**` without imports of `prismal.mcp` / `prismal.skills` (verified by architecture test; documented exemptions: `extension/providers.py`, `skill_manager.py`).
+- [x] Parity: identical output of `get_tools_for_agent` with the default provider (test).
+- [x] `_FIXED_TOOL_AGENTS` and token caps preserved.
+- [x] Optional variant B available and with a per-session isolation test.
+- [x] `build_default_tool_provider(settings)` documented for the host.
+- [x] Shims `init_mcp/get_mcp_tools/get_skill_tools` deprecated with `DeprecationWarning`.
+- [x] `docs/tool-providers.md` + 2 runnable examples.
+- [x] Coverage ≥ 85% in new modules (providers 100%, tool_registry 85%).
+- [x] Green suite within the phase scope (2604 passed; ~50 pre-existing failures unrelated to Phase Y, identical at baseline).
+- [x] `ruff` + `mypy --strict` + `bandit` clean (in `prismal/` and `tests/`; 20 pre-existing ruff issues in `examples/` multimodal/rag/subgraphs remain out of scope).
+- [x] `CLAUDE.md` and `README.md` updated.
+- [ ] PR merged to `main` with code review approved.
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-06-05 | Ernesto Crespo | Versión inicial — inyección de MCP/Skills vía `ToolProviderPort` desde capa externa |
+| 1.0 | 2026-06-05 | Ernesto Crespo | Initial version — injection of MCP/Skills via `ToolProviderPort` from an external layer |
 
-## Aprobaciones
+## Approvals
 
-| Rol | Nombre | Fecha | Estado |
+| Role | Name | Date | Status |
 |---|---|---|---|
-| Tech Lead | — | | ☐ Pendiente |
-| AI Architect | — | | ☐ Pendiente |
-| DX Lead | — | | ☐ Pendiente |
+| Tech Lead | — | | ☐ Pending |
+| AI Architect | — | | ☐ Pending |
+| DX Lead | — | | ☐ Pending |

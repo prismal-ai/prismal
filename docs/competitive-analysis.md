@@ -1,157 +1,157 @@
-# Prismal — Análisis competitivo y roadmap a producción
+# Prismal — Competitive Analysis and Production Roadmap
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Fecha** | 2026-06-06 |
-| **Estado** | `DRAFT` |
-| **Base** | Estructura del repo `prismal` (v3.0.0, ~52k LOC, 191 archivos de test) + specs en `specs/` + notas Obsidian `Documentacion/Prismal` |
-| **Alcance** | Posicionamiento frente a frameworks de agentes 2026, debilidades, y roadmap por features priorizado |
+| **Author** | Ernesto Crespo |
+| **Date** | 2026-06-06 |
+| **Status** | `DRAFT` |
+| **Basis** | Structure of the `prismal` repo (v3.0.0, ~52k LOC, 191 test files) + specs in `specs/` + Obsidian notes `Documentacion/Prismal` |
+| **Scope** | Positioning versus 2026 agent frameworks, weaknesses, and a prioritized feature roadmap |
 
-> Salvedad: este análisis se basa en la estructura del repo, los specs y las notas — no en correr la suite ni auditar cada capacidad end-to-end. Los specs describen el diseño *previsto*; la madurez real puede ser menor.
+> Caveat: this analysis is based on the repo structure, the specs, and the notes — not on running the suite or auditing each capability end-to-end. The specs describe the *intended* design; actual maturity may be lower.
 
 ---
 
-## 1. Qué es prismal y a qué se parece
+## 1. What prismal is and what it resembles
 
-Prismal es un **"LangGraph con baterías incluidas"**: envuelve LangGraph (motor de grafos de estado) y suma, en un solo paquete, lo que normalmente se ensambla de varias librerías — supervisor + 26 agentes, 7 motores RAG, 9 patrones, 12 subgrafos, seguridad de 5 capas, sandbox, MCP, skills, scheduler y multimodal.
+Prismal is a **"LangGraph with batteries included"**: it wraps LangGraph (state-graph engine) and adds, in a single package, what is normally assembled from several libraries — supervisor + 26 agents, 7 RAG engines, 9 patterns, 12 subgraphs, 5-layer security, sandbox, MCP, skills, scheduler, and multimodal.
 
-Comparables 2026 por pieza:
+2026 comparables by piece:
 
-| Framework | Solapamiento con prismal | Diferencia clave |
+| Framework | Overlap with prismal | Key difference |
 |---|---|---|
-| **LangGraph** (LangChain Inc.) | Es el sustrato que prismal envuelve | LangGraph es el motor; prismal añade las baterías |
-| **Microsoft Agent Framework** (GA v1.0) | Workflows de grafo + features enterprise | **A2A + MCP nativos**, OTel, Entra ID, runtime gestionado |
-| **Google ADK** | Multi-agente + **model-agnostic vía LiteLLM** (igual que prismal) | **A2A con Agent Cards** nativo |
-| **Claude Agent SDK** | Supervisor + subagentes + hooks + MCP + skills | Anthropic-native, runtime y memoria gestionados |
-| **CrewAI** | Multi-agente por roles | DSL de roles, baja curva |
-| **AutoGen / AG2** | Patrones de conversación/debate | Diálogo entre agentes |
-| **LlamaIndex** | RAG-first | Profundidad en datos indexados |
-| **Pydantic AI** | — | Type-safety y salidas estructuradas |
+| **LangGraph** (LangChain Inc.) | It is the substrate that prismal wraps | LangGraph is the engine; prismal adds the batteries |
+| **Microsoft Agent Framework** (GA v1.0) | Graph workflows + enterprise features | **Native A2A + MCP**, OTel, Entra ID, managed runtime |
+| **Google ADK** | Multi-agent + **model-agnostic via LiteLLM** (same as prismal) | Native **A2A with Agent Cards** |
+| **Claude Agent SDK** | Supervisor + subagents + hooks + MCP + skills | Anthropic-native, managed runtime and memory |
+| **CrewAI** | Role-based multi-agent | Roles DSL, low learning curve |
+| **AutoGen / AG2** | Conversation/debate patterns | Dialogue between agents |
+| **LlamaIndex** | RAG-first | Depth in indexed data |
+| **Pydantic AI** | — | Type-safety and structured outputs |
 
-**Ningún framework único hace exactamente lo mismo**: prismal es una *meta-ensambladura* integrada. Lo más parecido en filosofía es Microsoft Agent Framework (grafo + enterprise + A2A/MCP) y Google ADK (multi-agente + LiteLLM + A2A).
-
----
-
-## 2. ¿Es el más completo?
-
-- **Por amplitud integrada en un solo codebase: está en el tope.** Casi ningún OSS reúne supervisor + RAG avanzado (7 engines) + seguridad 5-capas + sandbox + MCP + skills + scheduler + multimodal de fábrica.
-- **Por madurez de producto/ecosistema: no.** Completitud en 2026 también se mide por runtime gestionado, observabilidad de primera parte (LangSmith), **interop estándar (A2A/Agent Cards)**, **gobernanza de identidad**, eval de sistema y comunidad. Prismal es **beta (v3.0.0), prácticamente de un mantenedor**, con toda la capa superior (`prismal-server`, `prismal-dashboard`, `prismal-sdk`) en estado **"Planned"**.
-
-**Veredicto: el más completo como *biblioteca de capacidades*, no como *plataforma de producción*.**
+**No single framework does exactly the same thing**: prismal is an integrated *meta-assembly*. The closest in philosophy is Microsoft Agent Framework (graph + enterprise + A2A/MCP) and Google ADK (multi-agent + LiteLLM + A2A).
 
 ---
 
-## 3. Debilidades (cruzadas con las brechas del sector 2026)
+## 2. Is it the most complete?
 
-1. **Brecha experimentación→producción.** Fallo #1 del sector y de prismal: falta la capa de despliegue/servicio (server/dashboard/SDK "Planned").
-2. **Sin interop A2A / Agent Cards.** Tiene MCP (interop de *tools*) pero no protocolo agente-a-agente; MS Agent Framework y Google ADK ya lo traen nativo (150+ orgs lo soportan). Riesgo de aislamiento del ecosistema multi-agente.
-3. **Identidad/gobernanza de agentes.** Brecha más citada en 2026. Tiene `PermissionManager` + `AuditLogger`, pero no identidad por agente (DID), credenciales OAuth-on-behalf ni IAM para agentes autónomos.
-4. **Sin harness de evaluación a nivel de sistema** (el "scaffold gap": evaluar el modelo aislado no predice el sistema agéntico).
-5. **Coste/latencia sin gobernanza.** Patrones debate/ToT/LATS/MoA son caros; sin presupuesto/cap por run ni circuit-breakers de coste.
-6. **Type-safety parcial.** `AgentState` es `TypedDict` sin validación I/O por nodo.
-7. **Observabilidad sin UI propia** (OTel/Langfuse; depende de terceros).
-8. **Deuda de cadena de dependencias/seguridad** (18 alertas Dependabot; churn del stack LangChain).
-9. **Acoplamientos pendientes:** vector store atado a Chroma; multi-tenant no real; inyección de MCP/Skills/vector sin terminar.
-10. **Bus factor / comunidad** mínima frente a frameworks de vendor.
+- **By integrated breadth in a single codebase: it is at the top.** Almost no OSS brings together supervisor + advanced RAG (7 engines) + 5-layer security + sandbox + MCP + skills + scheduler + multimodal out of the box.
+- **By product/ecosystem maturity: no.** Completeness in 2026 is also measured by managed runtime, first-party observability (LangSmith), **standard interop (A2A/Agent Cards)**, **identity governance**, system evaluation, and community. Prismal is **beta (v3.0.0), essentially a single maintainer**, with the entire upper layer (`prismal-server`, `prismal-dashboard`, `prismal-sdk`) in a **"Planned"** state.
+
+**Verdict: the most complete as a *library of capabilities*, not as a *production platform*.**
 
 ---
 
-## 4. Estado de las especificaciones (qué falta implementar)
+## 3. Weaknesses (cross-referenced with the 2026 industry gaps)
 
-| Spec | Fase | Estado real |
+1. **Experimentation→production gap.** The #1 failure of the industry and of prismal: the deployment/serving layer is missing (server/dashboard/SDK "Planned").
+2. **No A2A / Agent Cards interop.** It has MCP (*tool* interop) but no agent-to-agent protocol; MS Agent Framework and Google ADK already ship it natively (150+ orgs support it). Risk of isolation from the multi-agent ecosystem.
+3. **Agent identity/governance.** The most cited gap in 2026. It has `PermissionManager` + `AuditLogger`, but no per-agent identity (DID), OAuth-on-behalf credentials, or IAM for autonomous agents.
+4. **No system-level evaluation harness** (the "scaffold gap": evaluating the model in isolation does not predict the agentic system).
+5. **Cost/latency without governance.** The debate/ToT/LATS/MoA patterns are expensive; no budget/cap per run nor cost circuit-breakers.
+6. **Partial type-safety.** `AgentState` is a `TypedDict` without per-node I/O validation.
+7. **Observability without its own UI** (OTel/Langfuse; depends on third parties).
+8. **Dependency/security chain debt** (18 Dependabot alerts; LangChain stack churn).
+9. **Pending couplings:** vector store tied to Chroma; multi-tenant not real; MCP/Skills/vector injection not finished.
+10. **Bus factor / community** minimal versus vendor frameworks.
+
+---
+
+## 4. Specification status (what remains to implement)
+
+| Spec | Phase | Actual status |
 |---|---|---|
 | `extension-surface` | X | ✅ IMPLEMENTED |
 | `advanced-architectures` | A/B/C | ✅ IMPLEMENTED |
 | `multimodal-agents` | F | ✅ IMPLEMENTED |
-| `tool-provider-injection` | Y | 🟡 En curso (Y1–Y5 con código; cerrar Y6–Y8 + marcar IMPLEMENTED) |
-| `vector-store-port` | Z | 🔲 Especificado, sin implementar |
-| `composition-root` | R | 🔲 Especificado, sin implementar |
-| `dependency-security-remediation` | — | ✅ IMPLEMENTED (18/18 alertas en estado terminal: cerradas/remediadas/mitigadas) |
+| `tool-provider-injection` | Y | 🟡 In progress (Y1–Y5 with code; close Y6–Y8 + mark IMPLEMENTED) |
+| `vector-store-port` | Z | 🔲 Specified, not implemented |
+| `composition-root` | R | 🔲 Specified, not implemented |
+| `dependency-security-remediation` | — | ✅ IMPLEMENTED (18/18 alerts in terminal state: closed/remediated/mitigated) |
 
 ---
 
-## 5. Roadmap por features priorizado
+## 5. Prioritized feature roadmap
 
-Prioridad por **desbloqueo de producción** y **riesgo**. Las features marcadas "spec ✔" ya tienen artefactos SDD; las nuevas se generan en `specs/` para próximo desarrollo.
+Priority by **production unblocking** and **risk**. Features marked "spec ✔" already have SDD artifacts; new ones are generated in `specs/` for upcoming development.
 
-### P0 — Cerrar la última milla a producción (specs ya existentes)
-| # | Feature | Spec | Por qué P0 |
+### P0 — Close the last mile to production (specs already exist)
+| # | Feature | Spec | Why P0 |
 |---|---|---|---|
-| 1 | **Tool Provider Injection** (Fase Y) | `specs/tool-provider-injection/` ✔ | Cerrar Y6–Y8; desacopla MCP/Skills del núcleo |
-| 2 | **Vector Store Port** (Fase Z) | `specs/vector-store-port/` ✔ | Quita lock-in de Chroma; reduce superficie (CVE chromadb) |
-| 3 | **Runtime Composition Root** (Fase R) | `specs/composition-root/` ✔ | Desbloquea `prismal-server`/`dashboard` (la capa que falta) |
-| 4 | **Dependency Security Remediation** | `specs/dependency-security-remediation/` ✅ | Ya ejecutado: 18/18 alertas en estado terminal + incidente trivy cerrado |
+| 1 | **Tool Provider Injection** (Phase Y) | `specs/tool-provider-injection/` ✔ | Close Y6–Y8; decouples MCP/Skills from the core |
+| 2 | **Vector Store Port** (Phase Z) | `specs/vector-store-port/` ✔ | Removes Chroma lock-in; reduces surface (chromadb CVE) |
+| 3 | **Runtime Composition Root** (Phase R) | `specs/composition-root/` ✔ | Unblocks `prismal-server`/`dashboard` (the missing layer) |
+| 4 | **Dependency Security Remediation** | `specs/dependency-security-remediation/` ✅ | Already executed: 18/18 alerts in terminal state + trivy incident closed |
 
-### P1 — Interop y gobernanza (production blockers, specs nuevas)
-| # | Feature | Spec | Por qué P1 |
+### P1 — Interop and governance (production blockers, new specs)
+| # | Feature | Spec | Why P1 |
 |---|---|---|---|
-| 5 | **A2A / Agent Cards interop** (agente-a-agente) | `specs/a2a-interop/` 🆕 (full) | Estándar de interop 2026 (150+ orgs); evita aislamiento; complementa MCP |
-| 6 | **Agent Identity & Access Governance** | `specs/agent-identity-governance/` 🆕 (PRD) | Brecha #1 enterprise; DID + credenciales por agente; base de confianza para A2A |
+| 5 | **A2A / Agent Cards interop** (agent-to-agent) | `specs/a2a-interop/` 🆕 (full) | 2026 interop standard (150+ orgs); avoids isolation; complements MCP |
+| 6 | **Agent Identity & Access Governance** | `specs/agent-identity-governance/` 🆕 (PRD) | #1 enterprise gap; DID + per-agent credentials; trust foundation for A2A |
 
-### P2 — Fiabilidad y coste (specs nuevas)
-| # | Feature | Spec | Por qué P2 |
+### P2 — Reliability and cost (new specs)
+| # | Feature | Spec | Why P2 |
 |---|---|---|---|
-| 7 | **Agent Evaluation Harness** | `specs/agent-eval-harness/` 🆕 (PRD) | Cierra el "scaffold gap"; regresión de fiabilidad del sistema |
-| 8 | **Cost & Budget Governance** | `specs/cost-budget-governance/` 🆕 (PRD) | Cap de coste/llamadas por run; circuit-breakers (patrones caros) |
+| 7 | **Agent Evaluation Harness** | `specs/agent-eval-harness/` 🆕 (PRD) | Closes the "scaffold gap"; system reliability regression |
+| 8 | **Cost & Budget Governance** | `specs/cost-budget-governance/` 🆕 (PRD) | Cost/call cap per run; circuit-breakers (expensive patterns) |
 
-### P3 — Pulido (sin spec aún)
-- **Observabilidad UI** de primera parte (o integración profunda LangSmith/Langfuse).
-- **Type-safety por nodo** (validación Pydantic de I/O de nodos; evolución de `AgentState`).
+### P3 — Polish (no spec yet)
+- **First-party observability UI** (or deep LangSmith/Langfuse integration).
+- **Per-node type-safety** (Pydantic validation of node I/O; evolution of `AgentState`).
 
 ---
 
-## 5.1 ¿Framework o host? (dónde vive cada feature)
+## 5.1 Framework or host? (where each feature lives)
 
-Regla: **contrato/lógica → framework (`prismal/`); servir HTTP, autenticar, mostrar, persistir config → host (`prismal-server` / `prismal-dashboard`).** A2A e Identity quedan partidos.
+Rule: **contract/logic → framework (`prismal/`); serving HTTP, authenticating, displaying, persisting config → host (`prismal-server` / `prismal-dashboard`).** A2A and Identity are split.
 
 | # | Feature | Framework (`prismal/`) | Host (`prismal-server` / `dashboard`) |
 |---|---|---|---|
-| 1 | Tool Provider (Fase Y) | ports/providers (`agents/extension`) | compone e inyecta al arranque |
-| 2 | Vector Store Port (Fase Z) | `rag/stores/` + `VectorStorePort` | elige backend por config |
-| 3 | Composition Root (Fase R) | `composition.py` / `build_runtime()` | lo llama en el lifespan |
-| 4 | Cost & Budget Governance | guard en `react_loop` + patrones | cuotas por tenant |
-| 5 | A2A / Agent Cards (Fase I) | tipos · card · client · `A2AToolProvider` · handler | **endpoint HTTP (`/a2a`, `/.well-known/agent-card.json`) + auth** |
-| 6 | Agent Identity & Governance | `PolicyEngine` + puerto de identidad (`security/`) | **IdP/OAuth + bóveda de credenciales + DID** |
-| 7 | Agent Eval Harness | motor de eval (módulo) | herramienta dev/CI (o paquete aparte) |
-| 8 | Pulido | type-safety por nodo (`AgentState`) | observabilidad UI |
+| 1 | Tool Provider (Phase Y) | ports/providers (`agents/extension`) | composes and injects at startup |
+| 2 | Vector Store Port (Phase Z) | `rag/stores/` + `VectorStorePort` | chooses backend by config |
+| 3 | Composition Root (Phase R) | `composition.py` / `build_runtime()` | calls it in the lifespan |
+| 4 | Cost & Budget Governance | guard in `react_loop` + patterns | per-tenant quotas |
+| 5 | A2A / Agent Cards (Phase I) | types · card · client · `A2AToolProvider` · handler | **HTTP endpoint (`/a2a`, `/.well-known/agent-card.json`) + auth** |
+| 6 | Agent Identity & Governance | `PolicyEngine` + identity port (`security/`) | **IdP/OAuth + credential vault + DID** |
+| 7 | Agent Eval Harness | eval engine (module) | dev/CI tool (or separate package) |
+| 8 | Polish | per-node type-safety (`AgentState`) | observability UI |
 
-El framework define puertos y lógica; el host los compone y expone. Por eso A2A e Identity tienen una mitad en el núcleo (contrato) y otra en el host (servir/autenticar).
+The framework defines ports and logic; the host composes and exposes them. That is why A2A and Identity have one half in the core (contract) and another in the host (serve/authenticate).
 
 ---
 
-## 6. Secuencia recomendada
+## 6. Recommended sequence
 
 ```
-P0 (Y -> Z -> R -> security)   →  capa de producción viable (prismal-server/dashboard)
+P0 (Y -> Z -> R -> security)   →  viable production layer (prismal-server/dashboard)
         │
         ▼
-P1 (A2A interop  +  Agent Identity)   →  interoperable y gobernado (ecosistema + enterprise)
+P1 (A2A interop  +  Agent Identity)   →  interoperable and governed (ecosystem + enterprise)
         │
         ▼
-P2 (Eval harness  +  Cost governance) →  fiable y con coste acotado
+P2 (Eval harness  +  Cost governance) →  reliable and with bounded cost
         │
         ▼
-P3 (Observabilidad UI, type-safety)   →  pulido competitivo
+P3 (Observability UI, type-safety)   →  competitive polish
 ```
 
-Razonamiento: sin **P0** no hay producto desplegable; **A2A + Identity (P1)** es lo que cierra la brecha más visible frente a MS Agent Framework / Google ADK y habilita confianza enterprise; **Eval + Cost (P2)** convierte "funciona" en "es fiable y predecible"; **P3** es diferenciación.
+Reasoning: without **P0** there is no deployable product; **A2A + Identity (P1)** is what closes the most visible gap versus MS Agent Framework / Google ADK and enables enterprise trust; **Eval + Cost (P2)** turns "it works" into "it is reliable and predictable"; **P3** is differentiation.
 
 ---
 
-## 7. Artefactos generados con este análisis
+## 7. Artifacts generated with this analysis
 
-- `docs/competitive-analysis.md` (este documento).
-- `specs/a2a-interop/` — set SDD completo (PLAN, ARCHITECTURE, SPEC, TASKS).
-- `specs/agent-identity-governance/PLAN.md` — PRD semilla.
-- `specs/agent-eval-harness/PLAN.md` — PRD semilla.
-- `specs/cost-budget-governance/PLAN.md` — PRD semilla.
+- `docs/competitive-analysis.md` (this document).
+- `specs/a2a-interop/` — full SDD set (PLAN, ARCHITECTURE, SPEC, TASKS).
+- `specs/agent-identity-governance/PLAN.md` — seed PRD.
+- `specs/agent-eval-harness/PLAN.md` — seed PRD.
+- `specs/cost-budget-governance/PLAN.md` — seed PRD.
 
-Los tres PRD semilla pueden expandirse a sets SDD completos (ARCHITECTURE/SPEC/TASKS) en la siguiente iteración.
+The three seed PRDs can be expanded into full SDD sets (ARCHITECTURE/SPEC/TASKS) in the next iteration.
 
 ---
 
-## Fuentes
+## Sources
 
 - AI Agent Frameworks Compared 2026 — PE Collective, Alice Labs, Turing.
 - Microsoft Agent Framework (Microsoft Learn, GitHub microsoft/agent-framework); Morph "8 SDKs, ACP".
