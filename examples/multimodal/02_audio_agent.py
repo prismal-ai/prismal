@@ -29,7 +29,6 @@ Uso:
 from __future__ import annotations
 
 import asyncio
-import struct
 import wave
 from io import BytesIO
 from pathlib import Path
