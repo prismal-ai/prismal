@@ -33,7 +33,7 @@ class CheckpointPort(Protocol):
 
     def alist(
         self, config: dict[str, Any] | None, *args: Any, **kwargs: Any
-    ) -> AsyncIterator[Any]: ...
+    ) -> AsyncIterator[Any]: pass
 
 
 @runtime_checkable
