@@ -65,7 +65,8 @@ class AuditPort(Protocol):
         modality: str,
         size_bytes: int,
         duration_s: float | None,
-    ) -> None: ...
+    ) -> None:
+        pass
 
 
 @runtime_checkable
