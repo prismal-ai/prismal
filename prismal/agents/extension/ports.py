@@ -117,7 +117,7 @@ class ToolProviderPort(Protocol):
         *,
         agent_name: str,
         capabilities: list[str] | None = None,
-    ) -> list[BaseTool]: ...
+    ) -> list[BaseTool]: pass
 
 
 def conforms_to(obj: Any, port: type) -> bool:
