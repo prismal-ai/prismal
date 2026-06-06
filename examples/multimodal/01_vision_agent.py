@@ -57,7 +57,7 @@ class PaperFigure:
 
     arxiv_id: str
     title: str
-    expected_caption: str   # Lo que un VLM "ideal" debería responder.
+    expected_caption: str  # Lo que un VLM "ideal" debería responder.
     expected_objects: tuple[str, ...]
     image_bytes: bytes
 
@@ -144,7 +144,7 @@ def make_fake_vision_fn(corpus: list[PaperFigure]):
     return _vision
 
 
-async def make_fake_ocr_fn(image, prompt=None):  # noqa: ARG001 - shape compat
+async def make_fake_ocr_fn(image, prompt=None):
     """OCR mock: el texto siempre es 'arXiv preprint · 2024' como sellado."""
     return "arXiv preprint · 2024"
 

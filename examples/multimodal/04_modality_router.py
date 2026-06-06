@@ -84,9 +84,7 @@ def build_message(text: str | None, attachments_mime: str | None, block_type: st
     """Construir un HumanMessage con attachments y/o content blocks."""
     kwargs: dict = {}
     if attachments_mime:
-        kwargs["attachments"] = [
-            {"mime_type": m.strip()} for m in attachments_mime.split(",")
-        ]
+        kwargs["attachments"] = [{"mime_type": m.strip()} for m in attachments_mime.split(",")]
 
     if block_type:
         content: list[dict] = []

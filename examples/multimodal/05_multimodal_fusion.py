@@ -32,12 +32,11 @@ Uso:
 from __future__ import annotations
 
 import asyncio
-
 from dataclasses import dataclass
 
 from prismal.agents.multimodal import (
-    Modality,
     ModalContribution,
+    Modality,
     MultimodalFusion,
 )
 
@@ -116,7 +115,7 @@ SCENES = [
 async def fake_moderator(prompt: str) -> str:
     """Toma las contribuciones del prompt y produce un resumen estable."""
     # En producción esto sería: `llm.ainvoke(messages).content`
-    contributions = prompt.split("\n\n")[1]   # bloque "[modality · agent · …]"
+    contributions = prompt.split("\n\n")[1]  # bloque "[modality · agent · …]"
     points = [
         line.split("\n", 1)[1]
         for line in contributions.split("\n\n")
@@ -141,11 +140,10 @@ class FakeMoA:
     def __init__(self, n_proposers: int = 3) -> None:
         self._n = n_proposers
 
-    async def generate(self, query: str, state) -> _FakeMoAResult:  # noqa: ARG002
+    async def generate(self, query: str, state) -> _FakeMoAResult:
         proposals = [f"[Expert {i + 1}] view of: {query[:60]}" for i in range(self._n)]
-        synth = (
-            f"MoA-synth ({self._n} proposers): integrated answer drawing from "
-            + "; ".join(p.split(": ", 1)[1] for p in proposals)
+        synth = f"MoA-synth ({self._n} proposers): integrated answer drawing from " + "; ".join(
+            p.split(": ", 1)[1] for p in proposals
         )
         return _FakeMoAResult(final_answer=synth)
 
@@ -172,9 +170,7 @@ async def main() -> None:
             if strategy == "moa":
                 kwargs["moa"] = make_fake_moa()
             fusion = MultimodalFusion(strategy=strategy, **kwargs)
-            result = await fusion.combine(
-                scene["contributions"], context=scene["question"]
-            )
+            result = await fusion.combine(scene["contributions"], context=scene["question"])
             print(f"\n  [{strategy}] · strategy_used={result.strategy_used}")
             for line in result.answer.splitlines()[:6]:
                 print(f"    {line}")

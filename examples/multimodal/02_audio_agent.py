@@ -56,8 +56,7 @@ ATIS_UTTERANCES = [
         "transcript": "What's the cheapest fare from San Francisco to New York next Monday",
         "intent": "fare_inquiry",
         "expected_reply": (
-            "The cheapest fare from SFO to JFK on Monday is $187 (United, "
-            "1 stop in DEN)."
+            "The cheapest fare from SFO to JFK on Monday is $187 (United, 1 stop in DEN)."
         ),
     },
     {
@@ -96,7 +95,7 @@ class FakeSTT:
     def __init__(self, by_signature: dict[bytes, dict]) -> None:
         self._by_signature = by_signature
 
-    async def transcribe(self, audio, *, language=None, prompt=None) -> STTResult:  # noqa: ARG002
+    async def transcribe(self, audio, *, language=None, prompt=None) -> STTResult:
         blob = audio if isinstance(audio, bytes) else Path(audio).read_bytes()
         sample = self._by_signature.get(blob[:44]) or {
             "transcript": "[unknown audio]",
@@ -115,7 +114,7 @@ class FakeSTT:
 class FakeTTS:
     """TTSClient mock que genera un WAV de silencio del tamaño del texto."""
 
-    async def synthesize(self, text: str, *, voice=None, format="wav") -> TTSResult:  # noqa: ARG002
+    async def synthesize(self, text: str, *, voice=None, format="wav") -> TTSResult:
         # Aprox 1 char ~= 50 ms de audio.
         duration = max(0.5, min(8.0, len(text) * 0.05))
         audio = _make_silence_wav(duration_s=duration)
@@ -129,7 +128,7 @@ class FakeTTS:
 
 # ── reason_fn — usa el intent del dataset para responder de forma estable ────
 def make_reason_fn(by_transcript: dict[str, str]):
-    async def _reason(transcript: str, state) -> str:  # noqa: ARG001
+    async def _reason(transcript: str, state) -> str:
         return by_transcript.get(transcript.strip(), "I'm not sure how to help with that.")
 
     return _reason
@@ -160,7 +159,6 @@ async def main() -> None:
     print("\n" + "─" * 70)
     print("1) Pipeline completo STT → reason → TTS")
     print("─" * 70)
-    sample = ATIS_UTTERANCES[0]
     wav = _make_silence_wav(duration_s=0.5)
     result: AudioResult = await agent.process(wav, language="en", with_tts=True)
     print(f"\n  transcript : {result.transcript}")

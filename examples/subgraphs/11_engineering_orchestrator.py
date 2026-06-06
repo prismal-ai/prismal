@@ -83,29 +83,51 @@ def _classify(title: str, body: str) -> str:
 def _embedded_tasks() -> list[EngTask]:
     """Plan B si el CSV no está disponible."""
     return [
-        EngTask("ENG-01", "Fix TypeError in chat_models.py",
-                "There's a TypeError when calling .invoke() with None input. "
-                "Need to add a guard and a regression test.",
-                "coder", "MEDIUM"),
-        EngTask("ENG-02", "Implement new YAML parser",
-                "Run this script and capture stdout — the parser should accept "
-                "multi-document streams.",
-                "codeact", "HIGH"),
-        EngTask("ENG-03", "Design new retrieval architecture",
-                "We need a spec for the new hybrid retrieval architecture with "
-                "BM25 + dense + reranking. Write a PRD.",
-                "planner", "HIGH"),
-        EngTask("ENG-04", "Rename `utils.py` to `helpers.py`",
-                "Move every reference and update imports across the package.",
-                "file_manager", "LOW"),
-        EngTask("ENG-05", "Install pdf-export skill",
-                "We need to register and activate the pdf-export skill for "
-                "the docs team.",
-                "skill_manager", "LOW"),
-        EngTask("ENG-06", "Bug: race condition in cache layer",
-                "The cache returns stale entries under concurrent writes. "
-                "Reproduce, isolate, and patch.",
-                "coder", "HIGH"),
+        EngTask(
+            "ENG-01",
+            "Fix TypeError in chat_models.py",
+            "There's a TypeError when calling .invoke() with None input. "
+            "Need to add a guard and a regression test.",
+            "coder",
+            "MEDIUM",
+        ),
+        EngTask(
+            "ENG-02",
+            "Implement new YAML parser",
+            "Run this script and capture stdout — the parser should accept multi-document streams.",
+            "codeact",
+            "HIGH",
+        ),
+        EngTask(
+            "ENG-03",
+            "Design new retrieval architecture",
+            "We need a spec for the new hybrid retrieval architecture with "
+            "BM25 + dense + reranking. Write a PRD.",
+            "planner",
+            "HIGH",
+        ),
+        EngTask(
+            "ENG-04",
+            "Rename `utils.py` to `helpers.py`",
+            "Move every reference and update imports across the package.",
+            "file_manager",
+            "LOW",
+        ),
+        EngTask(
+            "ENG-05",
+            "Install pdf-export skill",
+            "We need to register and activate the pdf-export skill for the docs team.",
+            "skill_manager",
+            "LOW",
+        ),
+        EngTask(
+            "ENG-06",
+            "Bug: race condition in cache layer",
+            "The cache returns stale entries under concurrent writes. "
+            "Reproduce, isolate, and patch.",
+            "coder",
+            "HIGH",
+        ),
     ]
 
 
@@ -132,7 +154,7 @@ def _load_tasks(limit: int = 8) -> list[EngTask]:
                 )
                 if len(out) >= limit:
                     break
-    except Exception:  # noqa: BLE001 - dataset corrupto → fallback
+    except Exception:
         return _embedded_tasks()
     return out or _embedded_tasks()
 
@@ -161,33 +183,43 @@ class LeafResult:
 
 
 def stub_coder(t: EngTask) -> LeafResult:
-    return LeafResult("coder",
+    return LeafResult(
+        "coder",
         f"Patched issue {t.id}. Added regression test and updated CHANGELOG.",
-        ["patch.diff", "test_regression.py"])
+        ["patch.diff", "test_regression.py"],
+    )
 
 
 def stub_codeact(t: EngTask) -> LeafResult:
-    return LeafResult("codeact",
+    return LeafResult(
+        "codeact",
         f"Executed Python plan for {t.id}; produced expected stdout and validated outputs.",
-        ["plan.py", "stdout.log"])
+        ["plan.py", "stdout.log"],
+    )
 
 
 def stub_planner(t: EngTask) -> LeafResult:
-    return LeafResult("planner",
+    return LeafResult(
+        "planner",
         f"Drafted PRD + SDD spec for {t.id}; identified 4 milestones and 6 risks.",
-        ["spec.md", "milestones.png"])
+        ["spec.md", "milestones.png"],
+    )
 
 
 def stub_file_manager(t: EngTask) -> LeafResult:
-    return LeafResult("file_manager",
+    return LeafResult(
+        "file_manager",
         f"Renamed and re-wired imports for {t.id}; 17 files changed under workspace.",
-        ["rename.log"])
+        ["rename.log"],
+    )
 
 
 def stub_skill_manager(t: EngTask) -> LeafResult:
-    return LeafResult("skill_manager",
+    return LeafResult(
+        "skill_manager",
         f"Installed + activated skill referenced by {t.id}; smoke test passed.",
-        ["skills/active/*"])
+        ["skills/active/*"],
+    )
 
 
 LEAVES = {
@@ -212,8 +244,10 @@ def demo_simulation(tasks: list[EngTask]) -> None:
         hits += int(ok)
         result = LEAVES[routed](t)
         print(f"\n  {t.id} · {t.title[:60]}")
-        print(f"    supervisor → {LEAF_ICONS[routed]}{routed}    "
-              f"(expected={t.expected_leaf})  {'✓' if ok else '✗'}")
+        print(
+            f"    supervisor → {LEAF_ICONS[routed]}{routed}    "
+            f"(expected={t.expected_leaf})  {'✓' if ok else '✗'}"
+        )
         print(f"    {result.summary[:90]}")
     pct = 100.0 * hits / len(tasks)
     print(f"\n  Routing accuracy: {hits}/{len(tasks)} ({pct:.1f}%)")
@@ -254,13 +288,17 @@ async def demo_real_langgraph(tasks: list[EngTask]) -> None:
                 "messages": [AIMessage(content=f"[{name}] handled {task_id}", name=name)],
                 "current_agent": name,
             }
+
         _node.__name__ = name
         return _node
 
     async def demo_supervisor(state: DemoState) -> dict[str, Any]:
         msgs = list(state.get("messages") or [])
-        if msgs and getattr(msgs[-1], "type", "") == "ai" \
-                and state.get("current_agent") in ENGINEERING_AGENTS:
+        if (
+            msgs
+            and getattr(msgs[-1], "type", "") == "ai"
+            and state.get("current_agent") in ENGINEERING_AGENTS
+        ):
             return {"current_agent": "engineering_supervisor", "next_agent": None}
         human = next((m for m in reversed(msgs) if getattr(m, "type", "") == "human"), None)
         request = human.content if human else ""
@@ -291,7 +329,9 @@ async def demo_real_langgraph(tasks: list[EngTask]) -> None:
 
 async def main() -> None:
     tasks = _load_tasks(limit=10)
-    print(f"Loaded {len(tasks)} engineering tasks ({'dataset' if GH_ISSUES.exists() else 'fallback'})")
+    print(
+        f"Loaded {len(tasks)} engineering tasks ({'dataset' if GH_ISSUES.exists() else 'fallback'})"
+    )
     demo_simulation(tasks)
     await demo_real_langgraph(tasks)
 

@@ -111,7 +111,7 @@ def make_frame_extractor(out_dir: Path, frames_per_clip: dict[str, int]):
         idat = zlib.compress(row * 8, 9)
         return sig + _chunk(b"IHDR", ihdr) + _chunk(b"IDAT", idat) + _chunk(b"IEND", b"")
 
-    async def _extract(video: Path, fps: float, max_frames: int) -> list[Path]:  # noqa: ARG001
+    async def _extract(video: Path, fps: float, max_frames: int) -> list[Path]:
         clip_id = video.stem
         n_frames = min(frames_per_clip.get(clip_id, 3), max_frames)
         out: list[Path] = []
@@ -127,7 +127,7 @@ def make_frame_extractor(out_dir: Path, frames_per_clip: dict[str, int]):
 def make_vision_agent(captions_by_clip: dict[str, list[str]]) -> VisionAgent:
     """VisionAgent envuelve un vision_fn que mira el nombre del archivo."""
 
-    async def _vision(image, prompt: str) -> str:  # noqa: ARG001
+    async def _vision(image, prompt: str) -> str:
         if not isinstance(image, Path):
             return "(mock vision)"
         clip_id = image.stem.rsplit("_frame_", 1)[0]
@@ -212,7 +212,8 @@ async def main() -> None:
         bogus = tmp_dir / "not_a_video.bin"
         bogus.write_bytes(b"garbage")
         result = await agent.summarize(bogus, fps=1.0, max_frames=3)
-        assert result.summary == "" and result.total_frames_processed == 0
+        assert result.summary == ""
+        assert result.total_frames_processed == 0
         print("  ← el agente devolvió VideoResult vacío sin extraer frames")
 
     print("\n" + "=" * 70)

@@ -57,8 +57,11 @@ def _looks_like_rag_query(text: str) -> bool:
     """Heurística: preguntas factuales / definicionales → rag_agent."""
     t = text.lower()
     return bool(
-        re.search(r"^\s*(what is|what are|how does|how do|why does|when is|"
-                  r"qué es|cómo funciona|cuáles? son)\b", t)
+        re.search(
+            r"^\s*(what is|what are|how does|how do|why does|when is|"
+            r"qué es|cómo funciona|cuáles? son)\b",
+            t,
+        )
         or " kb " in t
         or "knowledge base" in t
         or "internal docs" in t
@@ -69,8 +72,11 @@ def _looks_like_research_query(text: str) -> bool:
     """Heurística: encuestas/búsquedas externas → researcher."""
     t = text.lower()
     return bool(
-        re.search(r"\b(survey|summari[sz]e|compare|recent papers|state of the art|"
-                  r"benchmark|literature|review of|latest research)\b", t)
+        re.search(
+            r"\b(survey|summari[sz]e|compare|recent papers|state of the art|"
+            r"benchmark|literature|review of|latest research)\b",
+            t,
+        )
         or "arxiv" in t
         or "papers" in t
     )
@@ -87,18 +93,17 @@ def _classify(text: str) -> str:
 
 def _embedded_tasks() -> list[ResearchTask]:
     return [
-        ResearchTask("R-01",
+        ResearchTask(
+            "R-01",
             "Summarise recent arXiv papers on retrieval-augmented generation.",
-            "researcher", "embedded"),
-        ResearchTask("R-02",
-            "What is type-2 diabetes?",
-            "rag_agent", "embedded"),
-        ResearchTask("R-03",
-            "Compare three state-of-the-art reranking benchmarks.",
-            "researcher", "embedded"),
-        ResearchTask("R-04",
-            "What are the symptoms of glaucoma?",
-            "rag_agent", "embedded"),
+            "researcher",
+            "embedded",
+        ),
+        ResearchTask("R-02", "What is type-2 diabetes?", "rag_agent", "embedded"),
+        ResearchTask(
+            "R-03", "Compare three state-of-the-art reranking benchmarks.", "researcher", "embedded"
+        ),
+        ResearchTask("R-04", "What are the symptoms of glaucoma?", "rag_agent", "embedded"),
     ]
 
 
@@ -113,16 +118,18 @@ def _load_tasks(limit_per_source: int = 4) -> list[ResearchTask]:
                     title = (row.get("title") or "").strip()
                     if not title:
                         continue
-                    out.append(ResearchTask(
-                        id=f"AX-{i:03d}",
-                        request=f"Summarise the contributions of the paper: {title!r}",
-                        expected_leaf="researcher",
-                        source="arxiv",
-                    ))
+                    out.append(
+                        ResearchTask(
+                            id=f"AX-{i:03d}",
+                            request=f"Summarise the contributions of the paper: {title!r}",
+                            expected_leaf="researcher",
+                            source="arxiv",
+                        )
+                    )
                     if sum(1 for t in out if t.source == "arxiv") >= limit_per_source:
                         break
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:
+            print(f"  (aviso: no se pudo leer {ARXIV_CSV.name}: {exc})")
 
     # MedQuAD → rag_agent
     if MEDQUAD_CSV.exists():
@@ -132,16 +139,18 @@ def _load_tasks(limit_per_source: int = 4) -> list[ResearchTask]:
                     q = (row.get("question") or "").strip()
                     if not q:
                         continue
-                    out.append(ResearchTask(
-                        id=f"MQ-{i:03d}",
-                        request=q,
-                        expected_leaf="rag_agent",
-                        source="medquad",
-                    ))
+                    out.append(
+                        ResearchTask(
+                            id=f"MQ-{i:03d}",
+                            request=q,
+                            expected_leaf="rag_agent",
+                            source="medquad",
+                        )
+                    )
                     if sum(1 for t in out if t.source == "medquad") >= limit_per_source:
                         break
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:
+            print(f"  (aviso: no se pudo leer {MEDQUAD_CSV.name}: {exc})")
 
     return out or _embedded_tasks()
 
@@ -186,11 +195,13 @@ def demo_simulation(tasks: list[ResearchTask]) -> None:
         hits += int(ok)
         res = LEAVES[routed](t)
         print(f"\n  {t.id} ({t.source}) — {t.request[:60]}")
-        print(f"    supervisor → {LEAF_ICONS[routed]}{routed}  "
-              f"(expected={t.expected_leaf}) {'✓' if ok else '✗'}")
+        print(
+            f"    supervisor → {LEAF_ICONS[routed]}{routed}  "
+            f"(expected={t.expected_leaf}) {'✓' if ok else '✗'}"
+        )
         print(f"    {res.summary}")
         print(f"    citations={res.citations}")
-    print(f"\n  Accuracy: {hits}/{len(tasks)} ({100*hits/len(tasks):.1f}%)")
+    print(f"\n  Accuracy: {hits}/{len(tasks)} ({100 * hits / len(tasks):.1f}%)")
 
 
 # ── Demo 2: LangGraph real con stubs ─────────────────────────────────────────
@@ -228,13 +239,17 @@ async def demo_real_langgraph(tasks: list[ResearchTask]) -> None:
                 "messages": [AIMessage(content=f"[{name}] resolved {task_id}", name=name)],
                 "current_agent": name,
             }
+
         _node.__name__ = name
         return _node
 
     async def demo_supervisor(state: DemoState) -> dict[str, Any]:
         msgs = list(state.get("messages") or [])
-        if msgs and getattr(msgs[-1], "type", "") == "ai" \
-                and state.get("current_agent") in RESEARCH_AGENTS:
+        if (
+            msgs
+            and getattr(msgs[-1], "type", "") == "ai"
+            and state.get("current_agent") in RESEARCH_AGENTS
+        ):
             return {"current_agent": "research_supervisor", "next_agent": None}
         human = next((m for m in reversed(msgs) if getattr(m, "type", "") == "human"), None)
         request = human.content if human else ""

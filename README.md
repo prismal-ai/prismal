@@ -289,6 +289,23 @@ Lo que falta, **ordenado de implementación rápida y necesaria → compleja y m
 7. **Agent Evaluation & Reliability Harness** — *moderado-complejo · útil (fiabilidad) · PRD seed* — [`specs/agent-eval-harness/`](./specs/agent-eval-harness/). Eval a nivel de sistema del grafo (trayectorias, tool-usage, groundedness RAG), regresión con gate en CI y suite adversaria. Cierra el "scaffold gap".
 8. **Pulido (sin spec aún)** — *variable · menos urgente* — UI de observabilidad de primera parte (o integración profunda LangSmith/Langfuse) y type-safety por nodo (validación Pydantic del I/O de nodos; evolución de `AgentState`).
 
+### ¿Framework o host? (dónde vive cada feature)
+
+Regla: **contrato/lógica → framework (`prismal/`); servir HTTP, autenticar, mostrar, persistir config → host (`prismal-server` / `prismal-dashboard`).** Por eso A2A e Identity quedan partidos.
+
+| # | Feature | Framework (`prismal/`) | Host (`prismal-server` / `dashboard`) |
+|---|---|---|---|
+| 1 | Tool Provider (Fase Y) | ✅ ports/providers (`agents/extension`) | compone e inyecta al arranque |
+| 2 | Vector Store Port (Fase Z) | ✅ `rag/stores/` + `VectorStorePort` | elige backend por config |
+| 3 | Composition Root (Fase R) | ✅ `composition.py` / `build_runtime()` | lo llama en el lifespan |
+| 4 | Cost & Budget Governance | ✅ guard en `react_loop` + patrones | cuotas por tenant |
+| 5 | A2A / Agent Cards (Fase I) | ✅ tipos · card · client · `A2AToolProvider` · handler | **endpoint HTTP (`/a2a`, `/.well-known/agent-card.json`) + auth** |
+| 6 | Agent Identity & Governance | ✅ `PolicyEngine` + puerto de identidad (`security/`) | **IdP/OAuth + bóveda de credenciales + emisión/rotación de DID** |
+| 7 | Agent Eval Harness | motor de eval (módulo) | corre como herramienta dev/CI (o paquete aparte) |
+| 8 | Pulido | type-safety por nodo (`AgentState`) | observabilidad UI |
+
+El framework define puertos y lógica; el host los compone y expone. Detalle en [`docs/competitive-analysis.md`](./docs/competitive-analysis.md).
+
 Análisis completo y comparativa con frameworks 2026 en [`docs/competitive-analysis.md`](./docs/competitive-analysis.md).
 
 ---

@@ -59,7 +59,7 @@ class InMemoryStore:
 
     def add_documents(self, documents: list[Document]) -> list[str]:
         ids: list[str] = []
-        for i, d in enumerate(documents):
+        for d in documents:
             self._docs.append(d)
             ids.append(f"doc-{len(self._docs):04d}")
         return ids
@@ -88,33 +88,37 @@ def _load_text_docs(limit: int = 8) -> list[Document]:
                 for i, row in enumerate(csv.DictReader(fh)):
                     if i >= limit // 2:
                         break
-                    out.append(Document(
-                        page_content=f"{row['title']}. {textwrap.shorten(row['abstract'], 300)}",
-                        metadata={
-                            "modality": "text",
-                            "source_uri": f"arxiv://{row['arxiv_id']}",
-                            "source": row["arxiv_id"],
-                            "category": row.get("category", ""),
-                        },
-                    ))
-        except Exception:  # noqa: BLE001
-            pass
+                    out.append(
+                        Document(
+                            page_content=f"{row['title']}. {textwrap.shorten(row['abstract'], 300)}",
+                            metadata={
+                                "modality": "text",
+                                "source_uri": f"arxiv://{row['arxiv_id']}",
+                                "source": row["arxiv_id"],
+                                "category": row.get("category", ""),
+                            },
+                        )
+                    )
+        except Exception as exc:
+            print(f"  (aviso: no se pudo leer {ARXIV_CSV.name}: {exc})")
     if MEDQUAD_CSV.exists():
         try:
             with MEDQUAD_CSV.open(encoding="utf-8") as fh:
                 for i, row in enumerate(csv.DictReader(fh)):
                     if i >= limit // 2:
                         break
-                    out.append(Document(
-                        page_content=f"Q: {row['question']} A: {textwrap.shorten(row['answer'], 280)}",
-                        metadata={
-                            "modality": "text",
-                            "source_uri": f"medquad://{row['focus_area']}",
-                            "source": row.get("focus_area", "medquad"),
-                        },
-                    ))
-        except Exception:  # noqa: BLE001
-            pass
+                    out.append(
+                        Document(
+                            page_content=f"Q: {row['question']} A: {textwrap.shorten(row['answer'], 280)}",
+                            metadata={
+                                "modality": "text",
+                                "source_uri": f"medquad://{row['focus_area']}",
+                                "source": row.get("focus_area", "medquad"),
+                            },
+                        )
+                    )
+        except Exception as exc:
+            print(f"  (aviso: no se pudo leer {MEDQUAD_CSV.name}: {exc})")
     return out or _embedded_text_docs()
 
 
@@ -122,13 +126,15 @@ def _embedded_text_docs() -> list[Document]:
     return [
         Document(
             page_content="Retrieval-Augmented Generation combines retrieval with generation.",
-            metadata={"modality": "text", "source_uri": "embedded://rag",
-                      "source": "embedded-rag"},
+            metadata={"modality": "text", "source_uri": "embedded://rag", "source": "embedded-rag"},
         ),
         Document(
             page_content="Type-2 diabetes is a chronic metabolic disorder affecting glucose.",
-            metadata={"modality": "text", "source_uri": "embedded://medquad/diabetes",
-                      "source": "medquad/diabetes"},
+            metadata={
+                "modality": "text",
+                "source_uri": "embedded://medquad/diabetes",
+                "source": "medquad/diabetes",
+            },
         ),
     ]
 
@@ -138,21 +144,33 @@ def _image_docs() -> list[Document]:
     return [
         Document(
             page_content="Figure: architecture diagram of a transformer encoder block "
-                         "with multi-head attention and feed-forward layers.",
-            metadata={"modality": "image", "source_uri": "arxiv://2604.02185#fig1",
-                      "source": "arxiv-2604.02185", "type": "diagram"},
+            "with multi-head attention and feed-forward layers.",
+            metadata={
+                "modality": "image",
+                "source_uri": "arxiv://2604.02185#fig1",
+                "source": "arxiv-2604.02185",
+                "type": "diagram",
+            },
         ),
         Document(
             page_content="Figure: a histopathology slide showing glaucoma-induced optic "
-                         "nerve atrophy in a 65-year-old patient.",
-            metadata={"modality": "image", "source_uri": "medquad://glaucoma/fig",
-                      "source": "medquad-glaucoma", "type": "medical-photo"},
+            "nerve atrophy in a 65-year-old patient.",
+            metadata={
+                "modality": "image",
+                "source_uri": "medquad://glaucoma/fig",
+                "source": "medquad-glaucoma",
+                "type": "medical-photo",
+            },
         ),
         Document(
             page_content="Figure: bar chart comparing BM25, dense, and hybrid retrieval "
-                         "MRR@10 across BEIR benchmark.",
-            metadata={"modality": "image", "source_uri": "arxiv://2604.02077#fig3",
-                      "source": "arxiv-2604.02077", "type": "chart"},
+            "MRR@10 across BEIR benchmark.",
+            metadata={
+                "modality": "image",
+                "source_uri": "arxiv://2604.02077#fig3",
+                "source": "arxiv-2604.02077",
+                "type": "chart",
+            },
         ),
     ]
 
@@ -162,18 +180,30 @@ def _audio_docs() -> list[Document]:
     return [
         Document(
             page_content="Show me all flights from Boston to Denver on Tuesday morning.",
-            metadata={"modality": "audio", "source_uri": "atis://flight_search_001",
-                      "source": "atis-001", "language": "en"},
+            metadata={
+                "modality": "audio",
+                "source_uri": "atis://flight_search_001",
+                "source": "atis-001",
+                "language": "en",
+            },
         ),
         Document(
             page_content="Cuántos asientos hay disponibles en el vuelo de las dos de la tarde.",
-            metadata={"modality": "audio", "source_uri": "atis://seat_avail_003",
-                      "source": "atis-003", "language": "es"},
+            metadata={
+                "modality": "audio",
+                "source_uri": "atis://seat_avail_003",
+                "source": "atis-003",
+                "language": "es",
+            },
         ),
         Document(
             page_content="Voice command transcript: cancel my reservation for tomorrow's flight.",
-            metadata={"modality": "audio", "source_uri": "atis://cancellation_004",
-                      "source": "atis-004", "language": "en"},
+            metadata={
+                "modality": "audio",
+                "source_uri": "atis://cancellation_004",
+                "source": "atis-004",
+                "language": "en",
+            },
         ),
     ]
 
@@ -182,14 +212,22 @@ def _video_docs() -> list[Document]:
     return [
         Document(
             page_content="Video: cooking pasta from scratch — boiling water, adding spaghetti, "
-                         "stirring with a wooden spoon, plating with sauce.",
-            metadata={"modality": "video", "source_uri": "anet://cooking_pasta",
-                      "source": "anet-001", "duration_s": 24.0},
+            "stirring with a wooden spoon, plating with sauce.",
+            metadata={
+                "modality": "video",
+                "source_uri": "anet://cooking_pasta",
+                "source": "anet-001",
+                "duration_s": 24.0,
+            },
         ),
         Document(
             page_content="Video: skateboarder lands a kickflip down a seven-stair set.",
-            metadata={"modality": "video", "source_uri": "anet://skateboard_trick",
-                      "source": "anet-002", "duration_s": 12.0},
+            metadata={
+                "modality": "video",
+                "source_uri": "anet://skateboard_trick",
+                "source": "anet-002",
+                "duration_s": 12.0,
+            },
         ),
     ]
 
@@ -207,8 +245,10 @@ async def main() -> None:
     audio_docs = _audio_docs()
     video_docs = _video_docs()
 
-    print(f"\nCorpus: {len(text_docs)} TEXT · {len(image_docs)} IMAGE "
-          f"· {len(audio_docs)} AUDIO · {len(video_docs)} VIDEO")
+    print(
+        f"\nCorpus: {len(text_docs)} TEXT · {len(image_docs)} IMAGE "
+        f"· {len(audio_docs)} AUDIO · {len(video_docs)} VIDEO"
+    )
 
     store.add_documents(text_docs + image_docs + audio_docs + video_docs)
 
@@ -232,8 +272,10 @@ async def main() -> None:
         if not chunks:
             print("    (sin resultados — keyword overlap=0)")
         for c in chunks:
-            print(f"    [{c.modality.value:5}] score={c.score:.2f}  "
-                  f"{c.source_uri}\n           → {c.content[:80]}…")
+            print(
+                f"    [{c.modality.value:5}] score={c.score:.2f}  "
+                f"{c.source_uri}\n           → {c.content[:80]}…"
+            )
 
     # 4. Búsqueda filtrada por modalidad
     print("\n" + "─" * 72)

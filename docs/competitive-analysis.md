@@ -101,6 +101,25 @@ Prioridad por **desbloqueo de producción** y **riesgo**. Las features marcadas 
 
 ---
 
+## 5.1 ¿Framework o host? (dónde vive cada feature)
+
+Regla: **contrato/lógica → framework (`prismal/`); servir HTTP, autenticar, mostrar, persistir config → host (`prismal-server` / `prismal-dashboard`).** A2A e Identity quedan partidos.
+
+| # | Feature | Framework (`prismal/`) | Host (`prismal-server` / `dashboard`) |
+|---|---|---|---|
+| 1 | Tool Provider (Fase Y) | ports/providers (`agents/extension`) | compone e inyecta al arranque |
+| 2 | Vector Store Port (Fase Z) | `rag/stores/` + `VectorStorePort` | elige backend por config |
+| 3 | Composition Root (Fase R) | `composition.py` / `build_runtime()` | lo llama en el lifespan |
+| 4 | Cost & Budget Governance | guard en `react_loop` + patrones | cuotas por tenant |
+| 5 | A2A / Agent Cards (Fase I) | tipos · card · client · `A2AToolProvider` · handler | **endpoint HTTP (`/a2a`, `/.well-known/agent-card.json`) + auth** |
+| 6 | Agent Identity & Governance | `PolicyEngine` + puerto de identidad (`security/`) | **IdP/OAuth + bóveda de credenciales + DID** |
+| 7 | Agent Eval Harness | motor de eval (módulo) | herramienta dev/CI (o paquete aparte) |
+| 8 | Pulido | type-safety por nodo (`AgentState`) | observabilidad UI |
+
+El framework define puertos y lógica; el host los compone y expone. Por eso A2A e Identity tienen una mitad en el núcleo (contrato) y otra en el host (servir/autenticar).
+
+---
+
 ## 6. Secuencia recomendada
 
 ```
