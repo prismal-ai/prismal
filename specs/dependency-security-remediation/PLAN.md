@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
+| **Estado** | `IMPLEMENTED` |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-06-05 |
 | **Reviewers** | Tech Lead, Security Lead, AI Architect |

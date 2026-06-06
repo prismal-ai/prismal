@@ -1,19 +1,19 @@
-alert_id,package,severity,cve_ghsa,current_version,fixed_version,status,surface,action,task
-4,litellm,Critical,CVE-2026-42208 / GHSA-r75f-5x8p-qvmc,1.86.2,1.83.7,RESUELTA,server,Verificar + cerrar,P0-01
-15,chromadb,Critical,CVE-2026-45829 / GHSA-f4j7-r4q5-qw2c,1.5.8,sin fix,MITIGAR,server,Uso embebido; no server HTTP; monitor,P0-03
-14,aquasecurity/trivy-action,Critical,GHSA-69fq-xp46-6x23,ci.yml,trivy-action 0.35.0 / setup-trivy 0.2.6 / trivy 0.69.3,SUPPLY-CHAIN,ci,Verificar referencia + pin SHA + rotar secretos,P0-02
-5,litellm,High,cluster X41 1.83.x (confirmar GHSA),1.86.2,~1.83.x,RESUELTA,server,Verificar + cerrar,P0-01
-3,litellm,High,SSTI /prompts/test (confirmar GHSA),1.86.2,~1.83.x,RESUELTA,server,Verificar + cerrar,P0-01
-8,litellm,High,CVE-2026-40217 (X41-2026-001),1.86.2,1.83.10,RESUELTA,server,Verificar + cerrar,P0-01
-7,urllib3,High,CVE-2026-21441 / GHSA-38jv-5279-wg99,2.7.0,2.6.3,RESUELTA,runtime,Verificar + cerrar,P0-01
-6,urllib3,High,GHSA-qccp-gfcp-xxvc,2.7.0,2.7.0,RESUELTA,runtime,Verificar + cerrar,P0-01
-1,ecdsa,High,CVE-2024-23342 / GHSA-wj6h-64fc-37mp,0.19.2,won't-fix,MITIGAR,runtime (transitiva),Aceptar + deuda PyJWT,P0-03
-9,langsmith,High,CVE-2026-45134,0.8.7,0.8.0,RESUELTA,runtime,Verificar + cerrar,P0-01
-10,langchain-classic->langsmith,High,CVE-2026-45134,1.0.7 / 0.8.7,langsmith 0.8.0,RESUELTA,runtime,Verificar + cerrar (misma CVE que #9),P0-01
-11,idna,Moderate,CVE-2026-45409 (bypass CVE-2024-3651),3.17,3.15,RESUELTA,runtime (transitiva),Verificar + cerrar,P0-01
-18,starlette,Moderate,CVE-2026-48710 (BadHost),1.2.0,1.0.1,RESUELTA,server (transitiva),Verificar + cerrar,P0-01
-17,aiohttp,Moderate,CVE-2026-47265,3.13.5,3.14.0,UPGRADE,runtime,Subir a >=3.14.0,P1-01
-16,aiohttp,Moderate,CVE-2026-34993,3.13.5,3.14.0,UPGRADE,runtime,Subir a >=3.14.0,P1-01
-2,transformers,Moderate,CVE-2026-1839,4.57.6,5.0.0rc3,MITIGAR/UPGRADE,runtime (no usa Trainer),Mitigar torch>=2.6 o subir a 5.x,P1-02
-12,pymdown-extensions,Moderate,regresion GHSA-jh85-wwv9-24hv / CVE-2023-32309,10.21.3,confirmar GHSA,VERIFICAR,dev/docs,Confirmar GHSA y subir,P1-04
-13,prefect,Low,SSRF DNS-rebinding (PR #21591 / OSS-7874),3.6.27,confirmar version,UPGRADE,runtime (webhooks),Subir a version con fix,P1-03
+alert_id,package,severity,cve_ghsa,current_version,fixed_version,status,surface,action,task,closure_evidence
+4,litellm,Critical,CVE-2026-42208 / GHSA-r75f-5x8p-qvmc,1.86.2,1.83.7,CERRADA-RESUELTA,server,Verificada en lock (1.86.2 >= 1.83.7) 2026-06-05,P0-01,uv pip show litellm=1.86.2; pip-audit limpio
+15,chromadb,Critical,CVE-2026-45829 / GHSA-f4j7-r4q5-qw2c,1.5.8,sin fix,MITIGADA,server,Uso embebido verificado (solo Chroma(persist_directory) en rag/vector_store.py); ignore + trigger,P0-03,.trivyignore SEC-A02 con trigger
+14,aquasecurity/trivy-action,Critical,GHSA-69fq-xp46-6x23,ci.yml,trivy-action 0.35.0 / trivy 0.69.2-3,CERRADA-SUPPLY-CHAIN,ci,Sin exposicion: workflows existen desde 2026-05-22 (post-ventana 19-20 mar); binario 0.70.0 via curl + sha256 verificado; actions pineadas a SHA,P0-02+P2-02,commits e08eb49 + d17e355; sin rotacion necesaria
+5,litellm,High,cluster proxy 1.83.x (MCP stdio test endpoints),1.86.2,~1.83.x,CERRADA-RESUELTA,server,Verificada en lock 2026-06-05,P0-01,litellm 1.86.2 >= serie 1.83.x parcheada
+3,litellm,High,cluster proxy 1.83.x (SSTI /prompts/test),1.86.2,~1.83.x,CERRADA-RESUELTA,server,Verificada en lock 2026-06-05,P0-01,litellm 1.86.2 >= serie 1.83.x parcheada
+8,litellm,High,CVE-2026-40217 / GHSA-wxxx-gvqv-xp7p,1.86.2,1.83.10,CERRADA-RESUELTA,server,Verificada en lock 2026-06-05 (GHSA confirmado),P0-01,litellm 1.86.2 >= 1.83.10
+7,urllib3,High,CVE-2026-21441 / GHSA-38jv-5279-wg99,2.7.0,2.6.3,CERRADA-RESUELTA,runtime,Verificada en lock 2026-06-05,P0-01,urllib3 2.7.0 >= 2.6.3
+6,urllib3,High,GHSA-qccp-gfcp-xxvc,2.7.0,2.7.0,CERRADA-RESUELTA,runtime,Verificada en lock 2026-06-05,P0-01,urllib3 2.7.0 >= 2.7.0
+1,ecdsa,High,CVE-2024-23342 / GHSA-wj6h-64fc-37mp,0.19.2,won't-fix,MITIGADA,runtime (transitiva),Riesgo aceptado; deuda python-jose -> PyJWT registrada,P0-03,.trivyignore SEC-A05 con trigger
+9,langsmith,High,CVE-2026-45134 / GHSA-3644-q5cj-c5c7,0.8.7,0.8.0,CERRADA-RESUELTA,runtime,Verificada en lock 2026-06-05 (GHSA confirmado),P0-01,langsmith 0.8.7 >= 0.8.0
+10,langchain-classic->langsmith,High,CVE-2026-45134 / GHSA-3644-q5cj-c5c7,1.0.7,1.0.7,CERRADA-RESUELTA,runtime,Verificada en lock (misma CVE que #9),P0-01,langchain-classic 1.0.7 >= 1.0.7
+11,idna,Moderate,CVE-2026-45409 / GHSA-65pc-fj4g-8rjx,3.17,3.15,CERRADA-RESUELTA,runtime (transitiva),Verificada en lock 2026-06-05 (GHSA confirmado),P0-01,idna 3.17 >= 3.15
+18,starlette,Moderate,CVE-2026-48710 / GHSA-86qp-5c8j-p5mr,1.2.0,1.0.1,CERRADA-RESUELTA,server (transitiva),Verificada en lock 2026-06-05 (GHSA confirmado),P0-01,starlette 1.2.0 >= 1.0.1
+17,aiohttp,Moderate,CVE-2026-47265 / GHSA-hg6j-4rv6-33pg,3.14.0,3.14.0,REMEDIADA-UPGRADE,runtime,pyproject aiohttp>=3.14.0; lock 3.14.0,P1-01,commit 9f81727; tests MCP 175 passed; pip-audit limpio
+16,aiohttp,Moderate,CVE-2026-34993 / GHSA-jg22-mg44-37j8,3.14.0,3.14.0,REMEDIADA-UPGRADE,runtime,pyproject aiohttp>=3.14.0; lock 3.14.0,P1-01,commit 9f81727; tests MCP 175 passed; pip-audit limpio
+2,transformers,Moderate,CVE-2026-1839 / GHSA-69w3-r845-3855,4.57.6 (py>=3.14) / 5.5.4 (py<3.14),5.0.0rc3,MITIGADA,runtime (no usa Trainer),torch>=2.6 en pyproject (lock 2.11.0) neutraliza el vector; py<3.14 ya en 5.5.4,P1-02,commit 7369beb; .trivyignore SEC-A10 con trigger
+12,pymdown-extensions,Moderate,CVE-2026-46338 / GHSA-62q4-447f-wv8h,10.21.3,10.21.3,CERRADA-RESUELTA,dev/docs,GHSA confirmado: lock ya fija exactamente la version fix,P1-04,pymdown-extensions 10.21.3 == fix 10.21.3
+13,prefect,Low,CVE-2026-7724 / GHSA-p3pq-hxmr-vqqr,3.7.4,3.6.28.dev2,REMEDIADA-UPGRADE,runtime (webhooks),pyproject prefect>=3.6.28; lock 3.7.4 (PR #21591 mergeado 2026-04-20),P1-03,commit 3af5862; scheduler suite 149/149

@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
+| **Estado** | `IMPLEMENTED` |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-06-05 |
 | **PLAN** | `specs/dependency-security-remediation/PLAN.md` |
@@ -171,8 +171,41 @@ Criterio de cierre por alerta: la CVE deja de aparecer en `pip-audit`/`trivy` **
 
 ---
 
+## Resultado de Ejecución (2026-06-05/06)
+
+Las 18 alertas alcanzaron estado terminal — detalle por alerta con evidencia en
+`remediation-tracker.csv`:
+
+| Resultado | # | Alertas |
+|---|---|---|
+| CERRADA-RESUELTA (lock ≥ fix; cierra con el push del lock a main) | 12 | #3 #4 #5 #6 #7 #8 #9 #10 #11 #12 #18 |
+| REMEDIADA-UPGRADE (aiohttp 3.14.0, prefect 3.7.4) | 3 | #16 #17 #13 |
+| MITIGADA (sin fix; ignore documentado + trigger) | 3 | #15 chromadb, #1 ecdsa, #2 transformers (torch≥2.6) |
+| CERRADA-SUPPLY-CHAIN (sin exposición; checksum + pin SHA) | 1 | #14 |
+
+Hallazgos adicionales corregidos durante la ejecución (DB de pip-audit más
+reciente que Dependabot): pip 26.1.2 (PYSEC-2026-196), pyjwt 2.13.0
+(PYSEC-2026-175/177/178/179).
+
+GHSA confirmados al ejecutar: #8 = GHSA-wxxx-gvqv-xp7p; #9/#10 =
+GHSA-3644-q5cj-c5c7; #11 = GHSA-65pc-fj4g-8rjx; #18 = GHSA-86qp-5c8j-p5mr;
+#16 = GHSA-jg22-mg44-37j8; #17 = GHSA-hg6j-4rv6-33pg; #2 =
+GHSA-69w3-r845-3855; #12 = CVE-2026-46338 / GHSA-62q4-447f-wv8h (fix =
+10.21.3, exactamente la versión del lock → reclasificada RESUELTA); #13 =
+CVE-2026-7724 / GHSA-p3pq-hxmr-vqqr (fix 3.6.28.dev2, lock → 3.7.4).
+
+Gates finales: `pip-audit` limpio (4 ignores sin-fix); `trivy fs uv.lock` = 0
+hallazgos no ignorados; `bandit` 0 medium/high; suite 2786 passed (19 fallos
+preexistentes verificados idénticos con prefect 3.6.27 — ajenos a esta
+remediación).
+
+Incidente #14: sin rotación de secretos — los workflows de GitHub Actions
+existen desde 2026-05-22, posterior a la ventana comprometida (19–20 mar 2026);
+verificado vía historial git.
+
 ## Historial de Cambios
 
 | Versión | Fecha | Autor | Cambios |
 |---|---|---|---|
 | 1.0 | 2026-06-05 | Ernesto Crespo | Matriz inicial de 18 alertas con CVE, versión fix y acción |
+| 1.1 | 2026-06-06 | Ernesto Crespo + Claude | Ejecución completada — 18/18 en estado terminal; spec `IMPLEMENTED` |
