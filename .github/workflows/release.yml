@@ -1,17 +1,19 @@
-# GitHub Actions Release — prismal
+# GitHub Actions Release — prismal-ai
 # ============================================================
-# Build + publish the prismal distribution to PyPI. Replaces the build +
+# Build + publish the prismal-ai distribution to PyPI. Replaces the build +
 # publish stages of the former .gitlab-ci.yml.
 #
-# Triggered by pushing a release tag `prismal/vX.Y.Z`, or manually
-# (workflow_dispatch) — the manual run can target TestPyPI for a dry run.
+# Triggered by pushing a release tag `prismal/vX.Y.Z`, or on every push to
+# main (skip-existing makes it a no-op when the version is unchanged), or
+# manually (workflow_dispatch) — the manual run can target TestPyPI for a dry
+# run.
 #
-# Publishing uses PyPI Trusted Publishing (OIDC) — no API token stored as a
-# secret. Configure a Trusted Publisher for the `prismal` project at
-# https://pypi.org/manage/account/publishing/ pointing at this repo, workflow
-# `release.yml`, and environment `pypi` (and `testpypi` for the test target).
-# To use an API token instead, replace the OIDC publish steps with
-# `password: ${{ secrets.PYPI_API_TOKEN }}` and drop the `id-token` permission.
+# Publishing uses an API token taken from a GitHub secret (NOT OIDC). Add the
+# token in the repo settings, scoped to the relevant environment:
+#   Settings → Environments → `pypi`     → Secrets → PYPI_API_TOKEN      = pypi-...
+#   Settings → Environments → `testpypi` → Secrets → TEST_PYPI_API_TOKEN = pypi-...
+# (A repo-level secret of the same name also works if you don't use
+# per-environment protection.) The token's username is always `__token__`.
 # ============================================================
 name: Release
 
@@ -55,9 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/project/prismal/
-    permissions:
-      id-token: write # OIDC for Trusted Publishing
+      url: https://test.pypi.org/project/prismal-ai/
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -66,18 +66,18 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          user: __token__
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           skip-existing: true
 
-  # Publish to PyPI on a release tag (or manual run targeting pypi).
+  # Publish to PyPI on a release tag, on push to main, or a manual run targeting pypi.
   publish-pypi:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
     needs: [build]
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/prismal/
-    permissions:
-      id-token: write # OIDC for Trusted Publishing
+      url: https://pypi.org/project/prismal-ai/
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -85,4 +85,6 @@ jobs:
           path: dist/
       - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
         with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
           skip-existing: true

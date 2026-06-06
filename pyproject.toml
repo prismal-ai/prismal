@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # PROJECT METADATA
 # ============================================================
 [project]
-name = "prismal"
+name = "prismal-ai"
 version = "3.0.0"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
@@ -171,7 +171,7 @@ ml = [
 
 # ML + Deep Learning (Phase 26)
 ml-dl = [
-  "prismal[ml]",
+  "prismal-ai[ml]",
   "torch>=2.6",  # >=2.6 neutralizes CVE-2026-1839 (transformers Trainer torch.load)
   "lightning>=2.4.0",
 ]
@@ -219,7 +219,7 @@ multimodal-embed = [
 
 # All optional extras combined
 all = [
-  "prismal[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance,multimodal,multimodal-local,multimodal-premium,multimodal-embed]",
+  "prismal-ai[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance,multimodal,multimodal-local,multimodal-premium,multimodal-embed]",
 ]
 
 # Development tools

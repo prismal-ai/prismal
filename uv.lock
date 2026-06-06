@@ -4971,7 +4971,7 @@ wheels = [
 ]
 
 [[package]]
-name = "prismal"
+name = "prismal-ai"
 version = "3.0.0"
 source = { editable = "." }
 dependencies = [
@@ -5261,8 +5261,8 @@ requires-dist = [
     { name = "polars", specifier = ">=1.17.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.1" },
     { name = "prefect", specifier = ">=3.6.28" },
-    { name = "prismal", extras = ["ml"], marker = "extra == 'ml-dl'" },
-    { name = "prismal", extras = ["postgres", "mongodb", "local-embeddings", "ollama", "analytics", "ml", "finance", "datetime", "maintenance", "multimodal", "multimodal-local", "multimodal-premium", "multimodal-embed"], marker = "extra == 'all'" },
+    { name = "prismal-ai", extras = ["ml"], marker = "extra == 'ml-dl'" },
+    { name = "prismal-ai", extras = ["postgres", "mongodb", "local-embeddings", "ollama", "analytics", "ml", "finance", "datetime", "maintenance", "multimodal", "multimodal-local", "multimodal-premium", "multimodal-embed"], marker = "extra == 'all'" },
     { name = "psutil", specifier = ">=6.1.1" },
     { name = "psycopg2-binary", marker = "extra == 'postgres'", specifier = ">=2.9.10" },
     { name = "pyarrow", specifier = ">=19.0.0" },
