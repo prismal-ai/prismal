@@ -24,7 +24,8 @@ class CheckpointPort(Protocol):
     ``langgraph.checkpoint.postgres.aio.AsyncPostgresSaver``.
     """
 
-    async def aget(self, config: dict[str, Any]) -> Any | None: ...
+    async def aget(self, config: dict[str, Any]) -> Any | None:
+        pass
 
     async def aput(
         self, config: dict[str, Any], checkpoint: Any, metadata: dict[str, Any], *args: Any
