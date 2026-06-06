@@ -130,28 +130,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint]
     env:
-      # Pinned packages with known CVEs but no safe upgrade path.
-      # Keep in sync with .trivyignore and .pre-commit-config.yaml.
+      # Only CVEs with NO applicable upstream fix. Exact mirror of
+      # .trivyignore (justification + re-eval trigger per entry there)
+      # and .pre-commit-config.yaml (pip-audit hook).
+      # Remediation: specs/dependency-security-remediation/ (2026-06).
       PIP_AUDIT_IGNORES: >-
-        --ignore-vuln=GHSA-r7w7-9xr2-qq2r
-        --ignore-vuln=GHSA-fv5p-p927-qmxr
-        --ignore-vuln=GHSA-rr7j-v2q5-chgv
-        --ignore-vuln=CVE-2025-66416
-        --ignore-vuln=CVE-2026-25990
-        --ignore-vuln=CVE-2026-40192
-        --ignore-vuln=GHSA-jj6c-8h6c-hppx
-        --ignore-vuln=GHSA-4pxv-j86v-mhcw
-        --ignore-vuln=GHSA-7gw9-cf7v-778f
-        --ignore-vuln=GHSA-x284-j5p8-9c5p
-        --ignore-vuln=CVE-2025-62379
         --ignore-vuln=GHSA-wj6h-64fc-37mp
-        --ignore-vuln=GHSA-xqmj-j6mv-4862
-        --ignore-vuln=CVE-2026-42203
-        --ignore-vuln=CVE-2026-42208
-        --ignore-vuln=CVE-2026-42271
+        --ignore-vuln=CVE-2024-23342
+        --ignore-vuln=CVE-2026-1839
         --ignore-vuln=CVE-2026-3219
         --ignore-vuln=CVE-2026-45829
-        --ignore-vuln=CVE-2026-7724
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-python-env
