@@ -74,7 +74,7 @@ class STTClient(Protocol):
         prompt: str | None = None,
     ) -> STTResult:
         """Transcribe audio to text. Raises ``STTError`` on backend failure."""
-        ...
+        pass
 
 
 def _coerce_segments(raw: object) -> list[STTSegment]:
