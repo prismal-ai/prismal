@@ -32,9 +32,8 @@ class CheckpointPort(Protocol):
     ) -> Any:
         pass
 
-    def alist(
-        self, config: dict[str, Any] | None, *args: Any, **kwargs: Any
-    ) -> AsyncIterator[Any]: pass
+    def alist(self, config: dict[str, Any] | None, *args: Any, **kwargs: Any) -> AsyncIterator[Any]:
+        pass
 
 
 @runtime_checkable
@@ -121,7 +120,8 @@ class ToolProviderPort(Protocol):
         *,
         agent_name: str,
         capabilities: list[str] | None = None,
-    ) -> list[BaseTool]: pass
+    ) -> list[BaseTool]:
+        pass
 
 
 def conforms_to(obj: Any, port: type) -> bool:
