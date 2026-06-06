@@ -1,12 +1,12 @@
-# prismal
+# prismal-ai
 
-[![PyPI version](https://badge.fury.io/py/prismal.svg)](https://pypi.org/project/prismal/)
+[![PyPI version](https://badge.fury.io/py/prismal-ai.svg)](https://pypi.org/project/prismal-ai/)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Prismal AI Agent Framework** — the core engine powering multi-agent orchestration, security guardrails, RAG, MCP integration, and observability.
 
-This package is the **agent framework layer** extracted from the larger monorepo as a standalone, publishable PyPI package. It provides everything needed to build and run AI agents without the web server, dashboard, or CLI. It was published as `lightagent-agents` through v2.x and **rebranded to `prismal` in v3.0.0** (distribution name plus the `lightagent.*` → `prismal.*` import namespace). End-user backward compatibility is provided by the deprecated `lightagent-agents` distribution, which now depends on `prismal`. The sibling `lightagent` app package historically shared this import namespace and is rebranded/coordinated in tandem.
+This package is the **agent framework layer** extracted from the larger monorepo as a standalone, publishable PyPI package. It provides everything needed to build and run AI agents without the web server, dashboard, or CLI. It was published as `lightagent-agents` through v2.x and **rebranded in v3.0.0**: the distribution is published on PyPI as `prismal-ai` while the import namespace is `prismal` (`lightagent.*` → `prismal.*`). End-user backward compatibility is provided by the deprecated `lightagent-agents` distribution, which now depends on `prismal-ai`. The sibling `lightagent` app package historically shared this import namespace and is rebranded/coordinated in tandem.
 
 ---
 
@@ -38,29 +38,31 @@ This package is the **agent framework layer** extracted from the larger monorepo
 ## Installation
 
 ```bash
-pip install prismal
+pip install prismal-ai
 # or with uv:
-uv pip install prismal
+uv pip install prismal-ai
 ```
+
+The distribution is named `prismal-ai`, but the import namespace is `prismal` (e.g. `from prismal.agents.graph import get_async_compiled_graph`).
 
 ### Optional extras
 
 ```bash
-pip install "prismal[postgres]"          # PostgreSQL checkpointing
-pip install "prismal[mongodb]"           # MongoDB long-term memory
-pip install "prismal[ollama]"            # Local LLMs via Ollama
-pip install "prismal[local-embeddings]"  # HuggingFace embeddings
-pip install "prismal[ml]"                # ML/AutoML pipeline
-pip install "prismal[ml-dl]"             # ML + PyTorch Lightning
-pip install "prismal[finance]"           # yfinance + pandas-ta
-pip install "prismal[analytics]"         # matplotlib + plotly
-pip install "prismal[datetime]"          # tzdata + NTP
-pip install "prismal[maintenance]"       # pip-audit
-pip install "prismal[multimodal]"         # Pillow + ffmpeg-python + imagehash (Fase F)
-pip install "prismal[multimodal-local]"   # faster-whisper (local STT)
-pip install "prismal[multimodal-premium]" # elevenlabs TTS
-pip install "prismal[multimodal-embed]"   # open-clip-torch (CLIP cross-modal embeddings)
-pip install "prismal[all]"                # Everything above
+pip install "prismal-ai[postgres]"          # PostgreSQL checkpointing
+pip install "prismal-ai[mongodb]"           # MongoDB long-term memory
+pip install "prismal-ai[ollama]"            # Local LLMs via Ollama
+pip install "prismal-ai[local-embeddings]"  # HuggingFace embeddings
+pip install "prismal-ai[ml]"                # ML/AutoML pipeline
+pip install "prismal-ai[ml-dl]"             # ML + PyTorch Lightning
+pip install "prismal-ai[finance]"           # yfinance + pandas-ta
+pip install "prismal-ai[analytics]"         # matplotlib + plotly
+pip install "prismal-ai[datetime]"          # tzdata + NTP
+pip install "prismal-ai[maintenance]"       # pip-audit
+pip install "prismal-ai[multimodal]"         # Pillow + ffmpeg-python + imagehash (Phase F)
+pip install "prismal-ai[multimodal-local]"   # faster-whisper (local STT)
+pip install "prismal-ai[multimodal-premium]" # elevenlabs TTS
+pip install "prismal-ai[multimodal-embed]"   # open-clip-torch (CLIP cross-modal embeddings)
+pip install "prismal-ai[all]"                # Everything above
 ```
 
 ---
@@ -94,7 +96,7 @@ A synchronous `get_compiled_graph()` entry point is also available for non-async
 
 ## Advanced architectures
 
-The package ships 19 composable architectures under `specs/advanced-architectures/` (Fases A/B/C, ≥82% coverage per module, 0 bandit issues). Every component follows a **callable-injection pattern** — business logic accepts `generate_fn`, `evaluate_fn`, `reward_fn`, `plan_fn`, `tool_executor`, … so tests run without LLM backends. Defaults wire `ProviderRegistry().get_llm()` lazily.
+The package ships 19 composable architectures under `specs/advanced-architectures/` (Phases A/B/C, ≥82% coverage per module, 0 bandit issues). Every component follows a **callable-injection pattern** — business logic accepts `generate_fn`, `evaluate_fn`, `reward_fn`, `plan_fn`, `tool_executor`, … so tests run without LLM backends. Defaults wire `ProviderRegistry().get_llm()` lazily.
 
 ### RAG engines (`prismal/rag/`)
 
@@ -134,11 +136,11 @@ Each subgraph exports both `build_<name>_subgraph()` (returns a `SubgraphDefinit
 
 ### MCP capability routing
 
-`config/mcp_servers.yaml` declares each server's `capabilities: list[str]`. `MCPClientManager.get_all_langchain_tools(capabilities=…)` and `get_tools_for_agent(agent, required_capabilities=…)` filter the tool pool per agent. Servers tagged `general` are always included; omitting `capabilities` from a YAML entry defaults to `["general"]` for backward compatibility. The capability set is extended in Fase F to include `vision`, `audio`, and `video`.
+`config/mcp_servers.yaml` declares each server's `capabilities: list[str]`. `MCPClientManager.get_all_langchain_tools(capabilities=…)` and `get_tools_for_agent(agent, required_capabilities=…)` filter the tool pool per agent. Servers tagged `general` are always included; omitting `capabilities` from a YAML entry defaults to `["general"]` for backward compatibility. The capability set is extended in Phase F to include `vision`, `audio`, and `video`.
 
-See [`specs/advanced-architectures/SPEC.md`](./specs/advanced-architectures/SPEC.md) for the full interface contracts of Fases A/B/C/D/E.
+See [`specs/advanced-architectures/SPEC.md`](./specs/advanced-architectures/SPEC.md) for the full interface contracts of Phases A/B/C/D/E.
 
-### Multimodal layer (Fase F — implemented, opt-in)
+### Multimodal layer (Phase F — implemented, opt-in)
 
 The multimodal expansion described in [`specs/multimodal-agents/`](./specs/multimodal-agents/) adds voice, image, and video to the existing text-only stack without modifying any existing agent. It is **opt-in**: gated by `settings.multimodal_enabled` (default `False`) and registered via `register_multimodal_pipeline(registry)` when the operator is ready.
 
@@ -178,9 +180,9 @@ Exports `build_multimodal_subgraph()` (returns `SubgraphDefinition`) and an idem
 
 `MediaValidator` enforces magic-byte verification + size/duration limits before any media reaches an agent. `InputSanitizer.sanitize_media()` strips EXIF; `AuditLogger.log_media()` records SHA-256 + modality (never content); `ActionInterceptor.check_media_op()` gates filesystem media operations; FFmpeg always runs inside `SandboxExecutor`.
 
-See [`specs/multimodal-agents/SPEC.md`](./specs/multimodal-agents/SPEC.md) for the full interface contracts of Fase F.
+See [`specs/multimodal-agents/SPEC.md`](./specs/multimodal-agents/SPEC.md) for the full interface contracts of Phase F.
 
-### Extension surface (Fase X — implemented, opt-in)
+### Extension surface (Phase X — implemented, opt-in)
 
 The extension surface (user guide: [`docs/extension.md`](./docs/extension.md); contracts: [`specs/extension-surface/`](./specs/extension-surface/)) exposes LangGraph as a first-class build target for users and third-party plugins, so you can write new patterns without forking prismal. All public symbols import from `prismal.agents.extension`. Five components:
 
@@ -248,11 +250,11 @@ Automatically maps `state["messages"]` ↔ the Runnable's input/output. Supports
 
 #### Formal ports (hexagonal)
 
-`prismal/agents/extension/ports.py` declares `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort`, `ToolProviderPort` as `Protocol`s. Existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, `BaseTool`, the Fase Y tool providers) conform structurally; users substitute their own (Redis checkpointer, Splunk audit, custom tool source, etc.) without modifying the core.
+`prismal/agents/extension/ports.py` declares `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort`, `ToolProviderPort` as `Protocol`s. Existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, `BaseTool`, the Phase Y tool providers) conform structurally; users substitute their own (Redis checkpointer, Splunk audit, custom tool source, etc.) without modifying the core.
 
-See [`specs/extension-surface/SPEC.md`](./specs/extension-surface/SPEC.md) for the full interface contracts of Fase X.
+See [`specs/extension-surface/SPEC.md`](./specs/extension-surface/SPEC.md) for the full interface contracts of Phase X.
 
-### Tool provider injection (Fase Y — implemented)
+### Tool provider injection (Phase Y — implemented)
 
 Tool resolution is a hexagonal port (user guide: [`docs/tool-providers.md`](./docs/tool-providers.md); contracts: [`specs/tool-provider-injection/`](./specs/tool-provider-injection/)): the agent core asks an injected `ToolProviderPort` for tools and never imports `prismal.mcp` / `prismal.skills` (enforced by an architecture test). The host composes the providers and injects them at startup:
 
@@ -274,39 +276,39 @@ Runnable examples: [`examples/tool_provider_host.py`](./examples/tool_provider_h
 
 ---
 
-## Roadmap — features por desarrollar
+## Roadmap — features to build
 
-Ya implementadas: extension surface (Fase X), advanced architectures (Fase A/B/C), multimodal (Fase F), y la remediación de dependencias (18/18 alertas en estado terminal).
+Already implemented: extension surface (Phase X), advanced architectures (Phase A/B/C), multimodal (Phase F), and the dependency remediation (18/18 alerts in a terminal state).
 
-Lo que falta, **ordenado de implementación rápida y necesaria → compleja y menos necesaria**. Cada feature tiene su contrato SDD en [`specs/`](./specs/). Estado: `spec ready` = listo para construir (PLAN/ARCHITECTURE/SPEC/TASKS); `PRD seed` = solo PRD, requiere expandir antes de construir.
+What remains, **ordered from fast-and-necessary → complex-and-less-necessary**. Each feature has its SDD contract in [`specs/`](./specs/). Status: `spec ready` = ready to build (PLAN/ARCHITECTURE/SPEC/TASKS); `PRD seed` = PRD only, needs expansion before building.
 
-1. **Terminar Tool Provider Injection (Fase Y)** — *rápido · necesario · en curso* — [`specs/tool-provider-injection/`](./specs/tool-provider-injection/). El código de Y1–Y5 ya aterrizó; falta cerrar Y6–Y8 (settings/observabilidad, docs/ejemplos, tests de paridad) y marcar el spec `IMPLEMENTED`.
-2. **Vector Store Port (Fase Z)** — *moderado · necesario · spec ready* — [`specs/vector-store-port/`](./specs/vector-store-port/). Quita el lock-in de ChromaDB tras un `VectorStorePort` con adaptadores (Chroma default + LanceDB, sqlite-vec, Qdrant, pgvector). Reduce superficie de seguridad y abre backends embebidos.
-3. **Runtime Composition Root (Fase R)** — *moderado · necesario · spec ready* — [`specs/composition-root/`](./specs/composition-root/). `build_runtime()` compone e inyecta todos los puertos (tools, vector store, embeddings, checkpoint, audit) en una llamada; **desbloquea `prismal-server` / `prismal-dashboard`**. Depende de Fase Y + Z.
-4. **Cost & Budget Governance** — *rápido-moderado · útil · PRD seed* — [`specs/cost-budget-governance/`](./specs/cost-budget-governance/). Presupuesto por run/sesión/tenant + circuit-breakers de coste/tokens/llamadas en `react_loop` y los patrones caros (debate, ToT, LATS, MoA). Seguro barato contra gasto runaway.
-5. **A2A / Agent Cards interop (Fase I)** — *complejo · necesario (ecosistema) · spec ready* — [`specs/a2a-interop/`](./specs/a2a-interop/). Interop agente-a-agente bidireccional: exponer prismal como agente A2A (Agent Card en `/.well-known/agent-card.json`, JSON-RPC + SSE) y consumir agentes remotos como nodos/tools. Complementa MCP; cierra la brecha frente a MS Agent Framework / Google ADK.
-6. **Agent Identity & Access Governance** — *complejo · necesario (enterprise) · PRD seed* — [`specs/agent-identity-governance/`](./specs/agent-identity-governance/). Identidad por agente (W3C DID), credenciales acotadas, OAuth-on-behalf y un `PolicyEngine`. Es la base de confianza que consume A2A; production-blocker enterprise.
-7. **Agent Evaluation & Reliability Harness** — *moderado-complejo · útil (fiabilidad) · PRD seed* — [`specs/agent-eval-harness/`](./specs/agent-eval-harness/). Eval a nivel de sistema del grafo (trayectorias, tool-usage, groundedness RAG), regresión con gate en CI y suite adversaria. Cierra el "scaffold gap".
-8. **Pulido (sin spec aún)** — *variable · menos urgente* — UI de observabilidad de primera parte (o integración profunda LangSmith/Langfuse) y type-safety por nodo (validación Pydantic del I/O de nodos; evolución de `AgentState`).
+1. **Finish Tool Provider Injection (Phase Y)** — *fast · necessary · in progress* — [`specs/tool-provider-injection/`](./specs/tool-provider-injection/). The Y1–Y5 code has already landed; what's left is closing Y6–Y8 (settings/observability, docs/examples, parity tests) and marking the spec `IMPLEMENTED`.
+2. **Vector Store Port (Phase Z)** — *moderate · necessary · spec ready* — [`specs/vector-store-port/`](./specs/vector-store-port/). Removes the ChromaDB lock-in behind a `VectorStorePort` with adapters (Chroma default + LanceDB, sqlite-vec, Qdrant, pgvector). Reduces the security surface and opens up embedded backends.
+3. **Runtime Composition Root (Phase R)** — *moderate · necessary · spec ready* — [`specs/composition-root/`](./specs/composition-root/). `build_runtime()` composes and injects every port (tools, vector store, embeddings, checkpoint, audit) in a single call; **unblocks `prismal-server` / `prismal-dashboard`**. Depends on Phase Y + Z.
+4. **Cost & Budget Governance** — *fast-to-moderate · useful · PRD seed* — [`specs/cost-budget-governance/`](./specs/cost-budget-governance/). Per-run/session/tenant budgets + cost/token/call circuit-breakers in `react_loop` and the expensive patterns (debate, ToT, LATS, MoA). A cheap insurance policy against runaway spend.
+5. **A2A / Agent Cards interop (Phase I)** — *complex · necessary (ecosystem) · spec ready* — [`specs/a2a-interop/`](./specs/a2a-interop/). Bidirectional agent-to-agent interop: expose prismal as an A2A agent (Agent Card at `/.well-known/agent-card.json`, JSON-RPC + SSE) and consume remote agents as nodes/tools. Complements MCP; closes the gap with MS Agent Framework / Google ADK.
+6. **Agent Identity & Access Governance** — *complex · necessary (enterprise) · PRD seed* — [`specs/agent-identity-governance/`](./specs/agent-identity-governance/). Per-agent identity (W3C DID), scoped credentials, OAuth-on-behalf, and a `PolicyEngine`. The trust foundation that A2A consumes; an enterprise production blocker.
+7. **Agent Evaluation & Reliability Harness** — *moderate-to-complex · useful (reliability) · PRD seed* — [`specs/agent-eval-harness/`](./specs/agent-eval-harness/). System-level evaluation of the graph (trajectories, tool usage, RAG groundedness), regression with a CI gate, and an adversarial suite. Closes the "scaffold gap".
+8. **Polish (no spec yet)** — *variable · less urgent* — first-party observability UI (or a deep LangSmith/Langfuse integration) and per-node type safety (Pydantic validation of node I/O; evolution of `AgentState`).
 
-### ¿Framework o host? (dónde vive cada feature)
+### Framework or host? (where each feature lives)
 
-Regla: **contrato/lógica → framework (`prismal/`); servir HTTP, autenticar, mostrar, persistir config → host (`prismal-server` / `prismal-dashboard`).** Por eso A2A e Identity quedan partidos.
+Rule: **contract/logic → framework (`prismal/`); serving HTTP, authenticating, rendering, persisting config → host (`prismal-server` / `prismal-dashboard`).** That's why A2A and Identity are split across both.
 
 | # | Feature | Framework (`prismal/`) | Host (`prismal-server` / `dashboard`) |
 |---|---|---|---|
-| 1 | Tool Provider (Fase Y) | ✅ ports/providers (`agents/extension`) | compone e inyecta al arranque |
-| 2 | Vector Store Port (Fase Z) | ✅ `rag/stores/` + `VectorStorePort` | elige backend por config |
-| 3 | Composition Root (Fase R) | ✅ `composition.py` / `build_runtime()` | lo llama en el lifespan |
-| 4 | Cost & Budget Governance | ✅ guard en `react_loop` + patrones | cuotas por tenant |
-| 5 | A2A / Agent Cards (Fase I) | ✅ tipos · card · client · `A2AToolProvider` · handler | **endpoint HTTP (`/a2a`, `/.well-known/agent-card.json`) + auth** |
-| 6 | Agent Identity & Governance | ✅ `PolicyEngine` + puerto de identidad (`security/`) | **IdP/OAuth + bóveda de credenciales + emisión/rotación de DID** |
-| 7 | Agent Eval Harness | motor de eval (módulo) | corre como herramienta dev/CI (o paquete aparte) |
-| 8 | Pulido | type-safety por nodo (`AgentState`) | observabilidad UI |
+| 1 | Tool Provider (Phase Y) | ✅ ports/providers (`agents/extension`) | composes and injects at startup |
+| 2 | Vector Store Port (Phase Z) | ✅ `rag/stores/` + `VectorStorePort` | picks the backend via config |
+| 3 | Composition Root (Phase R) | ✅ `composition.py` / `build_runtime()` | calls it in the lifespan |
+| 4 | Cost & Budget Governance | ✅ guard in `react_loop` + patterns | per-tenant quotas |
+| 5 | A2A / Agent Cards (Phase I) | ✅ types · card · client · `A2AToolProvider` · handler | **HTTP endpoint (`/a2a`, `/.well-known/agent-card.json`) + auth** |
+| 6 | Agent Identity & Governance | ✅ `PolicyEngine` + identity port (`security/`) | **IdP/OAuth + credential vault + DID issuance/rotation** |
+| 7 | Agent Eval Harness | eval engine (module) | runs as a dev/CI tool (or a separate package) |
+| 8 | Polish | per-node type safety (`AgentState`) | observability UI |
 
-El framework define puertos y lógica; el host los compone y expone. Detalle en [`docs/competitive-analysis.md`](./docs/competitive-analysis.md).
+The framework defines the ports and logic; the host composes and exposes them. Details in [`docs/competitive-analysis.md`](./docs/competitive-analysis.md).
 
-Análisis completo y comparativa con frameworks 2026 en [`docs/competitive-analysis.md`](./docs/competitive-analysis.md).
+A full analysis and comparison with 2026 frameworks is in [`docs/competitive-analysis.md`](./docs/competitive-analysis.md).
 
 ---
 
@@ -358,7 +360,7 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 │   ├── supervisor.py      ← Central router
 │   ├── state.py           ← AgentState (TypedDict; messages uses add_messages reducer)
 │   ├── intent_router.py   ← Deterministic regex routing
-│   ├── tool_registry.py   ← stable facade: delegates to the injected ToolProviderPort (Fase Y)
+│   ├── tool_registry.py   ← stable facade: delegates to the injected ToolProviderPort (Phase Y)
 │   ├── patterns/
 │   │   ├── reflection.py           ← reflection_loop()
 │   │   ├── parallel.py             ← make_parallel_dispatcher() via Send()
@@ -369,7 +371,7 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 │   │   ├── llm_compiler.py         ← DAG compilation + Kahn validation + parallel waves
 │   │   ├── mixture_of_agents.py    ← multi-provider proposers + aggregator
 │   │   └── swarm.py                ← decentralised handoff with audit
-│   ├── multimodal/                  ← (Fase F) vision / audio / video agents + router + fusion
+│   ├── multimodal/                  ← (Phase F) vision / audio / video agents + router + fusion
 │   │   ├── vision_agent.py
 │   │   ├── audio_agent.py
 │   │   ├── video_agent.py
@@ -387,16 +389,16 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 │       ├── data_etl/               ← extractor → validator → gate → transformer → loader → auditor
 │       ├── code_review/            ← linter → security_scanner → logic_reviewer → suggester → report
 │       ├── debate_consensus/       ← proponent → opponent → moderator → consensus
-│       ├── multimodal_pipeline/    ← (Fase F) router → vision|audio|video → fusion → output_formatter
+│       ├── multimodal_pipeline/    ← (Phase F) router → vision|audio|video → fusion → output_formatter
 │       ├── analysis_orchestrator/
 │       ├── engineering_orchestrator/
 │       └── research_orchestrator/
 ├── core/                  ← Pydantic Settings, logging, exceptions, DB, user model
 ├── providers/             ← LiteLLM wrapper (ONLY location for provider-specific imports;
-│                             Fase F adds stt/tts/vision/multimodal/cross_modal_embeddings)
+│                             Phase F adds stt/tts/vision/multimodal/cross_modal_embeddings)
 ├── memory/                ← Short-term history + long-term PII-sanitized store
 ├── mcp/                   ← MCP client, adapter, connection manager, capability routing
-├── security/              ← 5-layer defense-in-depth (see below) + (Fase F) media_validator.py
+├── security/              ← 5-layer defense-in-depth (see below) + (Phase F) media_validator.py
 ├── rag/                   ← 7 retrieval engines:
 │   ├── engine.py          ← standard RAGEngine
 │   ├── crag.py            ← CRAG pipeline
@@ -408,9 +410,9 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 │   ├── multi_vector.py    ← chunk + summary + N hypothetical questions
 │   ├── adaptive.py        ← facade routing by query type
 │   ├── federated.py       ← federated search
-│   ├── multimodal.py      ← (Fase F) MultimodalRAGEngine — text + image captions + audio/video transcripts
-│   ├── loaders/           ← (Fase F) document/image/audio/video loaders
-│   └── vector_store.py    ← ChromaDB vector store (extended with modality metadata in Fase F)
+│   ├── multimodal.py      ← (Phase F) MultimodalRAGEngine — text + image captions + audio/video transcripts
+│   ├── loaders/           ← (Phase F) document/image/audio/video loaders
+│   └── vector_store.py    ← ChromaDB vector store (extended with modality metadata in Phase F)
 ├── skills/                ← available/ (source) · active/ (gitignored) · custom/ (gitignored)
 ├── scheduler/             ← APScheduler CronExecutor, DateTimeService, Prefect flows
 ├── monitoring/            ← Langfuse, OpenTelemetry, structlog
@@ -445,8 +447,8 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 2. **Never** bypass `GuardrailsEngine` / `ActionInterceptor`.
 3. **Always** use `get_async_compiled_graph()` in async contexts (the sync variant wires a non-async SQLite saver).
 4. **Never** add provider-specific imports (`anthropic`, `openai`, `google.generativeai`, `ollama`, `whisper`, `pyttsx3`, `elevenlabs`, `open_clip_torch`, …) outside `prismal/providers/`.
-5. **Always** call `ActionInterceptor.check()` before tool calls that write files or execute code; call `ActionInterceptor.check_media_op()` before media filesystem operations (Fase F).
-6. **Always** validate incoming media with `MediaValidator.validate()` before passing to a multimodal agent (Fase F); FFmpeg always runs inside `SandboxExecutor`.
+5. **Always** call `ActionInterceptor.check()` before tool calls that write files or execute code; call `ActionInterceptor.check_media_op()` before media filesystem operations (Phase F).
+6. **Always** validate incoming media with `MediaValidator.validate()` before passing to a multimodal agent (Phase F); FFmpeg always runs inside `SandboxExecutor`.
 7. **Never** add `__init__.py` to `prismal/` — it must remain a PEP 420 namespace package.
 
 See [CLAUDE.md](./CLAUDE.md) for the full working guide (commands, testing notes, architectural context for contributors and AI assistants).
@@ -459,7 +461,7 @@ This package follows [Semantic Versioning](https://semver.org/).
 Tag format for releases: `prismal/vMAJOR.MINOR.PATCH`
 
 ```bash
-git tag prismal/v3.0.0
+git tag prismal/v3.0.1.1
 git push --tags
 ```
 
@@ -480,16 +482,16 @@ uv pip install -e ".[dev,all]"
 uv run pytest -m "not live_api"
 uv run ruff check . && uv run mypy prismal && uv run bandit -r prismal -c pyproject.toml
 
-# 2) Build + validate the prismal distribution
+# 2) Build + validate the prismal-ai distribution
 rm -rf dist/ && python -m build && twine check dist/*
 twine upload --repository testpypi dist/*          # validate on TestPyPI first
 
-# 3) Push history and publish prismal
+# 3) Push history and publish prismal-ai
 git push origin main
 twine upload dist/*                                 # publish to PyPI
-git tag prismal/v3.0.0 && git push --tags           # tag format: prismal/vMAJOR.MINOR.PATCH
+git tag prismal/v3.0.1.1 && git push --tags         # tag format: prismal/vMAJOR.MINOR.PATCH
 
-# 4) Publish the deprecated compatibility bridge (lightagent-agents -> prismal)
+# 4) Publish the deprecated compatibility bridge (lightagent-agents -> prismal-ai)
 cd compat/lightagent-agents
 rm -rf dist/ && python -m build && twine check dist/*
 twine upload dist/*                                 # publishes lightagent-agents 2.9.0
