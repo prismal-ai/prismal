@@ -28,7 +28,8 @@ class CheckpointPort(Protocol):
 
     async def aput(
         self, config: dict[str, Any], checkpoint: Any, metadata: dict[str, Any], *args: Any
-    ) -> Any: ...
+    ) -> Any:
+        pass
 
     def alist(
         self, config: dict[str, Any] | None, *args: Any, **kwargs: Any
