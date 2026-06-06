@@ -40,7 +40,11 @@ CVE-2025-62379
 # declaro publicamente que NO habra fix (GHSA-wj6h-64fc-37mp): la
 # mitigacion completa requiere criptografia en C. Recomienda migrar
 # a `cryptography`. Ya usamos python-jose[cryptography] pero python-jose
-# arrastra `ecdsa` como dep regular. TODO: evaluar migracion a PyJWT.
+# arrastra `ecdsa` como dep regular. Surface: prismal no realiza firmas
+# ECDSA P-256 sensibles en caliente -> riesgo residual aceptado.
+# Spec: specs/dependency-security-remediation/SPEC.md (SEC-A05, alerta #1).
+# TRIGGER de re-evaluacion: migracion python-jose -> PyJWT (deuda
+# registrada en el spec) o fix upstream en python-ecdsa -> quitar ignore.
 CVE-2024-23342
 
 # --- chromadb 1.5.8 -> CVE-2026-45829 (sin fix upstream) -----
@@ -49,9 +53,12 @@ CVE-2024-23342
 # parcheada (1.5.9 sigue afectada) y el stack langchain-chroma no admite
 # downgrade a <1.0.0. ChromaDB se usa aqui como vector store local/embebido
 # (SQLite + Chroma), no como servidor HTTP expuesto, lo que limita la
-# explotabilidad pre-auth. Mismo ignore en pip-audit (.pre-commit-config.yaml
-# + ci.yml). Quitar en cuanto chromadb publique fix. Triage: `prismal doctor
-# security-check`.
+# explotabilidad pre-auth (verificado: solo `Chroma(persist_directory=...)`
+# en rag/vector_store.py, sin HttpClient ni `chroma run`). Mismo ignore en
+# pip-audit (.pre-commit-config.yaml + ci.yml).
+# Spec: specs/dependency-security-remediation/SPEC.md (SEC-A02, alerta #15).
+# TRIGGER de re-evaluacion: chromadb publica first_patched_version ->
+# quitar ignore y subir. Triage: `prismal doctor security-check`.
 CVE-2026-45829
 
 # ============================================================
