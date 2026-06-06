@@ -204,13 +204,22 @@ jobs:
     # downloading the trivy binary from GitHub, even with a token. Install trivy
     # directly from the pinned release tarball — deterministic — and run the CLI.
     # The vuln DB is still fetched at runtime from its OCI registry (unaffected).
+    #
+    # Supply-chain note (GHSA-69fq-xp46-6x23, 2026-03-19): trivy-action tags and
+    # the trivy 0.69.4 binary were compromised. This repo never ran the action in
+    # the compromise window (workflows exist since 2026-05-22) and pins a clean
+    # post-incident binary (0.70.0 > 0.69.4) verified against the sha256 below
+    # (from the official trivy_<ver>_checksums.txt release asset).
+    # See specs/dependency-security-remediation/SPEC.md (SEC-A03).
     env:
       TRIVY_VERSION: "0.70.0"
+      TRIVY_SHA256: "8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9"
     steps:
       - uses: actions/checkout@v4
       - name: Install trivy
         run: |
           curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" -o "$RUNNER_TEMP/trivy.tar.gz"
+          echo "${TRIVY_SHA256}  $RUNNER_TEMP/trivy.tar.gz" | sha256sum --check --strict
           tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP" trivy
           "$RUNNER_TEMP/trivy" --version
       - name: Trivy fs (JSON report)
