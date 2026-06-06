@@ -2,64 +2,64 @@
 
 ## Metadata
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-05-27 |
-| **PLAN Relacionado** | `specs/extension-surface/PLAN.md` |
-| **SPEC Relacionado** | `specs/extension-surface/SPEC.md` |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` |
+| **Version** | 1.0 |
+| **Date** | 2026-05-27 |
+| **Related PLAN** | `specs/extension-surface/PLAN.md` |
+| **Related SPEC** | `specs/extension-surface/SPEC.md` |
 | **TASKS** | `specs/extension-surface/TASKS.md` |
 | **Reviewers** | Tech Lead, AI Architect, DX Lead |
 
 ---
 
-## 1. Contexto
+## 1. Context
 
-Prismal hoy ofrece extensibilidad implícita (callable injection en Fase B, `SubgraphRegistry` en Fase C), pero sin contrato público ni plugin discovery. Este documento describe la implementación de la **Fase X — Extension Surface**, que convierte esa extensibilidad en una API deliberada con cinco componentes: re-export de LangGraph, decorator `@prismal_node`, builder fluent, plugin discovery vía entry points, adapter LangChain.
+Today, prismal offers implicit extensibility (callable injection in Phase B, `SubgraphRegistry` in Phase C), but without a public contract or plugin discovery. This document describes the implementation of **Phase X — Extension Surface**, which turns that extensibility into a deliberate API with five components: LangGraph re-export, `@prismal_node` decorator, fluent builder, plugin discovery via entry points, and a LangChain adapter.
 
-Principio rector: **prismal es LangGraph con baterías incluidas, no LangGraph escondido**. La superficie de extensión debe preservar la legibilidad del código de usuario en términos de LangGraph estándar — todo lo que añade prismal es opt-in y observable.
-
----
-
-## 2. Objetivos Técnicos
-
-- **Compatibilidad cero-fricción con LangGraph upstream:** un usuario que sabe LangGraph debe poder construir un nodo en ≤ 15 minutos sin leer todo el código de prismal.
-- **Cross-cutting automatizado:** security, OTel, audit, logging se aplican via decorator/builder sin que el usuario los pida.
-- **Plugin auto-discovery declarativo:** `entry_points` estándar de Python; cero magic.
-- **Aislamiento de fallos:** un plugin roto no debe romper el startup ni el grafo principal.
-- **API congelada:** la superficie de extensión versionada con SemVer; deprecation cycle obligatorio.
-- **Sin dependencias nuevas obligatorias:** todo se construye sobre el stack ya instalado.
+Guiding principle: **prismal is LangGraph with batteries included, not LangGraph hidden**. The extension surface must preserve the readability of user code in terms of standard LangGraph — everything prismal adds is opt-in and observable.
 
 ---
 
-## 3. Arquitectura Propuesta
+## 2. Technical Objectives
 
-### 3.1 Diagrama de Alto Nivel — Módulos Nuevos
+- **Zero-friction compatibility with upstream LangGraph:** a user who knows LangGraph should be able to build a node in ≤ 15 minutes without reading all of prismal's code.
+- **Automated cross-cutting:** security, OTel, audit, logging are applied via decorator/builder without the user asking for them.
+- **Declarative plugin auto-discovery:** standard Python `entry_points`; zero magic.
+- **Failure isolation:** a broken plugin must not break startup or the main graph.
+- **Frozen API:** the extension surface is versioned with SemVer; a deprecation cycle is mandatory.
+- **No new mandatory dependencies:** everything is built on the already-installed stack.
+
+---
+
+## 3. Proposed Architecture
+
+### 3.1 High-Level Diagram — New Modules
 
 ```
 prismal/
-├── langgraph.py                       ← [NUEVO] re-export oficial
+├── langgraph.py                       ← [NEW] official re-export
 │
 ├── agents/
-│   └── extension/                     ← [NUEVO subdirectorio público]
+│   └── extension/                     ← [NEW public subdirectory]
 │       ├── __init__.py                ← re-exports: prismal_node, builder, plugins, adapters, ports
 │       ├── decorators.py              ← @prismal_node + helpers
 │       ├── builder.py                 ← PrismalStateGraphBuilder
 │       ├── plugins.py                 ← discover_plugins() + PluginRegistry
 │       ├── adapters.py                ← LangChainRunnableAdapter
 │       ├── ports.py                   ← CheckpointPort, AuditPort, EmbeddingsPort, ToolPort
-│       └── _middleware.py             ← internal middleware chain (no público)
+│       └── _middleware.py             ← internal middleware chain (not public)
 │
 └── core/
-    └── [EXTENSIÓN] config.py          ← plugins_autodiscover, plugins_allowlist, plugins_denylist
+    └── [EXTENSION] config.py          ← plugins_autodiscover, plugins_allowlist, plugins_denylist
 
 examples/
-├── custom_node.py                     ← [NUEVO] hello world: @prismal_node
-├── custom_subgraph.py                 ← [NUEVO] PrismalStateGraphBuilder
-├── langchain_migration.py             ← [NUEVO] AgentExecutor → nodo
-└── plugin_template/                   ← [NUEVO] esqueleto cookiecutter
+├── custom_node.py                     ← [NEW] hello world: @prismal_node
+├── custom_subgraph.py                 ← [NEW] PrismalStateGraphBuilder
+├── langchain_migration.py             ← [NEW] AgentExecutor → node
+└── plugin_template/                   ← [NEW] cookiecutter skeleton
     ├── pyproject.toml
     ├── src/prismal_x_<name>/
     │   ├── __init__.py
@@ -67,10 +67,10 @@ examples/
     └── README.md
 
 docs/
-└── extension.md                        ← [NUEVO] quickstart + recetario
+└── extension.md                        ← [NEW] quickstart + cookbook
 ```
 
-### 3.2 Diagrama de Capas
+### 3.2 Layer Diagram
 
 ```
                        ┌──────────────────────────────────────┐
@@ -85,18 +85,18 @@ docs/
                                       │
                                       ▼
                        ┌──────────────────────────────────────┐
-                       │   prismal.agents.extension (público) │
+                       │   prismal.agents.extension (public)  │
                        │  decorators • builder • plugins      │
                        │  adapters • ports                    │
                        └──────┬───────────────────────────────┘
-                              │ aplica middleware chain
+                              │ applies middleware chain
                               ▼
                        ┌──────────────────────────────────────┐
-                       │  _middleware.py (interno)            │
+                       │  _middleware.py (internal)          │
                        │  [security → otel → audit →          │
                        │   retry → execute → format_output]   │
                        └──────┬───────────────────────────────┘
-                              │ usa
+                              │ uses
    ┌──────────────────────────┼──────────────────────────┐
    ▼                          ▼                          ▼
 ┌──────────────┐    ┌──────────────────┐      ┌────────────────────┐
@@ -117,23 +117,23 @@ docs/
                               langgraph upstream
 ```
 
-### 3.3 Componentes por Módulo
+### 3.3 Components by Module
 
-#### X1 — Re-export oficial
+#### X1 — Official re-export
 
-| Símbolo | Origen | Razón |
+| Symbol | Origin | Reason |
 |---|---|---|
-| `StateGraph` | `langgraph.graph.StateGraph` | construcción del grafo |
-| `START`, `END` | `langgraph.graph` | nodos sentinel |
+| `StateGraph` | `langgraph.graph.StateGraph` | graph construction |
+| `START`, `END` | `langgraph.graph` | sentinel nodes |
 | `Send` | `langgraph.constants` | fan-out |
 | `interrupt` | `langgraph.types` | HITL |
-| `add_messages` | `langgraph.graph.message` | reducer de mensajes |
-| `CompiledStateGraph` | `langgraph.graph.state` | tipo del grafo compilado |
-| `VERSION` | `importlib.metadata.version("langgraph")` | trazabilidad de versión |
+| `add_messages` | `langgraph.graph.message` | message reducer |
+| `CompiledStateGraph` | `langgraph.graph.state` | compiled graph type |
+| `VERSION` | `importlib.metadata.version("langgraph")` | version traceability |
 
-Además se re-exportan los tipos propios de prismal que son inseparables del uso: `AgentState`, `SubgraphDefinition`, `SubgraphRegistry`.
+In addition, the prismal-specific types that are inseparable from usage are re-exported: `AgentState`, `SubgraphDefinition`, `SubgraphRegistry`.
 
-#### X2 — Decorator `@prismal_node`
+#### X2 — `@prismal_node` Decorator
 
 ```
 @prismal_node(name=..., capabilities=..., security=..., audit=..., retry=..., timeout_s=...)
@@ -141,36 +141,36 @@ async def my_node(state: AgentState) -> dict:
     ...
 ```
 
-Internamente aplica la **middleware chain** (en `_middleware.py`):
+Internally it applies the **middleware chain** (in `_middleware.py`):
 
 ```
-1. SECURITY    — opcional: si security="standard", aplica InputSanitizer y SecurePromptBuilder
-                  a state["messages"][-1].content antes de pasar al usuario.
-                  si security="strict", además llama ActionInterceptor.check() antes
-                  de cualquier write_files / execute_code emitido en el state_update.
-2. OTEL        — abre span "prismal.ext.node.<name>" con atributos session_id, node_name,
-                  state_keys; cierra al final con status=OK|ERROR.
-3. LOGGER      — bind contextual con node_name, session_id, capabilities.
-4. RETRY       — si retry={"max_attempts": N, "backoff_s": [0.1, 0.5, 1.0]}, reintenta
-                  con exponential backoff en excepciones transitorias.
-5. TIMEOUT     — wrap con asyncio.wait_for(timeout_s).
-6. EXECUTE     — invoca la función del usuario.
-7. AUDIT       — si audit=True, AuditLogger.log_node(name, session_id, status,
+1. SECURITY    — optional: if security="standard", applies InputSanitizer and SecurePromptBuilder
+                  to state["messages"][-1].content before passing to the user.
+                  if security="strict", it also calls ActionInterceptor.check() before
+                  any write_files / execute_code emitted in the state_update.
+2. OTEL        — opens span "prismal.ext.node.<name>" with attributes session_id, node_name,
+                  state_keys; closes at the end with status=OK|ERROR.
+3. LOGGER      — contextual bind with node_name, session_id, capabilities.
+4. RETRY       — if retry={"max_attempts": N, "backoff_s": [0.1, 0.5, 1.0]}, retries
+                  with exponential backoff on transient exceptions.
+5. TIMEOUT     — wrap with asyncio.wait_for(timeout_s).
+6. EXECUTE     — invokes the user's function.
+7. AUDIT       — if audit=True, AuditLogger.log_node(name, session_id, status,
                   hash(state_update), duration_ms).
-8. ERROR MAP   — captura excepciones no PrismalError y las mapea a NodeExecutionError,
-                  retornando state_update con metadata["error"]={...} en vez de raise.
-9. FORMAT      — valida que el state_update sea dict y retorna.
+8. ERROR MAP   — captures non-PrismalError exceptions and maps them to NodeExecutionError,
+                  returning a state_update with metadata["error"]={...} instead of raising.
+9. FORMAT      — validates that the state_update is a dict and returns.
 ```
 
-El decorator también ejecuta **registro lateral**:
+The decorator also performs **side registration**:
 
-- Añade `name` a `DEFAULT_CAPABILITY_MAP` en `tool_registry.py` (vía API pública nueva `register_node_capabilities()`).
-- Si está definido `capabilities`, declara qué tools MCP debe recibir.
-- Mantiene un registro interno `_REGISTERED_NODES: dict[str, NodeMetadata]` para introspección (`list_registered_nodes()`).
+- Adds `name` to `DEFAULT_CAPABILITY_MAP` in `tool_registry.py` (via the new public API `register_node_capabilities()`).
+- If `capabilities` is defined, declares which MCP tools it should receive.
+- Maintains an internal registry `_REGISTERED_NODES: dict[str, NodeMetadata]` for introspection (`list_registered_nodes()`).
 
-#### X3 — Builder fluent
+#### X3 — Fluent builder
 
-`PrismalStateGraphBuilder` envuelve `StateGraph[AgentState]` y expone:
+`PrismalStateGraphBuilder` wraps `StateGraph[AgentState]` and exposes:
 
 ```
 builder = PrismalStateGraphBuilder(name="my_pipeline", settings=...)
@@ -181,10 +181,10 @@ builder.add_edge(from_, to)
 builder.add_conditional_edges(from_, decision_fn, mapping)
 builder.set_entry_point(name)
 builder.compile() -> SubgraphDefinition
-builder.compile_raw() -> CompiledStateGraph     # escape hatch sin SubgraphDefinition
+builder.compile_raw() -> CompiledStateGraph     # escape hatch without SubgraphDefinition
 ```
 
-`add_node()` detecta si el callable ya tiene `@prismal_node` aplicado (vía atributo `__prismal_node__: NodeMetadata`); si no, lo aplica con los defaults pasados al builder. Esto significa que un usuario puede pasar funciones planas y recibir todas las cross-cutting concerns sin saberlo.
+`add_node()` detects whether the callable already has `@prismal_node` applied (via the `__prismal_node__: NodeMetadata` attribute); if not, it applies it with the defaults passed to the builder. This means a user can pass plain functions and receive all the cross-cutting concerns without knowing it.
 
 #### X4 — Plugin discovery
 
@@ -202,35 +202,35 @@ my_tool = "prismal_x_mypkg.tools:my_tool"
 my_engine = "prismal_x_mypkg.rag:MyRAGEngine"
 ```
 
-`discover_plugins(settings)` itera los cuatro grupos, aplica allowlist/denylist, y para cada entry point:
+`discover_plugins(settings)` iterates over the four groups, applies allowlist/denylist, and for each entry point:
 
-- Si grupo es `subgraphs` o `nodes`: importa el callable y lo invoca como `register(registry)` o lo añade al registro de nodos.
-- Si grupo es `tools`: añade al `tool_registry` respetando el cap de 120.
-- Si grupo es `rag_engines`: instancia y registra en un nuevo `RAGEngineRegistry` (también introducido en X4).
+- If the group is `subgraphs` or `nodes`: imports the callable and invokes it as `register(registry)` or adds it to the node registry.
+- If the group is `tools`: adds to the `tool_registry`, respecting the cap of 120.
+- If the group is `rag_engines`: instantiates and registers in a new `RAGEngineRegistry` (also introduced in X4).
 
-Cada carga está aislada en `try/except` con log + métrica. Falla individual no aborta el resto.
+Each load is isolated in `try/except` with log + metric. An individual failure does not abort the rest.
 
-CLI helper opcional:
+Optional CLI helper:
 ```
-python -m prismal.plugins list                 # lista todos los plugins descubiertos
-python -m prismal.plugins info <name>          # detalle (versión, hash, entry points)
-python -m prismal.plugins doctor               # diagnóstico de errores de carga
+python -m prismal.plugins list                 # list all discovered plugins
+python -m prismal.plugins info <name>          # details (version, hash, entry points)
+python -m prismal.plugins doctor               # diagnosis of load errors
 ```
 
 #### X5 — `LangChainRunnableAdapter`
 
 ```python
 adapter = LangChainRunnableAdapter(runnable)
-adapter.as_node(name="legacy", capabilities=[...])  # devuelve callable @prismal_node-decorated
+adapter.as_node(name="legacy", capabilities=[...])  # returns @prismal_node-decorated callable
 ```
 
-Internamente:
-- Inspecciona el `Runnable` para detectar si espera `dict` con keys (`input`, `chat_history`) o `BaseMessage[]`.
-- Mapea `state["messages"]` → input del Runnable.
-- Mapea output → `{"messages": [AIMessage(content=output)]}` o respeta `state_update` si el Runnable lo retorna ya en formato prismal.
-- Soporta `AgentExecutor`, `RunnableSequence`, `RunnableLambda`, `RunnableParallel`.
+Internally:
+- Inspects the `Runnable` to detect whether it expects a `dict` with keys (`input`, `chat_history`) or `BaseMessage[]`.
+- Maps `state["messages"]` → the Runnable's input.
+- Maps output → `{"messages": [AIMessage(content=output)]}` or respects `state_update` if the Runnable already returns it in prismal format.
+- Supports `AgentExecutor`, `RunnableSequence`, `RunnableLambda`, `RunnableParallel`.
 
-#### X6 — Ports formalizados
+#### X6 — Formalized ports
 
 ```python
 class CheckpointPort(Protocol):
@@ -250,11 +250,11 @@ class ToolPort(Protocol):
     async def ainvoke(self, args: dict) -> Any: ...
 ```
 
-Las implementaciones existentes (`AsyncSqliteSaver`, `AuditLogger`, embeddings de ChromaDB, herramientas LangChain `BaseTool`) ya cumplen estos protocolos estructuralmente. El cambio es declararlos explícitamente para que usuarios sustituyan con sus propios adapters.
+The existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, LangChain `BaseTool` tools) already conform to these protocols structurally. The change is to declare them explicitly so that users can substitute their own adapters.
 
-### 3.4 Flujos de Datos Detallados
+### 3.4 Detailed Data Flows
 
-#### Flujo X-A: Invocación de nodo con `@prismal_node`
+#### Flow X-A: Node invocation with `@prismal_node`
 
 ```
 LangGraph dispatcher ─▶ wrapper(state)
@@ -271,7 +271,7 @@ LangGraph dispatcher ─▶ wrapper(state)
                      ─▶ [otel_mw] close span with status
 ```
 
-#### Flujo X-B: Plugin discovery al startup
+#### Flow X-B: Plugin discovery at startup
 
 ```
 app startup ─▶ get_settings() ─▶ if not plugins_autodiscover: skip
@@ -281,104 +281,104 @@ app startup ─▶ get_settings() ─▶ if not plugins_autodiscover: skip
                   └─ for each ep:
                         try:
                             fn = ep.load()
-                            fn(SubgraphRegistry())     # plugin se registra
+                            fn(SubgraphRegistry())     # plugin registers itself
                             metric: plugins_loaded_total{status="success"} ++
                             audit: log_event("plugin_loaded", {name, version, ep})
                         except Exception as e:
                             metric: plugins_loaded_total{status="error"} ++
                             log.error("plugin_load_failed", name=..., error=str(e))
                             continue
-            ─▶ same para grupos: nodes, tools, rag_engines
+            ─▶ same for groups: nodes, tools, rag_engines
             ─▶ return DiscoveryReport(loaded=[...], failed=[...])
 ```
 
-#### Flujo X-C: LangChain adapter en runtime
+#### Flow X-C: LangChain adapter at runtime
 
 ```
 state ─▶ adapter.as_node returns wrapped_fn
        ─▶ wrapped_fn(state)
               ─▶ extract messages: state["messages"]
               ─▶ build runnable input: detect signature (BaseMessage[] vs dict)
-              ─▶ apply SecurePromptBuilder a content si security="standard"
+              ─▶ apply SecurePromptBuilder to content if security="standard"
               ─▶ runnable.ainvoke(input)
               ─▶ map output:
                     if AIMessage → {"messages": [output]}
                     if str       → {"messages": [AIMessage(content=output)]}
-                    if dict con "messages" → respetar
+                    if dict with "messages" → respect
               ─▶ return state_update
 ```
 
 ---
 
-## 4. Decisiones de Diseño
+## 4. Design Decisions
 
 ### DD-EXT-001: Decorator over Base Class
 
-- **Decisión:** Cross-cutting concerns se aplican vía decorator `@prismal_node`, no vía base class `BaseNode` que el usuario herede.
-- **Contexto:** Python idiomatic favorece composición sobre herencia; los nodos LangGraph son simplemente callables `async (state) → dict`, no objetos.
-- **Alternativas evaluadas:**
+- **Decision:** Cross-cutting concerns are applied via the `@prismal_node` decorator, not via a `BaseNode` base class that the user inherits from.
+- **Context:** Idiomatic Python favors composition over inheritance; LangGraph nodes are simply `async (state) → dict` callables, not objects.
+- **Alternatives evaluated:**
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **Decorator (elegida)** | Idiomatic Python; permite funciones simples; opt-in per-parámetro | Magia oculta si no se lee el wrapper |
-| Base class `BaseNode` | OOP explícito; methods documentados | Fuerza estilo; menos flexible para funciones puras |
-| Middleware list explícita | Máxima transparencia; sin magia | Verboso; mucho boilerplate en cada nodo |
+| **Decorator (chosen)** | Idiomatic Python; allows simple functions; opt-in per-parameter | Hidden magic if the wrapper is not read |
+| Base class `BaseNode` | Explicit OOP; documented methods | Forces a style; less flexible for pure functions |
+| Explicit middleware list | Maximum transparency; no magic | Verbose; lots of boilerplate in each node |
 
-- **Justificación:** El decorator es el patrón canónico en Python para cross-cutting (FastAPI, Click, Flask) y encaja con la convención callable-injection ya establecida en Fase B.
+- **Justification:** The decorator is the canonical Python pattern for cross-cutting (FastAPI, Click, Flask) and fits the callable-injection convention already established in Phase B.
 
-### DD-EXT-002: Plugin Discovery vía Entry Points (no scan)
+### DD-EXT-002: Plugin Discovery via Entry Points (no scan)
 
-- **Decisión:** Plugins se descubren vía `importlib.metadata.entry_points()`, no por escaneo de directorios o convenciones de nombre.
-- **Contexto:** Entry points son el estándar de Python (PEP 621); funcionan con cualquier instalador (pip, uv, poetry).
-- **Alternativas evaluadas:**
+- **Decision:** Plugins are discovered via `importlib.metadata.entry_points()`, not by directory scanning or naming conventions.
+- **Context:** Entry points are the Python standard (PEP 621); they work with any installer (pip, uv, poetry).
+- **Alternatives evaluated:**
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **Entry points (elegida)** | Estándar; sin escaneo; declarativo | Plugin debe estar instalado (no funciona con código suelto) |
-| Directorio `plugins/` escaneado | Funciona con código no instalado | No estándar; ambiguo con dev installs; security |
-| Config YAML manual | Operador controla 100% | Burocrático; no aprovecha PyPI |
+| **Entry points (chosen)** | Standard; no scanning; declarative | Plugin must be installed (does not work with loose code) |
+| Scanned `plugins/` directory | Works with non-installed code | Non-standard; ambiguous with dev installs; security |
+| Manual YAML config | Operator has 100% control | Bureaucratic; does not leverage PyPI |
 
-- **Justificación:** Entry points son la única opción que escala a un ecosistema PyPI; el costo (plugin debe instalarse) es aceptable y deseable (audit trail).
+- **Justification:** Entry points are the only option that scales to a PyPI ecosystem; the cost (plugin must be installed) is acceptable and desirable (audit trail).
 
-### DD-EXT-003: Builder devuelve `SubgraphDefinition`, no `CompiledStateGraph` por default
+### DD-EXT-003: Builder returns `SubgraphDefinition`, not `CompiledStateGraph` by default
 
-- **Decisión:** `builder.compile()` retorna `SubgraphDefinition` (registrable en `SubgraphRegistry`). Existe `compile_raw()` como escape hatch que retorna `CompiledStateGraph` directo.
-- **Contexto:** El path 95% de uso es construir un subgraph para registrar; sólo casos avanzados quieren el `CompiledStateGraph` crudo (testing, embebido en otros sistemas).
-- **Consecuencias:** Builder integra naturalmente con la convención `register_<name>(registry)`. El escape hatch evita lock-in.
+- **Decision:** `builder.compile()` returns a `SubgraphDefinition` (registrable in `SubgraphRegistry`). There is a `compile_raw()` escape hatch that returns a `CompiledStateGraph` directly.
+- **Context:** The 95% usage path is to build a subgraph to register; only advanced cases want the raw `CompiledStateGraph` (testing, embedding in other systems).
+- **Consequences:** The builder integrates naturally with the `register_<name>(registry)` convention. The escape hatch avoids lock-in.
 
-### DD-EXT-004: Aislamiento de fallos de plugins
+### DD-EXT-004: Plugin failure isolation
 
-- **Decisión:** Cada plugin se carga en `try/except` independiente. Falla individual produce log + métrica pero no impide el resto.
-- **Contexto:** Un ecosistema de plugins necesariamente tendrá calidad heterogénea; fallar el startup por un plugin roto es inaceptable.
-- **Consecuencias:** `DiscoveryReport` agrega `loaded` y `failed`; CLI `prismal.plugins doctor` ayuda a diagnosticar.
+- **Decision:** Each plugin is loaded in an independent `try/except`. An individual failure produces a log + metric but does not prevent the rest.
+- **Context:** A plugin ecosystem will necessarily have heterogeneous quality; failing startup because of one broken plugin is unacceptable.
+- **Consequences:** `DiscoveryReport` aggregates `loaded` and `failed`; the `prismal.plugins doctor` CLI helps diagnose.
 
-### DD-EXT-005: Sin contenedor DI completo
+### DD-EXT-005: No full DI container
 
-- **Decisión:** Se mantiene el patrón actual `settings: Settings | None = None` y resolución vía `get_settings()`. No se introduce `dependency-injector` ni equivalente.
-- **Contexto:** A la escala actual del repo, un contenedor DI añade complejidad sin beneficio claro. Los ports formalizados (X6) cubren el caso de "sustituir implementación".
-- **Consecuencias:** Si en futuro el grafo de dependencias crece (>50 servicios), se reevalúa.
+- **Decision:** The current pattern `settings: Settings | None = None` and resolution via `get_settings()` is kept. No `dependency-injector` or equivalent is introduced.
+- **Context:** At the repo's current scale, a DI container adds complexity without a clear benefit. The formalized ports (X6) cover the "substitute implementation" case.
+- **Consequences:** If in the future the dependency graph grows (>50 services), it is reevaluated.
 
-### DD-EXT-006: Allowlist/Denylist como settings (no en código)
+### DD-EXT-006: Allowlist/Denylist as settings (not in code)
 
-- **Decisión:** Los toggles `plugins_autodiscover`, `plugins_allowlist`, `plugins_denylist` viven en `core/config.py` (Pydantic Settings) y son configurables vía env vars.
-- **Contexto:** Deployment diferentes (dev, staging, prod, sandboxed) necesitan diferente postura; hardcoding viola configurabilidad.
-- **Consecuencias:** Variables `PRISMAL_PLUGINS_AUTODISCOVER`, `PRISMAL_PLUGINS_ALLOWLIST`, etc.
+- **Decision:** The toggles `plugins_autodiscover`, `plugins_allowlist`, `plugins_denylist` live in `core/config.py` (Pydantic Settings) and are configurable via env vars.
+- **Context:** Different deployments (dev, staging, prod, sandboxed) need a different posture; hardcoding violates configurability.
+- **Consequences:** Variables `PRISMAL_PLUGINS_AUTODISCOVER`, `PRISMAL_PLUGINS_ALLOWLIST`, etc.
 
-### DD-EXT-007: `prismal.langgraph` re-exporta, no envuelve
+### DD-EXT-007: `prismal.langgraph` re-exports, does not wrap
 
-- **Decisión:** El módulo `prismal.langgraph` re-exporta los símbolos tal cual de `langgraph.*`; no los envuelve ni los modifica.
-- **Contexto:** Envolver crea drift; el usuario debe poder copiar código de docs de LangGraph sin traducir.
-- **Consecuencias:** `from prismal.langgraph import StateGraph` es 100% equivalente a `from langgraph.graph import StateGraph`. La adición de prismal es `AgentState` (que el usuario quiere igual) y `VERSION` (trazabilidad).
+- **Decision:** The `prismal.langgraph` module re-exports the symbols verbatim from `langgraph.*`; it does not wrap or modify them.
+- **Context:** Wrapping creates drift; the user must be able to copy code from LangGraph docs without translating it.
+- **Consequences:** `from prismal.langgraph import StateGraph` is 100% equivalent to `from langgraph.graph import StateGraph`. Prismal's addition is `AgentState` (which the user wants anyway) and `VERSION` (traceability).
 
-### DD-EXT-008: Adapter LangChain como módulo opcional (sin extra)
+### DD-EXT-008: LangChain adapter as an optional module (no extra)
 
-- **Decisión:** `LangChainRunnableAdapter` vive en `agents/extension/adapters.py` sin requerir extra adicional — `langchain-core` ya es dep core de prismal.
-- **Contexto:** Casi todos los usuarios de prismal vienen del ecosistema LangChain; pedirles un extra extra (`[langchain-bridge]`) es fricción innecesaria.
-- **Consecuencias:** El adapter es lazy-import si `Runnable` no se usa; sin overhead para quien no lo necesita.
+- **Decision:** `LangChainRunnableAdapter` lives in `agents/extension/adapters.py` without requiring an additional extra — `langchain-core` is already a core dep of prismal.
+- **Context:** Almost all prismal users come from the LangChain ecosystem; asking them for an additional extra (`[langchain-bridge]`) is unnecessary friction.
+- **Consequences:** The adapter is lazy-imported if `Runnable` is not used; no overhead for those who don't need it.
 
 ---
 
-## 5. Estructura del Código
+## 5. Code Structure
 
 ```
 prismal/
@@ -393,8 +393,8 @@ prismal/
 │       ├── plugins.py                   ← discover_plugins, DiscoveryReport, PluginRegistry
 │       ├── adapters.py                  ← LangChainRunnableAdapter
 │       ├── ports.py                     ← CheckpointPort, AuditPort, EmbeddingsPort, ToolPort
-│       ├── _middleware.py               ← (interno) security_mw, otel_mw, retry_mw, etc.
-│       └── _registry.py                 ← (interno) _REGISTERED_NODES
+│       ├── _middleware.py               ← (internal) security_mw, otel_mw, retry_mw, etc.
+│       └── _registry.py                 ← (internal) _REGISTERED_NODES
 │
 ├── plugins.py                           ← CLI entry: python -m prismal.plugins (list|info|doctor)
 │
@@ -411,8 +411,8 @@ tests/
 └── integration/
     ├── test_custom_node_e2e.py
     ├── test_custom_subgraph_e2e.py
-    ├── test_plugin_discovery_e2e.py     ← instala un plugin de prueba in-memory
-    └── test_langchain_adapter_e2e.py    ← AgentExecutor real con LLM mockeado
+    ├── test_plugin_discovery_e2e.py     ← installs an in-memory test plugin
+    └── test_langchain_adapter_e2e.py    ← real AgentExecutor with mocked LLM
 
 examples/
 ├── custom_node.py
@@ -429,22 +429,22 @@ docs/
 └── extension.md
 ```
 
-### Patrones Aplicados
+### Patterns Applied
 
-| Patrón | Dónde | Por qué |
+| Pattern | Where | Why |
 |---|---|---|
-| **Decorator** | `@prismal_node` | Cross-cutting sin herencia; idiomatic Python |
-| **Builder fluent** | `PrismalStateGraphBuilder` | API declarativa sobre `StateGraph` |
-| **Plugin / Registry** | `discover_plugins` + entry points | Ecosistema extensible sin tocar core |
-| **Adapter** | `LangChainRunnableAdapter` | Bridge entre dos contratos (`Runnable` ↔ nodo async) |
-| **Ports & Adapters (Hexagonal)** | `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort` | Sustitución de implementaciones |
-| **Middleware Chain** | `_middleware.py` | Composición ordenada de cross-cutting |
-| **Strategy** | `security="standard"\|"strict"\|"off"` en decorator | Comportamiento configurable |
-| **Composite** | Subgraph como nodo | LangGraph nativo; prismal documenta y da helper |
-| **Template Method** | (implícito en `_middleware.py`) | Pipeline fijo con hook `execute` proveído por usuario |
-| **Open/Closed** | Plugin system | Extensible sin modificar el core |
+| **Decorator** | `@prismal_node` | Cross-cutting without inheritance; idiomatic Python |
+| **Fluent Builder** | `PrismalStateGraphBuilder` | Declarative API over `StateGraph` |
+| **Plugin / Registry** | `discover_plugins` + entry points | Extensible ecosystem without touching core |
+| **Adapter** | `LangChainRunnableAdapter` | Bridge between two contracts (`Runnable` ↔ async node) |
+| **Ports & Adapters (Hexagonal)** | `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort` | Substitution of implementations |
+| **Middleware Chain** | `_middleware.py` | Ordered composition of cross-cutting |
+| **Strategy** | `security="standard"\|"strict"\|"off"` in decorator | Configurable behavior |
+| **Composite** | Subgraph as node | Native LangGraph; prismal documents and provides a helper |
+| **Template Method** | (implicit in `_middleware.py`) | Fixed pipeline with `execute` hook provided by the user |
+| **Open/Closed** | Plugin system | Extensible without modifying the core |
 
-### Manejo de Errores
+### Error Handling
 
 ```python
 class ExtensionError(PrismalError): ...
@@ -455,51 +455,51 @@ class PluginLoadError(ExtensionError):
     plugin_name: str
     entry_point: str
     cause: BaseException
-class PluginConflictError(ExtensionError): ...     # nombre duplicado
+class PluginConflictError(ExtensionError): ...     # duplicate name
 class AdapterError(ExtensionError): ...
 class LangChainAdapterError(AdapterError): ...
 ```
 
-Política: el decorator captura excepciones del usuario y las **mapea** a `NodeExecutionError`, retornando un `state_update` con `metadata["error"]={...}` por default. El usuario opt-in puede pedir `@prismal_node(raise_on_error=True)` para propagar.
+Policy: the decorator captures user exceptions and **maps** them to `NodeExecutionError`, returning a `state_update` with `metadata["error"]={...}` by default. The user can opt in to `@prismal_node(raise_on_error=True)` to propagate.
 
 ---
 
-## 6. Seguridad
+## 6. Security
 
-### 6.1 Superficie de Ataque
+### 6.1 Attack Surface
 
-| Vector | Mitigación |
+| Vector | Mitigation |
 |---|---|
-| Plugin malicioso registra nodos backdoor | Allowlist/denylist por settings; audit log de cada carga; entry points son confianza explícita del operador (firmados por PyPI publisher) |
-| Nodo custom salta `SecurePromptBuilder` | `@prismal_node(security="standard")` lo aplica automáticamente; opt-out es explícito |
-| Adapter LangChain ejecuta tools no autorizadas | `ActionInterceptor.check()` aplicado antes de `Runnable.ainvoke()` si `security="strict"` |
-| Plugin carga código en import time | Try/except aislado; falla no afecta resto; warning si import time > 100 ms |
-| Conflicto de nombres entre plugins | Registry detecta y lanza `PluginConflictError` con mensaje claro |
-| Entry point apunta a callable inexistente | `ep.load()` falla, capturado, log estructurado |
-| Audit log crece con cada plugin load | Una entry por load (no por nodo); rotación heredada del `AuditLogger` |
+| Malicious plugin registers backdoor nodes | Allowlist/denylist via settings; audit log of each load; entry points are the operator's explicit trust (signed by PyPI publisher) |
+| Custom node bypasses `SecurePromptBuilder` | `@prismal_node(security="standard")` applies it automatically; opt-out is explicit |
+| LangChain adapter executes unauthorized tools | `ActionInterceptor.check()` applied before `Runnable.ainvoke()` if `security="strict"` |
+| Plugin loads code at import time | Isolated try/except; failure does not affect the rest; warning if import time > 100 ms |
+| Name conflict between plugins | Registry detects and raises `PluginConflictError` with a clear message |
+| Entry point points to a nonexistent callable | `ep.load()` fails, captured, structured log |
+| Audit log grows with each plugin load | One entry per load (not per node); rotation inherited from the `AuditLogger` |
 
-### 6.2 Reglas Transversales
+### 6.2 Cross-cutting Rules
 
-1. **Plugins son confianza explícita** — instalar un plugin equivale a instalar código Python; operador es responsable.
-2. **Allowlist es preferida a denylist en producción** — modo strict.
-3. **`@prismal_node` por default `security="standard"`** — opt-out explícito requerido.
-4. **Adapter LangChain aplica `SecurePromptBuilder`** al input antes del Runnable.
-5. **Audit log de cargas** con versión y entry point — trazabilidad completa.
+1. **Plugins are explicit trust** — installing a plugin is equivalent to installing Python code; the operator is responsible.
+2. **Allowlist is preferred over denylist in production** — strict mode.
+3. **`@prismal_node` defaults to `security="standard"`** — explicit opt-out required.
+4. **The LangChain adapter applies `SecurePromptBuilder`** to the input before the Runnable.
+5. **Audit log of loads** with version and entry point — full traceability.
 
 ---
 
-## 7. Observabilidad
+## 7. Observability
 
 ### 7.1 OTel Spans
 
-| Componente | Spans |
+| Component | Spans |
 |---|---|
-| Decorator | `prismal.ext.node.<name>` con attrs `node_name`, `session_id`, `capabilities`, `status` |
-| Builder | `prismal.ext.builder.compile` con attrs `subgraph_name`, `node_count`, `edge_count` |
-| Plugin discovery | `prismal.ext.discover` (overall), `prismal.ext.load_plugin.<name>` por plugin |
-| Adapter | `prismal.ext.adapter.langchain.ainvoke` con attrs `runnable_type`, `input_chars` |
+| Decorator | `prismal.ext.node.<name>` with attrs `node_name`, `session_id`, `capabilities`, `status` |
+| Builder | `prismal.ext.builder.compile` with attrs `subgraph_name`, `node_count`, `edge_count` |
+| Plugin discovery | `prismal.ext.discover` (overall), `prismal.ext.load_plugin.<name>` per plugin |
+| Adapter | `prismal.ext.adapter.langchain.ainvoke` with attrs `runnable_type`, `input_chars` |
 
-### 7.2 Métricas
+### 7.2 Metrics
 
 ```
 # Plugins
@@ -522,7 +522,7 @@ prismal_builder_compile_total{subgraph}
 
 ### 7.3 Startup Report
 
-Al arrancar la app con plugins activos, el logger emite un resumen estructurado:
+When the app boots with active plugins, the logger emits a structured summary:
 
 ```
 INFO prismal.extension.discovery
@@ -538,64 +538,64 @@ INFO prismal.extension.discovery
 
 ## 8. Testing Strategy
 
-| Nivel | Cobertura | Herramientas | Qué cubre |
+| Level | Coverage | Tools | What it covers |
 |---|---|---|---|
-| Unit | ≥ 85% por módulo | pytest + `AsyncMock` | Decorator, builder, plugin loader, adapter, ports |
-| Integration | Flujos críticos | pytest + plugin de prueba in-memory (via `pkg_resources` mock) | Discovery end-to-end; nodo custom dentro de grafo |
-| Live API | `@pytest.mark.live_api` | Skip por default | Adapter con LangChain `AgentExecutor` real |
-| Bench | `@pytest.mark.bench` | pytest-benchmark | Overhead del decorator ≤ 5 ms p95 |
-| Plugin lifecycle | `tests/integration/test_plugin_discovery_e2e.py` | crea wheel temporal con `build` + instala en venv aislado | Verifica que un plugin "real" se descubre |
+| Unit | ≥ 85% per module | pytest + `AsyncMock` | Decorator, builder, plugin loader, adapter, ports |
+| Integration | Critical flows | pytest + in-memory test plugin (via `pkg_resources` mock) | End-to-end discovery; custom node inside a graph |
+| Live API | `@pytest.mark.live_api` | Skipped by default | Adapter with a real LangChain `AgentExecutor` |
+| Bench | `@pytest.mark.bench` | pytest-benchmark | Decorator overhead ≤ 5 ms p95 |
+| Plugin lifecycle | `tests/integration/test_plugin_discovery_e2e.py` | creates a temporary wheel with `build` + installs in an isolated venv | Verifies that a "real" plugin is discovered |
 
-### Estrategia de Mock
+### Mock Strategy
 
-- **Entry points:** `monkeypatch.setattr(importlib.metadata, "entry_points", lambda group=None: [...])` para inyectar plugins de prueba sin tocar el filesystem.
-- **LangChain Runnable:** se construye con `RunnableLambda(lambda x: AIMessage(content="ok"))` para tests rápidos.
-- **OTel:** `OTelManager` mockeado para verificar que se abrió/cerró el span correcto.
-- **Audit:** `AuditLogger.log_event` mockeado para verificar que se loguearon cargas.
+- **Entry points:** `monkeypatch.setattr(importlib.metadata, "entry_points", lambda group=None: [...])` to inject test plugins without touching the filesystem.
+- **LangChain Runnable:** built with `RunnableLambda(lambda x: AIMessage(content="ok"))` for fast tests.
+- **OTel:** `OTelManager` mocked to verify that the correct span was opened/closed.
+- **Audit:** `AuditLogger.log_event` mocked to verify that loads were logged.
 
 ---
 
-## 9. Plan de Rollout
+## 9. Rollout Plan
 
-### 9.1 Estrategia de Adopción
+### 9.1 Adoption Strategy
 
-Fase X es **aditiva y opt-in**:
+Phase X is **additive and opt-in**:
 
-1. `prismal.langgraph` se publica como módulo nuevo — no afecta a nadie.
-2. `@prismal_node`, builder, adapters son APIs nuevas — no afectan nodos existentes.
-3. `discover_plugins()` se invoca explícitamente desde el startup del operador; `settings.plugins_autodiscover=True` por default pero sin plugins instalados es no-op.
-4. Los nodos existentes (26 textuales) **no se decoran retroactivamente** en Fase X. Migración es un seguimiento posterior (Fase X.1) si se quiere consolidar el comportamiento.
+1. `prismal.langgraph` is published as a new module — it affects no one.
+2. `@prismal_node`, builder, adapters are new APIs — they do not affect existing nodes.
+3. `discover_plugins()` is invoked explicitly from the operator's startup; `settings.plugins_autodiscover=True` by default but with no plugins installed it is a no-op.
+4. Existing nodes (26 textual) **are not decorated retroactively** in Phase X. Migration is a later follow-up (Phase X.1) if consolidating the behavior is desired.
 
 ### 9.2 Backward Compatibility
 
-- Cero cambios en la API pública existente.
-- `SubgraphRegistry` y `register_<name>()` siguen funcionando idénticamente.
-- Tests existentes (~688) pasan sin modificación.
-- Nuevas excepciones heredan de `PrismalError` (jerarquía conocida).
+- Zero changes to the existing public API.
+- `SubgraphRegistry` and `register_<name>()` continue to work identically.
+- Existing tests (~688) pass without modification.
+- New exceptions inherit from `PrismalError` (known hierarchy).
 
-### 9.3 Estabilidad de API
+### 9.3 API Stability
 
-La superficie de extensión es API pública con compromiso de SemVer:
+The extension surface is public API with a SemVer commitment:
 
-- **Breaking changes** requieren bump de **minor** (en pre-1.0) o **major** (post-1.0).
-- **Deprecations** vía `warnings.warn(DeprecationWarning, stacklevel=2)` con 1 minor release de aviso mínimo.
-- Decorador interno `@frozen_api` marca las funciones del contrato público; pre-commit hook valida que no cambien sin justificación documentada.
-
----
-
-## 10. Preguntas Abiertas
-
-- [ ] **`@prismal_node` defaults:** ¿`security="standard"` por default o `security="off"` para evitar overhead silencioso? — Owner: Tech Lead, Deadline: inicio X2.
-- [ ] **Entry point para `rag_engines`:** ¿realmente útil o es feature creep? Las 7 engines actuales son in-tree. — Owner: AI Architect, Deadline: inicio X4.
-- [ ] **Plugin sandboxing:** ¿permitimos ejecutar plugin en subprocess aislado (futuro `prismal.plugins exec --sandbox`) o confiamos en la jerarquía actual de seguridad? — Owner: Tech Lead, Deadline: Fase Y.
-- [ ] **Compatibilidad con `langgraph-checkpoint-redis`** y otros checkpointers externos — ¿declarar `CheckpointPort` con el contrato exacto que ellos usan? — Owner: AI Architect.
-- [ ] **CLI `python -m prismal.plugins`:** ¿incluir en Fase X o diferir a un follow-up? Costo bajo pero scope creep. — Owner: DX Lead, Deadline: inicio X4.
-- [ ] **Plugin templates:** ¿`cookiecutter` o `copier`? Copier tiene mejor UX moderna pero menor adopción. — Owner: DX Lead.
+- **Breaking changes** require a **minor** bump (pre-1.0) or **major** (post-1.0).
+- **Deprecations** via `warnings.warn(DeprecationWarning, stacklevel=2)` with a minimum of 1 minor release of notice.
+- The internal `@frozen_api` decorator marks the public contract's functions; a pre-commit hook validates that they do not change without documented justification.
 
 ---
 
-## Historial de Cambios
+## 10. Open Questions
 
-| Versión | Fecha | Autor | Cambios |
+- [ ] **`@prismal_node` defaults:** `security="standard"` by default or `security="off"` to avoid silent overhead? — Owner: Tech Lead, Deadline: start of X2.
+- [ ] **Entry point for `rag_engines`:** really useful or feature creep? The current 7 engines are in-tree. — Owner: AI Architect, Deadline: start of X4.
+- [ ] **Plugin sandboxing:** do we allow running a plugin in an isolated subprocess (future `prismal.plugins exec --sandbox`) or do we trust the current security hierarchy? — Owner: Tech Lead, Deadline: Phase Y.
+- [ ] **Compatibility with `langgraph-checkpoint-redis`** and other external checkpointers — declare `CheckpointPort` with the exact contract they use? — Owner: AI Architect.
+- [ ] **CLI `python -m prismal.plugins`:** include in Phase X or defer to a follow-up? Low cost but scope creep. — Owner: DX Lead, Deadline: start of X4.
+- [ ] **Plugin templates:** `cookiecutter` or `copier`? Copier has a better modern UX but lower adoption. — Owner: DX Lead.
+
+---
+
+## Change History
+
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-05-27 | Ernesto Crespo | Versión inicial — superficie de extensión LangGraph + plugin SDK |
+| 1.0 | 2026-05-27 | Ernesto Crespo | Initial version — LangGraph extension surface + plugin SDK |

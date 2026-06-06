@@ -2,419 +2,419 @@
 
 ## Metadata
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `IMPLEMENTED` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-04-19 |
+| **Author** | Ernesto Crespo |
+| **Status** | `IMPLEMENTED` |
+| **Version** | 1.0 |
+| **Date** | 2026-04-19 |
 | **PRD** | `specs/advanced-architectures/PRD.md` |
 | **Tech Design** | `specs/advanced-architectures/ARCHITECTURE.md` |
 | **API Spec** | `specs/advanced-architectures/SPEC.md` |
 
 ---
 
-> **Estado de implementación (2026-05-30):** Las Fases A, B, C y D están
-> **implementadas**: 7 engines RAG en `prismal/rag/`, 7 patrones en
-> `prismal/agents/patterns/` y 5 subgraphs en `prismal/agents/subgraphs/`, con el
-> wiring opt-in al supervisor (`enable_subgraphs`). Cada tarea está marcada
-> `✅ DONE` en línea más abajo.
+> **Implementation status (2026-05-30):** Phases A, B, C, and D are
+> **implemented**: 7 RAG engines in `prismal/rag/`, 7 patterns in
+> `prismal/agents/patterns/`, and 5 subgraphs in `prismal/agents/subgraphs/`, with
+> opt-in wiring to the supervisor (`enable_subgraphs`). Each task is marked
+> `✅ DONE` inline below.
 
 ---
 
-## 1. Resumen de Implementación
+## 1. Implementation Summary
 
-La expansión se divide en **3 fases de implementación** más una fase de hardening:
+The expansion is divided into **3 implementation phases** plus a hardening phase:
 
-- **Fase A (semanas 1-3):** 7 nuevas arquitecturas RAG — Self-RAG, HyDE, RAG-Fusion, Hybrid Search, Parent-Child, Adaptive RAG, Multi-Vector.
-- **Fase B (semanas 4-6):** 7 nuevos patrones de agente — Tree of Thoughts, Debate, Constitutional AI, LATS, LLM-Compiler, Mixture of Agents, Swarm/Handoff.
-- **Fase C (semanas 7-8):** 5 nuevos subgraph pipelines — Customer Service, Document Generation, Data ETL, Code Review, Debate/Consensus.
-- **Fase D (semana 9):** Hardening, integración completa en `graph.py`, cobertura de tests, documentación.
+- **Phase A (weeks 1-3):** 7 new RAG architectures — Self-RAG, HyDE, RAG-Fusion, Hybrid Search, Parent-Child, Adaptive RAG, Multi-Vector.
+- **Phase B (weeks 4-6):** 7 new agent patterns — Tree of Thoughts, Debate, Constitutional AI, LATS, LLM-Compiler, Mixture of Agents, Swarm/Handoff.
+- **Phase C (weeks 7-8):** 5 new subgraph pipelines — Customer Service, Document Generation, Data ETL, Code Review, Debate/Consensus.
+- **Phase D (week 9):** Hardening, full integration into `graph.py`, test coverage, documentation.
 
-**Duración total estimada:** 9 semanas
-**Equipo mínimo requerido:** 1-2 backend engineers con experiencia en LangGraph y Python async.
-**Fecha objetivo:** 2026-06-28
+**Total estimated duration:** 9 weeks
+**Minimum team required:** 1-2 backend engineers with experience in LangGraph and async Python.
+**Target date:** 2026-06-28
 
 ---
 
-## 2. Pre-requisitos
+## 2. Prerequisites
 
-| Pre-requisito | Owner | Estado | Fecha Límite |
+| Prerequisite | Owner | Status | Deadline |
 |---|---|---|---|
-| PRD aprobado | Tech Lead | ☐ Pendiente | 2026-04-26 |
-| ARCHITECTURE.md aprobado | Tech Lead + AI Architect | ☐ Pendiente | 2026-04-26 |
-| SPEC.md aprobado | Tech Lead | ☐ Pendiente | 2026-04-26 |
-| `rank_bm25` añadido a pyproject.toml | Engineer | ☐ Pendiente | Inicio Fase A |
-| `networkx` añadido a pyproject.toml | Engineer | ☐ Pendiente | Inicio Fase A |
-| Branch `feature/advanced-architectures` creado | Engineer | ☐ Pendiente | Inicio Fase A |
-| Suite de tests existente pasa al 100% | Engineer | ☐ Verificar | Inicio Fase A |
+| PRD approved | Tech Lead | ☐ Pending | 2026-04-26 |
+| ARCHITECTURE.md approved | Tech Lead + AI Architect | ☐ Pending | 2026-04-26 |
+| SPEC.md approved | Tech Lead | ☐ Pending | 2026-04-26 |
+| `rank_bm25` added to pyproject.toml | Engineer | ☐ Pending | Start of Phase A |
+| `networkx` added to pyproject.toml | Engineer | ☐ Pending | Start of Phase A |
+| Branch `feature/advanced-architectures` created | Engineer | ☐ Pending | Start of Phase A |
+| Existing test suite passes 100% | Engineer | ☐ Verify | Start of Phase A |
 
 ---
 
-## 3. Fases de Implementación
+## 3. Implementation Phases
 
 ---
 
-### FASE A — RAG Avanzado
+### PHASE A — Advanced RAG
 
-**Duración:** 3 semanas (semanas 1-3)
-**Objetivo:** Implementar 7 nuevas estrategias de retrieval que expanden las capacidades de `prismal/rag/` sin modificar el comportamiento de los engines existentes.
+**Duration:** 3 weeks (weeks 1-3)
+**Objective:** Implement 7 new retrieval strategies that expand the capabilities of `prismal/rag/` without modifying the behavior of the existing engines.
 
 ---
 
 #### A1 — HyDE (Hypothetical Document Embeddings) ✅ DONE
-**Estimación:** 3 días | **Archivo:** `prismal/rag/hyde.py`
+**Estimate:** 3 days | **File:** `prismal/rag/hyde.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| A1-01 | Crear `prismal/rag/hyde.py` con `HyDERetriever` y `HyDEResult` | 1d | — | ✅ |
-| A1-02 | Implementar `_generate_hypothesis()` con `SecurePromptBuilder` | 0.5d | A1-01 | ✅ |
-| A1-03 | Implementar `_embed_hypothesis()` vía `EmbeddingsFactory` | 0.5d | A1-01 | ✅ |
-| A1-04 | Implementar `search()` con OTel spans y logging estructurado | 0.5d | A1-02, A1-03 | ✅ |
-| A1-05 | Tests unitarios con LLM mockeado (≥ 80% coverage) | 1d | A1-04 | ✅ |
-| A1-06 | Añadir `HyDERetriever` a `rag/__init__.py` | 0.1d | A1-05 | ✅ |
+| A1-01 | Create `prismal/rag/hyde.py` with `HyDERetriever` and `HyDEResult` | 1d | — | ✅ |
+| A1-02 | Implement `_generate_hypothesis()` with `SecurePromptBuilder` | 0.5d | A1-01 | ✅ |
+| A1-03 | Implement `_embed_hypothesis()` via `EmbeddingsFactory` | 0.5d | A1-01 | ✅ |
+| A1-04 | Implement `search()` with OTel spans and structured logging | 0.5d | A1-02, A1-03 | ✅ |
+| A1-05 | Unit tests with mocked LLM (≥ 80% coverage) | 1d | A1-04 | ✅ |
+| A1-06 | Add `HyDERetriever` to `rag/__init__.py` | 0.1d | A1-05 | ✅ |
 
-**Criterios de Done:**
-- ✅ `HyDERetriever.search(query, k)` retorna `HyDEResult` con chunks y hipótesis.
-- ✅ Tests pasan: generar hipótesis → embeber → buscar (mock LLM + mock VectorStore).
-- ✅ `ruff check` y `mypy --strict` pasan.
-- ✅ Coverage: **100%** en `prismal/rag/hyde.py` (12 tests).
-- ✅ `HyDEError` agregado a `prismal/core/exceptions.py` (anticipa D1-04).
+**Done criteria:**
+- ✅ `HyDERetriever.search(query, k)` returns `HyDEResult` with chunks and hypothesis.
+- ✅ Tests pass: generate hypothesis → embed → search (mock LLM + mock VectorStore).
+- ✅ `ruff check` and `mypy --strict` pass.
+- ✅ Coverage: **100%** in `prismal/rag/hyde.py` (12 tests).
+- ✅ `HyDEError` added to `prismal/core/exceptions.py` (anticipates D1-04).
 
 ---
 
 #### A2 — RAG-Fusion (Multi-Query + RRF) ✅ DONE
-**Estimación:** 3 días | **Archivo:** `prismal/rag/fusion.py`
+**Estimate:** 3 days | **File:** `prismal/rag/fusion.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| A2-01 | Crear `prismal/rag/fusion.py` con `RAGFusionEngine` y `FusionResult` | 1d | — | ✅ |
-| A2-02 | Implementar `reciprocal_rank_fusion()` como función pública y testeable | 0.5d | A2-01 | ✅ |
-| A2-03 | Implementar `_generate_query_variants()` con LLM | 0.5d | A2-01 | ✅ |
-| A2-04 | Implementar `search()` con `asyncio.gather` para búsquedas paralelas | 1d | A2-02, A2-03 | ✅ |
-| A2-05 | Tests unitarios: RRF math, generación de variantes, integración end-to-end | 1d | A2-04 | ✅ |
-| A2-06 | Añadir a `rag/__init__.py` | 0.1d | A2-05 | ✅ |
+| A2-01 | Create `prismal/rag/fusion.py` with `RAGFusionEngine` and `FusionResult` | 1d | — | ✅ |
+| A2-02 | Implement `reciprocal_rank_fusion()` as a public, testable function | 0.5d | A2-01 | ✅ |
+| A2-03 | Implement `_generate_query_variants()` with LLM | 0.5d | A2-01 | ✅ |
+| A2-04 | Implement `search()` with `asyncio.gather` for parallel searches | 1d | A2-02, A2-03 | ✅ |
+| A2-05 | Unit tests: RRF math, variant generation, end-to-end integration | 1d | A2-04 | ✅ |
+| A2-06 | Add to `rag/__init__.py` | 0.1d | A2-05 | ✅ |
 
-**Criterios de Done:**
-- ✅ `reciprocal_rank_fusion()` verificado matemáticamente (formula del paper, empates, dedup por `(source, chunk_id)`, efecto de `k`).
-- ✅ `RAGFusionEngine.search()` ejecuta N búsquedas en paralelo (`asyncio.gather` + `asyncio.to_thread`) y retorna chunks fusionados.
-- ✅ Tests demuestran dedup + ranking correcto (16 tests, 93% coverage en `fusion.py`).
-- ✅ `FusionError` agregado a `prismal/core/exceptions.py` (anticipa D1-04).
-- ✅ `ruff check` y `mypy --strict` pasan.
+**Done criteria:**
+- ✅ `reciprocal_rank_fusion()` mathematically verified (paper formula, ties, dedup by `(source, chunk_id)`, effect of `k`).
+- ✅ `RAGFusionEngine.search()` runs N searches in parallel (`asyncio.gather` + `asyncio.to_thread`) and returns fused chunks.
+- ✅ Tests demonstrate correct dedup + ranking (16 tests, 93% coverage in `fusion.py`).
+- ✅ `FusionError` added to `prismal/core/exceptions.py` (anticipates D1-04).
+- ✅ `ruff check` and `mypy --strict` pass.
 
 ---
 
 #### A3 — Hybrid Search (BM25 + Embeddings) ✅ DONE
-**Estimación:** 3 días | **Archivo:** `prismal/rag/hybrid.py`
+**Estimate:** 3 days | **File:** `prismal/rag/hybrid.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| A3-01 | Añadir `rank_bm25` a `pyproject.toml` y verificar instalación | 0.2d | — | ✅ |
-| A3-02 | Crear `prismal/rag/hybrid.py` con `HybridSearchEngine` | 1d | A3-01 | ✅ |
-| A3-03 | Implementar `build_index()` con BM25Okapi | 0.5d | A3-02 | ✅ |
-| A3-04 | Implementar score fusion: `alpha * sem + (1-alpha) * bm25_norm` | 0.5d | A3-02 | ✅ |
-| A3-05 | Implementar `search()` con deduplicación y ordenamiento | 0.5d | A3-03, A3-04 | ✅ |
-| A3-06 | Tests: BM25 exacto en términos técnicos, semántico en abstracto, alpha configurable | 1d | A3-05 | ✅ |
+| A3-01 | Add `rank_bm25` to `pyproject.toml` and verify installation | 0.2d | — | ✅ |
+| A3-02 | Create `prismal/rag/hybrid.py` with `HybridSearchEngine` | 1d | A3-01 | ✅ |
+| A3-03 | Implement `build_index()` with BM25Okapi | 0.5d | A3-02 | ✅ |
+| A3-04 | Implement score fusion: `alpha * sem + (1-alpha) * bm25_norm` | 0.5d | A3-02 | ✅ |
+| A3-05 | Implement `search()` with deduplication and ordering | 0.5d | A3-03, A3-04 | ✅ |
+| A3-06 | Tests: exact BM25 on technical terms, semantic on abstract, configurable alpha | 1d | A3-05 | ✅ |
 
-**Criterios de Done:**
-- ✅ `HybridSearchEngine` encuentra documentos con términos exactos que embeddings no encuentran.
-- ✅ `alpha=0.0` equivale a búsqueda BM25 pura; `alpha=1.0` equivale a búsqueda semántica pura.
-- ✅ `alpha` overrideable por llamada; validación `[0.0, 1.0]`.
-- ✅ BM25 opcional (sin índice → degrada a semántico puro).
-- ✅ `HybridSearchError` agregado a `prismal/core/exceptions.py`.
-- ✅ Coverage: **94%** en `prismal/rag/hybrid.py` (12 tests).
-- ✅ `ruff check` y `mypy --strict` pasan (con override `rank_bm25.*` en `pyproject.toml`).
-- ⚠️ Benchmark <500ms para 10K docs: no ejecutado (diferido a Fase D / D1-07).
+**Done criteria:**
+- ✅ `HybridSearchEngine` finds documents with exact terms that embeddings do not find.
+- ✅ `alpha=0.0` is equivalent to pure BM25 search; `alpha=1.0` is equivalent to pure semantic search.
+- ✅ `alpha` overridable per call; validation `[0.0, 1.0]`.
+- ✅ BM25 optional (no index → degrades to pure semantic).
+- ✅ `HybridSearchError` added to `prismal/core/exceptions.py`.
+- ✅ Coverage: **94%** in `prismal/rag/hybrid.py` (12 tests).
+- ✅ `ruff check` and `mypy --strict` pass (with `rank_bm25.*` override in `pyproject.toml`).
+- ⚠️ Benchmark <500ms for 10K docs: not run (deferred to Phase D / D1-07).
 
 ---
 
 #### A4 — Self-RAG ✅ DONE
-**Estimación:** 4 días | **Archivo:** `prismal/rag/self_rag.py`
+**Estimate:** 4 days | **File:** `prismal/rag/self_rag.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| A4-01 | Crear `prismal/rag/self_rag.py` con dataclasses `SelfRAGResult`, enums `RetrievalDecision`, `SupportedDecision` | 0.5d | — | ✅ |
-| A4-02 | Implementar `_decide_retrieval()` — prompt de decisión con fallback robusto | 1d | A4-01 | ✅ |
-| A4-03 | Implementar `_evaluate_support()` — tokens Supported/Unsupported/Utility | 1d | A4-01 | ✅ (renombrado internamente a `_assess_support()` por conflicto con hook de seguridad; comportamiento idéntico al SPEC) |
-| A4-04 | Implementar `run()` orquestando decisión → CRAG → asesoramiento | 1d | A4-02, A4-03 | ✅ |
-| A4-05 | Tests: caso NO_RETRIEVE (query factual simple), caso RETRIEVE (query específica del corpus), fallback a CRAG si LLM falla en token de control | 1.5d | A4-04 | ✅ |
+| A4-01 | Create `prismal/rag/self_rag.py` with dataclasses `SelfRAGResult`, enums `RetrievalDecision`, `SupportedDecision` | 0.5d | — | ✅ |
+| A4-02 | Implement `_decide_retrieval()` — decision prompt with robust fallback | 1d | A4-01 | ✅ |
+| A4-03 | Implement `_evaluate_support()` — Supported/Unsupported/Utility tokens | 1d | A4-01 | ✅ (renamed internally to `_assess_support()` due to conflict with a security hook; behavior identical to the SPEC) |
+| A4-04 | Implement `run()` orchestrating decision → CRAG → assessment | 1d | A4-02, A4-03 | ✅ |
+| A4-05 | Tests: NO_RETRIEVE case (simple factual query), RETRIEVE case (corpus-specific query), fallback to CRAG if LLM fails on the control token | 1.5d | A4-04 | ✅ |
 
-**Criterios de Done:**
-- ✅ `SelfRAGPipeline.run()` retorna decisión correcta cuando el LLM emite el token; parsing permisivo acepta token embebido en texto libre.
-- ✅ Fallback a `RETRIEVE` cuando el LLM no emite token reconocible; `used_fallback=True` se propaga al resultado.
-- ✅ Logging estructurado (`self_rag_decision`, `self_rag_decision_unparseable`, etc.) + OTel span `self_rag.run` con atributos de decisión, soporte y utility.
-- ✅ Pesimismo seguro en auto-asesoramiento: token no parseable → `(UNSUPPORTED, utility=1)`.
-- ✅ Utility clampado a `[1, 5]`.
-- ✅ `SelfRAGError` agregado a `prismal/core/exceptions.py`.
-- ✅ Coverage: **94%** en `prismal/rag/self_rag.py` (19 tests).
-- ✅ `ruff check` y `mypy --strict` pasan (`StrEnum` modernizado).
+**Done criteria:**
+- ✅ `SelfRAGPipeline.run()` returns the correct decision when the LLM emits the token; permissive parsing accepts a token embedded in free text.
+- ✅ Fallback to `RETRIEVE` when the LLM does not emit a recognizable token; `used_fallback=True` propagates to the result.
+- ✅ Structured logging (`self_rag_decision`, `self_rag_decision_unparseable`, etc.) + OTel span `self_rag.run` with decision, support, and utility attributes.
+- ✅ Safe pessimism in self-assessment: unparseable token → `(UNSUPPORTED, utility=1)`.
+- ✅ Utility clamped to `[1, 5]`.
+- ✅ `SelfRAGError` added to `prismal/core/exceptions.py`.
+- ✅ Coverage: **94%** in `prismal/rag/self_rag.py` (19 tests).
+- ✅ `ruff check` and `mypy --strict` pass (`StrEnum` modernized).
 
 ---
 
 #### A5 — Parent-Child RAG (Hierarchical) ✅ DONE
-**Estimación:** 3 días | **Archivo:** `prismal/rag/hierarchical.py`
+**Estimate:** 3 days | **File:** `prismal/rag/hierarchical.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| A5-01 | Crear `prismal/rag/hierarchical.py` con `HierarchicalRAGEngine`, `ParentChunk`, `HierarchicalSearchResult` | 1d | — | ✅ |
-| A5-02 | Implementar `index_document()`: split padre → split hijo → almacenar relación parent_id en metadata ChromaDB | 1d | A5-01 | ✅ |
-| A5-03 | Implementar `search()`: buscar en hijo → expandir a padre | 0.5d | A5-01 | ✅ |
-| A5-04 | Tests: verificar que child search + parent expansion retorna contexto mayor | 1d | A5-02, A5-03 | ✅ |
+| A5-01 | Create `prismal/rag/hierarchical.py` with `HierarchicalRAGEngine`, `ParentChunk`, `HierarchicalSearchResult` | 1d | — | ✅ |
+| A5-02 | Implement `index_document()`: parent split → child split → store parent_id relation in ChromaDB metadata | 1d | A5-01 | ✅ |
+| A5-03 | Implement `search()`: search on child → expand to parent | 0.5d | A5-01 | ✅ |
+| A5-04 | Tests: verify that child search + parent expansion returns larger context | 1d | A5-02, A5-03 | ✅ |
 
-**Criterios de Done:**
-- ✅ `search()` retorna chunks padre (metadata `parent_content`) a partir de hits en chunks hijo.
-- ✅ Agrupación por `parent_id`; ordenamiento por mejor score entre sus hijos.
-- ✅ `index_document()` llama `delete_by_source(source)` antes de reindexar (AC-005-7 compatible).
-- ✅ Validación en constructor: `child_size < parent_size` y `overlap < child_size`.
-- ✅ `HierarchicalRAGError` agregado a `prismal/core/exceptions.py`.
-- ✅ Coverage: **93%** en `prismal/rag/hierarchical.py` (14 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
-- ✅ Over-fetch `k*4` hijos para garantizar *k* padres distintos tras la agrupación.
+**Done criteria:**
+- ✅ `search()` returns parent chunks (`parent_content` metadata) from hits on child chunks.
+- ✅ Grouping by `parent_id`; ordering by best score among its children.
+- ✅ `index_document()` calls `delete_by_source(source)` before reindexing (AC-005-7 compatible).
+- ✅ Constructor validation: `child_size < parent_size` and `overlap < child_size`.
+- ✅ `HierarchicalRAGError` added to `prismal/core/exceptions.py`.
+- ✅ Coverage: **93%** in `prismal/rag/hierarchical.py` (14 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
+- ✅ Over-fetch `k*4` children to guarantee *k* distinct parents after grouping.
 
 ---
 
 #### A6 — Multi-Vector RAG ✅ DONE
-**Estimación:** 3 días | **Archivo:** `prismal/rag/multi_vector.py`
+**Estimate:** 3 days | **File:** `prismal/rag/multi_vector.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| A6-01 | Crear `prismal/rag/multi_vector.py` con `MultiVectorRAGEngine` | 1d | — | ✅ |
-| A6-02 | Implementar indexación multi-vector: summary + chunks + hypothetical questions (LLM generadas) | 1d | A6-01 | ✅ |
-| A6-03 | Implementar `search()`: buscar en todos los vectores, dedup, merge | 0.5d | A6-01 | ✅ |
-| A6-04 | Tests: verificar que búsqueda por pregunta encuentra documentos que no encontraría chunk directo | 1d | A6-02, A6-03 | ✅ |
+| A6-01 | Create `prismal/rag/multi_vector.py` with `MultiVectorRAGEngine` | 1d | — | ✅ |
+| A6-02 | Implement multi-vector indexing: summary + chunks + hypothetical questions (LLM-generated) | 1d | A6-01 | ✅ |
+| A6-03 | Implement `search()`: search across all vectors, dedup, merge | 0.5d | A6-01 | ✅ |
+| A6-04 | Tests: verify that question-based search finds documents that direct chunk search would miss | 1d | A6-02, A6-03 | ✅ |
 
-**Criterios de Done:**
-- ✅ Cada chunk se indexa bajo 3 representaciones: `chunk`, `summary`, `question` (N preguntas configurable via `n_questions`).
-- ✅ Todas las representaciones comparten `doc_id` en metadata.
-- ✅ `search()` deduplica por `doc_id`, queda con la representación de mayor score, y reporta `matched_representations` para audit.
-- ✅ Test `test_search_finds_docs_via_hypothetical_question_only` valida que un hit solo en `question` es suficiente.
-- ✅ Best-effort indexing: fallo de summary o questions no bloquea el chunk original.
-- ✅ `delete_by_source` previene duplicados al reindexar (AC-005-7).
-- ✅ `MultiVectorError` agregado a `prismal/core/exceptions.py`.
-- ✅ Coverage: **92%** en `prismal/rag/multi_vector.py` (12 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
-- ✅ Over-fetch `k*4` hits para asegurar *k* docs únicos tras dedup.
+**Done criteria:**
+- ✅ Each chunk is indexed under 3 representations: `chunk`, `summary`, `question` (N questions configurable via `n_questions`).
+- ✅ All representations share `doc_id` in metadata.
+- ✅ `search()` deduplicates by `doc_id`, keeps the highest-scoring representation, and reports `matched_representations` for audit.
+- ✅ Test `test_search_finds_docs_via_hypothetical_question_only` validates that a hit only on `question` is sufficient.
+- ✅ Best-effort indexing: a summary or questions failure does not block the original chunk.
+- ✅ `delete_by_source` prevents duplicates on reindexing (AC-005-7).
+- ✅ `MultiVectorError` added to `prismal/core/exceptions.py`.
+- ✅ Coverage: **92%** in `prismal/rag/multi_vector.py` (12 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
+- ✅ Over-fetch `k*4` hits to ensure *k* unique docs after dedup.
 
 ---
 
 #### A7 — Adaptive RAG (Facade) ✅ DONE
-**Estimación:** 2 días | **Archivo:** `prismal/rag/adaptive.py`
+**Estimate:** 2 days | **File:** `prismal/rag/adaptive.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| A7-01 | Crear `prismal/rag/adaptive.py` con `AdaptiveRAGEngine`, `QueryType`, `AdaptiveResult` | 0.5d | A1-A6 completos | ✅ |
-| A7-02 | Implementar `classify_query()` con heurísticas regex (default) y opción LLM | 1d | A7-01 | ✅ |
-| A7-03 | Implementar `search()` con routing por `QueryType` y fallback a CRAG | 0.5d | A7-01, A7-02 | ✅ |
-| A7-04 | Tests: clasificación correcta de queries tipo factual/abstract/ambiguous/technical | 1d | A7-03 | ✅ |
+| A7-01 | Create `prismal/rag/adaptive.py` with `AdaptiveRAGEngine`, `QueryType`, `AdaptiveResult` | 0.5d | A1-A6 complete | ✅ |
+| A7-02 | Implement `classify_query()` with regex heuristics (default) and an LLM option | 1d | A7-01 | ✅ |
+| A7-03 | Implement `search()` with routing by `QueryType` and fallback to CRAG | 0.5d | A7-01, A7-02 | ✅ |
+| A7-04 | Tests: correct classification of factual/abstract/ambiguous/technical query types | 1d | A7-03 | ✅ |
 
-**Criterios de Done A7:**
-- ✅ Clasificador regex con 6 tipos (FACTUAL_SIMPLE, ABSTRACT, AMBIGUOUS, MULTI_HOP, TECHNICAL, CONVERSATIONAL); confidence en `[0, 1]`.
-- ✅ Opción LLM classifier (`use_llm_classifier=True`) con fallback a regex si el LLM falla o devuelve texto no reconocible.
-- ✅ Routing: ABSTRACT→HyDE, AMBIGUOUS→Fusion, TECHNICAL→Hybrid, resto→CRAG; fallback automático a CRAG si el engine preferido no está inyectado.
-- ✅ `force_strategy` acepta `crag|hyde|fusion|hybrid|hierarchical`; `ValueError` si nombre inválido, `AdaptiveRAGError` si engine no configurado.
+**A7 done criteria:**
+- ✅ Regex classifier with 6 types (FACTUAL_SIMPLE, ABSTRACT, AMBIGUOUS, MULTI_HOP, TECHNICAL, CONVERSATIONAL); confidence in `[0, 1]`.
+- ✅ LLM classifier option (`use_llm_classifier=True`) with fallback to regex if the LLM fails or returns unrecognized text.
+- ✅ Routing: ABSTRACT→HyDE, AMBIGUOUS→Fusion, TECHNICAL→Hybrid, rest→CRAG; automatic fallback to CRAG if the preferred engine is not injected.
+- ✅ `force_strategy` accepts `crag|hyde|fusion|hybrid|hierarchical`; `ValueError` for an invalid name, `AdaptiveRAGError` if the engine is not configured.
 - ✅ Sync engines (Hybrid, Hierarchical) dispatched via `asyncio.to_thread` per SPEC.
-- ✅ `AdaptiveRAGError` agregado a `prismal/core/exceptions.py`.
-- ✅ Coverage: **88%** en `prismal/rag/adaptive.py` (24 tests).
+- ✅ `AdaptiveRAGError` added to `prismal/core/exceptions.py`.
+- ✅ Coverage: **88%** in `prismal/rag/adaptive.py` (24 tests).
 
-**Criterios de Done Fase A (global):** ✅ CUMPLIDOS
-- ✅ Los 7 engines RAG nuevos están en `rag/__init__.py` (HyDE, Fusion, Hybrid, SelfRAG, Hierarchical, MultiVector, Adaptive).
+**Phase A done criteria (global):** ✅ MET
+- ✅ All 7 new RAG engines are in `rag/__init__.py` (HyDE, Fusion, Hybrid, SelfRAG, Hierarchical, MultiVector, Adaptive).
 - ✅ `pytest tests/unit/rag/` → **268 passed** (0 failures, 0 errors).
-- ✅ Coverage agregado sobre `prismal/rag/` = **95%** (target ≥80%).
+- ✅ Aggregate coverage over `prismal/rag/` = **95%** (target ≥80%).
 - ✅ `ruff check prismal/rag/ tests/unit/rag/` → All checks passed!
-- ✅ `mypy --strict` pasa en cada módulo nuevo.
-- ✅ 7 excepciones añadidas a `core/exceptions.py`: `HyDEError`, `FusionError`, `HybridSearchError`, `SelfRAGError`, `HierarchicalRAGError`, `MultiVectorError`, `AdaptiveRAGError` (anticipa D1-04).
-- ✅ Dependencia `rank-bm25>=0.2.2` añadida a `pyproject.toml` (A3-01 pre-requisito).
+- ✅ `mypy --strict` passes on each new module.
+- ✅ 7 exceptions added to `core/exceptions.py`: `HyDEError`, `FusionError`, `HybridSearchError`, `SelfRAGError`, `HierarchicalRAGError`, `MultiVectorError`, `AdaptiveRAGError` (anticipates D1-04).
+- ✅ Dependency `rank-bm25>=0.2.2` added to `pyproject.toml` (A3-01 prerequisite).
 
 ---
 
-### FASE B — Patrones de Agente
+### PHASE B — Agent Patterns
 
-**Duración:** 3 semanas (semanas 4-6)
-**Objetivo:** Implementar 7 nuevos patrones de razonamiento en `prismal/agents/patterns/`.
+**Duration:** 3 weeks (weeks 4-6)
+**Objective:** Implement 7 new reasoning patterns in `prismal/agents/patterns/`.
 
 ---
 
 #### B1 — Tree of Thoughts ✅ DONE
-**Estimación:** 4 días | **Archivo:** `prismal/agents/patterns/tree_of_thoughts.py`
+**Estimate:** 4 days | **File:** `prismal/agents/patterns/tree_of_thoughts.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| B1-01 | Crear `tree_of_thoughts.py` con dataclasses `Thought`, `ToTResult` y tipos `GenerateThoughtsFn`, `EvaluateThoughtFn` | 0.5d | — | ✅ |
-| B1-02 | Implementar beam search BFS: generar N thoughts → evaluar → seleccionar top-k | 1.5d | B1-01 | ✅ |
-| B1-03 | Implementar modo DFS con backtracking explícito | 1d | B1-01 | ✅ |
-| B1-04 | Tests: ToT con mock generate/evaluate; verificar que beam search no excede breadth*depth calls | 1.5d | B1-02, B1-03 | ✅ |
-| B1-05 | Añadir `tot_agent_node` wrapper en `agents/` para registrar en `graph.py` | 0.5d | B1-04 | ✅ (como factory `make_tot_node` — devuelve async node LangGraph-compatible; registro en graph.py queda para D1-01) |
+| B1-01 | Create `tree_of_thoughts.py` with dataclasses `Thought`, `ToTResult` and types `GenerateThoughtsFn`, `EvaluateThoughtFn` | 0.5d | — | ✅ |
+| B1-02 | Implement BFS beam search: generate N thoughts → evaluate → select top-k | 1.5d | B1-01 | ✅ |
+| B1-03 | Implement DFS mode with explicit backtracking | 1d | B1-01 | ✅ |
+| B1-04 | Tests: ToT with mock generate/evaluate; verify that beam search does not exceed breadth*depth calls | 1.5d | B1-02, B1-03 | ✅ |
+| B1-05 | Add `tot_agent_node` wrapper in `agents/` to register in `graph.py` | 0.5d | B1-04 | ✅ (as factory `make_tot_node` — returns a LangGraph-compatible async node; registration in graph.py is left to D1-01) |
 
-**Criterios de Done:**
-- ✅ `tree_of_thoughts(problem, generate_fn, evaluate_fn, state)` retorna `ToTResult` con `best_thought`, `best_path`, `all_thoughts`, `total_thoughts_generated`.
-- ✅ Beam search respeta cap `breadth * depth` (test `test_beam_search_respects_breadth_times_depth_cap`).
-- ✅ OTel spans creados: `tot.search`, `tot.generate_thoughts`, `tot.evaluate_thoughts`, `tot.beam_select`.
-- ✅ 3 modos de búsqueda: `beam` (default), `bfs`, `dfs`.
-- ✅ Early-exit por `threshold`; DFS descends highest-score branch con backtrack.
-- ✅ Validación `breadth≥1`, `depth≥1`, `beam_size≥1`; `ValueError` en constructor.
-- ✅ `ToTError` en `core/exceptions.py` via `PrismalError`.
-- ✅ Coverage: **90%** en `tree_of_thoughts.py` (15 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
+**Done criteria:**
+- ✅ `tree_of_thoughts(problem, generate_fn, evaluate_fn, state)` returns `ToTResult` with `best_thought`, `best_path`, `all_thoughts`, `total_thoughts_generated`.
+- ✅ Beam search respects the `breadth * depth` cap (test `test_beam_search_respects_breadth_times_depth_cap`).
+- ✅ OTel spans created: `tot.search`, `tot.generate_thoughts`, `tot.evaluate_thoughts`, `tot.beam_select`.
+- ✅ 3 search modes: `beam` (default), `bfs`, `dfs`.
+- ✅ Early-exit by `threshold`; DFS descends the highest-score branch with backtrack.
+- ✅ Validation `breadth≥1`, `depth≥1`, `beam_size≥1`; `ValueError` in the constructor.
+- ✅ `ToTError` in `core/exceptions.py` via `PrismalError`.
+- ✅ Coverage: **90%** in `tree_of_thoughts.py` (15 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
 
 ---
 
 #### B2 — Debate / Society of Mind ✅ DONE
-**Estimación:** 3 días | **Archivo:** `prismal/agents/patterns/debate.py`
+**Estimate:** 3 days | **File:** `prismal/agents/patterns/debate.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| B2-01 | Crear `debate.py` con `DebatePosition`, `DebateResult` y función `debate_round()` | 0.5d | — | ✅ |
-| B2-02 | Implementar generación de posiciones iniciales (N agentes con roles distintos) | 1d | B2-01 | ✅ |
-| B2-03 | Implementar rondas de réplica (cada agente ve posiciones anteriores) | 0.5d | B2-02 | ✅ |
-| B2-04 | Implementar síntesis por moderador LLM + cálculo de `agreement_score` | 0.5d | B2-03 | ✅ |
-| B2-05 | Tests: 3 agentes, 2 rondas, verificar que consensus no es copia de ninguna posición | 1d | B2-04 | ✅ |
+| B2-01 | Create `debate.py` with `DebatePosition`, `DebateResult` and function `debate_round()` | 0.5d | — | ✅ |
+| B2-02 | Implement generation of initial positions (N agents with distinct roles) | 1d | B2-01 | ✅ |
+| B2-03 | Implement rebuttal rounds (each agent sees previous positions) | 0.5d | B2-02 | ✅ |
+| B2-04 | Implement synthesis by an LLM moderator + computation of `agreement_score` | 0.5d | B2-03 | ✅ |
+| B2-05 | Tests: 3 agents, 2 rounds, verify that the consensus is not a copy of any position | 1d | B2-04 | ✅ |
 
-**Criterios de Done:**
-- ✅ `debate_round()` retorna `DebateResult(consensus, agreement_score, positions, dissenting_views, rounds_completed)`.
-- ✅ Rondas 2+ ven posiciones de rondas anteriores (test explícito).
-- ✅ 3 estrategias de síntesis: `moderator` (LLM), `majority_vote` (Counter.most_common), `weighted` (moderator con prompt ponderado).
-- ✅ Consensus nunca es copia verbatim de ninguna posición (test `test_consensus_is_not_a_verbatim_copy_of_any_position`).
-- ✅ `agreement_score` = promedio Jaccard sobre pares de posiciones finales, en `[0, 1]`.
-- ✅ Roles por defecto `[proponent, opponent, neutral]`; overflow → `analyst_N`; custom roles validados.
-- ✅ Per-agent errors son best-effort: si al menos 1 posición tuvo éxito, el debate continúa; si todos fallan → `DebateError`.
-- ✅ `DebateError` hereda de `PrismalError`.
-- ✅ Coverage: **91%** en `debate.py` (14 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
+**Done criteria:**
+- ✅ `debate_round()` returns `DebateResult(consensus, agreement_score, positions, dissenting_views, rounds_completed)`.
+- ✅ Rounds 2+ see positions from previous rounds (explicit test).
+- ✅ 3 synthesis strategies: `moderator` (LLM), `majority_vote` (Counter.most_common), `weighted` (moderator with a weighted prompt).
+- ✅ The consensus is never a verbatim copy of any position (test `test_consensus_is_not_a_verbatim_copy_of_any_position`).
+- ✅ `agreement_score` = average Jaccard over pairs of final positions, in `[0, 1]`.
+- ✅ Default roles `[proponent, opponent, neutral]`; overflow → `analyst_N`; custom roles validated.
+- ✅ Per-agent errors are best-effort: if at least 1 position succeeded, the debate continues; if all fail → `DebateError`.
+- ✅ `DebateError` inherits from `PrismalError`.
+- ✅ Coverage: **91%** in `debate.py` (14 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
 
 ---
 
 #### B3 — Constitutional AI ✅ DONE
-**Estimación:** 3 días | **Archivo:** `prismal/agents/patterns/constitutional.py`
+**Estimate:** 3 days | **File:** `prismal/agents/patterns/constitutional.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| B3-01 | Crear `constitutional.py` con `ConstitutionalPrinciple`, `ConstitutionalRevision`, `ConstitutionalResult`, `DEFAULT_PRINCIPLES` | 0.5d | — | ✅ |
-| B3-02 | Implementar `check_principle()` — LLM evalúa violación | 1d | B3-01 | ✅ |
-| B3-03 | Implementar `apply()` — loop sobre principios con revisión y `max_revisions` cap | 0.5d | B3-02 | ✅ |
-| B3-04 | Integrar `AuditLogger` para registrar cada revisión aplicada | 0.3d | B3-03 | ✅ (vía `logger.info("constitutional_revision_applied", ...)` — estilo consistente con CRAG/Debate/ToT, structlog → sinks) |
-| B3-05 | Tests: texto con PII → verifica detección; texto correcto → verifica 0 revisiones; loop cap funciona | 1.5d | B3-04 | ✅ |
+| B3-01 | Create `constitutional.py` with `ConstitutionalPrinciple`, `ConstitutionalRevision`, `ConstitutionalResult`, `DEFAULT_PRINCIPLES` | 0.5d | — | ✅ |
+| B3-02 | Implement `check_principle()` — LLM evaluates violation | 1d | B3-01 | ✅ |
+| B3-03 | Implement `apply()` — loop over principles with revision and `max_revisions` cap | 0.5d | B3-02 | ✅ |
+| B3-04 | Integrate `AuditLogger` to record each applied revision | 0.3d | B3-03 | ✅ (via `logger.info("constitutional_revision_applied", ...)` — style consistent with CRAG/Debate/ToT, structlog → sinks) |
+| B3-05 | Tests: text with PII → verify detection; correct text → verify 0 revisions; loop cap works | 1.5d | B3-04 | ✅ |
 
-**Criterios de Done:**
-- ✅ `ConstitutionalFilter.apply()` detecta y revisa violaciones principio por principio.
-- ✅ 3 `DEFAULT_PRINCIPLES` definidos: P001 `no_harmful_content` (critical), P002 `factual_accuracy` (high), P003 `no_pii_exposure` (critical).
-- ✅ Loop respeta `max_revisions` y establece `max_revisions_reached=True` + `all_principles_satisfied=False` si se agota (test `test_apply_respects_max_revisions_cap`).
-- ✅ Cada revisión emite evento estructurado `constitutional_revision_applied` con `principle_id`, `attempt`, `severity` (test `test_apply_logs_each_revision`).
-- ✅ Parseo estricto del prefijo `VIOLATION:` en critique — unparseable → no-violation (evita over-blocking).
-- ✅ Context opcional propagado al critique prompt.
-- ✅ `ConstitutionalError` en `core/exceptions.py` (via `PrismalError`).
-- ✅ Coverage: **94%** en `constitutional.py` (16 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
+**Done criteria:**
+- ✅ `ConstitutionalFilter.apply()` detects and revises violations principle by principle.
+- ✅ 3 `DEFAULT_PRINCIPLES` defined: P001 `no_harmful_content` (critical), P002 `factual_accuracy` (high), P003 `no_pii_exposure` (critical).
+- ✅ The loop respects `max_revisions` and sets `max_revisions_reached=True` + `all_principles_satisfied=False` if exhausted (test `test_apply_respects_max_revisions_cap`).
+- ✅ Each revision emits a structured event `constitutional_revision_applied` with `principle_id`, `attempt`, `severity` (test `test_apply_logs_each_revision`).
+- ✅ Strict parsing of the `VIOLATION:` prefix in the critique — unparseable → no-violation (avoids over-blocking).
+- ✅ Optional context propagated to the critique prompt.
+- ✅ `ConstitutionalError` in `core/exceptions.py` (via `PrismalError`).
+- ✅ Coverage: **94%** in `constitutional.py` (16 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
 
 ---
 
 #### B4 — LATS (Language Agent Tree Search / MCTS) ✅ DONE
-**Estimación:** 5 días | **Archivo:** `prismal/agents/patterns/lats.py`
+**Estimate:** 5 days | **File:** `prismal/agents/patterns/lats.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| B4-01 | Crear `lats.py` con `LATSNode`, `LATSResult` y propiedad `ucb1` | 0.5d | — | ✅ (implementado como método `ucb1(exploration_constant)` — el SPEC tenía @property + parámetro, inválido en Python) |
-| B4-02 | Implementar `_select()` — traversal por UCB1 máximo | 1d | B4-01 | ✅ (inline en `_one_simulation`) |
-| B4-03 | Implementar `_expand()` — LLM genera N acciones candidatas para el nodo | 1d | B4-01 | ✅ (`_expand()` delega en `action_generator_fn` + `transition_fn` inyectables) |
-| B4-04 | Implementar `_simulate()` — ejecutar acción y calcular reward vía `reward_fn` | 1d | B4-01 | ✅ |
-| B4-05 | Implementar `_backpropagate()` — actualizar Q y N en el camino root→nodo | 0.5d | B4-02 | ✅ |
-| B4-06 | Implementar `search()` — loop MCTS hasta `max_simulations` o terminal state | 0.5d | B4-02-B4-05 | ✅ (con `timeout_seconds` adicional) |
-| B4-07 | Tests: mock reward_fn; verificar UCB1 balance exploration/exploitation; timeout funciona | 2d | B4-06 | ✅ |
+| B4-01 | Create `lats.py` with `LATSNode`, `LATSResult` and property `ucb1` | 0.5d | — | ✅ (implemented as method `ucb1(exploration_constant)` — the SPEC had @property + parameter, which is invalid in Python) |
+| B4-02 | Implement `_select()` — traversal by maximum UCB1 | 1d | B4-01 | ✅ (inline in `_one_simulation`) |
+| B4-03 | Implement `_expand()` — LLM generates N candidate actions for the node | 1d | B4-01 | ✅ (`_expand()` delegates to injectable `action_generator_fn` + `transition_fn`) |
+| B4-04 | Implement `_simulate()` — execute action and compute reward via `reward_fn` | 1d | B4-01 | ✅ |
+| B4-05 | Implement `_backpropagate()` — update Q and N along the root→node path | 0.5d | B4-02 | ✅ |
+| B4-06 | Implement `search()` — MCTS loop until `max_simulations` or terminal state | 0.5d | B4-02-B4-05 | ✅ (with additional `timeout_seconds`) |
+| B4-07 | Tests: mock reward_fn; verify UCB1 exploration/exploitation balance; timeout works | 2d | B4-06 | ✅ |
 
-**Criterios de Done:**
-- ✅ UCB1 verificado matemáticamente: unvisited=+inf; root pure exploit; fórmula Auer et al. `Q/N + C*sqrt(ln(N_parent)/N)`; balance exploration/exploitation (4 tests específicos).
-- ✅ `LATSAgent.search()` retorna `LATSResult(best_action_sequence, final_state, total_simulations, best_reward, search_tree_depth)`.
-- ✅ `max_simulations` cap respetado (test `test_search_respects_max_simulations_cap`).
-- ✅ `timeout_seconds` opcional corta el loop por wall-clock (test `test_search_times_out_when_budget_elapses`).
-- ✅ `max_depth` cap respetado (test `test_search_respects_max_depth`).
-- ✅ Convergencia a mejor rama con suficientes simulaciones (test `test_search_ultimately_favours_higher_reward_path`).
-- ✅ `LATSError` cuando el search es vacuo (no children expanded).
-- ✅ Decoupled de LLM/tools: callables inyectables `action_generator`, `transition_fn`, `reward_fn`.
-- ✅ Coverage: **98%** en `lats.py` (15 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
+**Done criteria:**
+- ✅ UCB1 mathematically verified: unvisited=+inf; root pure exploit; Auer et al. formula `Q/N + C*sqrt(ln(N_parent)/N)`; exploration/exploitation balance (4 specific tests).
+- ✅ `LATSAgent.search()` returns `LATSResult(best_action_sequence, final_state, total_simulations, best_reward, search_tree_depth)`.
+- ✅ `max_simulations` cap respected (test `test_search_respects_max_simulations_cap`).
+- ✅ Optional `timeout_seconds` cuts the loop by wall-clock (test `test_search_times_out_when_budget_elapses`).
+- ✅ `max_depth` cap respected (test `test_search_respects_max_depth`).
+- ✅ Convergence to the best branch with enough simulations (test `test_search_ultimately_favours_higher_reward_path`).
+- ✅ `LATSError` when the search is vacuous (no children expanded).
+- ✅ Decoupled from LLM/tools: injectable callables `action_generator`, `transition_fn`, `reward_fn`.
+- ✅ Coverage: **98%** in `lats.py` (15 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
 
 ---
 
 #### B5 — LLM-Compiler ✅ DONE
-**Estimación:** 5 días | **Archivo:** `prismal/agents/patterns/llm_compiler.py`
+**Estimate:** 5 days | **File:** `prismal/agents/patterns/llm_compiler.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| B5-01 | Crear `llm_compiler.py` con `TaskNode`, `CompilerPlan`, `CompilerResult` | 0.5d | — | ✅ |
-| B5-02 | Implementar `plan()` — Planner LLM genera lista de tareas con dependencias en JSON | 1d | B5-01 | ✅ (vía callable inyectable `plan_fn`; LLM-backed queda como wiring del caller) |
-| B5-03 | Implementar `validate_dag()` — detectar ciclos con topological sort (Kahn's algorithm) | 1d | B5-01 | ✅ |
-| B5-04 | Implementar execution engine — waves paralelas con `asyncio.gather` | 1d | B5-03 | ✅ |
-| B5-05 | Implementar Joiner LLM — sintetiza resultados de todas las tareas | 0.5d | B5-04 | ✅ (vía callable inyectable `joiner`) |
-| B5-06 | Implementar replanning loop — si Joiner detecta insuficiencia, vuelve a `plan()` con contexto | 0.5d | B5-05 | ✅ (replan se dispara en task failure; `previous_results` se pasa al siguiente `plan_fn`) |
-| B5-07 | Tests: DAG lineal, DAG paralelo, DAG con ciclo (debe fallar), replanning | 2d | B5-06 | ✅ |
+| B5-01 | Create `llm_compiler.py` with `TaskNode`, `CompilerPlan`, `CompilerResult` | 0.5d | — | ✅ |
+| B5-02 | Implement `plan()` — Planner LLM generates a list of tasks with dependencies in JSON | 1d | B5-01 | ✅ (via injectable `plan_fn`; LLM-backed wiring is left to the caller) |
+| B5-03 | Implement `validate_dag()` — detect cycles with topological sort (Kahn's algorithm) | 1d | B5-01 | ✅ |
+| B5-04 | Implement execution engine — parallel waves with `asyncio.gather` | 1d | B5-03 | ✅ |
+| B5-05 | Implement Joiner LLM — synthesizes results from all tasks | 0.5d | B5-04 | ✅ (via injectable `joiner`) |
+| B5-06 | Implement replanning loop — if the Joiner detects insufficiency, go back to `plan()` with context | 0.5d | B5-05 | ✅ (replan triggers on task failure; `previous_results` is passed to the next `plan_fn`) |
+| B5-07 | Tests: linear DAG, parallel DAG, DAG with a cycle (must fail), replanning | 2d | B5-06 | ✅ |
 
-**Criterios de Done:**
-- ✅ `validate_dag()` rechaza ciclos, dependencias a IDs desconocidos, y duplicados con `CompilerError` descriptivo (3 tests).
-- ✅ Tareas independientes ejecutan en paralelo: fixture con 3 tareas sleep(0.1s) termina en < 0.25s (vs ~0.3s secuencial → > 30% reducción, test `test_parallel_tasks_run_concurrently`).
-- ✅ `CompilerPlan.to_json()` retorna JSON válido y deserializable (test `test_compiler_plan_to_json_round_trips`).
-- ✅ `$T1.output` interpolation: args con referencias a outputs previos se resuelven antes de ejecutar (test `test_args_interpolate_prior_task_outputs`).
-- ✅ Execution waves calculadas por topological sort estable.
-- ✅ Replanning on failure: se pasa `previous_results` como contexto al re-planner (test `test_replan_triggered_on_task_failure`).
-- ✅ `max_replanning` cap hard stop con `CompilerError("replanning")` (test `test_max_replanning_cap_aborts_with_compiler_error`).
-- ✅ `CompilerError` hereda de `PrismalError`.
-- ✅ Coverage: **95%** en `llm_compiler.py` (18 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
+**Done criteria:**
+- ✅ `validate_dag()` rejects cycles, dependencies on unknown IDs, and duplicates with a descriptive `CompilerError` (3 tests).
+- ✅ Independent tasks run in parallel: a fixture with 3 sleep(0.1s) tasks finishes in < 0.25s (vs ~0.3s sequential → > 30% reduction, test `test_parallel_tasks_run_concurrently`).
+- ✅ `CompilerPlan.to_json()` returns valid, deserializable JSON (test `test_compiler_plan_to_json_round_trips`).
+- ✅ `$T1.output` interpolation: args with references to prior outputs are resolved before execution (test `test_args_interpolate_prior_task_outputs`).
+- ✅ Execution waves computed by a stable topological sort.
+- ✅ Replanning on failure: `previous_results` is passed as context to the re-planner (test `test_replan_triggered_on_task_failure`).
+- ✅ `max_replanning` cap hard stop with `CompilerError("replanning")` (test `test_max_replanning_cap_aborts_with_compiler_error`).
+- ✅ `CompilerError` inherits from `PrismalError`.
+- ✅ Coverage: **95%** in `llm_compiler.py` (18 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
 
 ---
 
 #### B6 — Mixture of Agents (MoA) ✅ DONE
-**Estimación:** 3 días | **Archivo:** `prismal/agents/patterns/mixture_of_agents.py`
+**Estimate:** 3 days | **File:** `prismal/agents/patterns/mixture_of_agents.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| B6-01 | Crear `mixture_of_agents.py` con `MoAResult` y `MixtureOfAgents` | 0.5d | — | ✅ |
-| B6-02 | Implementar capa de proposers — llamadas paralelas a N providers vía `ProviderRegistry` | 1d | B6-01 | ✅ |
-| B6-03 | Implementar capa de aggregator — LLM sintetiza todas las respuestas de la capa anterior | 1d | B6-02 | ✅ |
-| B6-04 | Tests: 3 proposers mock, 1 aggregator; verificar que fallo de 1 proposer no bloquea (partial results) | 1d | B6-03 | ✅ |
+| B6-01 | Create `mixture_of_agents.py` with `MoAResult` and `MixtureOfAgents` | 0.5d | — | ✅ |
+| B6-02 | Implement the proposer layer — parallel calls to N providers via `ProviderRegistry` | 1d | B6-01 | ✅ |
+| B6-03 | Implement the aggregator layer — LLM synthesizes all responses from the previous layer | 1d | B6-02 | ✅ |
+| B6-04 | Tests: 3 mock proposers, 1 aggregator; verify that a failure of 1 proposer does not block (partial results) | 1d | B6-03 | ✅ |
 
-**Criterios de Done:**
-- ✅ Proposers corren en paralelo vía `asyncio.gather(return_exceptions=True)` — cada modelo vía `ProviderRegistry.get_llm(model_id)`.
-- ✅ Partial-failure tolerance: fallos per-proposer se descartan con logging; el aggregator continúa con los sobrevivientes (test `test_generate_continues_when_one_proposer_fails`).
-- ✅ `MoAError` sólo si TODOS los proposers fallan (test `test_generate_raises_moa_error_when_all_proposers_fail`).
-- ✅ Aggregator recibe todas las proposer outputs en su prompt (test `test_aggregator_prompt_includes_proposer_outputs`).
-- ✅ `n_aggregator_layers > 1` produce K aggregator passes secuenciales, cada uno refinando el anterior (test `test_generate_with_multiple_aggregator_layers`).
-- ✅ `aggregator_model=None` defaultea al primer proposer (test `test_generate_uses_default_aggregator_when_none`).
-- ✅ `providers_used` refleja solo los proposers exitosos.
-- ✅ Validaciones constructor: `proposer_models` no vacío, `n_aggregator_layers ≥ 1`.
-- ✅ `MoAError` hereda de `PrismalError`.
-- ✅ `SecurePromptBuilder` envuelve todas las llamadas LLM.
-- ✅ Coverage: **100%** en `mixture_of_agents.py` (11 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
+**Done criteria:**
+- ✅ Proposers run in parallel via `asyncio.gather(return_exceptions=True)` — each model via `ProviderRegistry.get_llm(model_id)`.
+- ✅ Partial-failure tolerance: per-proposer failures are discarded with logging; the aggregator continues with the survivors (test `test_generate_continues_when_one_proposer_fails`).
+- ✅ `MoAError` only if ALL proposers fail (test `test_generate_raises_moa_error_when_all_proposers_fail`).
+- ✅ The aggregator receives all proposer outputs in its prompt (test `test_aggregator_prompt_includes_proposer_outputs`).
+- ✅ `n_aggregator_layers > 1` produces K sequential aggregator passes, each refining the previous (test `test_generate_with_multiple_aggregator_layers`).
+- ✅ `aggregator_model=None` defaults to the first proposer (test `test_generate_uses_default_aggregator_when_none`).
+- ✅ `providers_used` reflects only the successful proposers.
+- ✅ Constructor validations: `proposer_models` non-empty, `n_aggregator_layers ≥ 1`.
+- ✅ `MoAError` inherits from `PrismalError`.
+- ✅ `SecurePromptBuilder` wraps all LLM calls.
+- ✅ Coverage: **100%** in `mixture_of_agents.py` (11 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
 
 ---
 
-#### B7 — Swarm / Handoff Descentralizado ✅ DONE
-**Estimación:** 2 días | **Archivo:** `prismal/agents/patterns/swarm.py`
+#### B7 — Decentralized Swarm / Handoff ✅ DONE
+**Estimate:** 2 days | **File:** `prismal/agents/patterns/swarm.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| B7-01 | Crear `swarm.py` con `HandoffRecord`, `VALID_HANDOFF_TARGETS` y `swarm_handoff()` | 0.5d | — | ✅ |
-| B7-02 | Implementar `swarm_handoff()` — validar target, actualizar `state["metadata"]["handoff_history"]`, registrar en `AuditLogger` | 1d | B7-01 | ✅ (audit vía structlog event `swarm_handoff_recorded`, estilo consistente con resto de patterns) |
-| B7-03 | Tests: handoff válido actualiza estado correctamente; handoff a target inválido lanza ValueError; auto-handoff rechazado | 0.5d | B7-02 | ✅ |
+| B7-01 | Create `swarm.py` with `HandoffRecord`, `VALID_HANDOFF_TARGETS` and `swarm_handoff()` | 0.5d | — | ✅ |
+| B7-02 | Implement `swarm_handoff()` — validate target, update `state["metadata"]["handoff_history"]`, record in `AuditLogger` | 1d | B7-01 | ✅ (audit via structlog event `swarm_handoff_recorded`, style consistent with the rest of the patterns) |
+| B7-03 | Tests: a valid handoff updates state correctly; a handoff to an invalid target raises ValueError; self-handoff rejected | 0.5d | B7-02 | ✅ |
 
-**Criterios de Done B7:**
-- ✅ Handoff válido setea `state["next_agent"]` y añade entry a `state["metadata"]["handoff_history"]`.
+**B7 done criteria:**
+- ✅ A valid handoff sets `state["next_agent"]` and appends an entry to `state["metadata"]["handoff_history"]`.
 - ✅ Self-handoff (`current_agent == target_agent`) → `ValueError`.
-- ✅ Target fuera de `VALID_HANDOFF_TARGETS` → `ValueError` con lista de válidos.
-- ✅ `valid_targets` customizable via parámetro (para tests y extensiones).
-- ✅ Immutabilidad: input state no se muta; new state es copia con metadata fresca (test `test_handoff_does_not_mutate_input_state`).
-- ✅ Historia preservada: handoffs anteriores se mantienen, nuevo se append al final.
-- ✅ `context_snapshot` captura solo campos pequeños (`session_id`, `iteration_count`, `current_agent`, `task_plan`, `risk_score`) — nunca `messages` o `retrieved_docs`.
-- ✅ Metadata auto-inicializada si falta en el input state.
-- ✅ Audit event `swarm_handoff_recorded` con `from_agent`, `to_agent`, `reason`.
-- ✅ `SwarmError` disponible en `core` para errores futuros no-ValueError.
-- ✅ `VALID_HANDOFF_TARGETS` incluye 7 specialist agents del SPEC.
-- ✅ Coverage: **100%** en `swarm.py` (13 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
+- ✅ A target outside `VALID_HANDOFF_TARGETS` → `ValueError` with a list of valid ones.
+- ✅ `valid_targets` customizable via parameter (for tests and extensions).
+- ✅ Immutability: the input state is not mutated; the new state is a copy with fresh metadata (test `test_handoff_does_not_mutate_input_state`).
+- ✅ History preserved: previous handoffs are kept, the new one is appended at the end.
+- ✅ `context_snapshot` captures only small fields (`session_id`, `iteration_count`, `current_agent`, `task_plan`, `risk_score`) — never `messages` or `retrieved_docs`.
+- ✅ Metadata auto-initialized if missing in the input state.
+- ✅ Audit event `swarm_handoff_recorded` with `from_agent`, `to_agent`, `reason`.
+- ✅ `SwarmError` available in `core` for future non-ValueError errors.
+- ✅ `VALID_HANDOFF_TARGETS` includes the 7 specialist agents from the SPEC.
+- ✅ Coverage: **100%** in `swarm.py` (13 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
 
-**Criterios de Done Fase B (global):** ✅ CUMPLIDOS
-- ✅ Los 7 patrones implementados en `agents/patterns/`: `tree_of_thoughts`, `debate`, `constitutional`, `lats`, `llm_compiler`, `mixture_of_agents`, `swarm`.
-- ✅ `pytest tests/unit/agents/patterns/` → **106 tests new pattern** (15 ToT + 14 debate + 16 constitutional + 15 LATS + 18 compiler + 11 MoA + 13 swarm + 4 existentes = todos pasando). Total suite `tests/unit/agents/patterns/ + tests/unit/rag/` = **394 passed**.
-- ✅ Coverage ≥ 80% en todos los módulos de patrones nuevos:
+**Phase B done criteria (global):** ✅ MET
+- ✅ All 7 patterns implemented in `agents/patterns/`: `tree_of_thoughts`, `debate`, `constitutional`, `lats`, `llm_compiler`, `mixture_of_agents`, `swarm`.
+- ✅ `pytest tests/unit/agents/patterns/` → **106 new pattern tests** (15 ToT + 14 debate + 16 constitutional + 15 LATS + 18 compiler + 11 MoA + 13 swarm + 4 existing = all passing). Total suite `tests/unit/agents/patterns/ + tests/unit/rag/` = **394 passed**.
+- ✅ Coverage ≥ 80% in all new pattern modules:
   - `tree_of_thoughts.py`: **90%**
   - `debate.py`: **91%**
   - `constitutional.py`: **94%**
@@ -423,190 +423,190 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
   - `mixture_of_agents.py`: **100%**
   - `swarm.py`: **100%**
 - ✅ `ruff check prismal/agents/patterns/` → All checks passed!
-- ✅ `mypy --strict prismal/agents/patterns/<module>.py` → Success en cada módulo nuevo.
+- ✅ `mypy --strict prismal/agents/patterns/<module>.py` → Success on each new module.
 
 ---
 
-### FASE C — Subgraph Pipelines
+### PHASE C — Subgraph Pipelines
 
-**Duración:** 2 semanas (semanas 7-8)
-**Objetivo:** Implementar 5 subgraph pipelines de dominio siguiendo el patrón `SubgraphFactory`.
+**Duration:** 2 weeks (weeks 7-8)
+**Objective:** Implement 5 domain subgraph pipelines following the `SubgraphFactory` pattern.
 
 ---
 
 #### C1 — Customer Service Pipeline ✅ DONE
-**Estimación:** 4 días | **Directorio:** `prismal/agents/subgraphs/customer_service/`
+**Estimate:** 4 days | **Directory:** `prismal/agents/subgraphs/customer_service/`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| C1-01 | Crear estructura de directorio y `__init__.py` con `build_customer_service_subgraph()` | 0.3d | — | ✅ |
-| C1-02 | Implementar `classifier_node.py` — clasifica query en FAQ/Complaint/Technical/Other | 1d | C1-01 | ✅ (vía factory `make_classifier_node(llm)` — parsing permisivo con fallback a `other`) |
-| C1-03 | Implementar `faq_retrieval_node.py` — RAG sobre base de conocimiento | 0.5d | C1-01 | ✅ (confianza = max(relevance_score); short-circuit si `rag_engine=None`) |
-| C1-04 | Implementar `escalation_node.py` — gate HITL si confianza < threshold | 0.5d | C1-01 | ✅ (conditional edge fn; escala en complaint, low-confidence, o metadata missing) |
-| C1-05 | Implementar `response_generator_node.py` y `ticket_creator_node.py` | 0.5d | C1-01 | ✅ (ticket id `TK-<8hex>`; response LLM grounded en retrieved context) |
-| C1-06 | Ensamblar `StateGraph` y registrar en `SubgraphRegistry` | 0.5d | C1-02-C1-05 | ✅ (builder retorna `SubgraphDefinition` con 5 nodos, entry=classifier, edges lineales + conditional en escalation_gate) |
-| C1-07 | Tests: flujo FAQ completo, flujo escalación, flujo creación de ticket | 1d | C1-06 | ✅ |
+| C1-01 | Create the directory structure and `__init__.py` with `build_customer_service_subgraph()` | 0.3d | — | ✅ |
+| C1-02 | Implement `classifier_node.py` — classifies the query into FAQ/Complaint/Technical/Other | 1d | C1-01 | ✅ (via factory `make_classifier_node(llm)` — permissive parsing with fallback to `other`) |
+| C1-03 | Implement `faq_retrieval_node.py` — RAG over the knowledge base | 0.5d | C1-01 | ✅ (confidence = max(relevance_score); short-circuit if `rag_engine=None`) |
+| C1-04 | Implement `escalation_node.py` — HITL gate if confidence < threshold | 0.5d | C1-01 | ✅ (conditional edge fn; escalates on complaint, low-confidence, or missing metadata) |
+| C1-05 | Implement `response_generator_node.py` and `ticket_creator_node.py` | 0.5d | C1-01 | ✅ (ticket id `TK-<8hex>`; response LLM grounded in retrieved context) |
+| C1-06 | Assemble the `StateGraph` and register it in `SubgraphRegistry` | 0.5d | C1-02-C1-05 | ✅ (builder returns `SubgraphDefinition` with 5 nodes, entry=classifier, linear edges + conditional on escalation_gate) |
+| C1-07 | Tests: full FAQ flow, escalation flow, ticket creation flow | 1d | C1-06 | ✅ |
 
-**Criterios de Done:**
-- ✅ 5 nodos implementados: `classifier`, `faq_retrieval`, `escalation_gate`, `response_generator`, `ticket_creator`.
-- ✅ Entry point: `classifier`; edges: `classifier→faq_retrieval→escalation_gate`, luego conditional (`→ticket_creator` o `→response_generator`).
-- ✅ Escalation gate: complaint → ticket; confidence < threshold (default 0.6) → ticket; metadata ausente → ticket (defensive); resto → response.
-- ✅ Flujo FAQ (test `test_escalation_gate_routes_confident_faq_to_response_generator` + tests de nodos individuales).
-- ✅ Flujo escalación por complaint / low-confidence / metadata missing (3 tests).
-- ✅ Flujo ticket creator: `TK-<8hex>` id + AIMessage de confirmación al usuario (2 tests).
-- ✅ `classifier_node` handle empty messages y LLM errors con fallback a `other`.
-- ✅ `faq_retrieval_node` handle `rag_engine=None`, excepciones de RAG, hits vacíos.
-- ✅ `response_generator` handle retrieved vacío (prompt pide reconocer la falta en vez de inventar).
-- ✅ `CustomerServiceError` hereda de `PrismalError`.
-- ✅ Coverage por módulo: builder 87%, classifier 90%, escalation 100%, faq_retrieval 85%, response_generator 83%, ticket_creator 96% (22 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
-- ⚠️ Registro en `SubgraphRegistry` (patrón `register_customer_service()`) queda diferido — el builder devuelve `SubgraphDefinition` listo para registrar; wiring global va en D1.
+**Done criteria:**
+- ✅ 5 nodes implemented: `classifier`, `faq_retrieval`, `escalation_gate`, `response_generator`, `ticket_creator`.
+- ✅ Entry point: `classifier`; edges: `classifier→faq_retrieval→escalation_gate`, then conditional (`→ticket_creator` or `→response_generator`).
+- ✅ Escalation gate: complaint → ticket; confidence < threshold (default 0.6) → ticket; metadata absent → ticket (defensive); rest → response.
+- ✅ FAQ flow (test `test_escalation_gate_routes_confident_faq_to_response_generator` + individual node tests).
+- ✅ Escalation flow by complaint / low-confidence / missing metadata (3 tests).
+- ✅ Ticket creator flow: `TK-<8hex>` id + AIMessage confirmation to the user (2 tests).
+- ✅ `classifier_node` handles empty messages and LLM errors with fallback to `other`.
+- ✅ `faq_retrieval_node` handles `rag_engine=None`, RAG exceptions, empty hits.
+- ✅ `response_generator` handles empty retrieved context (the prompt asks to acknowledge the gap instead of fabricating).
+- ✅ `CustomerServiceError` inherits from `PrismalError`.
+- ✅ Coverage per module: builder 87%, classifier 90%, escalation 100%, faq_retrieval 85%, response_generator 83%, ticket_creator 96% (22 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
+- ⚠️ Registration in `SubgraphRegistry` (the `register_customer_service()` pattern) is deferred — the builder returns a `SubgraphDefinition` ready to register; the global wiring goes in D1.
 
 ---
 
 #### C2 — Document Generation Pipeline ✅ DONE
-**Estimación:** 3 días | **Directorio:** `prismal/agents/subgraphs/document_generation/`
+**Estimate:** 3 days | **Directory:** `prismal/agents/subgraphs/document_generation/`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| C2-01 | Crear estructura y `__init__.py` con `build_document_generation_subgraph()` | 0.3d | — | ✅ |
-| C2-02 | Implementar nodos: `planner_node`, `researcher_node`, `writer_node`, `editor_node`, `formatter_node` | 2d | C2-01 | ✅ |
-| C2-03 | Ensamblar y registrar en `SubgraphRegistry` | 0.3d | C2-02 | ✅ (builder retorna `SubgraphDefinition` listo para `SubgraphRegistry.register`; wiring global queda para D1) |
-| C2-04 | Tests: generación de documento simple end-to-end | 1d | C2-03 | ✅ |
+| C2-01 | Create the structure and `__init__.py` with `build_document_generation_subgraph()` | 0.3d | — | ✅ |
+| C2-02 | Implement nodes: `planner_node`, `researcher_node`, `writer_node`, `editor_node`, `formatter_node` | 2d | C2-01 | ✅ |
+| C2-03 | Assemble and register in `SubgraphRegistry` | 0.3d | C2-02 | ✅ (builder returns a `SubgraphDefinition` ready for `SubgraphRegistry.register`; global wiring is left to D1) |
+| C2-04 | Tests: simple document generation end-to-end | 1d | C2-03 | ✅ |
 
-**Criterios de Done:**
-- ✅ 5 nodos implementados como factories `make_*_node(llm, ...)`: `planner`, `researcher`, `writer`, `editor`, `formatter`.
-- ✅ Pipeline lineal: `planner → researcher → writer → editor → formatter`; entry point `planner`.
-- ✅ Metadata namespaced `state["metadata"]["document_generation"]` con `outline`, `research`, `draft`, `edited`, `final`, `format`.
-- ✅ Planner: parseo permisivo de lista numerada con fallback a líneas crudas si LLM no numera.
-- ✅ Researcher: LLM + RAG opcional per-section; short-circuit si no hay outline.
-- ✅ Writer: compose draft desde outline + research; prompt incluye ambas (test verificado).
-- ✅ Editor: polish con fallback graceful a draft crudo si LLM falla.
-- ✅ Formatter: 3 formatos (`markdown`, `plain`, `html`), `ValueError` si formato desconocido; `AIMessage` final con el documento. Fallback a `draft` si no hubo editor.
-- ✅ `DocumentGenerationError` hereda de `PrismalError`.
-- ✅ Coverage por módulo: builder 89%, editor 89%, formatter 100%, planner 87%, researcher 88%, writer 84% (21 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
+**Done criteria:**
+- ✅ 5 nodes implemented as factories `make_*_node(llm, ...)`: `planner`, `researcher`, `writer`, `editor`, `formatter`.
+- ✅ Linear pipeline: `planner → researcher → writer → editor → formatter`; entry point `planner`.
+- ✅ Namespaced metadata `state["metadata"]["document_generation"]` with `outline`, `research`, `draft`, `edited`, `final`, `format`.
+- ✅ Planner: permissive parsing of a numbered list with fallback to raw lines if the LLM does not number.
+- ✅ Researcher: LLM + optional per-section RAG; short-circuit if there is no outline.
+- ✅ Writer: composes the draft from outline + research; the prompt includes both (verified by test).
+- ✅ Editor: polish with graceful fallback to the raw draft if the LLM fails.
+- ✅ Formatter: 3 formats (`markdown`, `plain`, `html`), `ValueError` for an unknown format; final `AIMessage` with the document. Fallback to `draft` if there was no editor.
+- ✅ `DocumentGenerationError` inherits from `PrismalError`.
+- ✅ Coverage per module: builder 89%, editor 89%, formatter 100%, planner 87%, researcher 88%, writer 84% (21 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
 
 ---
 
 #### C3 — Data ETL Pipeline ✅ DONE
-**Estimación:** 3 días | **Directorio:** `prismal/agents/subgraphs/data_etl/`
+**Estimate:** 3 days | **Directory:** `prismal/agents/subgraphs/data_etl/`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| C3-01 | Crear estructura y `__init__.py` con `build_data_etl_subgraph()` | 0.3d | — | ✅ |
-| C3-02 | Implementar nodos: `extractor_node`, `validator_node`, `transformer_node`, `loader_node`, `auditor_node` | 1.5d | C3-01 | ✅ |
-| C3-03 | Integrar con `data/` (DuckDB + Polars utilities) en nodos extractor/loader | 0.5d | C3-02 | ✅ (extractor/loader usan polars `read_csv/read_parquet/read_json` y `write_csv/write_parquet` directamente; DuckDB queda disponible como backend futuro vía `loader_fn/extractor_fn` inyectables) |
-| C3-04 | Ensamblar, registrar y tests | 1d | C3-02, C3-03 | ✅ |
+| C3-01 | Create the structure and `__init__.py` with `build_data_etl_subgraph()` | 0.3d | — | ✅ |
+| C3-02 | Implement nodes: `extractor_node`, `validator_node`, `transformer_node`, `loader_node`, `auditor_node` | 1.5d | C3-01 | ✅ |
+| C3-03 | Integrate with `data/` (DuckDB + Polars utilities) in the extractor/loader nodes | 0.5d | C3-02 | ✅ (extractor/loader use polars `read_csv/read_parquet/read_json` and `write_csv/write_parquet` directly; DuckDB remains available as a future backend via injectable `loader_fn/extractor_fn`) |
+| C3-04 | Assemble, register, and test | 1d | C3-02, C3-03 | ✅ |
 
-**Criterios de Done:**
-- ✅ 5 nodos: `extractor`, `validator`, `transformer`, `loader`, `auditor`.
-- ✅ Conditional edge en `validator`: valida `passed=True` → `transformer`, else → `auditor` (skip transform + load).
-- ✅ Metadata namespaced `state["metadata"]["data_etl"]` con: `source`, `destination`, `transforms`, `dataframe`, `raw_row_count`, `raw_columns`, `validation`, `transform_log`, `loaded_row_count`, `audit`.
-- ✅ Extractor: soporte para CSV / Parquet / JSON vía polars; `extractor_fn` inyectable para backends alternativos (SQL, REST); `ValueError` para `source.type` desconocido; acepta fns sync y async.
-- ✅ Validator: `non_empty` + `required_columns`; `validator_fn` inyectable para schema stricter (Pandera, Pydantic).
-- ✅ Transformer: ops declarativas `select` / `filter` (6 operators) / `rename`; `transform_log` lista operaciones aplicadas; `transformer_fn` inyectable.
-- ✅ Loader: CSV/Parquet via polars; `loader_fn` inyectable; `ValueError` para destino desconocido.
-- ✅ Auditor: summary con row counts, transforms, errors; `AIMessage` con digest legible (pass/fail).
-- ✅ `DataETLError` hereda de `PrismalError`.
-- ✅ Coverage por módulo: auditor 100%, builder 100%, extractor 92%, loader 100%, transformer 90%, validator 92% (31 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
+**Done criteria:**
+- ✅ 5 nodes: `extractor`, `validator`, `transformer`, `loader`, `auditor`.
+- ✅ Conditional edge on `validator`: validates `passed=True` → `transformer`, else → `auditor` (skip transform + load).
+- ✅ Namespaced metadata `state["metadata"]["data_etl"]` with: `source`, `destination`, `transforms`, `dataframe`, `raw_row_count`, `raw_columns`, `validation`, `transform_log`, `loaded_row_count`, `audit`.
+- ✅ Extractor: support for CSV / Parquet / JSON via polars; injectable `extractor_fn` for alternative backends (SQL, REST); `ValueError` for an unknown `source.type`; accepts sync and async fns.
+- ✅ Validator: `non_empty` + `required_columns`; injectable `validator_fn` for stricter schema (Pandera, Pydantic).
+- ✅ Transformer: declarative ops `select` / `filter` (6 operators) / `rename`; `transform_log` lists applied operations; injectable `transformer_fn`.
+- ✅ Loader: CSV/Parquet via polars; injectable `loader_fn`; `ValueError` for an unknown destination.
+- ✅ Auditor: summary with row counts, transforms, errors; `AIMessage` with a readable digest (pass/fail).
+- ✅ `DataETLError` inherits from `PrismalError`.
+- ✅ Coverage per module: auditor 100%, builder 100%, extractor 92%, loader 100%, transformer 90%, validator 92% (31 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
 
 ---
 
 #### C4 — Code Review Pipeline ✅ DONE
-**Estimación:** 4 días | **Directorio:** `prismal/agents/subgraphs/code_review/`
+**Estimate:** 4 days | **Directory:** `prismal/agents/subgraphs/code_review/`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| C4-01 | Crear estructura con `CodeIssue`, `CodeReviewReport` y `build_code_review_subgraph()` | 0.5d | — | ✅ |
-| C4-02 | Implementar `linter_node.py` — ejecuta ruff + mypy via `SandboxExecutor` (CodeAct) | 1d | C4-01 | ✅ (linter_fn inyectable; default no-op; wiring a SandboxExecutor queda para D1) |
-| C4-03 | Implementar `security_scanner_node.py` — detecta patrones bandit via LLM | 0.5d | C4-01 | ✅ (scanner_fn inyectable; default no-op) |
-| C4-04 | Implementar `logic_reviewer_node.py` — LLM revisa lógica de negocio | 0.5d | C4-01 | ✅ (reviewer_fn inyectable) |
-| C4-05 | Implementar `suggester_node.py` y `report_generator_node.py` | 0.5d | C4-01 | ✅ |
-| C4-06 | Ensamblar, registrar y tests con código fixture de distintas severidades | 1.5d | C4-02-C4-05 | ✅ |
+| C4-01 | Create the structure with `CodeIssue`, `CodeReviewReport` and `build_code_review_subgraph()` | 0.5d | — | ✅ |
+| C4-02 | Implement `linter_node.py` — runs ruff + mypy via `SandboxExecutor` (CodeAct) | 1d | C4-01 | ✅ (injectable linter_fn; default no-op; wiring to SandboxExecutor is left to D1) |
+| C4-03 | Implement `security_scanner_node.py` — detects bandit patterns via LLM | 0.5d | C4-01 | ✅ (injectable scanner_fn; default no-op) |
+| C4-04 | Implement `logic_reviewer_node.py` — LLM reviews business logic | 0.5d | C4-01 | ✅ (injectable reviewer_fn) |
+| C4-05 | Implement `suggester_node.py` and `report_generator_node.py` | 0.5d | C4-01 | ✅ |
+| C4-06 | Assemble, register, and test with fixture code of various severities | 1.5d | C4-02-C4-05 | ✅ |
 
-**Criterios de Done:**
-- ✅ 5 nodos: `linter`, `security_scanner`, `logic_reviewer`, `suggester`, `report_generator`.
-- ✅ Pipeline lineal con entry point `linter`.
-- ✅ Los 3 analyzers comparten contrato `(code, file) -> list[CodeIssue]` y hacen append al shared `issues` list.
-- ✅ `CodeIssue` con `severity` (critical/high/medium/low/info), `category` (security/logic/style/performance/test), line number opcional.
-- ✅ `CodeReviewReport` con `score` severity-weighted (critical=-0.4, high=-0.2, medium=-0.1, low=-0.05, info=-0.01), clamp `[0,1]`.
-- ✅ `approved = score >= approval_threshold` (default 0.8) — 1 critical issue por sí sola baja score a 0.6 → rejected.
-- ✅ Score clamp verificado: 20 critical issues → score=0.0 (no wraps a negativo).
-- ✅ Suggester preserva orden de issues; empty issues → empty suggestions.
-- ✅ Per-analyzer errors swallowed (logged) — graph no crashea por fallo de un analyzer.
-- ✅ Report_generator emite `AIMessage` con digest APPROVED/REJECTED + breakdown por severidad.
-- ✅ `CodeReviewError` hereda de `PrismalError`.
-- ✅ Coverage por módulo: types 100%, builder 100%, report_generator 95%, logic_reviewer 94%, security_scanner 94%, linter 82%, suggester 82% (24 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
+**Done criteria:**
+- ✅ 5 nodes: `linter`, `security_scanner`, `logic_reviewer`, `suggester`, `report_generator`.
+- ✅ Linear pipeline with entry point `linter`.
+- ✅ The 3 analyzers share the contract `(code, file) -> list[CodeIssue]` and append to the shared `issues` list.
+- ✅ `CodeIssue` with `severity` (critical/high/medium/low/info), `category` (security/logic/style/performance/test), optional line number.
+- ✅ `CodeReviewReport` with severity-weighted `score` (critical=-0.4, high=-0.2, medium=-0.1, low=-0.05, info=-0.01), clamped `[0,1]`.
+- ✅ `approved = score >= approval_threshold` (default 0.8) — a single critical issue alone lowers the score to 0.6 → rejected.
+- ✅ Score clamp verified: 20 critical issues → score=0.0 (does not wrap to negative).
+- ✅ Suggester preserves issue order; empty issues → empty suggestions.
+- ✅ Per-analyzer errors swallowed (logged) — the graph does not crash from a single analyzer failure.
+- ✅ Report_generator emits an `AIMessage` with an APPROVED/REJECTED digest + breakdown by severity.
+- ✅ `CodeReviewError` inherits from `PrismalError`.
+- ✅ Coverage per module: types 100%, builder 100%, report_generator 95%, logic_reviewer 94%, security_scanner 94%, linter 82%, suggester 82% (24 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
 
 ---
 
 #### C5 — Debate/Consensus Subgraph ✅ DONE
-**Estimación:** 2 días | **Directorio:** `prismal/agents/subgraphs/debate_consensus/`
+**Estimate:** 2 days | **Directory:** `prismal/agents/subgraphs/debate_consensus/`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| C5-01 | Crear `build_debate_consensus_subgraph()` reutilizando `debate_round()` de Fase B | 0.5d | B2 completo | ✅ (reusa `DebatePosition` + `pairwise_jaccard` del pattern B2; renombré el helper de `_pairwise_jaccard` a `pairwise_jaccard` como API pública) |
-| C5-02 | Implementar nodos: `proponent_node`, `opponent_node`, `moderator_node`, `consensus_node` | 1d | C5-01 | ✅ |
-| C5-03 | Ensamblar, registrar y tests | 0.5d | C5-02 | ✅ |
+| C5-01 | Create `build_debate_consensus_subgraph()` reusing `debate_round()` from Phase B | 0.5d | B2 complete | ✅ (reuses `DebatePosition` + `pairwise_jaccard` from pattern B2; renamed the helper from `_pairwise_jaccard` to `pairwise_jaccard` as a public API) |
+| C5-02 | Implement nodes: `proponent_node`, `opponent_node`, `moderator_node`, `consensus_node` | 1d | C5-01 | ✅ |
+| C5-03 | Assemble, register, and test | 0.5d | C5-02 | ✅ |
 
-**Criterios de Done:**
-- ✅ 4 nodos: `proponent`, `opponent`, `moderator`, `consensus`; pipeline lineal con entry point `proponent`.
-- ✅ Cada rol es un `DebatePosition` acumulado en `state["metadata"]["debate_consensus"]["positions"]`.
-- ✅ `opponent` ve `proponent` position; `moderator` ve ambos (tests verifican contenido del prompt).
-- ✅ `consensus_node` sintetiza con LLM + calcula `agreement_score` via `pairwise_jaccard` (reuso de B2).
-- ✅ Identical positions → agreement cerca de 1.0 (test matemático).
-- ✅ Helper `make_role_node()` compartido entre los 3 roles — prompts son el único delta.
-- ✅ Degradación graceful: error per-role loguea + inserta placeholder position; consenso LLM falla → usa primera position como fallback.
-- ✅ `DebateConsensusError` hereda de `PrismalError`.
-- ✅ Coverage por módulo: proponent/opponent/moderator 100%, _helpers 92%, consensus 91%, builder 88% (13 tests).
-- ✅ `ruff check` y `mypy --strict` pasan.
+**Done criteria:**
+- ✅ 4 nodes: `proponent`, `opponent`, `moderator`, `consensus`; linear pipeline with entry point `proponent`.
+- ✅ Each role is a `DebatePosition` accumulated in `state["metadata"]["debate_consensus"]["positions"]`.
+- ✅ `opponent` sees the `proponent` position; `moderator` sees both (tests verify prompt content).
+- ✅ `consensus_node` synthesizes with the LLM + computes `agreement_score` via `pairwise_jaccard` (reuse of B2).
+- ✅ Identical positions → agreement near 1.0 (mathematical test).
+- ✅ Shared `make_role_node()` helper among the 3 roles — prompts are the only delta.
+- ✅ Graceful degradation: a per-role error logs + inserts a placeholder position; if the consensus LLM fails → uses the first position as fallback.
+- ✅ `DebateConsensusError` inherits from `PrismalError`.
+- ✅ Coverage per module: proponent/opponent/moderator 100%, _helpers 92%, consensus 91%, builder 88% (13 tests).
+- ✅ `ruff check` and `mypy --strict` pass.
 
-**Criterios de Done Fase C (global):** ✅ CUMPLIDOS
-- ✅ Los 5 subgraphs implementados: `customer_service`, `document_generation`, `data_etl`, `code_review`, `debate_consensus`.
-- ✅ Cada builder retorna un `SubgraphDefinition` registrable en `SubgraphRegistry` (wiring global a `graph.py` queda diferido a D1-01).
-- ✅ Tests unitarios por nodo y builder pasan al 100% (112 tests Fase C).
-- ✅ Coverage ≥ 80% en todos los módulos Fase C.
-- ✅ `ruff check prismal/agents/subgraphs/` y `mypy --strict` pasan.
-- ✅ Patrón consistente: cada nodo es un `make_*_node(deps)` async callable; metadata namespaced per subgraph; degradación graceful en cada step.
+**Phase C done criteria (global):** ✅ MET
+- ✅ All 5 subgraphs implemented: `customer_service`, `document_generation`, `data_etl`, `code_review`, `debate_consensus`.
+- ✅ Each builder returns a `SubgraphDefinition` registrable in `SubgraphRegistry` (global wiring into `graph.py` is deferred to D1-01).
+- ✅ Unit tests per node and builder pass 100% (112 Phase C tests).
+- ✅ Coverage ≥ 80% in all Phase C modules.
+- ✅ `ruff check prismal/agents/subgraphs/` and `mypy --strict` pass.
+- ✅ Consistent pattern: each node is an async callable `make_*_node(deps)`; namespaced metadata per subgraph; graceful degradation at each step.
 
 ---
 
-### FASE D — Hardening e Integración Final
+### PHASE D — Hardening and Final Integration
 
-**Duración:** 1 semana (semana 9)
-**Objetivo:** Integrar todos los nuevos nodos en `graph.py`, alcanzar targets de coverage, y asegurar calidad de producción.
+**Duration:** 1 week (week 9)
+**Objective:** Integrate all the new nodes into `graph.py`, reach coverage targets, and ensure production quality.
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| D1-01 | Registrar todos los nuevos nodos en `agents/graph.py` (6 patrones + 5 subgraphs) | 1d | Fases A+B+C | ✅ DONE (nuevo `agents/patterns/nodes.py` con 6 node-factories `make_*_node` de wiring LLM perezoso; `graph.py` gana `build_supervisor_graph(advanced_nodes=...)` + `_build_advanced_nodes()` que compila los 5 subgraphs vía `SubgraphFactory` y construye los 6 nodos de patrón. Opt-in vía `enable_subgraphs`; cero regresión por defecto) |
-| D1-02 | Actualizar `agents/supervisor.py` — añadir nuevos nodos a las rutas válidas y al prompt del supervisor | 0.5d | D1-01 | ✅ DONE (`ADVANCED_MEMBERS` + `effective_valid_routes(enable_advanced)` + `build_system_prompt(enable_advanced)`; `_match_route`/`_intent_short_circuit`/`supervisor_node` gatean por `enable_subgraphs`; `_RouterLiteral` ampliado. Prompt base byte-idéntico cuando el flag está off) |
-| D1-03 | Actualizar `agents/intent_router.py` — añadir patrones regex para nuevos intents (ToT, debate, code review, etl) | 0.5d | D1-01 | ✅ DONE (regex conservadores para `tot_agent`/`data_etl`/`debate_consensus`/`debate_agent`/`code_review`; solo hacen short-circuit cuando `enable_subgraphs` está on) |
-| D1-04 | Añadir excepciones nuevas a `core/exceptions.py` (HyDEError, FusionError, ToTError, DebateError, ConstitutionalError, LATSError, CompilerError) | 0.3d | — | ✅ DONE (12 excepciones nuevas centralizadas en `core/exceptions.py`: 7 RAG, 7 patterns, 5 subgraphs; cada módulo importa la canónica desde core) |
-| D1-05 | Añadir `constitutional_principles` a `core/config.py` Settings con valores por defecto | 0.3d | — | ✅ DONE (agregados `constitutional_enabled`, `constitutional_max_revisions`, `constitutional_principles: list[str]` con IDs default `["P001","P002","P003"]`) |
-| D1-06 | Tests de integración end-to-end: RAG Adaptive + Constitutional AI + graph supervisor | 2d | D1-01, D1-02 | ✅ DONE (tests/integration/test_adaptive_rag_constitutional.py con 2 tests: flujo clean y flujo con revisión — cobertura del SPEC sin requerir graph.py integration) |
-| D1-07 | Coverage audit: verificar ≥ 80% en todos los módulos nuevos; añadir tests faltantes | 1d | D1-06 | ✅ DONE (todos los módulos Fase A+B+C con ≥ 82% coverage; la mayoría ≥ 90%) |
-| D1-08 | Security audit: `uv run bandit -r prismal -c pyproject.toml` sin HIGH/CRITICAL | 0.5d | D1-07 | ✅ DONE (**0 issues** en 7034 LoC nuevas: High=0, Medium=0, Low=0) |
-| D1-09 | Actualizar `CLAUDE.md` con las nuevas secciones de arquitectura | 0.5d | D1-06 | ✅ DONE (sección "Advanced architectures" con 19 arquitecturas enumeradas; nota del factory-injection pattern) |
-| D1-10 | Actualizar nota en Obsidian `Documentacion/Prismal/Prismal - Arquitecturas Agentes - Analisis y Gaps.md` marcando arquitecturas como implementadas | 0.2d | D1-09 | ⚠️ SKIP (Obsidian vault externo fuera del repo; actualización manual por el usuario) |
+| D1-01 | Register all new nodes in `agents/graph.py` (6 patterns + 5 subgraphs) | 1d | Phases A+B+C | ✅ DONE (new `agents/patterns/nodes.py` with 6 `make_*_node` node-factories for lazy LLM wiring; `graph.py` gains `build_supervisor_graph(advanced_nodes=...)` + `_build_advanced_nodes()` which compiles the 5 subgraphs via `SubgraphFactory` and builds the 6 pattern nodes. Opt-in via `enable_subgraphs`; zero regression by default) |
+| D1-02 | Update `agents/supervisor.py` — add new nodes to the valid routes and to the supervisor prompt | 0.5d | D1-01 | ✅ DONE (`ADVANCED_MEMBERS` + `effective_valid_routes(enable_advanced)` + `build_system_prompt(enable_advanced)`; `_match_route`/`_intent_short_circuit`/`supervisor_node` gate on `enable_subgraphs`; `_RouterLiteral` expanded. Base prompt byte-identical when the flag is off) |
+| D1-03 | Update `agents/intent_router.py` — add regex patterns for new intents (ToT, debate, code review, etl) | 0.5d | D1-01 | ✅ DONE (conservative regexes for `tot_agent`/`data_etl`/`debate_consensus`/`debate_agent`/`code_review`; they only short-circuit when `enable_subgraphs` is on) |
+| D1-04 | Add new exceptions to `core/exceptions.py` (HyDEError, FusionError, ToTError, DebateError, ConstitutionalError, LATSError, CompilerError) | 0.3d | — | ✅ DONE (12 new exceptions centralized in `core/exceptions.py`: 7 RAG, 7 patterns, 5 subgraphs; each module imports the canonical one from core) |
+| D1-05 | Add `constitutional_principles` to `core/config.py` Settings with default values | 0.3d | — | ✅ DONE (added `constitutional_enabled`, `constitutional_max_revisions`, `constitutional_principles: list[str]` with default IDs `["P001","P002","P003"]`) |
+| D1-06 | End-to-end integration tests: Adaptive RAG + Constitutional AI + graph supervisor | 2d | D1-01, D1-02 | ✅ DONE (tests/integration/test_adaptive_rag_constitutional.py with 2 tests: clean flow and flow with revision — covers the SPEC without requiring graph.py integration) |
+| D1-07 | Coverage audit: verify ≥ 80% in all new modules; add missing tests | 1d | D1-06 | ✅ DONE (all Phase A+B+C modules with ≥ 82% coverage; most ≥ 90%) |
+| D1-08 | Security audit: `uv run bandit -r prismal -c pyproject.toml` with no HIGH/CRITICAL | 0.5d | D1-07 | ✅ DONE (**0 issues** in 7034 new LoC: High=0, Medium=0, Low=0) |
+| D1-09 | Update `CLAUDE.md` with the new architecture sections | 0.5d | D1-06 | ✅ DONE (the "Advanced architectures" section with 19 architectures listed; note on the factory-injection pattern) |
+| D1-10 | Update the Obsidian note `Documentacion/Prismal/Prismal - Arquitecturas Agentes - Analisis y Gaps.md` marking architectures as implemented | 0.2d | D1-09 | ⚠️ SKIP (external Obsidian vault outside the repo; manual update by the user) |
 
-**Criterios de Done Fase D (global):** ✅ CUMPLIDOS (D1-01/02/03 ya integrados — wiring opt-in vía `enable_subgraphs`)
-- ✅ `pytest tests/unit/agents/subgraphs/ tests/unit/agents/patterns/ tests/unit/rag/ tests/integration/test_adaptive_rag_constitutional.py` → **507 passed** (0 fallos, 0 errors).
-- ✅ Coverage de nuevos módulos ≥ 80%: 82–100% por módulo.
-- ✅ `ruff check prismal/` sin errores (scope Fase A/B/C/D).
-- ✅ `mypy --strict` sin errores en scope nuevo.
-- ✅ `bandit -r` sobre módulos nuevos: **0 issues High/Medium/Low**.
-- ✅ `CLAUDE.md` actualizado con sección de advanced architectures.
-- ✅ Wiring a `graph.py` / `supervisor.py` / `intent_router.py` COMPLETADO: los 6 patrones (vía `agents/patterns/nodes.py`) y los 5 subgraphs se registran como nodos del supervisor cuando `enable_subgraphs=True`; con el flag off el comportamiento de los agentes base es idéntico al previo (cero regresión, verificado por la suite unit completa en verde).
+**Phase D done criteria (global):** ✅ MET (D1-01/02/03 already integrated — opt-in wiring via `enable_subgraphs`)
+- ✅ `pytest tests/unit/agents/subgraphs/ tests/unit/agents/patterns/ tests/unit/rag/ tests/integration/test_adaptive_rag_constitutional.py` → **507 passed** (0 failures, 0 errors).
+- ✅ Coverage of new modules ≥ 80%: 82–100% per module.
+- ✅ `ruff check prismal/` with no errors (Phase A/B/C/D scope).
+- ✅ `mypy --strict` with no errors in the new scope.
+- ✅ `bandit -r` over new modules: **0 High/Medium/Low issues**.
+- ✅ `CLAUDE.md` updated with the advanced architectures section.
+- ✅ Wiring into `graph.py` / `supervisor.py` / `intent_router.py` COMPLETED: the 6 patterns (via `agents/patterns/nodes.py`) and the 5 subgraphs are registered as supervisor nodes when `enable_subgraphs=True`; with the flag off, the behavior of the base agents is identical to before (zero regression, verified by the full unit suite passing).
 
 ---
 
-## 4. Mapa de Dependencias
+## 4. Dependency Map
 
 ```
-FASE A — RAG (semanas 1-3)
+PHASE A — RAG (weeks 1-3)
   A1 HyDE ──────────────────────────────────────────┐
   A2 RAG-Fusion ──────────────────────────────────── │
   A3 Hybrid Search ───────────────────────────────── ├──▶ A7 Adaptive RAG (facade)
@@ -615,7 +615,7 @@ FASE A — RAG (semanas 1-3)
   A6 Multi-Vector RAG ────────────────────────────── ┘
       │
       ▼
-FASE B — Agent Patterns (semanas 4-6)
+PHASE B — Agent Patterns (weeks 4-6)
   B1 Tree of Thoughts ─────┐
   B2 Debate ───────────────├──▶ C5 Debate/Consensus Subgraph
   B3 Constitutional AI ────┤
@@ -625,15 +625,15 @@ FASE B — Agent Patterns (semanas 4-6)
   B7 Swarm/Handoff ────────┘
       │
       ▼
-FASE C — Subgraph Pipelines (semanas 7-8)
+PHASE C — Subgraph Pipelines (weeks 7-8)
   C1 Customer Service ─────┐
   C2 Document Generation ──┤
-  C3 Data ETL ─────────────├──▶ D1 Integración en graph.py
+  C3 Data ETL ─────────────├──▶ D1 Integration into graph.py
   C4 Code Review ──────────┤
   C5 Debate/Consensus ─────┘
       │
       ▼
-FASE D — Hardening (semana 9)
+PHASE D — Hardening (week 9)
   D1 graph.py integration
   D2 supervisor.py update
   D3 Tests + Coverage + Docs
@@ -641,87 +641,87 @@ FASE D — Hardening (semana 9)
 
 ---
 
-## 5. Riesgos de Implementación
+## 5. Implementation Risks
 
-| Riesgo | Probabilidad | Impacto | Mitigación | Owner |
+| Risk | Probability | Impact | Mitigation | Owner |
 |---|---|---|---|---|
-| Self-RAG: LLM no emite tokens de control correctamente | Alta | Alto | Prompt engineering extenso; parsing permisivo (regex sobre respuesta libre); fallback a CRAG siempre disponible | Engineer |
-| LATS: explosion del árbol de búsqueda (latencia) | Alta | Medio | `max_simulations` default conservador (50); timeout por nodo; logging de profundidad para alertas | Engineer |
-| LLM-Compiler: Planner genera DAGs con ciclos | Media | Alto | `validate_dag()` con Kahn's algorithm antes de ejecutar; test exhaustivo de casos edge | Engineer |
-| BM25 in-memory no escala (Hybrid Search) | Media | Medio | Documentar límite recomendado en docstring; benchmark en Fase D | Engineer |
-| Constitutional AI: loop sin convergencia | Baja | Alto | `max_revisions` = 3 hardcap; retornar con `max_revisions_reached=True` en vez de error fatal | Engineer |
-| `graph.py` se vuelve demasiado grande (26+ → 33+ nodos) | Media | Medio | Refactorizar `graph.py` en Fase D si supera 200 líneas; extraer a `graph_builder.py` | Tech Lead |
-| Interferencia entre patterns (ej: ToT + Constitutional) | Baja | Medio | Tests de integración específicos en Fase D; documentar composición soportada | Engineer |
+| Self-RAG: LLM does not emit control tokens correctly | High | High | Extensive prompt engineering; permissive parsing (regex over free response); fallback to CRAG always available | Engineer |
+| LATS: search tree explosion (latency) | High | Medium | Conservative `max_simulations` default (50); per-node timeout; depth logging for alerts | Engineer |
+| LLM-Compiler: Planner generates DAGs with cycles | Medium | High | `validate_dag()` with Kahn's algorithm before executing; exhaustive edge-case tests | Engineer |
+| BM25 in-memory does not scale (Hybrid Search) | Medium | Medium | Document the recommended limit in the docstring; benchmark in Phase D | Engineer |
+| Constitutional AI: loop without convergence | Low | High | `max_revisions` = 3 hardcap; return with `max_revisions_reached=True` instead of a fatal error | Engineer |
+| `graph.py` becomes too large (26+ → 33+ nodes) | Medium | Medium | Refactor `graph.py` in Phase D if it exceeds 200 lines; extract to `graph_builder.py` | Tech Lead |
+| Interference between patterns (e.g., ToT + Constitutional) | Low | Medium | Specific integration tests in Phase D; document the supported composition | Engineer |
 
 ---
 
-## 6. Definición de Done (Global)
+## 6. Definition of Done (Global)
 
-Para cerrar el proyecto de expansión como COMPLETED:
+To close the expansion project as COMPLETED:
 
-- [ ] Las 19 arquitecturas implementadas y registradas.
-- [ ] `uv run pytest -m "not live_api"` pasa al 100% (0 failures, 0 errors).
-- [ ] Coverage global ≥ 80% (`uv run pytest --cov=prismal --cov-fail-under=80`).
-- [ ] `uv run ruff check .` sin errores.
-- [ ] `uv run mypy prismal` sin errores (strict mode).
-- [ ] `uv run bandit -r prismal -c pyproject.toml` sin HIGH o CRITICAL findings.
-- [ ] Todos los módulos nuevos con docstrings públicos (clases y métodos públicos).
-- [ ] `CLAUDE.md` actualizado con las nuevas secciones.
-- [ ] Nota en Obsidian `Prismal - Arquitecturas Agentes - Analisis y Gaps.md` actualizada.
-- [ ] `pyproject.toml` incluye `rank_bm25` y `networkx` en dependencias.
-- [ ] PR mergeado a `main` con code review aprobado.
+- [ ] The 19 architectures implemented and registered.
+- [ ] `uv run pytest -m "not live_api"` passes 100% (0 failures, 0 errors).
+- [ ] Global coverage ≥ 80% (`uv run pytest --cov=prismal --cov-fail-under=80`).
+- [ ] `uv run ruff check .` with no errors.
+- [ ] `uv run mypy prismal` with no errors (strict mode).
+- [ ] `uv run bandit -r prismal -c pyproject.toml` with no HIGH or CRITICAL findings.
+- [ ] All new modules with public docstrings (public classes and methods).
+- [ ] `CLAUDE.md` updated with the new sections.
+- [ ] The Obsidian note `Prismal - Arquitecturas Agentes - Analisis y Gaps.md` updated.
+- [ ] `pyproject.toml` includes `rank_bm25` and `networkx` in dependencies.
+- [ ] PR merged to `main` with approved code review.
 
 ---
 
-## 7. Estimación de Esfuerzo por Fase
+## 7. Effort Estimate per Phase
 
-| Fase | Tareas | Días Estimados | Semanas |
+| Phase | Tasks | Estimated Days | Weeks |
 |---|---|---|---|
-| A — RAG Avanzado | 37 subtareas | 21 días | 3 semanas |
-| B — Agent Patterns | 34 subtareas | 25 días | 3 semanas |
-| C — Subgraph Pipelines | 21 subtareas | 16 días | 2 semanas |
-| D — Hardening | 10 subtareas | 7 días | 1 semana |
-| **Total** | **102 subtareas** | **69 días** | **9 semanas** |
+| A — Advanced RAG | 37 subtasks | 21 days | 3 weeks |
+| B — Agent Patterns | 34 subtasks | 25 days | 3 weeks |
+| C — Subgraph Pipelines | 21 subtasks | 16 days | 2 weeks |
+| D — Hardening | 10 subtasks | 7 days | 1 week |
+| **Total** | **102 subtasks** | **69 days** | **9 weeks** |
 
-*Estimación basada en 1 engineer senior. Con 2 engineers: Fase A y B pueden solaparse desde semana 2.*
-
----
+*Estimate based on 1 senior engineer. With 2 engineers: Phases A and B can overlap from week 2.*
 
 ---
 
-## FASE E — MCP Capability Routing ✅ DONE
+---
 
-**Duración real:** 1 día | **Objetivo:** enrutar tools MCP específicas a cada patrón y subgraph según sus capabilities, evitando que agentes reciban tools irrelevantes o peligrosas.
+## PHASE E — MCP Capability Routing ✅ DONE
 
-| ID | Tarea | Estado |
+**Actual duration:** 1 day | **Objective:** route specific MCP tools to each pattern and subgraph according to their capabilities, preventing agents from receiving irrelevant or dangerous tools.
+
+| ID | Task | Status |
 |---|---|---|
-| E1 | Crear `config/mcp_servers.yaml` con campo `capabilities: list[str]` en cada entrada | ✅ DONE (el archivo no existía; se creó con 4 servidores de ejemplo: filesystem, web_search, code_sandbox, rag_store — todos con `enabled: false` y capabilities apropiadas) |
-| E2 | Extender `MCPClientManager.get_all_langchain_tools()` con parámetro `capabilities: list[str] \| None = None` | ✅ DONE — filtrado a nivel de servidor, `general` siempre incluido, `None` mantiene backward compatibility |
-| E3 | Extender `get_tools_for_agent()` con `required_capabilities: list[str] \| None = None` y propagarlo a `get_mcp_tools()` | ✅ DONE — la firma legacy (`get_tools_for_agent("researcher")`) sigue funcionando sin cambios |
-| E4 | Actualizar registros en `graph.py` con mapping por nodo | ⚠️ ADAPTADO — los nodos de Fase D (tot_agent, lats_agent, llm_compiler, etc.) siguen diferidos (D1-01 no se completó); en su lugar se expone `DEFAULT_CAPABILITY_MAP` + `get_recommended_capabilities(node_name)` en `tool_registry.py` para que operador use al hacer el wiring. Mapping idéntico al especificado en el prompt. |
-| E5 | Tests unitarios en `tests/unit/mcp/test_capability_routing.py` | ✅ DONE — **13 tests**, todos pasan; cubren: default capability, filtro None, filtro positivo/negativo, servidor `general` universal, plumbing end-to-end a `get_tools_for_agent`, mapping de E4, legacy path. |
-| E6 | Actualizar TASKS.md + SPEC.md | ✅ DONE |
+| E1 | Create `config/mcp_servers.yaml` with a `capabilities: list[str]` field in each entry | ✅ DONE (the file did not exist; it was created with 4 example servers: filesystem, web_search, code_sandbox, rag_store — all with `enabled: false` and appropriate capabilities) |
+| E2 | Extend `MCPClientManager.get_all_langchain_tools()` with a `capabilities: list[str] \| None = None` parameter | ✅ DONE — server-level filtering, `general` always included, `None` keeps backward compatibility |
+| E3 | Extend `get_tools_for_agent()` with `required_capabilities: list[str] \| None = None` and propagate it to `get_mcp_tools()` | ✅ DONE — the legacy signature (`get_tools_for_agent("researcher")`) keeps working unchanged |
+| E4 | Update registrations in `graph.py` with a per-node mapping | ⚠️ ADAPTED — the Phase D nodes (tot_agent, lats_agent, llm_compiler, etc.) remain deferred (D1-01 was not completed); instead, `DEFAULT_CAPABILITY_MAP` + `get_recommended_capabilities(node_name)` are exposed in `tool_registry.py` for the operator to use when wiring. Mapping identical to that specified in the prompt. |
+| E5 | Unit tests in `tests/unit/mcp/test_capability_routing.py` | ✅ DONE — **13 tests**, all passing; they cover: default capability, None filter, positive/negative filter, universal `general` server, end-to-end plumbing into `get_tools_for_agent`, the E4 mapping, the legacy path. |
+| E6 | Update TASKS.md + SPEC.md | ✅ DONE |
 
-**Criterios de Done Fase E:**
-- ✅ `MCPServerConfig.capabilities: list[str]` con default `["general"]` (backward compatible — configs YAML sin el campo tratados como universales).
-- ✅ `MCPClientManager.get_all_langchain_tools(capabilities=None)` comportamiento idéntico al previo a Fase E.
-- ✅ Con `capabilities=[...]`: solo servidores con intersección de capabilities O tagged `"general"` contribuyen tools.
-- ✅ `get_tools_for_agent()` firma retro-compatible — agentes legacy (researcher, coder, …) siguen recibiendo pool completo.
-- ✅ **Tests: 13 pasan** — cubren los 6 casos del prompt + mapping de E4 + legacy path + universal capability.
-- ✅ Regresión: **688 tests totales pasan** (10 nuevos + 678 previos), 0 fallos.
+**Phase E done criteria:**
+- ✅ `MCPServerConfig.capabilities: list[str]` with default `["general"]` (backward compatible — YAML configs without the field are treated as universal).
+- ✅ `MCPClientManager.get_all_langchain_tools(capabilities=None)` behavior identical to pre-Phase-E.
+- ✅ With `capabilities=[...]`: only servers with a capability intersection OR tagged `"general"` contribute tools.
+- ✅ `get_tools_for_agent()` backward-compatible signature — legacy agents (researcher, coder, …) still receive the full pool.
+- ✅ **Tests: 13 pass** — they cover the 6 prompt cases + the E4 mapping + the legacy path + universal capability.
+- ✅ Regression: **688 total tests pass** (10 new + 678 previous), 0 failures.
 - ✅ `ruff check prismal/agents/tool_registry.py prismal/mcp/client.py tests/unit/mcp/test_capability_routing.py` → All checks passed!
-- ✅ `mypy --strict` → Success en `prismal/mcp/client.py` + `prismal/agents/tool_registry.py` (2 source files checked).
+- ✅ `mypy --strict` → Success on `prismal/mcp/client.py` + `prismal/agents/tool_registry.py` (2 source files checked).
 - ✅ `bandit -r prismal/mcp/client.py prismal/agents/tool_registry.py -c pyproject.toml` → High=0, Medium=0.
-- ✅ Coverage `prismal/mcp/client.py`: **83%**; las líneas nuevas de E2 (filtrado) cubiertas al 100% por test_capability_routing.
+- ✅ Coverage `prismal/mcp/client.py`: **83%**; the new E2 lines (filtering) covered 100% by test_capability_routing.
 
-**Archivos modificados (4) + creados (2):**
-- **Creado**: `config/mcp_servers.yaml` — nuevo catálogo con capabilities.
-- **Creado**: `tests/unit/mcp/test_capability_routing.py` — 13 tests.
-- **Modificado**: `prismal/mcp/connection.py` — añadido `capabilities` a `MCPServerConfig`.
-- **Modificado**: `prismal/mcp/client.py` — firma `get_all_langchain_tools(capabilities=None)` + filtrado.
-- **Modificado**: `prismal/agents/tool_registry.py` — firma `get_tools_for_agent(..., required_capabilities=None)`, `get_mcp_tools(capabilities=None)`, `DEFAULT_CAPABILITY_MAP`, `get_recommended_capabilities()`.
+**Files modified (4) + created (2):**
+- **Created**: `config/mcp_servers.yaml` — new catalog with capabilities.
+- **Created**: `tests/unit/mcp/test_capability_routing.py` — 13 tests.
+- **Modified**: `prismal/mcp/connection.py` — added `capabilities` to `MCPServerConfig`.
+- **Modified**: `prismal/mcp/client.py` — signature `get_all_langchain_tools(capabilities=None)` + filtering.
+- **Modified**: `prismal/agents/tool_registry.py` — signature `get_tools_for_agent(..., required_capabilities=None)`, `get_mcp_tools(capabilities=None)`, `DEFAULT_CAPABILITY_MAP`, `get_recommended_capabilities()`.
 
-**Mapping canónico (según prompt)** expuesto como `DEFAULT_CAPABILITY_MAP` público en `tool_registry.py`:
+**Canonical mapping (per prompt)** exposed as the public `DEFAULT_CAPABILITY_MAP` in `tool_registry.py`:
 
 | Node | Capabilities |
 |---|---|
@@ -735,15 +735,15 @@ Para cerrar el proyecto de expansión como COMPLETED:
 | `document_generation` | `["document_generation", "research", "file_management"]` |
 | `debate_consensus` | `["research", "general"]` |
 
-**Desviaciones respecto al prompt:**
-1. `config/mcp_servers.yaml` **no existía** en el repo — se creó desde cero (el prompt asumía que existía). Contiene 4 servidores de muestra con `enabled: false` para no afectar el runtime.
-2. D1-01/02/03 siguen diferidos (documentado en sección Fase D) — los nodos Fase B/C no están en `graph.py`. Por eso E4 se adaptó: en lugar de modificar llamadas a `get_tools_for_agent()` en `graph.py` (llamadas que no existen), se expone el mapping canónico como constante pública `DEFAULT_CAPABILITY_MAP` y helper `get_recommended_capabilities()`. Cuando operación ejecute D1-01, tendrá que pasar `required_capabilities=get_recommended_capabilities(node_name)` en sus llamadas.
+**Deviations from the prompt:**
+1. `config/mcp_servers.yaml` **did not exist** in the repo — it was created from scratch (the prompt assumed it existed). It contains 4 sample servers with `enabled: false` so as not to affect the runtime.
+2. D1-01/02/03 remain deferred (documented in the Phase D section) — the Phase B/C nodes are not in `graph.py`. That is why E4 was adapted: instead of modifying `get_tools_for_agent()` calls in `graph.py` (calls that do not exist), the canonical mapping is exposed as the public constant `DEFAULT_CAPABILITY_MAP` and the helper `get_recommended_capabilities()`. When the operator runs D1-01, they will have to pass `required_capabilities=get_recommended_capabilities(node_name)` in their calls.
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-04-19 | Ernesto Crespo | Versión inicial — 102 subtareas en 4 fases, 9 semanas |
-| 1.1 | 2026-04-19 | Claude Code | Fase E — MCP capability routing (6 subtareas, 13 tests nuevos, 688 total) |
+| 1.0 | 2026-04-19 | Ernesto Crespo | Initial version — 102 subtasks across 4 phases, 9 weeks |
+| 1.1 | 2026-04-19 | Claude Code | Phase E — MCP capability routing (6 subtasks, 13 new tests, 688 total) |

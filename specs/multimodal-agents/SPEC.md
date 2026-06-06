@@ -2,34 +2,34 @@
 
 ## Metadata
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-05-27 |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` |
+| **Version** | 1.0 |
+| **Date** | 2026-05-27 |
 | **PLAN** | `specs/multimodal-agents/PLAN.md` |
 | **Architecture** | `specs/multimodal-agents/ARCHITECTURE.md` |
 | **TASKS** | `specs/multimodal-agents/TASKS.md` |
 
 ---
 
-## Convenciones
+## Conventions
 
-- Todos los módulos usan `from __future__ import annotations`.
-- Imports pesados (Whisper, CLIP, FFmpeg wrappers) bajo `TYPE_CHECKING` o lazy dentro de la función.
-- Async donde aplique (todos los STT/TTS/VLM calls son `async`); helpers puros son `sync`.
-- Dataclasses frozen donde aplique.
-- Constructores aceptan `settings: Settings | None = None`.
-- Ningún módulo importa `openai`, `anthropic`, `google.generativeai`, `elevenlabs`, `whisper`, `pyttsx3` directamente — todo vía `prismal/providers/`.
-- Callable injection en todas las clases agente (`stt_fn`, `tts_fn`, `vision_fn`, `frame_extractor_fn`, `transcribe_fn`).
-- Errores propios viven en `prismal/core/exceptions.py` (extensión).
+- All modules use `from __future__ import annotations`.
+- Heavy imports (Whisper, CLIP, FFmpeg wrappers) under `TYPE_CHECKING` or lazy inside the function.
+- Async where applicable (all STT/TTS/VLM calls are `async`); pure helpers are `sync`.
+- Frozen dataclasses where applicable.
+- Constructors accept `settings: Settings | None = None`.
+- No module imports `openai`, `anthropic`, `google.generativeai`, `elevenlabs`, `whisper`, `pyttsx3` directly — everything via `prismal/providers/`.
+- Callable injection in all agent classes (`stt_fn`, `tts_fn`, `vision_fn`, `frame_extractor_fn`, `transcribe_fn`).
+- Custom errors live in `prismal/core/exceptions.py` (extension).
 
 ---
 
-## Resumen de módulos
+## Module Summary
 
-| SPEC | Archivo | Componentes |
+| SPEC | File | Components |
 |---|---|---|
 | SPEC-MM-PROV-001 | `prismal/providers/stt.py` | `STTClient`, `get_stt()` |
 | SPEC-MM-PROV-002 | `prismal/providers/tts.py` | `TTSClient`, `get_tts()` |
@@ -50,9 +50,9 @@
 
 ## SPEC-MM-PROV-001: STT Provider Wrapper
 
-**Archivo:** `prismal/providers/stt.py`
+**File:** `prismal/providers/stt.py`
 
-### Tipos
+### Types
 
 ```python
 from enum import Enum
@@ -63,13 +63,13 @@ class STTProvider(str, Enum):
 
 @dataclass(frozen=True)
 class STTResult:
-    """Resultado de una transcripción.
+    """Result of a transcription.
 
     Attributes:
-        text: Transcripción completa concatenada.
-        language: Idioma detectado (ISO-639-1) o el solicitado.
-        segments: Segmentos con timestamps; vacío si el provider no los aporta.
-        provider_used: Identificador del backend usado.
+        text: Full concatenated transcription.
+        language: Detected language (ISO-639-1) or the requested one.
+        segments: Segments with timestamps; empty if the provider does not supply them.
+        provider_used: Identifier of the backend used.
     """
     text: str
     language: str
@@ -83,11 +83,11 @@ class STTSegment:
     text: str
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class STTClient(Protocol):
-    """Interfaz uniforme de Speech-to-Text."""
+    """Uniform Speech-to-Text interface."""
 
     async def transcribe(
         self,
@@ -96,18 +96,18 @@ class STTClient(Protocol):
         language: str | None = None,
         prompt: str | None = None,
     ) -> STTResult:
-        """Transcribe audio a texto.
+        """Transcribe audio to text.
 
         Args:
-            audio: Bytes del audio o path al archivo.
-            language: ISO-639-1 hint; None deja auto-detect.
-            prompt: Contexto opcional (vocabulario, nombres propios).
+            audio: Audio bytes or path to the file.
+            language: ISO-639-1 hint; None lets it auto-detect.
+            prompt: Optional context (vocabulary, proper nouns).
 
         Returns:
-            STTResult con texto, idioma y segmentos.
+            STTResult with text, language, and segments.
 
         Raises:
-            STTError: Si la transcripción falla en el backend.
+            STTError: If transcription fails in the backend.
         """
         ...
 
@@ -118,19 +118,19 @@ def get_stt(
     *,
     settings: Settings | None = None,
 ) -> STTClient:
-    """Resuelve un STTClient según `settings.stt_provider` o el override.
+    """Resolve an STTClient according to `settings.stt_provider` or the override.
 
     Args:
-        provider: Si se especifica, override del default.
-        model: Modelo (ej. "whisper-1" para openai, "base" para local).
-        settings: Settings inyectables.
+        provider: If specified, overrides the default.
+        model: Model (e.g. "whisper-1" for openai, "base" for local).
+        settings: Injectable settings.
 
     Returns:
-        STTClient listo para uso.
+        STTClient ready for use.
 
     Raises:
-        STTError: Si el provider solicitado no está disponible
-            (ej. extras `[multimodal-local]` no instalados).
+        STTError: If the requested provider is not available
+            (e.g. `[multimodal-local]` extras not installed).
     """
     ...
 ```
@@ -139,25 +139,25 @@ def get_stt(
 
 ## SPEC-MM-PROV-002: TTS Provider Wrapper
 
-**Archivo:** `prismal/providers/tts.py`
+**File:** `prismal/providers/tts.py`
 
-### Tipos
+### Types
 
 ```python
 class TTSProvider(str, Enum):
     PYTTSX3 = "pyttsx3"         # offline, default
-    OPENAI = "openai"           # gpt-4o-mini-tts y similares
+    OPENAI = "openai"           # gpt-4o-mini-tts and similar
     ELEVENLABS = "elevenlabs"   # premium
 
 @dataclass(frozen=True)
 class TTSResult:
-    audio: bytes               # WAV/MP3 según provider
+    audio: bytes               # WAV/MP3 depending on provider
     mime_type: str             # "audio/wav" | "audio/mpeg" | ...
     provider_used: str
-    duration_s: float          # estimada; 0.0 si no aporta
+    duration_s: float          # estimated; 0.0 if not supplied
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class TTSClient(Protocol):
@@ -169,18 +169,18 @@ class TTSClient(Protocol):
         voice: str | None = None,
         format: Literal["wav", "mp3"] = "wav",
     ) -> TTSResult:
-        """Sintetiza texto a voz.
+        """Synthesize text to speech.
 
         Args:
-            text: Texto a sintetizar (≤ settings.tts_max_chars).
-            voice: ID de voz (provider-specific). None usa el default.
-            format: Formato de salida.
+            text: Text to synthesize (≤ settings.tts_max_chars).
+            voice: Voice ID (provider-specific). None uses the default.
+            format: Output format.
 
         Returns:
-            TTSResult con audio bytes y metadata.
+            TTSResult with audio bytes and metadata.
 
         Raises:
-            TTSError: Si el provider falla.
+            TTSError: If the provider fails.
         """
         ...
 
@@ -190,10 +190,10 @@ def get_tts(
     *,
     settings: Settings | None = None,
 ) -> TTSClient:
-    """Resuelve un TTSClient con fallback en cascada.
+    """Resolve a TTSClient with cascading fallback.
 
-    Si el provider preferido falla en init, cae a:
-        elevenlabs → openai → pyttsx3 (local, siempre disponible).
+    If the preferred provider fails to init, it falls back to:
+        elevenlabs → openai → pyttsx3 (local, always available).
     """
     ...
 ```
@@ -202,7 +202,7 @@ def get_tts(
 
 ## SPEC-MM-PROV-003 / 004 / 005: Vision / Multimodal LLM / Cross-Modal Embeddings
 
-**Archivos:** `prismal/providers/vision.py`, `multimodal.py`, `cross_modal_embeddings.py`
+**Files:** `prismal/providers/vision.py`, `multimodal.py`, `cross_modal_embeddings.py`
 
 ```python
 # vision.py
@@ -211,9 +211,9 @@ def get_vision_llm(
     *,
     settings: Settings | None = None,
 ) -> BaseChatModel:
-    """Retorna un BaseChatModel con soporte de imágenes.
+    """Return a BaseChatModel with image support.
 
-    El modelo acepta `HumanMessage(content=[{"type":"image_url","image_url":{"url":...}},
+    The model accepts `HumanMessage(content=[{"type":"image_url","image_url":{"url":...}},
                                              {"type":"text","text":prompt}])`.
     Default: settings.cua_vision_model.
     """
@@ -226,10 +226,10 @@ def get_multimodal_llm(
     *,
     settings: Settings | None = None,
 ) -> BaseChatModel:
-    """Retorna un BaseChatModel nativamente multimodal (Gemini 2.x, GPT-4o, Sonnet 4.6).
+    """Return a natively multimodal BaseChatModel (Gemini 2.x, GPT-4o, Sonnet 4.6).
 
-    Soporta audio + imagen + video + texto en el mismo mensaje cuando el
-    modelo lo permite. Default: settings.multimodal_model.
+    Supports audio + image + video + text in the same message when the
+    model allows it. Default: settings.multimodal_model.
     """
     ...
 
@@ -240,10 +240,10 @@ def get_cross_modal_embeddings(
     *,
     settings: Settings | None = None,
 ) -> Embeddings:
-    """Retorna un Embeddings que acepta texto e imágenes (CLIP-style).
+    """Return an Embeddings that accepts text and images (CLIP-style).
 
-    Si `open_clip_torch` o el backend solicitado no están instalados,
-    levanta MissingDependencyError sugiriendo `pip install "prismal[multimodal-embed]"`.
+    If `open_clip_torch` or the requested backend is not installed,
+    raises MissingDependencyError suggesting `pip install "prismal[multimodal-embed]"`.
     """
     ...
 ```
@@ -252,16 +252,16 @@ def get_cross_modal_embeddings(
 
 ## SPEC-MM-AGT-001: Vision Agent
 
-**Archivo:** `prismal/agents/multimodal/vision_agent.py`
+**File:** `prismal/agents/multimodal/vision_agent.py`
 
-### Tipos
+### Types
 
 ```python
 @dataclass(frozen=True)
 class DetectedObject:
     label: str
     confidence: float        # [0.0, 1.0]
-    bbox: tuple[float, float, float, float] | None  # (x, y, w, h) normalizado o None
+    bbox: tuple[float, float, float, float] | None  # (x, y, w, h) normalized or None
 
 @dataclass(frozen=True)
 class VisionResult:
@@ -273,23 +273,23 @@ class VisionResult:
 
 
 VisionFn = Callable[[bytes | Path, str], Awaitable[str]]
-"""(image, prompt) → respuesta textual del VLM."""
+"""(image, prompt) → textual response from the VLM."""
 
 OcrFn = Callable[[bytes | Path], Awaitable[str]]
 """(image) → OCR text."""
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class VisionAgent:
-    """Agente de análisis de imágenes de propósito general.
+    """General-purpose image analysis agent.
 
     Args:
-        vision_fn: Callable que invoca un VLM. None usa get_vision_llm().
-        ocr_fn: Callable de OCR. None usa el VLM con prompt OCR.
-        media_validator: Instancia de MediaValidator. None crea una por default.
-        settings: Settings inyectables.
+        vision_fn: Callable that invokes a VLM. None uses get_vision_llm().
+        ocr_fn: OCR callable. None uses the VLM with an OCR prompt.
+        media_validator: MediaValidator instance. None creates one by default.
+        settings: Injectable settings.
 
     Example::
 
@@ -316,20 +316,20 @@ class VisionAgent:
         prompt: str | None = None,
         with_ocr: bool | None = None,
     ) -> VisionResult:
-        """Analiza una imagen.
+        """Analyze an image.
 
         Args:
-            image: Bytes o path.
-            prompt: Prompt custom (None usa el default: "Describe la imagen
-                y lista los objetos visibles.").
-            with_ocr: Override del settings.vision_ocr_enabled.
+            image: Bytes or path.
+            prompt: Custom prompt (None uses the default: "Describe the image
+                and list the visible objects.").
+            with_ocr: Override of settings.vision_ocr_enabled.
 
         Returns:
-            VisionResult con descripción, objetos y OCR opcional.
+            VisionResult with description, objects, and optional OCR.
 
         Raises:
-            VisionAgentError: Si la validación o el VLM fallan
-                (sólo si degrade_gracefully=False).
+            VisionAgentError: If validation or the VLM fails
+                (only if degrade_gracefully=False).
         """
         ...
 ```
@@ -338,35 +338,35 @@ class VisionAgent:
 
 ## SPEC-MM-AGT-002: Audio Agent
 
-**Archivo:** `prismal/agents/multimodal/audio_agent.py`
+**File:** `prismal/agents/multimodal/audio_agent.py`
 
-### Tipos
+### Types
 
 ```python
 @dataclass(frozen=True)
 class AudioResult:
     transcript: str
     response_text: str
-    response_audio: bytes | None       # None si with_tts=False
+    response_audio: bytes | None       # None if with_tts=False
     response_mime: str | None           # "audio/wav" | ... | None
     stt_provider_used: str
     tts_provider_used: str | None
-    duration_s: float                   # duración del audio entrante
+    duration_s: float                   # duration of the incoming audio
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class AudioAgent:
-    """Pipeline voz-a-voz: STT → razonamiento → opcional TTS.
+    """Voice-to-voice pipeline: STT → reasoning → optional TTS.
 
     Args:
-        stt_client: STTClient inyectable. None usa get_stt().
-        tts_client: TTSClient inyectable. None usa get_tts().
-        reason_fn: Callable async (transcript: str, state: AgentState) → response_text.
-            None usa ProviderRegistry().get_llm() con prompt default.
-        media_validator: MediaValidator. None crea default.
-        settings: Settings inyectables.
+        stt_client: Injectable STTClient. None uses get_stt().
+        tts_client: Injectable TTSClient. None uses get_tts().
+        reason_fn: Async callable (transcript: str, state: AgentState) → response_text.
+            None uses ProviderRegistry().get_llm() with a default prompt.
+        media_validator: MediaValidator. None creates a default.
+        settings: Injectable settings.
 
     Example::
 
@@ -375,8 +375,8 @@ class AudioAgent:
             audio=Path("user_voice.wav"),
             with_tts=True,
         )
-        print(result.transcript)         # "Hola, ¿qué tal?"
-        print(result.response_text)      # "Hola, todo bien. ¿En qué te ayudo?"
+        print(result.transcript)         # "Hello, how are you?"
+        print(result.response_text)      # "Hello, all good. How can I help you?"
         Path("reply.wav").write_bytes(result.response_audio)
     """
 
@@ -398,19 +398,19 @@ class AudioAgent:
         language: str | None = None,
         with_tts: bool = False,
     ) -> AudioResult:
-        """Ejecuta el pipeline completo.
+        """Run the full pipeline.
 
         Args:
-            audio: Bytes o path.
-            state: AgentState para contexto del LLM. None usa state vacío.
-            language: ISO-639-1 hint para STT.
-            with_tts: Si True, sintetiza la respuesta.
+            audio: Bytes or path.
+            state: AgentState for LLM context. None uses an empty state.
+            language: ISO-639-1 hint for STT.
+            with_tts: If True, synthesizes the response.
 
         Returns:
             AudioResult.
 
         Raises:
-            AudioAgentError: Si una etapa falla y degrade_gracefully=False.
+            AudioAgentError: If a stage fails and degrade_gracefully=False.
         """
         ...
 ```
@@ -419,9 +419,9 @@ class AudioAgent:
 
 ## SPEC-MM-AGT-003: Video Agent
 
-**Archivo:** `prismal/agents/multimodal/video_agent.py`
+**File:** `prismal/agents/multimodal/video_agent.py`
 
-### Tipos
+### Types
 
 ```python
 @dataclass(frozen=True)
@@ -446,22 +446,22 @@ TranscribeFn = Callable[[Path], Awaitable[str]]
 """(audio_path) → transcript."""
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class VideoAgent:
-    """Pipeline de comprensión de video.
+    """Video comprehension pipeline.
 
     Args:
-        vision_agent: VisionAgent para describir frames. None crea uno default.
-        audio_agent: AudioAgent para transcribir la pista de audio. None crea default.
-        frame_extractor_fn: Callable que invoca FFmpeg vía sandbox. None usa
-            el extractor por default (`SandboxExecutor` + ffmpeg-python).
-        transcribe_fn: Si None, delega a audio_agent.
-        fusion_fn: Callable que sintetiza summary a partir de frames + transcript.
-            None usa get_multimodal_llm() o get_llm() con un prompt de fusión.
+        vision_agent: VisionAgent to describe frames. None creates a default one.
+        audio_agent: AudioAgent to transcribe the audio track. None creates a default.
+        frame_extractor_fn: Callable that invokes FFmpeg via sandbox. None uses
+            the default extractor (`SandboxExecutor` + ffmpeg-python).
+        transcribe_fn: If None, delegates to audio_agent.
+        fusion_fn: Callable that synthesizes the summary from frames + transcript.
+            None uses get_multimodal_llm() or get_llm() with a fusion prompt.
         media_validator: MediaValidator.
-        settings: Settings inyectables.
+        settings: Injectable settings.
 
     Example::
 
@@ -491,19 +491,19 @@ class VideoAgent:
         fps: float | None = None,
         max_frames: int | None = None,
     ) -> VideoResult:
-        """Extrae frames + transcribe pista de audio + sintetiza resumen.
+        """Extract frames + transcribe audio track + synthesize summary.
 
         Args:
-            video: Path al archivo de video.
-            fps: Frames-per-second a samplear. None usa settings.video_sample_fps.
-            max_frames: Máximo de frames a procesar. None usa settings.max_frames_per_video.
+            video: Path to the video file.
+            fps: Frames-per-second to sample. None uses settings.video_sample_fps.
+            max_frames: Maximum frames to process. None uses settings.max_frames_per_video.
 
         Returns:
             VideoResult.
 
         Raises:
-            VideoAgentError: Si extracción/transcripción/fusión fallan
-                (y degrade_gracefully=False).
+            VideoAgentError: If extraction/transcription/fusion fail
+                (and degrade_gracefully=False).
         """
         ...
 ```
@@ -512,9 +512,9 @@ class VideoAgent:
 
 ## SPEC-MM-AGT-004: Modality Router
 
-**Archivo:** `prismal/agents/multimodal/modality_router.py`
+**File:** `prismal/agents/multimodal/modality_router.py`
 
-### Tipos
+### Types
 
 ```python
 class Modality(str, Enum):
@@ -522,18 +522,18 @@ class Modality(str, Enum):
     AUDIO = "audio"
     IMAGE = "image"
     VIDEO = "video"
-    MIXED = "mixed"        # múltiples modalidades simultáneas
+    MIXED = "mixed"        # multiple simultaneous modalities
     UNKNOWN = "unknown"
 
 @dataclass(frozen=True)
 class ModalityClassification:
     modality: Modality
     confidence: float
-    detected_attachments: list[str]   # MIME types detectados
+    detected_attachments: list[str]   # detected MIME types
     used_fallback_llm: bool = False
 ```
 
-### Funciones / Factories
+### Functions / Factories
 
 ```python
 def classify_modality(
@@ -541,10 +541,10 @@ def classify_modality(
     *,
     settings: Settings | None = None,
 ) -> ModalityClassification:
-    """Heurística: MIME de adjuntos primero; regex sobre content secundario.
+    """Heuristic: attachment MIME first; regex over content second.
 
-    No hace llamadas LLM. Si no puede decidir, retorna Modality.UNKNOWN
-    con confidence=0.0 (el router LLM se invoca como fallback opt-in).
+    Makes no LLM calls. If it cannot decide, returns Modality.UNKNOWN
+    with confidence=0.0 (the LLM router is invoked as an opt-in fallback).
     """
     ...
 
@@ -554,13 +554,13 @@ def make_modality_router_node(
     use_llm_fallback: bool = False,
     settings: Settings | None = None,
 ) -> Callable[[AgentState], Awaitable[dict]]:
-    """Construye un nodo LangGraph que rutea por modalidad.
+    """Build a LangGraph node that routes by modality.
 
-    El nodo retorna `{"next": "<agent_name>", "metadata": {"mm": {...}}}`.
+    The node returns `{"next": "<agent_name>", "metadata": {"mm": {...}}}`.
 
     Args:
-        use_llm_fallback: Si True, ante Modality.UNKNOWN llama a
-            get_multimodal_llm() para decidir.
+        use_llm_fallback: If True, on Modality.UNKNOWN it calls
+            get_multimodal_llm() to decide.
     """
     ...
 ```
@@ -569,9 +569,9 @@ def make_modality_router_node(
 
 ## SPEC-MM-AGT-005: Multimodal Fusion
 
-**Archivo:** `prismal/agents/multimodal/multimodal_fusion.py`
+**File:** `prismal/agents/multimodal/multimodal_fusion.py`
 
-### Tipos
+### Types
 
 ```python
 @dataclass(frozen=True)
@@ -588,25 +588,25 @@ class FusionResult:
     strategy_used: Literal["moa", "moderator", "concat"]
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class MultimodalFusion:
-    """Fusiona outputs de agentes modales en una sola respuesta.
+    """Fuses outputs from modal agents into a single response.
 
     Args:
-        strategy: "moa" (delega a MixtureOfAgents.aggregate), "moderator"
-            (LLM moderador sintetiza), "concat" (concatenación con headers).
-        moa: Instancia de MixtureOfAgents si strategy="moa". None construye una.
-        moderator_fn: Callable para strategy="moderator".
+        strategy: "moa" (delegates to MixtureOfAgents.aggregate), "moderator"
+            (a moderator LLM synthesizes), "concat" (concatenation with headers).
+        moa: MixtureOfAgents instance if strategy="moa". None builds one.
+        moderator_fn: Callable for strategy="moderator".
         settings: Settings.
 
     Example::
 
         fusion = MultimodalFusion(strategy="moderator")
         result = await fusion.combine([
-            ModalContribution(Modality.IMAGE, "Foto de un perro.", "vision_agent", 0.9),
-            ModalContribution(Modality.AUDIO, "El usuario pregunta el nombre.", "audio_agent", 0.95),
+            ModalContribution(Modality.IMAGE, "Photo of a dog.", "vision_agent", 0.9),
+            ModalContribution(Modality.AUDIO, "The user asks for the name.", "audio_agent", 0.95),
         ])
         print(result.answer)
     """
@@ -632,7 +632,7 @@ class MultimodalFusion:
 
 ## SPEC-MM-SUB-001: Multimodal Pipeline Subgraph
 
-**Archivo:** `prismal/agents/subgraphs/multimodal_pipeline/__init__.py`
+**File:** `prismal/agents/subgraphs/multimodal_pipeline/__init__.py`
 
 ```python
 def build_multimodal_subgraph(
@@ -645,18 +645,18 @@ def build_multimodal_subgraph(
     use_llm_router_fallback: bool = False,
     settings: Settings | None = None,
 ) -> SubgraphDefinition:
-    """Construye el subgraph multimodal end-to-end.
+    """Build the end-to-end multimodal subgraph.
 
-    Nodos:
-        - router_node      → classify_modality → rutea
+    Nodes:
+        - router_node      → classify_modality → routes
         - vision_node      → wrap(VisionAgent)
         - audio_node       → wrap(AudioAgent)
         - video_node       → wrap(VideoAgent)
         - fusion_node      → MultimodalFusion.combine
-        - output_formatter → texto | TTS | JSON estructurado
+        - output_formatter → text | TTS | structured JSON
 
     Returns:
-        SubgraphDefinition listo para registrar.
+        SubgraphDefinition ready to register.
     """
     ...
 
@@ -666,7 +666,7 @@ def register_multimodal_pipeline(
     *,
     settings: Settings | None = None,
 ) -> None:
-    """Registro idempotente (mismo patrón que register_ml_pipeline)."""
+    """Idempotent registration (same pattern as register_ml_pipeline)."""
     ...
 ```
 
@@ -674,39 +674,39 @@ def register_multimodal_pipeline(
 
 ## SPEC-MM-RAG-001: Multimodal RAG Engine
 
-**Archivo:** `prismal/rag/multimodal.py`
+**File:** `prismal/rag/multimodal.py`
 
-### Tipos
+### Types
 
 ```python
 @dataclass(frozen=True)
 class MultimodalRetrievedChunk:
     chunk_id: str
-    content: str              # texto (para imagen: caption; para audio/video: transcript)
+    content: str              # text (for image: caption; for audio/video: transcript)
     modality: Modality
-    source_uri: str           # path o URL al medio original
+    source_uri: str           # path or URL to the original medium
     score: float
     metadata: dict[str, Any]
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
 class MultimodalRAGEngine:
-    """RAG con soporte cross-modal.
+    """RAG with cross-modal support.
 
     Args:
-        vector_store: ChromaVectorStore con metadata `modality` y `source_uri`.
-        cross_modal_embedder: Embeddings cross-modales (CLIP-style). Si None,
-            cae a embeddings textuales sobre captions/transcripts y emite warning.
-        image_loader / audio_loader / video_loader: loaders inyectables.
+        vector_store: ChromaVectorStore with `modality` and `source_uri` metadata.
+        cross_modal_embedder: Cross-modal Embeddings (CLIP-style). If None,
+            falls back to textual embeddings over captions/transcripts and emits a warning.
+        image_loader / audio_loader / video_loader: injectable loaders.
         settings: Settings.
 
     Example::
 
         engine = MultimodalRAGEngine(vector_store=store)
-        engine.index(Path("dataset/"))   # auto-detecta tipos
-        result = await engine.search("perro en la playa",
+        engine.index(Path("dataset/"))   # auto-detects types
+        result = await engine.search("dog on the beach",
                                      modalities=[Modality.IMAGE, Modality.TEXT],
                                      k=5)
         for chunk in result:
@@ -725,10 +725,10 @@ class MultimodalRAGEngine:
     ) -> None: ...
 
     def index(self, path: Path) -> dict[Modality, int]:
-        """Indexa un archivo o directorio recursivamente.
+        """Index a file or directory recursively.
 
         Returns:
-            Conteo de chunks indexados por modalidad.
+            Count of indexed chunks by modality.
         """
         ...
 
@@ -739,15 +739,15 @@ class MultimodalRAGEngine:
         k: int = 5,
         modalities: list[Modality] | None = None,
     ) -> list[MultimodalRetrievedChunk]:
-        """Busca con filtro por modalidad.
+        """Search with modality filter.
 
         Args:
-            query: Texto de búsqueda.
-            k: Top-k a retornar.
-            modalities: Filtro. None = todas las modalidades.
+            query: Search text.
+            k: Top-k to return.
+            modalities: Filter. None = all modalities.
 
         Returns:
-            Chunks ordenados por score descendente.
+            Chunks ordered by descending score.
         """
         ...
 ```
@@ -756,35 +756,35 @@ class MultimodalRAGEngine:
 
 ## SPEC-MM-RAG-002: Multimodal Loaders
 
-**Archivo:** `prismal/rag/loaders/{image,audio,video}_loader.py`
+**File:** `prismal/rag/loaders/{image,audio,video}_loader.py`
 
 ```python
 class ImageLoader:
-    """Carga imágenes y genera captions vía VLM."""
+    """Loads images and generates captions via VLM."""
 
     def __init__(self, *, vision_agent: VisionAgent | None = None) -> None: ...
 
     async def load(self, path: Path) -> list[Document]:
-        """Retorna 1 Document por imagen con caption como page_content y
+        """Return 1 Document per image with the caption as page_content and
         metadata={"modality": "image", "source_uri": str(path)}.
         """
         ...
 
 
 class AudioLoader:
-    """Carga audio y emite chunks por segmento transcrito."""
+    """Loads audio and emits chunks per transcribed segment."""
 
     def __init__(self, *, stt_client: STTClient | None = None,
                  segment_chunk_chars: int = 1000) -> None: ...
 
     async def load(self, path: Path) -> list[Document]:
-        """Documents con `modality="audio"`, content = texto de segmento,
-        metadata incluye `start_s`, `end_s`."""
+        """Documents with `modality="audio"`, content = segment text,
+        metadata includes `start_s`, `end_s`."""
         ...
 
 
 class VideoLoader:
-    """Compone AudioLoader + ImageLoader (frames sampleados)."""
+    """Composes AudioLoader + ImageLoader (sampled frames)."""
 
     def __init__(
         self,
@@ -797,8 +797,8 @@ class VideoLoader:
     ) -> None: ...
 
     async def load(self, path: Path) -> list[Document]:
-        """Mix de Documents `modality="video_frame"` y `modality="audio"`,
-        todos con `source_uri` apuntando al video original.
+        """Mix of Documents `modality="video_frame"` and `modality="audio"`,
+        all with `source_uri` pointing to the original video.
         """
         ...
 ```
@@ -807,9 +807,9 @@ class VideoLoader:
 
 ## SPEC-MM-SEC-001: Media Validator
 
-**Archivo:** `prismal/security/media_validator.py`
+**File:** `prismal/security/media_validator.py`
 
-### Tipos
+### Types
 
 ```python
 class MediaKind(str, Enum):
@@ -820,23 +820,23 @@ class MediaKind(str, Enum):
 @dataclass(frozen=True)
 class MediaValidationResult:
     ok: bool
-    reason: str | None             # None si ok=True
+    reason: str | None             # None if ok=True
     detected_mime: str | None
     detected_kind: MediaKind | None
     size_bytes: int
-    duration_s: float | None        # None si no aplica (imagen)
+    duration_s: float | None        # None if not applicable (image)
 ```
 
-### Clase Principal
+### Main Class
 
 ```python
-# Magic bytes hardcoded para evitar dependencia opcional libmagic
+# Magic bytes hardcoded to avoid the optional libmagic dependency
 _MAGIC_BYTES: dict[bytes, tuple[str, MediaKind]] = {
     b"\x89PNG\r\n\x1a\n":     ("image/png",  MediaKind.IMAGE),
     b"\xff\xd8\xff":           ("image/jpeg", MediaKind.IMAGE),
     b"GIF87a":                 ("image/gif",  MediaKind.IMAGE),
     b"GIF89a":                 ("image/gif",  MediaKind.IMAGE),
-    b"RIFF":                   ("audio/wav",  MediaKind.AUDIO),    # validar WAVE header después
+    b"RIFF":                   ("audio/wav",  MediaKind.AUDIO),    # validate WAVE header afterward
     b"ID3":                    ("audio/mpeg", MediaKind.AUDIO),
     b"\x00\x00\x00\x18ftyp":   ("video/mp4",  MediaKind.VIDEO),
     b"\x00\x00\x00\x20ftyp":   ("video/mp4",  MediaKind.VIDEO),
@@ -845,22 +845,22 @@ _MAGIC_BYTES: dict[bytes, tuple[str, MediaKind]] = {
 
 
 class MediaValidator:
-    """Valida medios antes de pasar al agente.
+    """Validates media before passing it to the agent.
 
-    Verifica:
-        - Magic bytes coinciden con `expected_kind`.
-        - Tamaño ≤ límite por kind (configurable).
-        - Duración ≤ límite por kind (audio/video).
-        - EXIF/metadata sospechoso (opcional, modo strict).
+    Checks:
+        - Magic bytes match `expected_kind`.
+        - Size ≤ limit per kind (configurable).
+        - Duration ≤ limit per kind (audio/video).
+        - Suspicious EXIF/metadata (optional, strict mode).
 
     Args:
-        max_image_bytes: Límite por imagen (default 10 MB).
-        max_audio_bytes: Límite por audio (default 50 MB).
-        max_video_bytes: Límite por video (default 200 MB).
+        max_image_bytes: Limit per image (default 10 MB).
+        max_audio_bytes: Limit per audio (default 50 MB).
+        max_video_bytes: Limit per video (default 200 MB).
         max_audio_duration_s: Default 600.
         max_video_duration_s: Default 300.
-        strict: Si True, rechaza archivos con EXIF sospechoso.
-        settings: Settings inyectables (cuando se proveen, los kwargs son override).
+        strict: If True, rejects files with suspicious EXIF.
+        settings: Injectable settings (when provided, the kwargs are overrides).
 
     Example::
 
@@ -888,11 +888,11 @@ class MediaValidator:
         *,
         expected_kind: MediaKind | None = None,
     ) -> MediaValidationResult:
-        """Valida los bytes/archivo.
+        """Validate the bytes/file.
 
         Args:
-            media: Bytes o path.
-            expected_kind: Si se especifica, falla si el kind detectado difiere.
+            media: Bytes or path.
+            expected_kind: If specified, fails if the detected kind differs.
 
         Returns:
             MediaValidationResult.
@@ -900,13 +900,13 @@ class MediaValidator:
         ...
 
     def sniff(self, media: bytes | Path) -> tuple[str | None, MediaKind | None]:
-        """Detecta MIME y kind sin imponer límites (público para testing)."""
+        """Detect MIME and kind without enforcing limits (public for testing)."""
         ...
 ```
 
 ---
 
-## Excepciones (`prismal/core/exceptions.py` — extensión)
+## Exceptions (`prismal/core/exceptions.py` — extension)
 
 ```python
 class MultimodalError(PrismalError): ...      # base
@@ -920,29 +920,29 @@ class MultimodalFusionError(MultimodalError): ...
 class MultimodalRAGError(RAGError): ...
 class MediaValidationError(PrismalError): ...
 class MissingDependencyError(PrismalError):
-    """Levantada cuando se pide un backend cuyo extra no está instalado."""
+    """Raised when a backend whose extra is not installed is requested."""
     extra_to_install: str
 ```
 
 ---
 
-## Settings (`prismal/core/config.py` — extensión)
+## Settings (`prismal/core/config.py` — extension)
 
 ```python
 # Multimodal toggles
-multimodal_enabled: bool = Field(default=False, description="Habilita la capa multimodal completa.")
-vision_enabled: bool = Field(default=False, description="Habilita VisionAgent y vision_node.")
-audio_enabled: bool = Field(default=False, description="Habilita AudioAgent y audio_node.")
-video_enabled: bool = Field(default=False, description="Habilita VideoAgent y video_node.")
+multimodal_enabled: bool = Field(default=False, description="Enables the full multimodal layer.")
+vision_enabled: bool = Field(default=False, description="Enables VisionAgent and vision_node.")
+audio_enabled: bool = Field(default=False, description="Enables AudioAgent and audio_node.")
+video_enabled: bool = Field(default=False, description="Enables VideoAgent and video_node.")
 
-# Modelos
-vision_model: str = Field(default="", description="Modelo VLM (LiteLLM string). Reusa cua_vision_model si vacío.")
+# Models
+vision_model: str = Field(default="", description="VLM model (LiteLLM string). Reuses cua_vision_model if empty.")
 multimodal_model: str = Field(default="gemini/gemini-2.0-flash",
-                              description="Modelo nativamente multimodal.")
+                              description="Natively multimodal model.")
 cross_modal_embedding_model: str = Field(default="open_clip:ViT-B-32",
-                                         description="Modelo de embeddings cross-modales.")
+                                         description="Cross-modal embeddings model.")
 
-# Límites de medios (heredados por MediaValidator)
+# Media limits (inherited by MediaValidator)
 max_image_bytes: int = Field(default=10_485_760, ge=1024, description="10 MB default.")
 max_audio_bytes: int = Field(default=52_428_800, ge=1024, description="50 MB default.")
 max_video_bytes: int = Field(default=209_715_200, ge=1024, description="200 MB default.")
@@ -958,21 +958,21 @@ vision_ocr_enabled: bool = Field(default=False)
 
 ---
 
-## Compatibilidad de Interfaces
+## Interface Compatibility
 
-### Protocolo común para agentes modales
+### Common protocol for modal agents
 
 ```python
 class ModalAgentProtocol(Protocol):
-    """Contrato informal para integrarse al subgraph multimodal."""
+    """Informal contract to integrate with the multimodal subgraph."""
     async def process(self, media: bytes | Path, *, state: AgentState | None = None) -> Any: ...
 ```
 
-`VisionAgent.analyze`, `AudioAgent.process`, `VideoAgent.summarize` exponen métodos especializados pero todos retornan dataclasses frozen con `.description`/`.transcript`/`.summary` que el `fusion_node` consume vía `ModalContribution`.
+`VisionAgent.analyze`, `AudioAgent.process`, `VideoAgent.summarize` expose specialized methods but all return frozen dataclasses with `.description`/`.transcript`/`.summary` that the `fusion_node` consumes via `ModalContribution`.
 
 ### State namespacing
 
-Todo metadata multimodal vive bajo `state["metadata"]["mm"]`:
+All multimodal metadata lives under `state["metadata"]["mm"]`:
 
 ```python
 state["metadata"]["mm"] = {
@@ -985,12 +985,12 @@ state["metadata"]["mm"] = {
 }
 ```
 
-Esto aísla la nueva capa del resto del state y simplifica auditoría.
+This isolates the new layer from the rest of the state and simplifies auditing.
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-05-27 | Ernesto Crespo | Versión inicial — contratos para 14 módulos multimodales |
+| 1.0 | 2026-05-27 | Ernesto Crespo | Initial version — contracts for 14 multimodal modules |

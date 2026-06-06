@@ -2,388 +2,388 @@
 
 ## Metadata
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `IMPLEMENTED` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-05-27 |
+| **Author** | Ernesto Crespo |
+| **Status** | `IMPLEMENTED` |
+| **Version** | 1.0 |
+| **Date** | 2026-05-27 |
 | **PLAN** | `specs/multimodal-agents/PLAN.md` |
 | **Architecture** | `specs/multimodal-agents/ARCHITECTURE.md` |
 | **SPEC** | `specs/multimodal-agents/SPEC.md` |
 
 ---
 
-> **Estado de implementación (2026-05-30):** La Fase F está **implementada**
-> (opt-in, gated por `settings.multimodal_enabled`). Módulos en disco:
+> **Implementation status (2026-05-30):** Phase F is **implemented**
+> (opt-in, gated by `settings.multimodal_enabled`). Modules on disk:
 > `providers/{stt,tts,vision,multimodal,cross_modal_embeddings}.py`,
 > `agents/multimodal/`, `agents/subgraphs/multimodal_pipeline/`,
 > `rag/multimodal.py`, `rag/loaders/{image,audio,video}_loader.py`,
-> `security/media_validator.py`; settings `multimodal_*` en `core/config.py`;
-> extras `[multimodal*]` en `pyproject.toml`. Registrada en `CHANGELOG.md`.
-> Única salvedad (DD-MM-006): ligar los agentes modales como nodos directos del
-> supervisor en `graph.py` queda como opt-in del operador. Los checkboxes `☐`
-> de abajo son el plan original; no se mantuvieron al día durante la ejecución.
+> `security/media_validator.py`; `multimodal_*` settings in `core/config.py`;
+> `[multimodal*]` extras in `pyproject.toml`. Recorded in `CHANGELOG.md`.
+> Only caveat (DD-MM-006): wiring the modal agents as direct supervisor nodes
+> in `graph.py` remains an operator opt-in. The `☐` checkboxes
+> below are the original plan; they were not kept up to date during execution.
 
 ---
 
-## 1. Resumen de Implementación
+## 1. Implementation Summary
 
-La Fase F multimodal se divide en **7 sub-fases ejecutables independientemente** más una de hardening:
+The multimodal Phase F is split into **7 independently executable sub-phases** plus a hardening one:
 
-- **F1 (semana 1):** Providers — STT, TTS, Vision, Multimodal LLM, Cross-Modal Embeddings.
-- **F2 (semanas 2-3):** Agentes modales — Vision, Audio, Video, Modality Router, Multimodal Fusion.
-- **F3 (semana 4):** Subgraph `multimodal_pipeline/` con builder y register idempotente.
-- **F4 (semana 5):** RAG multimodal — `MultimodalRAGEngine` + 3 loaders.
-- **F5 (semana 5.5):** Seguridad — `MediaValidator`, extensiones a Sanitizer/Interceptor/Audit.
-- **F6 (semana 5.7):** Config + toggles + extras en `pyproject.toml`.
-- **F7 (semana 6):** Integración LangGraph + intent router + capability routing.
-- **Hardening (semana 7):** Coverage, docs, security audit, integration tests.
+- **F1 (week 1):** Providers — STT, TTS, Vision, Multimodal LLM, Cross-Modal Embeddings.
+- **F2 (weeks 2-3):** Modal agents — Vision, Audio, Video, Modality Router, Multimodal Fusion.
+- **F3 (week 4):** `multimodal_pipeline/` subgraph with builder and idempotent register.
+- **F4 (week 5):** Multimodal RAG — `MultimodalRAGEngine` + 3 loaders.
+- **F5 (week 5.5):** Security — `MediaValidator`, extensions to Sanitizer/Interceptor/Audit.
+- **F6 (week 5.7):** Config + toggles + extras in `pyproject.toml`.
+- **F7 (week 6):** LangGraph integration + intent router + capability routing.
+- **Hardening (week 7):** Coverage, docs, security audit, integration tests.
 
-**Duración total estimada:** 7 semanas
-**Equipo mínimo:** 1 engineer senior con LangGraph + experiencia multimedia (FFmpeg, audio basics).
-**Fecha objetivo:** 2026-07-15
+**Total estimated duration:** 7 weeks
+**Minimum team:** 1 senior engineer with LangGraph + multimedia experience (FFmpeg, audio basics).
+**Target date:** 2026-07-15
 
 ---
 
-## 2. Pre-requisitos
+## 2. Prerequisites
 
-| Pre-requisito | Owner | Estado | Fecha Límite |
+| Prerequisite | Owner | Status | Deadline |
 |---|---|---|---|
-| PLAN.md aprobado | Tech Lead | ☐ Pendiente | 2026-06-01 |
-| ARCHITECTURE.md aprobado | Tech Lead + AI Architect | ☐ Pendiente | 2026-06-01 |
-| SPEC.md aprobado | Tech Lead | ☐ Pendiente | 2026-06-01 |
-| Decisión sobre STT local (`openai-whisper` vs `faster-whisper`) | AI Architect | ☐ Pendiente | Inicio F1 |
-| Decisión sobre `python-magic` opcional para `MediaValidator` | Tech Lead | ☐ Pendiente | Inicio F5 |
-| Extras en `pyproject.toml` documentados | Engineer | ☐ Pendiente | Inicio F1 |
-| Branch `feature/multimodal-agents` creado | Engineer | ☐ Pendiente | Inicio F1 |
-| Suite de tests existente pasa al 100% (688+ tests) | Engineer | ☐ Verificar | Inicio F1 |
-| FFmpeg disponible en CI runner | DevOps | ☐ Verificar | Inicio F2 (`VideoAgent`) |
+| PLAN.md approved | Tech Lead | ☐ Pending | 2026-06-01 |
+| ARCHITECTURE.md approved | Tech Lead + AI Architect | ☐ Pending | 2026-06-01 |
+| SPEC.md approved | Tech Lead | ☐ Pending | 2026-06-01 |
+| Decision on local STT (`openai-whisper` vs `faster-whisper`) | AI Architect | ☐ Pending | Start of F1 |
+| Decision on optional `python-magic` for `MediaValidator` | Tech Lead | ☐ Pending | Start of F5 |
+| Extras in `pyproject.toml` documented | Engineer | ☐ Pending | Start of F1 |
+| Branch `feature/multimodal-agents` created | Engineer | ☐ Pending | Start of F1 |
+| Existing test suite passes 100% (688+ tests) | Engineer | ☐ Verify | Start of F1 |
+| FFmpeg available in CI runner | DevOps | ☐ Verify | Start of F2 (`VideoAgent`) |
 
 ---
 
-## 3. Fases de Implementación
+## 3. Implementation Phases
 
 ---
 
-### FASE F1 — Providers
+### PHASE F1 — Providers
 
-**Duración:** 1 semana (semana 1) | **Objetivo:** wrappers limpios sobre STT/TTS/VLM/multimodal/embeddings cross-modales, todos aislados en `prismal/providers/`.
+**Duration:** 1 week (week 1) | **Objective:** clean wrappers over STT/TTS/VLM/multimodal/cross-modal embeddings, all isolated in `prismal/providers/`.
 
 #### F1-01 — STT wrapper
-**Estimación:** 1.5 días | **Archivo:** `prismal/providers/stt.py`
+**Estimate:** 1.5 days | **File:** `prismal/providers/stt.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| F1-01-01 | Crear `STTProvider` enum, `STTResult`, `STTSegment` dataclasses | 0.2d | — | ☐ |
-| F1-01-02 | Implementar backend `openai` (Whisper API via LiteLLM) | 0.5d | F1-01-01 | ☐ |
-| F1-01-03 | Implementar backend `local` (lazy import opcional) | 0.5d | F1-01-01 | ☐ |
-| F1-01-04 | `get_stt()` factory con resolución por settings + override | 0.2d | F1-01-02, F1-01-03 | ☐ |
-| F1-01-05 | Tests unitarios con `AsyncMock` (≥ 80% coverage) | 0.5d | F1-01-04 | ☐ |
-| F1-01-06 | Excepción `STTError` en `core/exceptions.py` | 0.1d | — | ☐ |
+| F1-01-01 | Create `STTProvider` enum, `STTResult`, `STTSegment` dataclasses | 0.2d | — | ☐ |
+| F1-01-02 | Implement `openai` backend (Whisper API via LiteLLM) | 0.5d | F1-01-01 | ☐ |
+| F1-01-03 | Implement `local` backend (optional lazy import) | 0.5d | F1-01-01 | ☐ |
+| F1-01-04 | `get_stt()` factory with settings-based resolution + override | 0.2d | F1-01-02, F1-01-03 | ☐ |
+| F1-01-05 | Unit tests with `AsyncMock` (≥ 80% coverage) | 0.5d | F1-01-04 | ☐ |
+| F1-01-06 | `STTError` exception in `core/exceptions.py` | 0.1d | — | ☐ |
 
-**Criterios de Done:**
-- `STTClient` protocol + 2 implementaciones funcionales.
-- `get_stt(provider="openai")` retorna client funcional con LLM mockeado en tests.
-- Coverage ≥ 80% en `providers/stt.py`.
-- `ruff` + `mypy --strict` pasan.
+**Done criteria:**
+- `STTClient` protocol + 2 functional implementations.
+- `get_stt(provider="openai")` returns a functional client with a mocked LLM in tests.
+- Coverage ≥ 80% in `providers/stt.py`.
+- `ruff` + `mypy --strict` pass.
 
 ---
 
 #### F1-02 — TTS wrapper
-**Estimación:** 1.5 días | **Archivo:** `prismal/providers/tts.py`
+**Estimate:** 1.5 days | **File:** `prismal/providers/tts.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
 | F1-02-01 | `TTSProvider` enum + `TTSResult` dataclass | 0.2d | — | ☐ |
-| F1-02-02 | Backend `pyttsx3` (offline, baseline) | 0.5d | F1-02-01 | ☐ |
-| F1-02-03 | Backend `openai` (gpt-4o-mini-tts via LiteLLM) | 0.3d | F1-02-01 | ☐ |
-| F1-02-04 | Backend `elevenlabs` (lazy import opcional) | 0.5d | F1-02-01 | ☐ |
-| F1-02-05 | `get_tts()` con cascada elevenlabs → openai → pyttsx3 | 0.3d | F1-02-02..04 | ☐ |
-| F1-02-06 | Tests + excepción `TTSError` | 0.5d | F1-02-05 | ☐ |
+| F1-02-02 | `pyttsx3` backend (offline, baseline) | 0.5d | F1-02-01 | ☐ |
+| F1-02-03 | `openai` backend (gpt-4o-mini-tts via LiteLLM) | 0.3d | F1-02-01 | ☐ |
+| F1-02-04 | `elevenlabs` backend (optional lazy import) | 0.5d | F1-02-01 | ☐ |
+| F1-02-05 | `get_tts()` with cascade elevenlabs → openai → pyttsx3 | 0.3d | F1-02-02..04 | ☐ |
+| F1-02-06 | Tests + `TTSError` exception | 0.5d | F1-02-05 | ☐ |
 
-**Criterios de Done:**
-- Fallback en cascada verificado con tests (mockear fallo del primario).
-- `pyttsx3` siempre disponible (no requiere extras).
+**Done criteria:**
+- Cascading fallback verified with tests (mock primary failure).
+- `pyttsx3` always available (requires no extras).
 
 ---
 
 #### F1-03 — Vision LLM wrapper
-**Estimación:** 0.5 día | **Archivo:** `prismal/providers/vision.py`
+**Estimate:** 0.5 day | **File:** `prismal/providers/vision.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| F1-03-01 | Formalizar `get_vision_llm(model)` con LiteLLM | 0.3d | — | ☐ |
-| F1-03-02 | Tests + integración con `provider_registry` legacy (compatibilidad CUA) | 0.2d | F1-03-01 | ☐ |
+| F1-03-01 | Formalize `get_vision_llm(model)` with LiteLLM | 0.3d | — | ☐ |
+| F1-03-02 | Tests + integration with legacy `provider_registry` (CUA compatibility) | 0.2d | F1-03-01 | ☐ |
 
-**Criterios de Done:**
-- `CUAgent` sigue funcionando idénticamente (regresión zero).
+**Done criteria:**
+- `CUAgent` keeps working identically (zero regression).
 
 ---
 
 #### F1-04 — Multimodal LLM wrapper
-**Estimación:** 0.5 día | **Archivo:** `prismal/providers/multimodal.py`
+**Estimate:** 0.5 day | **File:** `prismal/providers/multimodal.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| F1-04-01 | `get_multimodal_llm(model)` con default `gemini/gemini-2.0-flash` | 0.3d | — | ☐ |
-| F1-04-02 | Tests con mocks | 0.2d | F1-04-01 | ☐ |
+| F1-04-01 | `get_multimodal_llm(model)` with default `gemini/gemini-2.0-flash` | 0.3d | — | ☐ |
+| F1-04-02 | Tests with mocks | 0.2d | F1-04-01 | ☐ |
 
 ---
 
 #### F1-05 — Cross-Modal Embeddings wrapper
-**Estimación:** 1 día | **Archivo:** `prismal/providers/cross_modal_embeddings.py`
+**Estimate:** 1 day | **File:** `prismal/providers/cross_modal_embeddings.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| F1-05-01 | `get_cross_modal_embeddings(model)` con backend `open_clip` (lazy) | 0.5d | — | ☐ |
-| F1-05-02 | `MissingDependencyError` cuando extras no instalados | 0.2d | F1-05-01 | ☐ |
-| F1-05-03 | Tests con embedder mockeado | 0.3d | F1-05-01 | ☐ |
+| F1-05-01 | `get_cross_modal_embeddings(model)` with `open_clip` backend (lazy) | 0.5d | — | ☐ |
+| F1-05-02 | `MissingDependencyError` when extras not installed | 0.2d | F1-05-01 | ☐ |
+| F1-05-03 | Tests with mocked embedder | 0.3d | F1-05-01 | ☐ |
 
-**Criterios Globales F1:**
-- 5 módulos en `prismal/providers/`, todos con tests ≥ 80% coverage.
-- 0 imports directos de SDKs en módulos fuera de `providers/`.
-- 3 excepciones nuevas en `core/exceptions.py`: `STTError`, `TTSError`, `MissingDependencyError`.
+**Global F1 criteria:**
+- 5 modules in `prismal/providers/`, all with tests ≥ 80% coverage.
+- 0 direct SDK imports in modules outside `providers/`.
+- 3 new exceptions in `core/exceptions.py`: `STTError`, `TTSError`, `MissingDependencyError`.
 
 ---
 
-### FASE F2 — Agentes Modales
+### PHASE F2 — Modal Agents
 
-**Duración:** 2 semanas (semanas 2-3) | **Objetivo:** 5 agentes/routers en `prismal/agents/multimodal/`.
+**Duration:** 2 weeks (weeks 2-3) | **Objective:** 5 agents/routers in `prismal/agents/multimodal/`.
 
 #### F2-01 — VisionAgent
-**Estimación:** 2.5 días | **Archivo:** `prismal/agents/multimodal/vision_agent.py`
+**Estimate:** 2.5 days | **File:** `prismal/agents/multimodal/vision_agent.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| F2-01-01 | Crear directorio `agents/multimodal/` + `__init__.py` | 0.1d | — | ☐ |
+| F2-01-01 | Create `agents/multimodal/` directory + `__init__.py` | 0.1d | — | ☐ |
 | F2-01-02 | `VisionResult`, `DetectedObject` dataclasses | 0.2d | F2-01-01 | ☐ |
-| F2-01-03 | `VisionAgent.__init__` con callables `vision_fn`, `ocr_fn` | 0.3d | F2-01-02 | ☐ |
+| F2-01-03 | `VisionAgent.__init__` with `vision_fn`, `ocr_fn` callables | 0.3d | F2-01-02 | ☐ |
 | F2-01-04 | `analyze(image, with_ocr)` — validate → VLM → parse | 1d | F2-01-03, F1-03, F5-01 | ☐ |
-| F2-01-05 | OCR path (segundo VLM call con prompt OCR) | 0.4d | F2-01-04 | ☐ |
-| F2-01-06 | OTel spans + métricas | 0.2d | F2-01-04 | ☐ |
-| F2-01-07 | Tests unitarios con VLM mockeado (15+ tests, ≥80% coverage) | 0.8d | F2-01-04, F2-01-05 | ☐ |
-| F2-01-08 | Excepción `VisionAgentError` en `core/exceptions.py` | 0.1d | — | ☐ |
+| F2-01-05 | OCR path (second VLM call with OCR prompt) | 0.4d | F2-01-04 | ☐ |
+| F2-01-06 | OTel spans + metrics | 0.2d | F2-01-04 | ☐ |
+| F2-01-07 | Unit tests with mocked VLM (15+ tests, ≥80% coverage) | 0.8d | F2-01-04, F2-01-05 | ☐ |
+| F2-01-08 | `VisionAgentError` exception in `core/exceptions.py` | 0.1d | — | ☐ |
 
 ---
 
 #### F2-02 — AudioAgent
-**Estimación:** 2 días | **Archivo:** `prismal/agents/multimodal/audio_agent.py`
+**Estimate:** 2 days | **File:** `prismal/agents/multimodal/audio_agent.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
 | F2-02-01 | `AudioResult` dataclass | 0.1d | — | ☐ |
-| F2-02-02 | `AudioAgent.__init__` con `stt_client`, `tts_client`, `reason_fn` | 0.3d | F1-01, F1-02 | ☐ |
-| F2-02-03 | `process(audio, with_tts)` — validate → STT → reason → TTS opcional | 0.8d | F2-02-02 | ☐ |
-| F2-02-04 | Audit logging (hash de audio in + out, nunca contenido) | 0.3d | F2-02-03, F5-04 | ☐ |
-| F2-02-05 | OTel spans + métricas | 0.2d | F2-02-03 | ☐ |
-| F2-02-06 | Tests unitarios (14+ tests, ≥80% coverage) | 0.6d | F2-02-03 | ☐ |
-| F2-02-07 | Excepción `AudioAgentError` | 0.1d | — | ☐ |
+| F2-02-02 | `AudioAgent.__init__` with `stt_client`, `tts_client`, `reason_fn` | 0.3d | F1-01, F1-02 | ☐ |
+| F2-02-03 | `process(audio, with_tts)` — validate → STT → reason → optional TTS | 0.8d | F2-02-02 | ☐ |
+| F2-02-04 | Audit logging (hash of audio in + out, never content) | 0.3d | F2-02-03, F5-04 | ☐ |
+| F2-02-05 | OTel spans + metrics | 0.2d | F2-02-03 | ☐ |
+| F2-02-06 | Unit tests (14+ tests, ≥80% coverage) | 0.6d | F2-02-03 | ☐ |
+| F2-02-07 | `AudioAgentError` exception | 0.1d | — | ☐ |
 
 ---
 
 #### F2-03 — VideoAgent
-**Estimación:** 3.5 días | **Archivo:** `prismal/agents/multimodal/video_agent.py`
+**Estimate:** 3.5 days | **File:** `prismal/agents/multimodal/video_agent.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
 | F2-03-01 | `VideoResult`, `FrameDescription` dataclasses | 0.2d | — | ☐ |
-| F2-03-02 | `frame_extractor_fn` default usando `SandboxExecutor` + `ffmpeg-python` | 1d | F5-01 (validator) | ☐ |
-| F2-03-03 | `summarize(video, fps, max_frames)` — extract → dedup → vision+audio en paralelo → fusion | 1d | F2-03-02, F2-01, F2-02 | ☐ |
-| F2-03-04 | Dedup de frames con `imagehash` (opcional, gated por extra) | 0.4d | F2-03-03 | ☐ |
-| F2-03-05 | OTel spans + métricas | 0.2d | F2-03-03 | ☐ |
-| F2-03-06 | Tests unitarios con FFmpeg mockeado + frames sintéticos (12+ tests) | 0.7d | F2-03-03 | ☐ |
-| F2-03-07 | Excepción `VideoAgentError` | 0.1d | — | ☐ |
+| F2-03-02 | Default `frame_extractor_fn` using `SandboxExecutor` + `ffmpeg-python` | 1d | F5-01 (validator) | ☐ |
+| F2-03-03 | `summarize(video, fps, max_frames)` — extract → dedup → vision+audio in parallel → fusion | 1d | F2-03-02, F2-01, F2-02 | ☐ |
+| F2-03-04 | Frame dedup with `imagehash` (optional, gated by extra) | 0.4d | F2-03-03 | ☐ |
+| F2-03-05 | OTel spans + metrics | 0.2d | F2-03-03 | ☐ |
+| F2-03-06 | Unit tests with mocked FFmpeg + synthetic frames (12+ tests) | 0.7d | F2-03-03 | ☐ |
+| F2-03-07 | `VideoAgentError` exception | 0.1d | — | ☐ |
 
-**Riesgos F2-03:**
-- FFmpeg en CI puede no estar disponible — tests core deben funcionar sin él (callable inyectado).
-- Latencia: limitar `max_frames` default a 60 para evitar costos LLM altos en CI.
+**F2-03 risks:**
+- FFmpeg may not be available in CI — core tests must work without it (injected callable).
+- Latency: cap `max_frames` default to 60 to avoid high LLM costs in CI.
 
 ---
 
 #### F2-04 — ModalityRouter
-**Estimación:** 1.5 días | **Archivo:** `prismal/agents/multimodal/modality_router.py`
+**Estimate:** 1.5 days | **File:** `prismal/agents/multimodal/modality_router.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
 | F2-04-01 | `Modality` enum + `ModalityClassification` dataclass | 0.2d | — | ☐ |
-| F2-04-02 | `classify_modality()` heurística (MIME + regex) | 0.4d | F2-04-01 | ☐ |
-| F2-04-03 | `make_modality_router_node()` factory LangGraph-compatible | 0.3d | F2-04-02 | ☐ |
-| F2-04-04 | LLM fallback opcional (opt-in via `use_llm_fallback=True`) | 0.3d | F1-04, F2-04-03 | ☐ |
-| F2-04-05 | Tests unitarios (10+ tests, cubrir mixed/unknown/text/each modality) | 0.3d | F2-04-03 | ☐ |
-| F2-04-06 | Excepción `ModalityRouterError` | 0.1d | — | ☐ |
+| F2-04-02 | `classify_modality()` heuristic (MIME + regex) | 0.4d | F2-04-01 | ☐ |
+| F2-04-03 | `make_modality_router_node()` LangGraph-compatible factory | 0.3d | F2-04-02 | ☐ |
+| F2-04-04 | Optional LLM fallback (opt-in via `use_llm_fallback=True`) | 0.3d | F1-04, F2-04-03 | ☐ |
+| F2-04-05 | Unit tests (10+ tests, cover mixed/unknown/text/each modality) | 0.3d | F2-04-03 | ☐ |
+| F2-04-06 | `ModalityRouterError` exception | 0.1d | — | ☐ |
 
 ---
 
 #### F2-05 — MultimodalFusion
-**Estimación:** 1.5 días | **Archivo:** `prismal/agents/multimodal/multimodal_fusion.py`
+**Estimate:** 1.5 days | **File:** `prismal/agents/multimodal/multimodal_fusion.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
 | F2-05-01 | `ModalContribution`, `FusionResult` dataclasses | 0.2d | — | ☐ |
-| F2-05-02 | `MultimodalFusion.__init__` con strategy `moa|moderator|concat` | 0.2d | F2-05-01 | ☐ |
-| F2-05-03 | `combine()` para strategy `concat` (baseline) | 0.2d | F2-05-02 | ☐ |
-| F2-05-04 | `combine()` strategy `moderator` (delega a LLM call) | 0.3d | F2-05-02 | ☐ |
-| F2-05-05 | `combine()` strategy `moa` (delega a `MixtureOfAgents.aggregate`) | 0.3d | F2-05-02 | ☐ |
-| F2-05-06 | Tests unitarios (10+ tests cubriendo 3 strategies) | 0.3d | F2-05-03..05 | ☐ |
-| F2-05-07 | Excepción `MultimodalFusionError` | 0.1d | — | ☐ |
+| F2-05-02 | `MultimodalFusion.__init__` with strategy `moa|moderator|concat` | 0.2d | F2-05-01 | ☐ |
+| F2-05-03 | `combine()` for strategy `concat` (baseline) | 0.2d | F2-05-02 | ☐ |
+| F2-05-04 | `combine()` strategy `moderator` (delegates to LLM call) | 0.3d | F2-05-02 | ☐ |
+| F2-05-05 | `combine()` strategy `moa` (delegates to `MixtureOfAgents.aggregate`) | 0.3d | F2-05-02 | ☐ |
+| F2-05-06 | Unit tests (10+ tests covering 3 strategies) | 0.3d | F2-05-03..05 | ☐ |
+| F2-05-07 | `MultimodalFusionError` exception | 0.1d | — | ☐ |
 
-**Criterios Globales F2:**
-- 5 agentes/utilities, todos con tests ≥ 80% coverage.
-- Reutilización demostrada: `MultimodalFusion` strategy=`moa` invoca `prismal/agents/patterns/mixture_of_agents.py`.
-- Suite total no debe regresar: 688 tests previos + ~61 nuevos = ~749.
-
----
-
-### FASE F3 — Subgraph `multimodal_pipeline/`
-
-**Duración:** 1 semana (semana 4) | **Archivo:** `prismal/agents/subgraphs/multimodal_pipeline/`
-
-| ID | Tarea | Estimación | Dependencia | Estado |
-|---|---|---|---|---|
-| F3-01 | Crear estructura del directorio + `__init__.py` | 0.2d | F2 done | ☐ |
-| F3-02 | `router_node.py` — adapter de `make_modality_router_node()` | 0.3d | F2-04 | ☐ |
-| F3-03 | `vision_node.py`, `audio_node.py`, `video_node.py` — adapters de los agentes | 0.5d | F2-01..03 | ☐ |
-| F3-04 | `fusion_node.py` — adapter de `MultimodalFusion` | 0.3d | F2-05 | ☐ |
-| F3-05 | `output_formatter_node.py` — decide texto / TTS / JSON según `state["metadata"]["mm"]["preferred_output"]` | 0.5d | F2-02 (TTS) | ☐ |
-| F3-06 | `builder.py` — `build_multimodal_subgraph()` retorna `SubgraphDefinition` | 0.8d | F3-02..05 | ☐ |
-| F3-07 | `register_multimodal_pipeline(registry)` idempotente | 0.2d | F3-06 | ☐ |
-| F3-08 | Tests unitarios por nodo (20+ tests) | 0.8d | F3-02..05 | ☐ |
-| F3-09 | Test integración end-to-end del subgraph (LLM/FFmpeg mockeados) | 0.7d | F3-06 | ☐ |
-| F3-10 | Excepción `MultimodalSubgraphError` (reusa `MultimodalError`) | 0.1d | — | ☐ |
-
-**Criterios Globales F3:**
-- Subgraph registrable y testeable sin red.
-- Conditional edges del router verificados: cada modalidad llega al nodo correcto.
-- Test end-to-end pasa con audio + imagen mockeados.
+**Global F2 criteria:**
+- 5 agents/utilities, all with tests ≥ 80% coverage.
+- Reuse demonstrated: `MultimodalFusion` strategy=`moa` invokes `prismal/agents/patterns/mixture_of_agents.py`.
+- Total suite must not regress: 688 previous tests + ~61 new = ~749.
 
 ---
 
-### FASE F4 — RAG Multimodal
+### PHASE F3 — Subgraph `multimodal_pipeline/`
 
-**Duración:** 1 semana (semana 5) | **Archivos:** `prismal/rag/multimodal.py` + `prismal/rag/loaders/`
+**Duration:** 1 week (week 4) | **File:** `prismal/agents/subgraphs/multimodal_pipeline/`
 
-#### F4-01 — Refactor de loaders existentes
-**Estimación:** 0.5 día
-
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| F4-01-01 | Mover `prismal/rag/loaders.py` a `prismal/rag/loaders/document_loader.py` | 0.2d | — | ☐ |
-| F4-01-02 | Crear `prismal/rag/loaders/__init__.py` con re-exports backward-compatible | 0.2d | F4-01-01 | ☐ |
-| F4-01-03 | Verificar 0 regresiones en imports existentes | 0.1d | F4-01-02 | ☐ |
+| F3-01 | Create directory structure + `__init__.py` | 0.2d | F2 done | ☐ |
+| F3-02 | `router_node.py` — adapter of `make_modality_router_node()` | 0.3d | F2-04 | ☐ |
+| F3-03 | `vision_node.py`, `audio_node.py`, `video_node.py` — agent adapters | 0.5d | F2-01..03 | ☐ |
+| F3-04 | `fusion_node.py` — adapter of `MultimodalFusion` | 0.3d | F2-05 | ☐ |
+| F3-05 | `output_formatter_node.py` — decides text / TTS / JSON according to `state["metadata"]["mm"]["preferred_output"]` | 0.5d | F2-02 (TTS) | ☐ |
+| F3-06 | `builder.py` — `build_multimodal_subgraph()` returns `SubgraphDefinition` | 0.8d | F3-02..05 | ☐ |
+| F3-07 | Idempotent `register_multimodal_pipeline(registry)` | 0.2d | F3-06 | ☐ |
+| F3-08 | Unit tests per node (20+ tests) | 0.8d | F3-02..05 | ☐ |
+| F3-09 | End-to-end integration test of the subgraph (LLM/FFmpeg mocked) | 0.7d | F3-06 | ☐ |
+| F3-10 | `MultimodalSubgraphError` exception (reuses `MultimodalError`) | 0.1d | — | ☐ |
+
+**Global F3 criteria:**
+- Subgraph registrable and testable without network.
+- Router conditional edges verified: each modality reaches the correct node.
+- End-to-end test passes with mocked audio + image.
 
 ---
 
-#### F4-02 — Loaders multimodales
-**Estimación:** 2 días
+### PHASE F4 — Multimodal RAG
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+**Duration:** 1 week (week 5) | **Files:** `prismal/rag/multimodal.py` + `prismal/rag/loaders/`
+
+#### F4-01 — Refactor existing loaders
+**Estimate:** 0.5 day
+
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| F4-02-01 | `ImageLoader` — usa `VisionAgent` para caption | 0.5d | F2-01 | ☐ |
-| F4-02-02 | `AudioLoader` — usa `STTClient` + segmentación por chars | 0.7d | F1-01 | ☐ |
-| F4-02-03 | `VideoLoader` — compone `AudioLoader` + frames vía `VideoAgent` | 0.5d | F4-02-01, F4-02-02, F2-03 | ☐ |
-| F4-02-04 | Tests por loader (15+ tests cumulativos) | 0.3d | F4-02-01..03 | ☐ |
+| F4-01-01 | Move `prismal/rag/loaders.py` to `prismal/rag/loaders/document_loader.py` | 0.2d | — | ☐ |
+| F4-01-02 | Create `prismal/rag/loaders/__init__.py` with backward-compatible re-exports | 0.2d | F4-01-01 | ☐ |
+| F4-01-03 | Verify 0 regressions in existing imports | 0.1d | F4-01-02 | ☐ |
+
+---
+
+#### F4-02 — Multimodal loaders
+**Estimate:** 2 days
+
+| ID | Task | Estimate | Dependency | Status |
+|---|---|---|---|---|
+| F4-02-01 | `ImageLoader` — uses `VisionAgent` for caption | 0.5d | F2-01 | ☐ |
+| F4-02-02 | `AudioLoader` — uses `STTClient` + char-based segmentation | 0.7d | F1-01 | ☐ |
+| F4-02-03 | `VideoLoader` — composes `AudioLoader` + frames via `VideoAgent` | 0.5d | F4-02-01, F4-02-02, F2-03 | ☐ |
+| F4-02-04 | Tests per loader (15+ cumulative tests) | 0.3d | F4-02-01..03 | ☐ |
 
 ---
 
 #### F4-03 — MultimodalRAGEngine
-**Estimación:** 2 días | **Archivo:** `prismal/rag/multimodal.py`
+**Estimate:** 2 days | **File:** `prismal/rag/multimodal.py`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
 | F4-03-01 | `MultimodalRetrievedChunk` dataclass | 0.1d | — | ☐ |
-| F4-03-02 | `MultimodalRAGEngine.__init__` con loaders inyectables | 0.3d | F4-02 | ☐ |
-| F4-03-03 | `index(path)` — auto-detecta tipo (vía `MediaValidator.sniff`) y delega a loader | 0.6d | F5-01, F4-02 | ☐ |
-| F4-03-04 | `search(query, k, modalities)` con filtro por metadata `modality` | 0.5d | F4-03-03 | ☐ |
-| F4-03-05 | Fallback a captions textuales cuando `cross_modal_embedder=None` + warning | 0.2d | F4-03-04 | ☐ |
-| F4-03-06 | Tests unitarios (20+ tests) | 0.7d | F4-03-04 | ☐ |
-| F4-03-07 | Excepción `MultimodalRAGError` (hereda de `RAGError`) | 0.1d | — | ☐ |
+| F4-03-02 | `MultimodalRAGEngine.__init__` with injectable loaders | 0.3d | F4-02 | ☐ |
+| F4-03-03 | `index(path)` — auto-detects type (via `MediaValidator.sniff`) and delegates to loader | 0.6d | F5-01, F4-02 | ☐ |
+| F4-03-04 | `search(query, k, modalities)` with filter by `modality` metadata | 0.5d | F4-03-03 | ☐ |
+| F4-03-05 | Fallback to textual captions when `cross_modal_embedder=None` + warning | 0.2d | F4-03-04 | ☐ |
+| F4-03-06 | Unit tests (20+ tests) | 0.7d | F4-03-04 | ☐ |
+| F4-03-07 | `MultimodalRAGError` exception (inherits from `RAGError`) | 0.1d | — | ☐ |
 
-**Criterios Globales F4:**
-- Loaders reutilizan agentes de F2 (no duplican lógica de VLM/STT).
-- `MultimodalRAGEngine.search(modalities=[Modality.IMAGE])` filtra correctamente.
-- Sin extras de embeddings: el engine sigue funcionando con captions textuales.
-
----
-
-### FASE F5 — Seguridad
-
-**Duración:** 0.5 semana | **Archivos:** `prismal/security/`
-
-| ID | Tarea | Estimación | Dependencia | Estado |
-|---|---|---|---|---|
-| F5-01 | Crear `prismal/security/media_validator.py` con `MediaValidator`, `MediaKind`, `MediaValidationResult`, `_MAGIC_BYTES` | 1d | — | ☐ |
-| F5-02 | Tests de `MediaValidator`: magic bytes correctos, falsos positivos, polyglot, oversize, duración | 0.5d | F5-01 | ☐ |
-| F5-03 | Extender `InputSanitizer.sanitize_media(blob, kind)` con EXIF strip vía `Pillow` | 0.4d | F5-01 | ☐ |
-| F5-04 | Extender `AuditLogger.log_media(event, sha256, modality, size_bytes, duration_s)` | 0.3d | — | ☐ |
-| F5-05 | Extender `ActionInterceptor.check_media_op(op, path)` con permisos por kind | 0.3d | — | ☐ |
-| F5-06 | Excepción `MediaValidationError` | 0.1d | — | ☐ |
-| F5-07 | Tests integración: agente recibe medio inválido → bloqueado antes de LLM | 0.4d | F5-01..05 | ☐ |
-
-**Criterios Globales F5:**
-- Test específico: PNG con magic bytes JPEG es rechazado.
-- Test específico: archivo de 100 MB con `max_image_bytes=10 MB` es rechazado.
-- EXIF de geolocalización removido en imágenes procesadas (testeado).
+**Global F4 criteria:**
+- Loaders reuse the F2 agents (do not duplicate VLM/STT logic).
+- `MultimodalRAGEngine.search(modalities=[Modality.IMAGE])` filters correctly.
+- Without embeddings extras: the engine still works with textual captions.
 
 ---
 
-### FASE F6 — Config + Toggles + Pyproject
+### PHASE F5 — Security
 
-**Duración:** 0.2 semana
+**Duration:** 0.5 week | **Files:** `prismal/security/`
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| F6-01 | Añadir campos `multimodal_*`, `vision_*`, `video_*`, `tts_max_chars`, `max_image_bytes`, etc. a `core/config.py` | 0.5d | — | ☐ |
-| F6-02 | Extras en `pyproject.toml`: `[multimodal]`, `[multimodal-local]`, `[multimodal-premium]`, `[multimodal-embed]` | 0.3d | — | ☐ |
-| F6-03 | `env.example` actualizado con nuevas variables `PRISMAL_MULTIMODAL_*` | 0.1d | F6-01 | ☐ |
-| F6-04 | Tests de validación de settings (límites Pydantic) | 0.2d | F6-01 | ☐ |
+| F5-01 | Create `prismal/security/media_validator.py` with `MediaValidator`, `MediaKind`, `MediaValidationResult`, `_MAGIC_BYTES` | 1d | — | ☐ |
+| F5-02 | `MediaValidator` tests: correct magic bytes, false positives, polyglot, oversize, duration | 0.5d | F5-01 | ☐ |
+| F5-03 | Extend `InputSanitizer.sanitize_media(blob, kind)` with EXIF strip via `Pillow` | 0.4d | F5-01 | ☐ |
+| F5-04 | Extend `AuditLogger.log_media(event, sha256, modality, size_bytes, duration_s)` | 0.3d | — | ☐ |
+| F5-05 | Extend `ActionInterceptor.check_media_op(op, path)` with per-kind permissions | 0.3d | — | ☐ |
+| F5-06 | `MediaValidationError` exception | 0.1d | — | ☐ |
+| F5-07 | Integration tests: agent receives invalid media → blocked before LLM | 0.4d | F5-01..05 | ☐ |
+
+**Global F5 criteria:**
+- Specific test: PNG with JPEG magic bytes is rejected.
+- Specific test: 100 MB file with `max_image_bytes=10 MB` is rejected.
+- Geolocation EXIF removed in processed images (tested).
 
 ---
 
-### FASE F7 — Integración LangGraph + Intent Router + Capability Routing
+### PHASE F6 — Config + Toggles + Pyproject
 
-**Duración:** 0.5 semana
+**Duration:** 0.2 week
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| F7-01 | `register_multimodal_pipeline()` invocado opt-in en startup cuando `settings.multimodal_enabled=True` | 0.3d | F3 | ☐ |
-| F7-02 | Añadir `"multimodal_router"`, `"vision_agent"`, `"audio_agent"`, `"video_agent"` a `VALID_NEXT_NODES` (gated por toggle) | 0.3d | F3 | ☐ |
-| F7-03 | Extender `intent_router.py` con regex `r"(?i)\b(transcribe|imagen|video|voz|audio)\b"` + detección de adjunto MIME | 0.4d | — | ☐ |
-| F7-04 | Extender `DEFAULT_CAPABILITY_MAP` en `tool_registry.py` con entries `multimodal_router`, `vision_agent`, `audio_agent`, `video_agent` | 0.2d | — | ☐ |
-| F7-05 | Documentar capabilities `audio`, `vision`, `video` en `config/mcp_servers.yaml` (entries con `enabled: false`) | 0.1d | F7-04 | ☐ |
-| F7-06 | Tests integración con grafo compilado: query con adjunto imagen → llega a `vision_agent` | 0.7d | F7-01..04 | ☐ |
+| F6-01 | Add `multimodal_*`, `vision_*`, `video_*`, `tts_max_chars`, `max_image_bytes`, etc. fields to `core/config.py` | 0.5d | — | ☐ |
+| F6-02 | Extras in `pyproject.toml`: `[multimodal]`, `[multimodal-local]`, `[multimodal-premium]`, `[multimodal-embed]` | 0.3d | — | ☐ |
+| F6-03 | `env.example` updated with new `PRISMAL_MULTIMODAL_*` variables | 0.1d | F6-01 | ☐ |
+| F6-04 | Settings validation tests (Pydantic limits) | 0.2d | F6-01 | ☐ |
 
-**Criterios Globales F7:**
-- Sin `multimodal_enabled=True`, los 26 agentes textuales se comportan idénticos a hoy (regresión zero).
-- Con toggle activo, los 4 nuevos nodos aparecen como destinos válidos del supervisor.
+---
+
+### PHASE F7 — LangGraph Integration + Intent Router + Capability Routing
+
+**Duration:** 0.5 week
+
+| ID | Task | Estimate | Dependency | Status |
+|---|---|---|---|---|
+| F7-01 | `register_multimodal_pipeline()` invoked opt-in at startup when `settings.multimodal_enabled=True` | 0.3d | F3 | ☐ |
+| F7-02 | Add `"multimodal_router"`, `"vision_agent"`, `"audio_agent"`, `"video_agent"` to `VALID_NEXT_NODES` (gated by toggle) | 0.3d | F3 | ☐ |
+| F7-03 | Extend `intent_router.py` with regex `r"(?i)\b(transcribe|imagen|video|voz|audio)\b"` + MIME attachment detection | 0.4d | — | ☐ |
+| F7-04 | Extend `DEFAULT_CAPABILITY_MAP` in `tool_registry.py` with `multimodal_router`, `vision_agent`, `audio_agent`, `video_agent` entries | 0.2d | — | ☐ |
+| F7-05 | Document `audio`, `vision`, `video` capabilities in `config/mcp_servers.yaml` (entries with `enabled: false`) | 0.1d | F7-04 | ☐ |
+| F7-06 | Integration tests with compiled graph: query with image attachment → reaches `vision_agent` | 0.7d | F7-01..04 | ☐ |
+
+**Global F7 criteria:**
+- Without `multimodal_enabled=True`, the 26 text agents behave identically to today (zero regression).
+- With the toggle active, the 4 new nodes appear as valid supervisor destinations.
 
 ---
 
 ### HARDENING — Coverage, Docs, Security Audit
 
-**Duración:** 1 semana (semana 7)
+**Duration:** 1 week (week 7)
 
-| ID | Tarea | Estimación | Dependencia | Estado |
+| ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| H-01 | Coverage audit: cada módulo nuevo ≥ 80% | 0.5d | F1..F7 | ☐ |
+| H-01 | Coverage audit: each new module ≥ 80% | 0.5d | F1..F7 | ☐ |
 | H-02 | `bandit -r prismal -c pyproject.toml` HIGH=0 MEDIUM=0 | 0.3d | F1..F7 | ☐ |
-| H-03 | Test integración end-to-end voz-a-voz con providers mockeados | 0.5d | F3, F7 | ☐ |
-| H-04 | Test integración end-to-end RAG multimodal sobre corpus mixto pequeño | 0.5d | F4 | ☐ |
-| H-05 | Test de regresión: 688 tests previos siguen pasando | 0.3d | F1..F7 | ☐ |
-| H-06 | Actualizar `CLAUDE.md` con sección multimodal + módulos nuevos | 0.3d | F1..F7 | ☐ |
-| H-07 | Actualizar `README.md` con sección "Multimodal" en features + arquitectura | 0.4d | F1..F7 | ☐ |
-| H-08 | Actualizar `CHANGELOG.md` con entrada Fase F | 0.2d | — | ☐ |
-| H-09 | Verificar `ruff check .` y `mypy --strict` clean en todo lo nuevo | 0.3d | F1..F7 | ☐ |
-| H-10 | Crear `examples/multimodal_pipeline.py` ejecutable | 0.5d | F3, F7 | ☐ |
-| H-11 | Code review interno (1 reviewer aprueba PR) | 1d | H-01..09 | ☐ |
-| H-12 | Merge a `main` | 0.2d | H-11 | ☐ |
+| H-03 | End-to-end voice-to-voice integration test with mocked providers | 0.5d | F3, F7 | ☐ |
+| H-04 | End-to-end multimodal RAG integration test over a small mixed corpus | 0.5d | F4 | ☐ |
+| H-05 | Regression test: 688 previous tests still pass | 0.3d | F1..F7 | ☐ |
+| H-06 | Update `CLAUDE.md` with multimodal section + new modules | 0.3d | F1..F7 | ☐ |
+| H-07 | Update `README.md` with a "Multimodal" section in features + architecture | 0.4d | F1..F7 | ☐ |
+| H-08 | Update `CHANGELOG.md` with Phase F entry | 0.2d | — | ☐ |
+| H-09 | Verify `ruff check .` and `mypy --strict` clean across everything new | 0.3d | F1..F7 | ☐ |
+| H-10 | Create runnable `examples/multimodal_pipeline.py` | 0.5d | F3, F7 | ☐ |
+| H-11 | Internal code review (1 reviewer approves PR) | 1d | H-01..09 | ☐ |
+| H-12 | Merge to `main` | 0.2d | H-11 | ☐ |
 
 ---
 
-## 4. Dependencias Inter-Tareas
+## 4. Inter-Task Dependencies
 
 ```
-F1 (providers) ─┬──▶ F2 (agentes) ─┬──▶ F3 (subgraph) ─┐
+F1 (providers) ─┬──▶ F2 (agents) ─┬──▶ F3 (subgraph) ─┐
                 │                   │                   │
                 └──▶ F4 (RAG) ──────┘                   │
                                                          ▶ F7 (integration)
@@ -395,86 +395,86 @@ F6 (config) ────┴─────────────────�
                                               HARDENING ─▶ MERGE
 ```
 
-- F1 → F2 (agentes consumen wrappers).
-- F2 → F3 (subgraph wrappea agentes).
-- F5 → F2 (`MediaValidator` requerido antes de cualquier agente).
-- F4 puede arrancar en paralelo con F3 si F2 ya está completo.
-- F6 puede ir en paralelo desde día 1 (independiente).
-- F7 espera F3 + F4 completos.
+- F1 → F2 (agents consume the wrappers).
+- F2 → F3 (subgraph wraps the agents).
+- F5 → F2 (`MediaValidator` required before any agent).
+- F4 can start in parallel with F3 if F2 is already complete.
+- F6 can run in parallel from day 1 (independent).
+- F7 waits for F3 + F4 to be complete.
 
 ---
 
-## 5. Matriz de Riesgos y Mitigaciones
+## 5. Risk and Mitigation Matrix
 
-| Riesgo | Probabilidad | Impacto | Mitigación | Owner |
+| Risk | Probability | Impact | Mitigation | Owner |
 |---|---|---|---|---|
-| FFmpeg no disponible en CI | Media | Alto | Tests core con callable mockeado; CI marker `@pytest.mark.requires_ffmpeg` para los integration | Engineer |
-| Latencia voz-a-voz por encima de 1500ms | Alta | Alto | Permitir cascada local (Whisper local + pyttsx3); medir p95 en CI | Engineer |
-| Costos LLM en video (muchos frames) | Alta | Medio | Cap `max_frames_per_video=60` default; dedup por `imagehash`; sampling 1 fps default | Engineer |
-| `open_clip_torch` añade 1 GB al instalar | Alta | Bajo | Extra opcional `[multimodal-embed]`; documentar | Engineer |
-| Magic bytes hardcoded no cubren todos los formatos | Media | Medio | Documentar formatos soportados; modo permisivo opt-in; opción `[multimodal-magic]` con `python-magic` | Tech Lead |
-| EXIF strip rompe metadata legítima | Baja | Bajo | Strip por default sólo en sanitizer; flag opt-in para preservar | Engineer |
-| Regresión en `CUAgent` por refactor de `get_vision_llm` | Media | Alto | Tests existentes deben pasar 100% antes de aceptar F1-03 | Engineer |
-| Inflación del pool de tools (>120) | Media | Medio | Capability routing (Fase E) — los agentes multimodales reciben sólo tools relevantes | Engineer |
-| Estado `state["metadata"]["mm"]` colisiona con keys existentes | Baja | Bajo | Namespace `mm.*` reservado; grep en repo confirma 0 usos previos | Engineer |
-| Audit log crece rápido con hashes de medios | Media | Bajo | Rotación de log existente (heredada); tamaño por entry ≤ 1 KB | Engineer |
+| FFmpeg not available in CI | Medium | High | Core tests with mocked callable; CI marker `@pytest.mark.requires_ffmpeg` for the integration ones | Engineer |
+| Voice-to-voice latency above 1500ms | High | High | Allow local cascade (local Whisper + pyttsx3); measure p95 in CI | Engineer |
+| LLM costs on video (many frames) | High | Medium | Cap `max_frames_per_video=60` default; dedup via `imagehash`; 1 fps sampling default | Engineer |
+| `open_clip_torch` adds 1 GB on install | High | Low | Optional extra `[multimodal-embed]`; document | Engineer |
+| Hardcoded magic bytes do not cover all formats | Medium | Medium | Document supported formats; opt-in permissive mode; `[multimodal-magic]` option with `python-magic` | Tech Lead |
+| EXIF strip breaks legitimate metadata | Low | Low | Strip by default only in the sanitizer; opt-in flag to preserve | Engineer |
+| Regression in `CUAgent` due to `get_vision_llm` refactor | Medium | High | Existing tests must pass 100% before accepting F1-03 | Engineer |
+| Tool pool inflation (>120) | Medium | Medium | Capability routing (Phase E) — multimodal agents receive only relevant tools | Engineer |
+| `state["metadata"]["mm"]` state collides with existing keys | Low | Low | Reserved `mm.*` namespace; grep in repo confirms 0 prior uses | Engineer |
+| Audit log grows fast with media hashes | Medium | Low | Existing log rotation (inherited); size per entry ≤ 1 KB | Engineer |
 
 ---
 
-## 6. Definición de Done (Global de Fase F)
+## 6. Definition of Done (Phase F Global)
 
-Para cerrar Fase F como COMPLETED:
+To close Phase F as COMPLETED:
 
-- [ ] 5 wrappers de providers (`stt`, `tts`, `vision`, `multimodal`, `cross_modal_embeddings`).
-- [ ] 5 agentes/utilities en `prismal/agents/multimodal/`.
-- [ ] 1 subgraph `multimodal_pipeline/` con builder + register idempotente.
+- [ ] 5 provider wrappers (`stt`, `tts`, `vision`, `multimodal`, `cross_modal_embeddings`).
+- [ ] 5 agents/utilities in `prismal/agents/multimodal/`.
+- [ ] 1 `multimodal_pipeline/` subgraph with builder + idempotent register.
 - [ ] 1 RAG engine `MultimodalRAGEngine` + 3 loaders (image/audio/video).
-- [ ] 1 `MediaValidator` + extensiones de Sanitizer/Interceptor/Audit.
-- [ ] Settings/toggles nuevos + extras en `pyproject.toml`.
-- [ ] Integración opt-in con `graph.py` / `supervisor.py` / `intent_router.py` / `tool_registry.py`.
-- [ ] `uv run pytest -m "not live_api"` pasa al 100% (688+ existentes + ~140 nuevos = ~828+).
-- [ ] Coverage ≥ 80% por módulo nuevo (`pytest --cov=prismal --cov-fail-under=80`).
-- [ ] `uv run ruff check .` sin errores.
-- [ ] `uv run mypy prismal` sin errores en strict mode.
-- [ ] `uv run bandit -r prismal -c pyproject.toml` sin HIGH/CRITICAL.
-- [ ] `CLAUDE.md`, `README.md`, `CHANGELOG.md` actualizados.
-- [ ] `examples/multimodal_pipeline.py` ejecutable end-to-end con providers mockeados.
-- [ ] PR mergeado a `main` con 1 reviewer aprobado.
+- [ ] 1 `MediaValidator` + Sanitizer/Interceptor/Audit extensions.
+- [ ] New settings/toggles + extras in `pyproject.toml`.
+- [ ] Opt-in integration with `graph.py` / `supervisor.py` / `intent_router.py` / `tool_registry.py`.
+- [ ] `uv run pytest -m "not live_api"` passes 100% (688+ existing + ~140 new = ~828+).
+- [ ] Coverage ≥ 80% per new module (`pytest --cov=prismal --cov-fail-under=80`).
+- [ ] `uv run ruff check .` with no errors.
+- [ ] `uv run mypy prismal` with no errors in strict mode.
+- [ ] `uv run bandit -r prismal -c pyproject.toml` with no HIGH/CRITICAL.
+- [ ] `CLAUDE.md`, `README.md`, `CHANGELOG.md` updated.
+- [ ] `examples/multimodal_pipeline.py` runnable end-to-end with mocked providers.
+- [ ] PR merged to `main` with 1 approving reviewer.
 
 ---
 
-## 7. Estimación de Esfuerzo por Sub-Fase
+## 7. Effort Estimate per Sub-Phase
 
-| Sub-Fase | Sub-tareas | Días | Semanas |
+| Sub-Phase | Sub-tasks | Days | Weeks |
 |---|---|---|---|
 | F1 — Providers | 22 | 5 | 1 |
-| F2 — Agentes modales | 36 | 11 | 2 |
+| F2 — Modal agents | 36 | 11 | 2 |
 | F3 — Subgraph | 10 | 5 | 1 |
-| F4 — RAG multimodal | 14 | 5 | 1 |
-| F5 — Seguridad | 7 | 3 | 0.5 |
+| F4 — Multimodal RAG | 14 | 5 | 1 |
+| F5 — Security | 7 | 3 | 0.5 |
 | F6 — Config + extras | 4 | 1 | 0.2 |
-| F7 — Integración | 6 | 2 | 0.5 |
+| F7 — Integration | 6 | 2 | 0.5 |
 | Hardening | 12 | 5 | 1 |
 | **Total** | **~111** | **~37** | **~7** |
 
-*Estimación basada en 1 engineer senior. Con 2 engineers: F1, F5, F6 pueden ir en paralelo desde semana 1; F4 en paralelo con F2-03 desde semana 2.*
+*Estimate based on 1 senior engineer. With 2 engineers: F1, F5, F6 can run in parallel from week 1; F4 in parallel with F2-03 from week 2.*
 
 ---
 
-## 8. Métricas de Éxito Operacionales
+## 8. Operational Success Metrics
 
-Tras merge a `main`, monitorear semana 1:
+After merging to `main`, monitor during week 1:
 
 - `mm_pipeline_e2e_latency_seconds` p95 ≤ 1500 ms.
-- `mm_media_validation_rejected_total` por reason — alertar si `magic_bytes` >5% del total (posible ataque).
-- `mm_stt_requests_total{status="error"}` < 1% del total.
-- `mm_tts_requests_total` por provider — confirma cascada funcional.
-- Coverage continúa ≥ 80% al añadir features futuros (`fail_under=80` en `pytest.ini_options`).
+- `mm_media_validation_rejected_total` by reason — alert if `magic_bytes` >5% of the total (possible attack).
+- `mm_stt_requests_total{status="error"}` < 1% of the total.
+- `mm_tts_requests_total` by provider — confirms the cascade is functional.
+- Coverage stays ≥ 80% as future features are added (`fail_under=80` in `pytest.ini_options`).
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-05-27 | Ernesto Crespo | Versión inicial — 111 sub-tareas en 8 fases, 7 semanas |
+| 1.0 | 2026-05-27 | Ernesto Crespo | Initial version — 111 sub-tasks across 8 phases, 7 weeks |

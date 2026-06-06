@@ -2,39 +2,39 @@
 
 ## Metadata
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-06-05 |
-| **PLAN Relacionado** | `specs/composition-root/PLAN.md` |
-| **SPEC Relacionado** | `specs/composition-root/SPEC.md` |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` |
+| **Version** | 1.0 |
+| **Date** | 2026-06-05 |
+| **Related PLAN** | `specs/composition-root/PLAN.md` |
+| **Related SPEC** | `specs/composition-root/SPEC.md` |
 | **TASKS** | `specs/composition-root/TASKS.md` |
 | **Reviewers** | Tech Lead, AI Architect, Security Lead |
 
 ---
 
-## 1. Contexto
+## 1. Context
 
-Tras Fase Y (`ToolProviderPort` para MCP+Skills) y Fase Z (`VectorStorePort` para base vectorial intercambiable), el núcleo expone varios puntos de inyección independientes. El host que falta (`prismal-server`, FastAPI, multi-tenant por `org_id`) necesitaría cablearlos uno a uno. Este documento describe la **Fase R — Runtime Composition Root**: un *facade* de composición (`build_runtime`) que orquesta todos los puertos del core bajo un contrato único (`RuntimeContext`), con loaders de config y resolución de tenant. Es coherente con la familia de puertos de Fase X/Y/Z y con el modelo de capas del ecosistema (core → server → sdk → dashboard) documentado en las notas de Obsidian.
-
----
-
-## 2. Objetivos Técnicos
-
-- **OT-1:** Un único `build_runtime(settings, *, org_id=None)` que compone tools (Y), vector store (Z), embeddings, checkpoint y audit.
-- **OT-2:** No duplicar lógica: orquestar `build_default_tool_provider`, `VectorStoreFactory`/provider, `EmbeddingsFactory`, `build_checkpointer`, `AuditLogger`.
-- **OT-3:** Formalizar multi-tenant por aislamiento de **colección** (`org_id`), no por backend.
-- **OT-4:** Ciclo de vida coordinado (`aclose()` / async context manager).
-- **OT-5:** Dos modos: global (inyecta singletons) y context (contexto por sesión sin estado global).
-- **OT-6:** Mantener backward-compat: la inyección individual de Y/Z sigue válida.
+After Phase Y (`ToolProviderPort` for MCP+Skills) and Phase Z (`VectorStorePort` for an interchangeable vector database), the core exposes several independent injection points. The missing host (`prismal-server`, FastAPI, multi-tenant by `org_id`) would need to wire them one by one. This document describes **Phase R — Runtime Composition Root**: a composition *facade* (`build_runtime`) that orchestrates all the core ports under a single contract (`RuntimeContext`), with config loaders and tenant resolution. It is consistent with the Phase X/Y/Z port family and with the ecosystem's layer model (core → server → sdk → dashboard) documented in the Obsidian notes.
 
 ---
 
-## 3. Arquitectura Propuesta
+## 2. Technical Objectives
 
-### 3.1 Diagrama de Alto Nivel
+- **OT-1:** A single `build_runtime(settings, *, org_id=None)` that composes tools (Y), vector store (Z), embeddings, checkpoint, and audit.
+- **OT-2:** Do not duplicate logic: orchestrate `build_default_tool_provider`, `VectorStoreFactory`/provider, `EmbeddingsFactory`, `build_checkpointer`, `AuditLogger`.
+- **OT-3:** Formalize multi-tenancy by **collection** isolation (`org_id`), not by backend.
+- **OT-4:** Coordinated lifecycle (`aclose()` / async context manager).
+- **OT-5:** Two modes: global (injects singletons) and context (per-session context without global state).
+- **OT-6:** Maintain backward-compat: the individual injection of Y/Z still valid.
+
+---
+
+## 3. Proposed Architecture
+
+### 3.1 High-Level Diagram
 
 ```
                         prismal-server (FastAPI, lifespan)         ← HOST
@@ -48,195 +48,195 @@ Tras Fase Y (`ToolProviderPort` para MCP+Skills) y Fase Z (`VectorStorePort` par
         │    4. embeddings      = EmbeddingsFactory.create(settings)            │
         │    5. checkpointer    = build_checkpointer(settings)                  │
         │    6. audit           = AuditLogger(...)                              │
-        │    7. (modo global) set_tool_provider(...) ; set_vector_store_provider│
-        │       (modo context) deja todo dentro del RuntimeContext             │
+        │    7. (global mode) set_tool_provider(...) ; set_vector_store_provider│
+        │       (context mode) leaves everything inside the RuntimeContext     │
         │    → RuntimeContext(tool_provider, vstore_provider, embeddings,       │
         │                     checkpointer, audit, org_id, aclose())           │
         └───────────────────────────────────────────────────────────────────────┘
-                                   │ consume
-                  prismal core (agents, rag, memory)  ← solo usa los puertos
+                                   │ consumes
+                  prismal core (agents, rag, memory)  ← only uses the ports
 ```
 
-### 3.2 Diagrama de Capas (ecosistema)
+### 3.2 Layer Diagram (ecosystem)
 
 ```
 ┌───────────────────────────────────────────────────────────┐
-│ prismal-dashboard (Reflex)  → EDITA config (MCP/skills/    │
-│                               settings/backend vectorial)  │
+│ prismal-dashboard (Reflex)  → EDITS config (MCP/skills/    │
+│                               settings/vector backend)     │
 └───────────────┬───────────────────────────────────────────┘
-                │ persiste config
+                │ persists config
 ┌───────────────▼───────────────────────────────────────────┐
-│ prismal-server (FastAPI)  → COMPONE: build_runtime(...)    │
+│ prismal-server (FastAPI)  → COMPOSES: build_runtime(...)   │
 │   lifespan startup → build_runtime ; shutdown → aclose()   │
 │   multi-tenant: build_runtime(org_id=...)                  │
 └───────────────┬───────────────────────────────────────────┘
                 │ build_runtime
 ┌───────────────▼───────────────────────────────────────────┐
 │ prismal core                                              │
-│   composition.py (R) ── orquesta ──► Y (tools) · Z (vstore)│
+│   composition.py (R) ── orchestrates ──► Y (tools) · Z (vstore)│
 │                                       · embeddings · ckpt  │
 │                                       · audit              │
-│   puertos en extension/ports.py ; consumidores en agents/  │
-│   rag/ memory/ (sin cambios de firma)                     │
+│   ports in extension/ports.py ; consumers in agents/      │
+│   rag/ memory/ (no signature changes)                     │
 └───────────────────────────────────────────────────────────┘
-        prismal-sdk = CLIENTE de la API (no compone, no inyecta)
+        prismal-sdk = CLIENT of the API (does not compose, does not inject)
 ```
 
-### 3.3 Componentes
+### 3.3 Components
 
 #### R1 — `RuntimeContext` / `RuntimeConfig` (`prismal/composition.py`)
-- `RuntimeConfig`: vista inmutable resuelta — `mcp_config_path`, `skills_source`, `vector_store_backend`, `collection_base`, `org_id`, overrides aplicados.
-- `RuntimeContext`: dataclass con `tool_provider: ToolProviderPort`, `vector_store_provider`, `embeddings: EmbeddingsPort`, `checkpointer: CheckpointPort`, `audit: AuditPort`, `org_id: str | None`, y `async aclose()`.
+- `RuntimeConfig`: resolved immutable view — `mcp_config_path`, `skills_source`, `vector_store_backend`, `collection_base`, `org_id`, applied overrides.
+- `RuntimeContext`: dataclass with `tool_provider: ToolProviderPort`, `vector_store_provider`, `embeddings: EmbeddingsPort`, `checkpointer: CheckpointPort`, `audit: AuditPort`, `org_id: str | None`, and `async aclose()`.
 
 #### R2 — `build_runtime` (composition root)
-`async def build_runtime(settings=None, *, org_id=None, overrides=None, mode=None) -> RuntimeContext`. Resuelve config (R3), compone sub-puertos reusando los builders de Y/Z y los factories existentes, y según `mode`:
-- **global:** `set_tool_provider(tp)` + `set_vector_store_provider(vsp)` (singletons del proceso).
-- **context:** no toca globals; el `RuntimeContext` se pasa a `get_async_compiled_graph(tool_provider=..., vector_store_provider=...)` (bound por sesión).
+`async def build_runtime(settings=None, *, org_id=None, overrides=None, mode=None) -> RuntimeContext`. Resolves config (R3), composes sub-ports reusing the Y/Z builders and the existing factories, and depending on `mode`:
+- **global:** `set_tool_provider(tp)` + `set_vector_store_provider(vsp)` (process singletons).
+- **context:** does not touch globals; the `RuntimeContext` is passed to `get_async_compiled_graph(tool_provider=..., vector_store_provider=...)` (bound per session).
 
 #### R3 — Config loaders (`prismal/composition/config_sources.py`)
-- `load_mcp_config(path) -> McpConfig`: parsea `config/mcp_servers.yaml`.
-- `resolve_skills_source(settings)`: directorios/estado de skills activas.
-- `resolve_vector_store(settings, org_id)`: backend + `collection_name` derivado.
-- `apply_org_overrides(settings, org_id, overrides) -> Settings`: settings efectivos por tenant.
+- `load_mcp_config(path) -> McpConfig`: parses `config/mcp_servers.yaml`.
+- `resolve_skills_source(settings)`: directories/state of active skills.
+- `resolve_vector_store(settings, org_id)`: backend + derived `collection_name`.
+- `apply_org_overrides(settings, org_id, overrides) -> Settings`: effective per-tenant settings.
 
-#### R4 — Resolución de tenant
-`collection_for(base, org_id) -> str` = `base` si `org_id is None`, si no `f"{base}_{org_id}"`. Se aplica **igual** en RAG (`RAGEngine`) y memoria (`LongTermMemory`) para que un tenant vea su colección en ambos.
+#### R4 — Tenant resolution
+`collection_for(base, org_id) -> str` = `base` if `org_id is None`, otherwise `f"{base}_{org_id}"`. It is applied **identically** in RAG (`RAGEngine`) and memory (`LongTermMemory`) so that a tenant sees its collection in both.
 
-#### R5 — Modos
-`settings.runtime_mode: Literal["global","context"] = "global"`. Espejo de los modos de Fase Y/Z; el composition root los unifica en un único parámetro.
+#### R5 — Modes
+`settings.runtime_mode: Literal["global","context"] = "global"`. Mirror of the Phase Y/Z modes; the composition root unifies them into a single parameter.
 
-#### R6 — Ciclo de vida
-`RuntimeContext.aclose()` cierra MCP (desconecta servers), vector store (cierra conexiones servidor si aplica) y checkpointer. `build_runtime` también es usable como `async with`.
+#### R6 — Lifecycle
+`RuntimeContext.aclose()` closes MCP (disconnects servers), vector store (closes server connections if applicable), and checkpointer. `build_runtime` is also usable as `async with`.
 
-### 3.4 Flujos de Datos
+### 3.4 Data Flows
 
-#### Flujo R-A: Arranque global (prismal-server lifespan)
+#### Flow R-A: Global startup (prismal-server lifespan)
 ```
 1. startup → ctx = await build_runtime(get_settings())     # mode=global
-2. build_runtime compone Y+Z+emb+ckpt+audit
+2. build_runtime composes Y+Z+emb+ckpt+audit
 3. set_tool_provider / set_vector_store_provider (singletons)
-4. get_async_compiled_graph() usa los providers inyectados
+4. get_async_compiled_graph() uses the injected providers
 5. shutdown → await ctx.aclose()
 ```
 
-#### Flujo R-B: Per-tenant (context)
+#### Flow R-B: Per-tenant (context)
 ```
 1. request org=acme → ctx = await build_runtime(settings, org_id="acme")   # mode=context
 2. resolve_vector_store → collection_name = "<base>_acme"
 3. graph = await get_async_compiled_graph(tool_provider=ctx.tool_provider,
                                           vector_store_provider=ctx.vector_store_provider)
-4. ejecución aislada; otro tenant en paralelo no comparte estado
-5. fin de sesión → await ctx.aclose()  (o reutilizar recursos compartibles)
+4. isolated execution; another tenant in parallel does not share state
+5. end of session → await ctx.aclose()  (or reuse shareable resources)
 ```
 
 ---
 
-## 4. Decisiones de Diseño
+## 4. Design Decisions
 
-### DD-CR-001: Orquestar, no reimplementar
-`build_runtime` **llama** a `build_default_tool_provider` (Y) y a `VectorStoreFactory`/provider (Z); no reproduce su lógica. Un test verifica que no hay duplicación (los sub-builders son los puntos de verdad).
+### DD-CR-001: Orchestrate, do not reimplement
+`build_runtime` **calls** `build_default_tool_provider` (Y) and `VectorStoreFactory`/provider (Z); it does not reproduce their logic. A test verifies there is no duplication (the sub-builders are the sources of truth).
 
-### DD-CR-002: `RuntimeContext` como contenedor, no como God-object
-El contexto solo **agrupa referencias** a puertos ya compuestos + `aclose()`. No añade comportamiento de negocio; los patrones RAG/agentes siguen consumiendo los puertos directamente.
+### DD-CR-002: `RuntimeContext` as a container, not a God-object
+The context only **groups references** to already-composed ports + `aclose()`. It adds no business behavior; the RAG/agent patterns keep consuming the ports directly.
 
-### DD-CR-003: Multi-tenant por colección, backend por proceso
-Aislamiento de datos por `org_id` = `collection_name` derivado (barato, ya soportado por los constructores). El backend vectorial se fija por proceso (Fase Z). Backend-por-tenant queda fuera de alcance (recurso con estado, memoria singleton).
+### DD-CR-003: Multi-tenant by collection, backend per process
+Data isolation by `org_id` = derived `collection_name` (cheap, already supported by the constructors). The vector backend is fixed per process (Phase Z). Per-tenant backend is out of scope (a stateful resource, singleton memory).
 
-### DD-CR-004: Dos modos heredados de Y/Z, unificados
-En vez de exponer `tool_provider_mode` y un futuro `vector_store_mode` por separado, el composition root expone **un** `runtime_mode` que propaga a ambos. Menos superficie de config.
+### DD-CR-004: Two modes inherited from Y/Z, unified
+Instead of exposing `tool_provider_mode` and a future `vector_store_mode` separately, the composition root exposes **one** `runtime_mode` that it propagates to both. Less config surface.
 
-### DD-CR-005: El feature vive en el core, el server solo lo llama
-`prismal/composition.py` es del núcleo (publicable); `prismal-server` aporta el *lifespan* y la config persistida. Así el contrato existe antes que el server (que está "Planned").
+### DD-CR-005: The feature lives in the core, the server only calls it
+`prismal/composition.py` belongs to the core (publishable); `prismal-server` contributes the *lifespan* and the persisted config. This way the contract exists before the server (which is "Planned").
 
-### DD-CR-006: Backward-compat total
-Quien ya usa `set_tool_provider`/`VectorStoreFactory` directamente sigue igual. `build_runtime` es **opt-in**; no cambia defaults ni firmas de nodos/patrones.
+### DD-CR-006: Full backward-compat
+Anyone already using `set_tool_provider`/`VectorStoreFactory` directly keeps working the same. `build_runtime` is **opt-in**; it does not change defaults or the signatures of nodes/patterns.
 
-### DD-CR-007: Ciclo de vida explícito
-`aclose()` evita conexiones colgadas (MCP, Qdrant/pg). Async context manager para uso ergonómico en tests y scripts.
+### DD-CR-007: Explicit lifecycle
+`aclose()` avoids hanging connections (MCP, Qdrant/pg). Async context manager for ergonomic use in tests and scripts.
 
 ---
 
-## 5. Estructura del Código
+## 5. Code Structure
 
 ```
 prismal/
-├── composition.py                 # NUEVO: build_runtime, RuntimeContext, RuntimeConfig
-├── composition/                   # (si crece) submódulo
-│   └── config_sources.py          # NUEVO: loaders MCP/skills/vstore/overrides
+├── composition.py                 # NEW: build_runtime, RuntimeContext, RuntimeConfig
+├── composition/                   # (if it grows) submodule
+│   └── config_sources.py          # NEW: loaders MCP/skills/vstore/overrides
 ├── agents/
-│   ├── extension/providers.py     # Y: build_default_tool_provider (reusado)
-│   └── graph.py                   # acepta vector_store_provider en context (Z)
+│   ├── extension/providers.py     # Y: build_default_tool_provider (reused)
+│   └── graph.py                   # accepts vector_store_provider in context (Z)
 ├── rag/
-│   ├── vector_store_factory.py    # Z: VectorStoreFactory (reusado)
+│   ├── vector_store_factory.py    # Z: VectorStoreFactory (reused)
 │   └── ...
 ├── core/
-│   ├── config.py                  # + runtime_mode (unifica modos)
+│   ├── config.py                  # + runtime_mode (unifies modes)
 │   └── exceptions.py              # + RuntimeCompositionError
-docs/composition-root.md           # NUEVO
-examples/composition_root.py       # NUEVO
-tests/unit/composition/            # tests del composition root
+docs/composition-root.md           # NEW
+examples/composition_root.py       # NEW
+tests/unit/composition/            # composition root tests
 ```
 
-### Patrones Aplicados
-- **Composition Root** (patrón DI clásico: un único lugar ensambla el grafo de objetos).
-- **Facade** (`build_runtime` sobre builders existentes).
-- **Hexagonal** (orquesta puertos; no conoce implementaciones concretas más allá de los builders).
+### Applied Patterns
+- **Composition Root** (classic DI pattern: a single place assembles the object graph).
+- **Facade** (`build_runtime` over existing builders).
+- **Hexagonal** (orchestrates ports; does not know concrete implementations beyond the builders).
 
-### Manejo de Errores
-- Falla de un sub-builder → `RuntimeCompositionError` con la causa (qué puerto falló), tras intentar `aclose()` de lo ya creado (no dejar recursos colgando).
-- Config inválida (yaml MCP malo, backend desconocido) → error claro del loader correspondiente (reusa los de Y/Z).
-
----
-
-## 6. Seguridad
-
-- **Aislamiento entre tenants:** en modo context, dos `RuntimeContext` no comparten estado; las colecciones vectoriales están separadas por `org_id`. Test de aislamiento obligatorio.
-- **Credenciales:** DSN/keys de backends servidor y MCP no se loguean; `RuntimeConfig` marca campos sensibles como secretos.
-- **Las barreras L1–L5 no se mueven:** el composition root compone; la ejecución de tools sigue pasando por `react_loop` + middleware de `@prismal_node`.
+### Error Handling
+- Failure of a sub-builder → `RuntimeCompositionError` with the cause (which port failed), after attempting `aclose()` of what was already created (do not leave resources hanging).
+- Invalid config (bad MCP yaml, unknown backend) → clear error from the corresponding loader (reuses those of Y/Z).
 
 ---
 
-## 7. Observabilidad
+## 6. Security
 
-- Span `prismal.composition.build_runtime` con `mode`, `org_id`, `vector_store_backend`, `n_mcp_servers`, `n_skills`.
-- Log `composition.runtime_built` (paridad con `mcp_initialized`/`vector_store.created`).
-- Métrica `prismal_runtime_built_total{mode}`, `prismal_runtime_active{}` (gauge), `prismal_runtime_teardown_total`.
+- **Isolation between tenants:** in context mode, two `RuntimeContext`s do not share state; the vector collections are separated by `org_id`. Isolation test mandatory.
+- **Credentials:** DSN/keys of server backends and MCP are not logged; `RuntimeConfig` marks sensitive fields as secrets.
+- **The L1–L5 barriers do not move:** the composition root composes; tool execution still passes through `react_loop` + the `@prismal_node` middleware.
+
+---
+
+## 7. Observability
+
+- Span `prismal.composition.build_runtime` with `mode`, `org_id`, `vector_store_backend`, `n_mcp_servers`, `n_skills`.
+- Log `composition.runtime_built` (parity with `mcp_initialized`/`vector_store.created`).
+- Metric `prismal_runtime_built_total{mode}`, `prismal_runtime_active{}` (gauge), `prismal_runtime_teardown_total`.
 
 ---
 
 ## 8. Testing Strategy
 
-- **Composición:** `build_runtime` produce un `RuntimeContext` con los 5 puertos no nulos; cada sub-puerto es el que producen los builders de Y/Z (no una reimplementación).
-- **Tenant:** `collection_for(base, org)` correcto; RAG y memoria del mismo tenant ven la misma colección; tenants distintos, distinta.
-- **Aislamiento (context):** dos runtimes en paralelo (`asyncio.gather`) no comparten providers ni colección.
-- **Lifecycle:** `aclose()` cierra MCP/vstore/checkpointer (mocks que verifican la llamada); async context manager.
-- **Backward-compat:** usar `set_tool_provider`/`VectorStoreFactory` sin `build_runtime` sigue funcionando.
-- **Fakes:** `build_test_runtime` arma un contexto con `FakeToolProvider`/`FakeVectorStore`.
+- **Composition:** `build_runtime` produces a `RuntimeContext` with the 5 ports non-null; each sub-port is the one produced by the Y/Z builders (not a reimplementation).
+- **Tenant:** `collection_for(base, org)` correct; RAG and memory of the same tenant see the same collection; different tenants, different.
+- **Isolation (context):** two runtimes in parallel (`asyncio.gather`) do not share providers or collection.
+- **Lifecycle:** `aclose()` closes MCP/vstore/checkpointer (mocks that verify the call); async context manager.
+- **Backward-compat:** using `set_tool_provider`/`VectorStoreFactory` without `build_runtime` keeps working.
+- **Fakes:** `build_test_runtime` assembles a context with `FakeToolProvider`/`FakeVectorStore`.
 
 ---
 
-## 9. Plan de Rollout
+## 9. Rollout Plan
 
-1. R1–R2 (context + build_runtime global) — aditivo; el server puede empezar a usarlo.
-2. R3–R4 (loaders + tenant) — formaliza config y multi-tenant.
-3. R5–R6 (modos + lifecycle).
-4. R7–R8 (contratos + tests + docs).
+1. R1–R2 (context + global build_runtime) — additive; the server can start using it.
+2. R3–R4 (loaders + tenant) — formalizes config and multi-tenancy.
+3. R5–R6 (modes + lifecycle).
+4. R7–R8 (contracts + tests + docs).
 
-Backout: `build_runtime` es opt-in; quitar su uso vuelve a la inyección individual de Y/Z.
-
----
-
-## 10. Preguntas Abiertas
-
-- **PA-1:** ¿`embeddings`/`checkpointer` se comparten entre tenants en modo context (recomendado) o se aíslan? (Propuesta: compartir; solo la colección cambia.)
-- **PA-2:** ¿`RuntimeContext` debe exponer también el grafo compilado, o el server lo pide aparte? (Propuesta: aparte; el contexto agrupa puertos, no el grafo.)
-- **PA-3:** ¿`config_sources` debe soportar overrides por org desde DB (server) o solo desde settings/env? (Propuesta: aceptar `overrides` dict; el server decide la fuente.)
-- **PA-4:** ¿Pool de runtimes por tenant para reuso? (Futuro; depende de carga real.)
+Backout: `build_runtime` is opt-in; removing its use reverts to the individual injection of Y/Z.
 
 ---
 
-## Historial de Cambios
+## 10. Open Questions
 
-| Versión | Fecha | Autor | Cambios |
+- **PA-1:** Are `embeddings`/`checkpointer` shared between tenants in context mode (recommended) or isolated? (Proposal: share; only the collection changes.)
+- **PA-2:** Should `RuntimeContext` also expose the compiled graph, or does the server request it separately? (Proposal: separately; the context groups ports, not the graph.)
+- **PA-3:** Should `config_sources` support per-org overrides from a DB (server) or only from settings/env? (Proposal: accept an `overrides` dict; the server decides the source.)
+- **PA-4:** Pool of runtimes per tenant for reuse? (Future; depends on real load.)
+
+---
+
+## Change History
+
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-06-05 | Ernesto Crespo | Diseño técnico inicial — composition root |
+| 1.0 | 2026-06-05 | Ernesto Crespo | Initial technical design — composition root |

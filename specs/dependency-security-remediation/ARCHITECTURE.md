@@ -1,13 +1,13 @@
-# Prismal Dependency Security Remediation — Metodología de Triage y Remediación
+# Prismal Dependency Security Remediation — Triage and Remediation Methodology
 
 ## Metadata
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `IMPLEMENTED` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-06-05 |
+| **Author** | Ernesto Crespo |
+| **Status** | `IMPLEMENTED` |
+| **Version** | 1.0 |
+| **Date** | 2026-06-05 |
 | **PLAN** | `specs/dependency-security-remediation/PLAN.md` |
 | **SPEC** | `specs/dependency-security-remediation/SPEC.md` |
 | **TASKS** | `specs/dependency-security-remediation/TASKS.md` |
@@ -15,195 +15,195 @@
 
 ---
 
-## 1. Contexto
+## 1. Context
 
-Dependabot reportó 18 alertas contra `uv.lock` y `.github/workflows/ci.yml`. A diferencia de un *feature* con superficie de API, esto es un **esfuerzo de remediación de dependencias**: no se diseña código nuevo, se decide y ejecuta por cada CVE una de cuatro acciones (cerrar / actualizar / mitigar / responder a cadena de suministro). Este documento define la **metodología de triage** que produce la matriz de `SPEC.md` y el plan de `TASKS.md`, de modo que las decisiones sean reproducibles y auditables, no ad-hoc.
+Dependabot reported 18 alerts against `uv.lock` and `.github/workflows/ci.yml`. Unlike a *feature* with an API surface, this is a **dependency remediation effort**: no new code is designed; for each CVE, one of four actions is decided and executed (close / update / mitigate / respond to supply chain). This document defines the **triage methodology** that produces the matrix in `SPEC.md` and the plan in `TASKS.md`, so that the decisions are reproducible and auditable, not ad-hoc.
 
-El repo ya opera un proceso de SCA (Software Composition Analysis): `pip-audit` (pre-commit + CI), `trivy` (`.trivyignore`), `bandit`, y triage vía `prismal doctor security-check`. Esta metodología se monta sobre ese proceso.
-
----
-
-## 2. Objetivos Técnicos
-
-- **OT-1:** Clasificar cada alerta de forma determinista (resuelta / upgrade / mitigar / supply-chain).
-- **OT-2:** Distinguir **riesgo nominal** (por versión, lo que ve Dependabot) de **riesgo efectivo** (por *surface* real de prismal).
-- **OT-3:** No introducir regresiones: todo upgrade pasa por `uv lock` + suite de tests + SCA.
-- **OT-4:** Dejar trazabilidad versionada (este spec) y sincronizar los tres ignore-lists.
-- **OT-5:** Tratar el incidente de cadena de suministro como un flujo aparte (verificación + rotación), no como un simple bump.
+The repo already operates an SCA (Software Composition Analysis) process: `pip-audit` (pre-commit + CI), `trivy` (`.trivyignore`), `bandit`, and triage via `prismal doctor security-check`. This methodology is built on top of that process.
 
 ---
 
-## 3. Modelo de Decisión
+## 2. Technical Goals
 
-### 3.1 Árbol de clasificación por alerta
+- **OT-1:** Classify each alert deterministically (resolved / upgrade / mitigate / supply-chain).
+- **OT-2:** Distinguish **nominal risk** (by version, what Dependabot sees) from **effective risk** (by prismal's real *surface*).
+- **OT-3:** Introduce no regressions: every upgrade passes through `uv lock` + test suite + SCA.
+- **OT-4:** Leave versioned traceability (this spec) and synchronize the three ignore-lists.
+- **OT-5:** Treat the supply-chain incident as a separate flow (verification + rotation), not as a simple bump.
+
+---
+
+## 3. Decision Model
+
+### 3.1 Per-alert classification tree
 
 ```
-Para cada alerta:
-  ¿La versión en uv.lock ≥ versión parcheada (GHSA)?
-    ├─ SÍ  → RESUELTA  → push del lock + verificar + cerrar alerta
-    └─ NO  → ¿Existe versión parcheada compatible con el stack?
-              ├─ SÍ  → UPGRADE → bump constraint + uv lock + validar
-              └─ NO  → ¿Es un won't-fix o sin parche?
-                        ├─ Sí → MITIGAR → análisis de surface + ignore documentado + trigger
-                        └─ (caso CI) → SUPPLY-CHAIN → verificar referencia + pin SHA + rotar secretos
+For each alert:
+  Is the version in uv.lock ≥ patched version (GHSA)?
+    ├─ YES → RESOLVED  → push the lock + verify + close the alert
+    └─ NO  → Is there a patched version compatible with the stack?
+              ├─ YES → UPGRADE → bump constraint + uv lock + validate
+              └─ NO  → Is it a won't-fix or unpatched?
+                        ├─ Yes → MITIGATE → surface analysis + documented ignore + trigger
+                        └─ (CI case) → SUPPLY-CHAIN → verify reference + pin SHA + rotate secrets
 ```
 
-### 3.2 Análisis de exposición (riesgo nominal vs efectivo)
+### 3.2 Exposure analysis (nominal vs effective risk)
 
-El paso clave que Dependabot **no** hace: ¿la ruta vulnerable está en el *surface* de prismal?
+The key step Dependabot does **not** perform: is the vulnerable path in prismal's *surface*?
 
-| Surface | Definición | Ejemplos en este reporte | Efecto en prioridad |
+| Surface | Definition | Examples in this report | Effect on priority |
 |---|---|---|---|
-| `runtime` | Código que prismal ejecuta en producción | urllib3, aiohttp, langsmith, idna, ecdsa | Prioridad según severidad real |
-| `server` | Vulnerabilidad en un servidor que prismal **no levanta** (usa la lib como cliente/embebido) | LiteLLM Proxy (SQLi, SSTI, MCP stdio, guardrail), ChromaDB FastAPI (RCE pre-auth), Starlette (BadHost) | Riesgo efectivo bajo; remediar por higiene |
-| `dev/docs` | Toolchain de desarrollo o documentación | pymdown-extensions | Riesgo bajo; build-time only |
-| `ci` | Workflow de integración continua | trivy-action | Riesgo de cadena de build; tratar como P0 |
+| `runtime` | Code that prismal runs in production | urllib3, aiohttp, langsmith, idna, ecdsa | Priority according to real severity |
+| `server` | Vulnerability in a server that prismal **does not run** (uses the lib as client/embedded) | LiteLLM Proxy (SQLi, SSTI, MCP stdio, guardrail), ChromaDB FastAPI (pre-auth RCE), Starlette (BadHost) | Low effective risk; remediate for hygiene |
+| `dev/docs` | Development or documentation toolchain | pymdown-extensions | Low risk; build-time only |
+| `ci` | Continuous integration workflow | trivy-action | Build-chain risk; treat as P0 |
 
-**Principio:** la severidad de Dependabot fija el *orden de revisión*; el análisis de surface ajusta el *riesgo efectivo* y la urgencia de la acción. Una Critical de `server` que prismal no expone (chromadb) tiene menor riesgo efectivo que una Moderate de `runtime` que sí se ejercita (aiohttp).
+**Principle:** Dependabot's severity sets the *review order*; the surface analysis adjusts the *effective risk* and the urgency of the action. A `server` Critical that prismal does not expose (chromadb) has lower effective risk than a `runtime` Moderate that is actually exercised (aiohttp).
 
-### 3.3 Matriz de acción
+### 3.3 Action matrix
 
 ```
-                 hay fix          sin fix
+                 fix exists       no fix
               ┌───────────────┬──────────────────┐
- lock ≥ fix   │  RESUELTA     │   (n/a)          │
+ lock ≥ fix   │  RESOLVED     │   (n/a)          │
               ├───────────────┼──────────────────┤
- lock < fix   │  UPGRADE      │   MITIGAR        │
+ lock < fix   │  UPGRADE      │   MITIGATE       │
               └───────────────┴──────────────────┘
-   caso CI / actions  →  SUPPLY-CHAIN (flujo propio)
+   CI case / actions  →  SUPPLY-CHAIN (its own flow)
 ```
 
 ---
 
-## 4. Flujos de Remediación
+## 4. Remediation Flows
 
-### Flujo A — RESUELTA (push del lock + cierre)
+### Flow A — RESOLVED (push the lock + close)
 ```
-1. Confirmar uv.lock >= fix:  uv pip show <pkg>
-2. Asegurar que el uv.lock está commiteado y pusheado a la rama que Dependabot escanea.
-3. Dependabot re-escanea y auto-cierra; si no, cerrar manualmente citando "fixed in <ver>".
-4. Quitar el ignore correspondiente de .trivyignore/CI si existía.
+1. Confirm uv.lock >= fix:  uv pip show <pkg>
+2. Ensure the uv.lock is committed and pushed to the branch Dependabot scans.
+3. Dependabot re-scans and auto-closes; if not, close manually citing "fixed in <ver>".
+4. Remove the corresponding ignore from .trivyignore/CI if it existed.
 ```
-Aplica a: litellm×4, urllib3×2, langsmith×2, idna, starlette (≈11 alertas).
+Applies to: litellm×4, urllib3×2, langsmith×2, idna, starlette (≈11 alerts).
 
-### Flujo B — UPGRADE (bump + validación)
+### Flow B — UPGRADE (bump + validation)
 ```
-1. Editar pyproject.toml: subir el constraint mínimo a la versión fix.
-2. uv lock  (resolver) ; revisar el diff de uv.lock (efectos transitivos).
-3. uv sync ; correr la sub-suite afectada (p.ej. integración MCP para aiohttp).
-4. pip-audit + trivy + bandit limpios.
-5. Commit aislado y revertible.
+1. Edit pyproject.toml: raise the minimum constraint to the fix version.
+2. uv lock  (resolve) ; review the uv.lock diff (transitive effects).
+3. uv sync ; run the affected sub-suite (e.g. MCP integration for aiohttp).
+4. pip-audit + trivy + bandit clean.
+5. Isolated and revertible commit.
 ```
-Aplica a: aiohttp (≥3.14.0), prefect, posiblemente pymdown, transformers (vía torch).
+Applies to: aiohttp (≥3.14.0), prefect, possibly pymdown, transformers (via torch).
 
-### Flujo C — MITIGAR (sin fix)
+### Flow C — MITIGATE (no fix)
 ```
-1. Análisis de surface: ¿la ruta vulnerable es alcanzable en prismal?
-2. Aplicar mitigación compensatoria (config, aislamiento, constraint indirecto p.ej. torch>=2.6).
-3. Mantener/añadir el ignore en .trivyignore + ci.yml + pre-commit, con:
-   - CVE/GHSA, paquete, razón (won't-fix / no patch yet),
-   - referencia a este spec,
-   - TRIGGER de re-evaluación (condición para quitar el ignore).
+1. Surface analysis: is the vulnerable path reachable in prismal?
+2. Apply a compensating mitigation (config, isolation, indirect constraint e.g. torch>=2.6).
+3. Keep/add the ignore in .trivyignore + ci.yml + pre-commit, with:
+   - CVE/GHSA, package, reason (won't-fix / no patch yet),
+   - reference to this spec,
+   - re-evaluation TRIGGER (condition to remove the ignore).
 ```
-Aplica a: chromadb (sin parche), ecdsa (won't-fix), transformers (mitigación por torch).
+Applies to: chromadb (unpatched), ecdsa (won't-fix), transformers (mitigation via torch).
 
-### Flujo D — SUPPLY-CHAIN (incidente trivy-action)
+### Flow D — SUPPLY-CHAIN (trivy-action incident)
 ```
-1. grep .github/workflows/** por aquasecurity/trivy-action y aquasecurity/setup-trivy.
-2. Determinar si algún run usó tags/binarios en las ventanas comprometidas (19–20 mar 2026).
-3. Si se usó la action: pinear a SHA inmutable de versión segura (trivy-action 0.35.0 / setup-trivy 0.2.6).
-   Si se descarga binario por curl: fijar TRIVY_VERSION=0.69.3 + verificar checksum/firma.
-4. Rotación de secretos del runner si hubo ejecución en ventana comprometida (P0).
-5. Política: pinear TODAS las actions a SHA (deuda de seguimiento).
+1. grep .github/workflows/** for aquasecurity/trivy-action and aquasecurity/setup-trivy.
+2. Determine whether any run used compromised tags/binaries during the windows (Mar 19–20, 2026).
+3. If the action was used: pin to an immutable SHA of a safe version (trivy-action 0.35.0 / setup-trivy 0.2.6).
+   If the binary is downloaded via curl: pin TRIVY_VERSION=0.69.3 + verify checksum/signature.
+4. Rotate runner secrets if there was execution during the compromised window (P0).
+5. Policy: pin ALL actions to SHA (follow-up debt).
 ```
 
 ---
 
-## 5. Estructura de Cambios (qué se toca)
+## 5. Change Structure (what gets touched)
 
 ```
 prismal/
-├── pyproject.toml                 # bump de constraints: aiohttp>=3.14.0, (torch>=2.6), prefect, pymdown
-├── uv.lock                        # re-resuelto por `uv lock`
-├── .trivyignore                   # sync: quitar resueltas, mantener chromadb/ecdsa + nuevos sin-fix
-├── .pre-commit-config.yaml        # hook pip-audit: espejo de .trivyignore
-├── .github/workflows/ci.yml       # security-pip-audit: espejo + pin de actions a SHA
-├── CHANGELOG.md                   # entrada de seguridad
+├── pyproject.toml                 # constraint bumps: aiohttp>=3.14.0, (torch>=2.6), prefect, pymdown
+├── uv.lock                        # re-resolved by `uv lock`
+├── .trivyignore                   # sync: remove resolved, keep chromadb/ecdsa + new no-fix
+├── .pre-commit-config.yaml        # pip-audit hook: mirror of .trivyignore
+├── .github/workflows/ci.yml       # security-pip-audit: mirror + pin actions to SHA
+├── CHANGELOG.md                   # security entry
 └── specs/dependency-security-remediation/
     ├── PLAN.md
-    ├── ARCHITECTURE.md  (este)
-    ├── SPEC.md          (matriz)
-    └── TASKS.md         (ejecución)
+    ├── ARCHITECTURE.md  (this)
+    ├── SPEC.md          (matrix)
+    └── TASKS.md         (execution)
 ```
 
-No se modifica código de `prismal/**`: las 18 alertas son de dependencias, no de código propio.
+No code under `prismal/**` is modified: the 18 alerts are in dependencies, not in our own code.
 
 ---
 
-## 6. Decisiones de Diseño
+## 6. Design Decisions
 
-### DD-SEC-001: Priorizar por riesgo efectivo, no solo por severidad nominal
-El orden de ejecución pondera severidad **y** surface. Las Critical de superficie de servidor que prismal no expone (chromadb, litellm proxy) se documentan pero no bloquean; las Moderate de runtime que sí se ejercitan (aiohttp) se remedian con upgrade real.
+### DD-SEC-001: Prioritize by effective risk, not just nominal severity
+The execution order weighs severity **and** surface. The server-surface Criticals that prismal does not expose (chromadb, litellm proxy) are documented but do not block; the runtime Moderates that are actually exercised (aiohttp) are remediated with a real upgrade.
 
-### DD-SEC-002: "Push del lock primero"
-Como ~11 alertas ya están resueltas en el lock, la primera acción (P0) es asegurar que `uv.lock` está empujado. Esto cierra la mayoría del ruido antes de tocar nada, y aclara el trabajo real restante.
+### DD-SEC-002: "Push the lock first"
+Since ~11 alerts are already resolved in the lock, the first action (P0) is to ensure that `uv.lock` is pushed. This closes most of the noise before touching anything, and clarifies the remaining real work.
 
-### DD-SEC-003: Mitigación por constraint indirecto antes que bump mayor
-Para `transformers` (CVE-2026-1839) se prefiere forzar `torch>=2.6` (neutraliza el vector) en lugar de subir a `transformers` 5.x (breaking para `sentence-transformers`). Menor blast radius, mismo efecto de seguridad.
+### DD-SEC-003: Mitigation via indirect constraint before a major bump
+For `transformers` (CVE-2026-1839) it is preferred to force `torch>=2.6` (neutralizes the vector) instead of bumping to `transformers` 5.x (breaking for `sentence-transformers`). Smaller blast radius, same security effect.
 
-### DD-SEC-004: Ignore-lists como verdad única triplicada
-`.trivyignore`, el hook `pip-audit` y `ci.yml` deben permanecer espejados. Un test/script de consistencia (o `prismal doctor security-check`) verifica que los tres listan el mismo set, cada entrada con justificación y trigger.
+### DD-SEC-004: Ignore-lists as a triplicated single source of truth
+`.trivyignore`, the `pip-audit` hook, and `ci.yml` must remain mirrored. A consistency test/script (or `prismal doctor security-check`) verifies that all three list the same set, each entry with justification and trigger.
 
-### DD-SEC-005: Cadena de suministro = flujo P0 con rotación
-El incidente de `trivy-action` no se trata como un bump de versión sino como respuesta a incidente: verificación de exposición + rotación de secretos. Pinear a SHA, no a tag.
+### DD-SEC-005: Supply chain = P0 flow with rotation
+The `trivy-action` incident is not treated as a version bump but as incident response: exposure verification + secret rotation. Pin to SHA, not to tag.
 
-### DD-SEC-006: Trazabilidad por CVE fechada
-Las versiones parcheadas se basan en GHSA a 2026-06-05 y se re-verifican al ejecutar. Cada decisión queda en `SPEC.md` con CVE, versión, acción y fecha — auditable.
+### DD-SEC-006: Dated per-CVE traceability
+The patched versions are based on GHSA as of 2026-06-05 and are re-verified at execution time. Each decision is recorded in `SPEC.md` with CVE, version, action, and date — auditable.
 
 ---
 
-## 7. Validación y Observabilidad
+## 7. Validation and Observability
 
-### 7.1 Gates de validación
-- `uv lock` resoluble sin conflictos.
-- `pip-audit` (con ignores justificados) sin hallazgos no esperados.
-- `trivy fs --ignorefile .trivyignore .` limpio.
-- `bandit -r prismal` limpio.
+### 7.1 Validation gates
+- `uv lock` resolvable without conflicts.
+- `pip-audit` (with justified ignores) without unexpected findings.
+- `trivy fs --ignorefile .trivyignore .` clean.
+- `bandit -r prismal` clean.
 - `pytest -m "not live_api"` 100%.
 
-### 7.2 Evidencia de cierre
-- Por alerta resuelta: captura de `uv pip show <pkg>` ≥ fix + ausencia en `pip-audit`.
-- Por mitigación: entrada en `.trivyignore` con trigger + nota de surface.
-- Por supply-chain: diff del workflow (pin SHA) + checklist de rotación.
+### 7.2 Closure evidence
+- Per resolved alert: capture of `uv pip show <pkg>` ≥ fix + absence in `pip-audit`.
+- Per mitigation: entry in `.trivyignore` with trigger + surface note.
+- Per supply-chain: workflow diff (pin SHA) + rotation checklist.
 
-### 7.3 Métrica de proceso
-- `n_alertas_terminal / 18` (objetivo 18/18).
-- `n_ignores_sin_justificacion` (objetivo 0).
-- `n_actions_sin_pin_sha` (objetivo 0 — deuda de seguimiento).
-
----
-
-## 8. Plan de Rollout
-
-1. **P0:** push del lock (cierra ~11) + incidente trivy-action + documentar chromadb/ecdsa.
-2. **P1:** upgrades reales (aiohttp, transformers vía torch, prefect, pymdown) en commits aislados.
-3. **P2:** sincronizar ignore-lists, validación final, cierre de alertas restantes, entrada en `CHANGELOG.md`.
-
-Backout: cada upgrade es un commit revertible; `uv.lock` permite rollback determinista.
+### 7.3 Process metric
+- `n_alerts_terminal / 18` (target 18/18).
+- `n_ignores_without_justification` (target 0).
+- `n_actions_without_pin_sha` (target 0 — follow-up debt).
 
 ---
 
-## 9. Preguntas Abiertas
+## 8. Rollout Plan
 
-- **PA-1:** ¿`ci.yml` ya migró 100% de `trivy-action` a `curl`? (Verificar en P0; condiciona si hay rotación de secretos.)
-- **PA-2:** ¿`torch>=2.6` es resoluble con el resto del lock sin downgrades problemáticos? (Validar en P1.)
-- **PA-3:** ¿Versión exacta de `prefect` con el PR #21591 y GHSA de `pymdown`? (Confirmar contra GHSA al ejecutar.)
-- **PA-4:** ¿Se adopta ya la política de pinear todas las actions a SHA, o queda como deuda? (Recomendado: adoptar.)
+1. **P0:** push the lock (closes ~11) + trivy-action incident + document chromadb/ecdsa.
+2. **P1:** real upgrades (aiohttp, transformers via torch, prefect, pymdown) in isolated commits.
+3. **P2:** synchronize ignore-lists, final validation, closure of remaining alerts, entry in `CHANGELOG.md`.
+
+Backout: each upgrade is a revertible commit; `uv.lock` allows deterministic rollback.
 
 ---
 
-## Historial de Cambios
+## 9. Open Questions
 
-| Versión | Fecha | Autor | Cambios |
+- **PA-1:** Has `ci.yml` already migrated 100% from `trivy-action` to `curl`? (Verify in P0; conditions whether secret rotation is needed.)
+- **PA-2:** Is `torch>=2.6` resolvable with the rest of the lock without problematic downgrades? (Validate in P1.)
+- **PA-3:** Exact version of `prefect` with PR #21591 and the GHSA for `pymdown`? (Confirm against GHSA at execution time.)
+- **PA-4:** Do we adopt the policy of pinning all actions to SHA now, or leave it as debt? (Recommended: adopt.)
+
+---
+
+## Change History
+
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-06-05 | Ernesto Crespo | Metodología de triage + flujos de remediación |
+| 1.0 | 2026-06-05 | Ernesto Crespo | Triage methodology + remediation flows |
