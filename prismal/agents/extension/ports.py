@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    from langchain_core.tools import BaseTool
+
 
 @runtime_checkable
 class CheckpointPort(Protocol):
@@ -88,6 +90,32 @@ class ToolPort(Protocol):
     async def ainvoke(self, args: Any, *posargs: Any, **kwargs: Any) -> Any: ...
 
 
+@runtime_checkable
+class ToolProviderPort(Protocol):
+    """Tool source resolvable per agent and capability, at runtime (SPEC-TPI-001).
+
+    Conforming implementations: ``McpToolProvider``, ``SkillToolProvider``,
+    ``StubToolProvider``, ``CompositeToolProvider``, ``FakeToolProvider`` and
+    any host-supplied provider. The core only calls :meth:`get_tools`; it never
+    constructs providers — the host composes and injects them.
+
+    ``get_tools`` is sync and must not raise on a degraded source: it returns
+    whatever it can (an empty list at minimum). ``agent_name`` lets a provider
+    select tools per agent (providers that don't need it ignore it);
+    ``capabilities`` is the Fase E filter — ``None`` means no filter.
+
+    Returned tools are ``langchain_core.tools.BaseTool`` instances (the
+    concrete type that conforms to :class:`ToolPort`).
+    """
+
+    def get_tools(
+        self,
+        *,
+        agent_name: str,
+        capabilities: list[str] | None = None,
+    ) -> list[BaseTool]: ...
+
+
 def conforms_to(obj: Any, port: type) -> bool:
     """Return ``True`` if ``obj`` structurally satisfies ``port``.
 
@@ -105,5 +133,6 @@ __all__ = [
     "CheckpointPort",
     "EmbeddingsPort",
     "ToolPort",
+    "ToolProviderPort",
     "conforms_to",
 ]

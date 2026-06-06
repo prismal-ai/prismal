@@ -244,6 +244,23 @@ class OTelManager:
             "prismal.mcp_tool_calls_total",
             description="Total MCP tool calls",
         )
+        # Fase Y — tool provider injection (SPEC §7.2).
+        self._counters["tool_provider_resolved"] = self._meter.create_counter(
+            "prismal.tool_provider_resolved_total",
+            description="Tool resolutions per provider kind (composite|mcp|skill|stub|fake)",
+        )
+        self._counters["tools_injected"] = self._meter.create_counter(
+            "prismal.tools_injected_total",
+            description="Total tools handed to agents, labelled by agent",
+        )
+        self._counters["tool_provider_fallback"] = self._meter.create_counter(
+            "prismal.tool_provider_fallback_total",
+            description="Resolutions that fell back to stubs because no provider was injected",
+        )
+        self._counters["tool_provider_subprovider_errors"] = self._meter.create_counter(
+            "prismal.tool_provider_subprovider_errors_total",
+            description="Sub-provider failures swallowed by CompositeToolProvider",
+        )
         self._histograms["agent_latency"] = self._meter.create_histogram(
             "prismal.agent_latency_seconds",
             description="Agent execution latency in seconds",

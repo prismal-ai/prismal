@@ -224,6 +224,24 @@ uv run python examples/multimodal_pipeline.py
 
 ---
 
+## Tool Providers (Fase Y)
+
+Inyección de proveedores de herramientas desde el host (`ToolProviderPort`) —
+guía completa en [`docs/tool-providers.md`](../docs/tool-providers.md). Ambos
+corren offline (sin LLM ni servidores MCP).
+
+| Archivo | Descripción |
+|---------|-------------|
+| `tool_provider_host.py` | Composición tipo host (MCP opcional + Skills + stubs) + `set_tool_provider` (variante A) y toolsets por sesión (variante B) |
+| `tool_provider_custom.py` | Proveedor propio que conforma `ToolProviderPort` estructuralmente y sustituye el merge completo |
+
+```bash
+uv run python examples/tool_provider_host.py     # EXAMPLE_USE_MCP=1 para conectar MCP real
+uv run python examples/tool_provider_custom.py
+```
+
+---
+
 ## Estructura de los ejemplos
 
 Cada ejemplo sigue la misma estructura:

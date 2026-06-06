@@ -29,7 +29,8 @@ This package is the **agent framework layer** extracted from the larger monorepo
 - **Long-term memory** — PII-sanitized cross-session store (SQLite + ChromaDB; optional MongoDB)
 - **Observability** — Langfuse traces, OpenTelemetry spans, structlog
 - **Deterministic intent routing** — regex-based `match_intent()` ahead of LLM supervision
-- **120-tool global cap** enforced by `tool_registry.py`
+- **Tool provider injection (implemented)** — `ToolProviderPort` hexagonal port: the host composes MCP/Skills/stub providers and injects them (`set_tool_provider` or per-session via graph config); the agent core no longer imports `prismal.mcp`/`prismal.skills` — see [`docs/tool-providers.md`](./docs/tool-providers.md) and [`specs/tool-provider-injection/`](./specs/tool-provider-injection/)
+- **120-tool global cap** enforced by the official `CompositeToolProvider` (legacy constants kept in `tool_registry.py`)
 - **Graph visualization** — `to_mermaid()` / `visualize()` / `save_graph_image()` (from `prismal.langgraph`) render any compiled graph or `SubgraphDefinition`; `SubgraphDefinition.to_mermaid()` and `visualize_supervisor_graph()` are one-line shortcuts (see `examples/visualize_graphs.py`)
 
 ---
@@ -247,9 +248,29 @@ Automatically maps `state["messages"]` ↔ the Runnable's input/output. Supports
 
 #### Formal ports (hexagonal)
 
-`prismal/agents/extension/ports.py` declares `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort` as `Protocol`s. Existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, `BaseTool`) conform structurally; users substitute their own (Redis checkpointer, Splunk audit, etc.) without modifying the core.
+`prismal/agents/extension/ports.py` declares `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort`, `ToolProviderPort` as `Protocol`s. Existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, `BaseTool`, the Fase Y tool providers) conform structurally; users substitute their own (Redis checkpointer, Splunk audit, custom tool source, etc.) without modifying the core.
 
 See [`specs/extension-surface/SPEC.md`](./specs/extension-surface/SPEC.md) for the full interface contracts of Fase X.
+
+### Tool provider injection (Fase Y — implemented)
+
+Tool resolution is a hexagonal port (user guide: [`docs/tool-providers.md`](./docs/tool-providers.md); contracts: [`specs/tool-provider-injection/`](./specs/tool-provider-injection/)): the agent core asks an injected `ToolProviderPort` for tools and never imports `prismal.mcp` / `prismal.skills` (enforced by an architecture test). The host composes the providers and injects them at startup:
+
+```python
+from prismal.agents.extension import build_default_tool_provider
+from prismal.agents.tool_registry import set_tool_provider
+
+async def on_startup() -> None:                       # FastAPI lifespan or equivalent
+    set_tool_provider(await build_default_tool_provider())   # MCP + Skills + stubs
+```
+
+- **Providers** (`prismal.agents.extension`): `McpToolProvider`, `SkillToolProvider`, `StubToolProvider`, `CompositeToolProvider` (merge with MCP→Skills→stubs priority, name dedupe, 60/120 tool caps, fixed-tool-agent exemption — exact parity with the historical registry) and `FakeToolProvider` for tests.
+- **Variante A (global)** — `set_tool_provider()` once per process; nodes keep calling `get_tools_for_agent(name)` unchanged.
+- **Variante B (multi-tenant)** — `get_async_compiled_graph(tool_provider=provider)` with `tool_provider_mode="context"` binds a per-session provider; nodes resolve via `get_tools_for_agent_ctx(name, config)`. No shared global state.
+- **No provider?** The registry degrades to static stubs with a warning (`tool_provider_strict=True` raises `ToolProviderNotConfigured` instead).
+- **Legacy shims** — `init_mcp()` / `get_mcp_tools()` / `get_skill_tools()` still work, emit `DeprecationWarning`, and will be removed in the next minor.
+
+Runnable examples: [`examples/tool_provider_host.py`](./examples/tool_provider_host.py), [`examples/tool_provider_custom.py`](./examples/tool_provider_custom.py).
 
 ---
 
@@ -301,7 +322,7 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 │   ├── supervisor.py      ← Central router
 │   ├── state.py           ← AgentState (TypedDict; messages uses add_messages reducer)
 │   ├── intent_router.py   ← Deterministic regex routing
-│   ├── tool_registry.py   ← MAX 120 tools global cap; capability-based MCP filtering
+│   ├── tool_registry.py   ← stable facade: delegates to the injected ToolProviderPort (Fase Y)
 │   ├── patterns/
 │   │   ├── reflection.py           ← reflection_loop()
 │   │   ├── parallel.py             ← make_parallel_dispatcher() via Send()

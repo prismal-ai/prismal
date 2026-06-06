@@ -1,9 +1,10 @@
 """Tests for the global tool-count cap in :mod:`prismal.agents.tool_registry`.
 
 OpenAI rejects ``tools`` arrays longer than 128 entries with a
-``BadRequestError``.  ``get_tools_for_agent`` must enforce a hard upper
-bound (``_MAX_TOTAL_TOOLS``) so the merged MCP + skills + stubs list
-never exceeds the provider limit.
+``BadRequestError``.  ``get_tools_for_agent`` (delegating to the injected
+``CompositeToolProvider`` since Fase Y) must enforce a hard upper bound
+(``_MAX_TOTAL_TOOLS``) so the merged MCP + skills + stubs list never
+exceeds the provider limit.
 """
 
 from __future__ import annotations
@@ -16,6 +17,11 @@ if TYPE_CHECKING:
     import pytest
 
 from prismal.agents import tool_registry
+from prismal.agents.extension.providers import (
+    CompositeToolProvider,
+    FakeToolProvider,
+    StubToolProvider,
+)
 
 
 def _make_tools(prefix: str, count: int) -> list[BaseTool]:
@@ -41,8 +47,14 @@ def test_get_tools_for_agent_caps_at_max_total(
     fake_mcp = _make_tools("mcp", 60)
     fake_skill = _make_tools("skill", 90)
 
-    monkeypatch.setattr(tool_registry, "get_mcp_tools", lambda **_: fake_mcp)
-    monkeypatch.setattr(tool_registry, "get_skill_tools", lambda: fake_skill)
+    provider = CompositeToolProvider(
+        [
+            FakeToolProvider(default=fake_mcp),
+            FakeToolProvider(default=fake_skill),
+            StubToolProvider(),
+        ]
+    )
+    monkeypatch.setattr(tool_registry, "_provider", provider)
 
     tools = tool_registry.get_tools_for_agent("researcher")
 
@@ -61,8 +73,14 @@ def test_get_tools_for_agent_no_cap_when_under_limit(
     fake_mcp = _make_tools("mcp", 10)
     fake_skill = _make_tools("skill", 5)
 
-    monkeypatch.setattr(tool_registry, "get_mcp_tools", lambda **_: fake_mcp)
-    monkeypatch.setattr(tool_registry, "get_skill_tools", lambda: fake_skill)
+    provider = CompositeToolProvider(
+        [
+            FakeToolProvider(default=fake_mcp),
+            FakeToolProvider(default=fake_skill),
+            StubToolProvider(),
+        ]
+    )
+    monkeypatch.setattr(tool_registry, "_provider", provider)
 
     tools = tool_registry.get_tools_for_agent("researcher")
 

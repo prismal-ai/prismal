@@ -1060,6 +1060,23 @@ class Settings(BaseSettings):
         description="Default per-invocation timeout for @prismal_node (None = no timeout).",
     )
 
+    # ── Tool provider injection (Fase Y) ─────────────────────────────
+    tool_provider_mode: Literal["global", "context"] = Field(
+        default="global",
+        description=(
+            "Tool provider resolution mode: 'global' uses the provider injected "
+            "via set_tool_provider() (variante A); 'context' resolves a per-session "
+            "provider from the graph config (variante B, multi-tenant)."
+        ),
+    )
+    tool_provider_strict: bool = Field(
+        default=False,
+        description=(
+            "If True, a missing tool provider raises ToolProviderNotConfigured "
+            "instead of degrading to static stubs with a warning."
+        ),
+    )
+
     # Webhooks (Phase 25)
     webhooks_enabled: bool = Field(
         default=True,
