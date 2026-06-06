@@ -44,7 +44,8 @@ class AuditPort(Protocol):
     forward audit to Splunk/Datadog/CloudTrail by satisfying this shape.
     """
 
-    def log_event(self, event_type: str, payload: dict[str, Any]) -> None: ...
+    def log_event(self, event_type: str, payload: dict[str, Any]) -> None:
+        pass
 
     def log_node(
         self,
