@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 import litellm
 
@@ -71,7 +71,6 @@ class STTClient(Protocol):
         prompt: str | None = None,
     ) -> STTResult:
         """Transcribe audio to text. Raises ``STTError`` on backend failure."""
-        pass
 
 
 def _coerce_segments(raw: object) -> list[STTSegment]:
