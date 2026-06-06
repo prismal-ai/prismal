@@ -51,8 +51,11 @@ async def test_supervisor_routes_to_end_with_fake_llm() -> None:
 
     Patches the provider's ``get_llm_with_fallback`` (the method the supervisor
     actually uses) with a fake whose ``ainvoke`` always returns ``AIMessage
-    ("END")``. Memory recall/extraction are stubbed so the test isolates graph
-    routing rather than the memory subsystem.
+    ("END")``. The END branch then builds a direct answer via
+    ``llm.bind_tools(...).ainvoke(...)``, so ``bind_tools`` is wired to return the
+    same fake (mirroring the unit-test convention) and keep that call awaitable.
+    Memory recall/extraction are stubbed so the test isolates graph routing
+    rather than the memory subsystem.
     """
 
     async def fake_ainvoke(_messages: object) -> AIMessage:
@@ -70,12 +73,15 @@ async def test_supervisor_routes_to_end_with_fake_llm() -> None:
         patch("prismal.agents.supervisor._spawn_memory_extraction", new=MagicMock()),
     ):
         mock_llm.return_value.ainvoke = fake_ainvoke
-        result = await graph.ainvoke(
-            state, config={"configurable": {"thread_id": "e2e-route-end"}}
-        )
+        # The END branch answers directly via ``llm.bind_tools(...).ainvoke``;
+        # return the same fake so that second call resolves (and stays awaitable).
+        mock_llm.return_value.bind_tools.return_value = mock_llm.return_value
+        result = await graph.ainvoke(state, config={"configurable": {"thread_id": "e2e-route-end"}})
 
     # The run completed and terminated at the supervisor (routed to END).
     assert result["session_id"] == "e2e-route-end"
     assert result["next_agent"] is None
     # The original human turn is still present in the accumulated state.
     assert any(isinstance(m, HumanMessage) for m in result["messages"])
+    # The END branch produced a direct answer (guards the bind_tools path).
+    assert any(isinstance(m, AIMessage) for m in result["messages"])

@@ -22,11 +22,11 @@ import psutil
 from pydantic import BaseModel, Field, model_validator
 
 import mcp.types
-from prismal.core.exceptions import MCPConnectionError, MCPToolError
-from prismal.core.logging import get_logger
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from mcp.client.stdio import StdioServerParameters, stdio_client
+from prismal.core.exceptions import MCPConnectionError, MCPToolError
+from prismal.core.logging import get_logger
 
 
 def _kill_process_tree(pids: list[int]) -> None:

@@ -5,12 +5,20 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
+| **Estado** | `IMPLEMENTED` |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-04-19 |
 | **PRD** | `specs/advanced-architectures/PRD.md` |
 | **Tech Design** | `specs/advanced-architectures/ARCHITECTURE.md` |
 | **API Spec** | `specs/advanced-architectures/SPEC.md` |
+
+---
+
+> **Estado de implementación (2026-05-30):** Las Fases A, B, C y D están
+> **implementadas**: 7 engines RAG en `prismal/rag/`, 7 patrones en
+> `prismal/agents/patterns/` y 5 subgraphs en `prismal/agents/subgraphs/`, con el
+> wiring opt-in al supervisor (`enable_subgraphs`). Cada tarea está marcada
+> `✅ DONE` en línea más abajo.
 
 ---
 
@@ -573,9 +581,9 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| D1-01 | Registrar todos los nuevos nodos en `agents/graph.py` (tot_agent, debate_agent, constitutional_filter, lats_agent, llm_compiler, mixture_agent) | 1d | Fases A+B+C | ⚠️ DEFERIDO (cada subgraph expone `register_<name>()` idempotente estilo `register_ml_pipeline`; el wiring final a `graph.py`/`supervisor.py` es una migración operacional de alto riesgo fuera del scope de este plan — las primitivas están listas) |
-| D1-02 | Actualizar `agents/supervisor.py` — añadir nuevos nodos a `VALID_NEXT_NODES` y al prompt del supervisor | 0.5d | D1-01 | ⚠️ DEFERIDO (mismo motivo — supervisor.py es producción crítica 976 LoC; cambio requiere planning operacional) |
-| D1-03 | Actualizar `agents/intent_router.py` — añadir patrones regex para nuevos intents (ToT, debate, code review, etl) | 0.5d | D1-01 | ⚠️ DEFERIDO (igual razón) |
+| D1-01 | Registrar todos los nuevos nodos en `agents/graph.py` (6 patrones + 5 subgraphs) | 1d | Fases A+B+C | ✅ DONE (nuevo `agents/patterns/nodes.py` con 6 node-factories `make_*_node` de wiring LLM perezoso; `graph.py` gana `build_supervisor_graph(advanced_nodes=...)` + `_build_advanced_nodes()` que compila los 5 subgraphs vía `SubgraphFactory` y construye los 6 nodos de patrón. Opt-in vía `enable_subgraphs`; cero regresión por defecto) |
+| D1-02 | Actualizar `agents/supervisor.py` — añadir nuevos nodos a las rutas válidas y al prompt del supervisor | 0.5d | D1-01 | ✅ DONE (`ADVANCED_MEMBERS` + `effective_valid_routes(enable_advanced)` + `build_system_prompt(enable_advanced)`; `_match_route`/`_intent_short_circuit`/`supervisor_node` gatean por `enable_subgraphs`; `_RouterLiteral` ampliado. Prompt base byte-idéntico cuando el flag está off) |
+| D1-03 | Actualizar `agents/intent_router.py` — añadir patrones regex para nuevos intents (ToT, debate, code review, etl) | 0.5d | D1-01 | ✅ DONE (regex conservadores para `tot_agent`/`data_etl`/`debate_consensus`/`debate_agent`/`code_review`; solo hacen short-circuit cuando `enable_subgraphs` está on) |
 | D1-04 | Añadir excepciones nuevas a `core/exceptions.py` (HyDEError, FusionError, ToTError, DebateError, ConstitutionalError, LATSError, CompilerError) | 0.3d | — | ✅ DONE (12 excepciones nuevas centralizadas en `core/exceptions.py`: 7 RAG, 7 patterns, 5 subgraphs; cada módulo importa la canónica desde core) |
 | D1-05 | Añadir `constitutional_principles` a `core/config.py` Settings con valores por defecto | 0.3d | — | ✅ DONE (agregados `constitutional_enabled`, `constitutional_max_revisions`, `constitutional_principles: list[str]` con IDs default `["P001","P002","P003"]`) |
 | D1-06 | Tests de integración end-to-end: RAG Adaptive + Constitutional AI + graph supervisor | 2d | D1-01, D1-02 | ✅ DONE (tests/integration/test_adaptive_rag_constitutional.py con 2 tests: flujo clean y flujo con revisión — cobertura del SPEC sin requerir graph.py integration) |
@@ -584,14 +592,14 @@ La expansión se divide en **3 fases de implementación** más una fase de harde
 | D1-09 | Actualizar `CLAUDE.md` con las nuevas secciones de arquitectura | 0.5d | D1-06 | ✅ DONE (sección "Advanced architectures" con 19 arquitecturas enumeradas; nota del factory-injection pattern) |
 | D1-10 | Actualizar nota en Obsidian `Documentacion/Prismal/Prismal - Arquitecturas Agentes - Analisis y Gaps.md` marcando arquitecturas como implementadas | 0.2d | D1-09 | ⚠️ SKIP (Obsidian vault externo fuera del repo; actualización manual por el usuario) |
 
-**Criterios de Done Fase D (global):** ✅ CUMPLIDOS (con las notas de diferimiento en D1-01/02/03)
+**Criterios de Done Fase D (global):** ✅ CUMPLIDOS (D1-01/02/03 ya integrados — wiring opt-in vía `enable_subgraphs`)
 - ✅ `pytest tests/unit/agents/subgraphs/ tests/unit/agents/patterns/ tests/unit/rag/ tests/integration/test_adaptive_rag_constitutional.py` → **507 passed** (0 fallos, 0 errors).
 - ✅ Coverage de nuevos módulos ≥ 80%: 82–100% por módulo.
 - ✅ `ruff check prismal/` sin errores (scope Fase A/B/C/D).
 - ✅ `mypy --strict` sin errores en scope nuevo.
 - ✅ `bandit -r` sobre módulos nuevos: **0 issues High/Medium/Low**.
 - ✅ `CLAUDE.md` actualizado con sección de advanced architectures.
-- ⚠️ Wiring a `graph.py` / `supervisor.py` / `intent_router.py` deferido: documented en SPEC.md como follow-up operacional; las primitivas (register_*() helpers, factories, patterns) están listas para integrar cuando el operador decida.
+- ✅ Wiring a `graph.py` / `supervisor.py` / `intent_router.py` COMPLETADO: los 6 patrones (vía `agents/patterns/nodes.py`) y los 5 subgraphs se registran como nodos del supervisor cuando `enable_subgraphs=True`; con el flag off el comportamiento de los agentes base es idéntico al previo (cero regresión, verificado por la suite unit completa en verde).
 
 ---
 

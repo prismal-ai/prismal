@@ -1,0 +1,37 @@
+<svg viewBox="0 0 320 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Prismal icon">
+  <defs>
+    <linearGradient id="i-front" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e6091"/>
+      <stop offset="100%" stop-color="#0b3d5c"/>
+    </linearGradient>
+    <linearGradient id="i-right" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#168aad"/>
+      <stop offset="100%" stop-color="#0b3d5c"/>
+    </linearGradient>
+    <linearGradient id="i-top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#76c893"/>
+      <stop offset="100%" stop-color="#168aad"/>
+    </linearGradient>
+    <linearGradient id="i-white" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="i-r" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#e63946" stop-opacity="0"/><stop offset="100%" stop-color="#e63946"/></linearGradient>
+    <linearGradient id="i-o" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#f4a261" stop-opacity="0"/><stop offset="100%" stop-color="#f4a261"/></linearGradient>
+    <linearGradient id="i-y" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#f1c40f" stop-opacity="0"/><stop offset="100%" stop-color="#f1c40f"/></linearGradient>
+    <linearGradient id="i-g" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#2a9d8f" stop-opacity="0"/><stop offset="100%" stop-color="#2a9d8f"/></linearGradient>
+    <linearGradient id="i-b" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#1d3557" stop-opacity="0"/><stop offset="100%" stop-color="#1d3557"/></linearGradient>
+    <linearGradient id="i-v" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#7209b7" stop-opacity="0"/><stop offset="100%" stop-color="#7209b7"/></linearGradient>
+  </defs>
+  <line x1="10" y1="140" x2="100" y2="140" stroke="url(#i-white)" stroke-width="6" stroke-linecap="round"/>
+  <polygon points="150,60 175,46 250,170 220,186" fill="url(#i-right)" stroke="#0b3d5c" stroke-width="1"/>
+  <polygon points="80,186 150,60 175,46 105,172" fill="url(#i-top)" stroke="#0b3d5c" stroke-width="1" opacity="0.55"/>
+  <polygon points="80,186 150,60 220,186" fill="url(#i-front)" stroke="#0b3d5c" stroke-width="1.4"/>
+  <line x1="150" y1="60" x2="175" y2="46" stroke="#b5e48c" stroke-width="1" opacity="0.85" stroke-linecap="round"/>
+  <line x1="195" y1="130" x2="310" y2="60"  stroke="url(#i-r)" stroke-width="4" stroke-linecap="round"/>
+  <line x1="195" y1="130" x2="310" y2="86"  stroke="url(#i-o)" stroke-width="4" stroke-linecap="round"/>
+  <line x1="195" y1="130" x2="310" y2="112" stroke="url(#i-y)" stroke-width="4" stroke-linecap="round"/>
+  <line x1="195" y1="130" x2="310" y2="140" stroke="url(#i-g)" stroke-width="4" stroke-linecap="round"/>
+  <line x1="195" y1="130" x2="310" y2="168" stroke="url(#i-b)" stroke-width="4" stroke-linecap="round"/>
+  <line x1="195" y1="130" x2="310" y2="196" stroke="url(#i-v)" stroke-width="4" stroke-linecap="round"/>
+</svg>

@@ -56,6 +56,7 @@ from prismal.rag.loaders import (
     UnsupportedDocumentTypeError,
 )
 from prismal.rag.multi_vector import MultiVectorRAGEngine, MultiVectorResult
+from prismal.rag.multimodal import MultimodalRAGEngine, MultimodalRetrievedChunk
 from prismal.rag.self_rag import (
     RetrievalDecision,
     SelfRAGPipeline,
@@ -82,6 +83,8 @@ __all__ = [
     "HybridSearchEngine",
     "MultiVectorRAGEngine",
     "MultiVectorResult",
+    "MultimodalRAGEngine",
+    "MultimodalRetrievedChunk",
     "ParentChunk",
     "QueryType",
     "RAGEngine",

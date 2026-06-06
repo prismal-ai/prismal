@@ -401,8 +401,208 @@ class DebateConsensusError(PrismalError):
     """Debate/consensus subgraph error (C5)."""
 
 
+# ── Extension surface (Fase X) ────────────────────────────────────────────────
+
+
+class ExtensionError(PrismalError):
+    """Base for errors raised by the public extension surface."""
+
+
+class NodeExecutionError(ExtensionError):
+    """Error captured while executing a node wrapped by ``@prismal_node``.
+
+    Args:
+        node_name: Name of the failing node.
+        state_keys: Keys present in the state passed to the node (for context;
+            values are never stored to avoid leaking user content).
+        cause: The original exception raised by the user function.
+    """
+
+    def __init__(
+        self,
+        node_name: str,
+        state_keys: list[str],
+        cause: BaseException,
+    ) -> None:
+        """Initialize NodeExecutionError."""
+        self.node_name = node_name
+        self.state_keys = state_keys
+        self.cause = cause
+        super().__init__(f"Node '{node_name}' failed: {cause!r}")
+
+
+class NodeTimeoutError(NodeExecutionError):
+    """Raised when a decorated node exceeds its ``timeout_s``.
+
+    Args:
+        node_name: Name of the node.
+        state_keys: Keys present in the state at timeout.
+        cause: Underlying ``TimeoutError`` (or the cancellation cause).
+        timeout_s: The configured timeout that was exceeded.
+    """
+
+    def __init__(
+        self,
+        node_name: str,
+        state_keys: list[str],
+        cause: BaseException,
+        *,
+        timeout_s: float,
+    ) -> None:
+        """Initialize NodeTimeoutError."""
+        self.timeout_s = timeout_s
+        super().__init__(node_name, state_keys, cause)
+        self.args = (f"Node '{node_name}' timed out after {timeout_s}s",)
+
+
+class NodeValidationError(NodeExecutionError):
+    """Raised when the ``state_update`` returned by a node is not valid."""
+
+
+class PluginLoadError(ExtensionError):
+    """Error raised while loading a plugin from an entry point.
+
+    Args:
+        plugin_name: Entry-point name of the plugin.
+        entry_point: The ``module:object`` reference that failed.
+        cause: The original exception.
+    """
+
+    def __init__(
+        self,
+        plugin_name: str,
+        entry_point: str,
+        cause: BaseException,
+    ) -> None:
+        """Initialize PluginLoadError."""
+        self.plugin_name = plugin_name
+        self.entry_point = entry_point
+        self.cause = cause
+        super().__init__(f"Plugin '{plugin_name}' ({entry_point}) failed to load: {cause!r}")
+
+
+class PluginConflictError(ExtensionError):
+    """Raised when two plugins try to register the same name.
+
+    Args:
+        conflicting_name: The name both plugins tried to register.
+        plugins: Distribution names of the conflicting plugins.
+    """
+
+    def __init__(self, conflicting_name: str, plugins: list[str]) -> None:
+        """Initialize PluginConflictError."""
+        self.conflicting_name = conflicting_name
+        self.plugins = plugins
+        super().__init__(f"Plugin name conflict on '{conflicting_name}': {plugins}")
+
+
+# Name mandated by SPEC-TPI-010 (public API) — kept without the Error suffix.
+class ToolProviderNotConfigured(ExtensionError):  # noqa: N818
+    """No ``ToolProviderPort`` injected and ``settings.tool_provider_strict`` is True.
+
+    Args:
+        agent_name: Agent whose tool resolution found no provider.
+    """
+
+    def __init__(self, agent_name: str) -> None:
+        """Initialize ToolProviderNotConfigured."""
+        self.agent_name = agent_name
+        super().__init__(
+            f"No tool provider configured for agent '{agent_name}'. "
+            "Call set_tool_provider(...) at startup, or set "
+            "settings.tool_provider_strict=False to fall back to stubs."
+        )
+
+
+class AdapterError(ExtensionError):
+    """Base for adapter errors."""
+
+
+class LangChainAdapterError(AdapterError):
+    """Error raised by :class:`LangChainRunnableAdapter`.
+
+    Args:
+        runnable_type: Type name of the offending Runnable.
+        message: Human-readable description of the failure.
+    """
+
+    def __init__(self, runnable_type: str, message: str) -> None:
+        """Initialize LangChainAdapterError."""
+        self.runnable_type = runnable_type
+        super().__init__(f"{message} (runnable_type={runnable_type})")
+
+
+# ── Multimodal (Fase F) ───────────────────────────────────────────────────────
+
+
+class MultimodalError(PrismalError):
+    """Base for errors raised by the multimodal layer (Fase F)."""
+
+
+class STTError(MultimodalError):
+    """Speech-to-text transcription failed in the backend."""
+
+
+class TTSError(MultimodalError):
+    """Text-to-speech synthesis failed across every configured backend."""
+
+
+class VisionAgentError(MultimodalError):
+    """:class:`VisionAgent` failed (validation or VLM call)."""
+
+
+class AudioAgentError(MultimodalError):
+    """:class:`AudioAgent` failed at one of its pipeline stages."""
+
+
+class VideoAgentError(MultimodalError):
+    """:class:`VideoAgent` failed (extraction, transcription or fusion)."""
+
+
+class ModalityRouterError(MultimodalError):
+    """Modality classification or routing failed."""
+
+
+class MultimodalFusionError(MultimodalError):
+    """Fusion of modal contributions failed."""
+
+
+class MultimodalRAGError(RAGError):
+    """Multimodal RAG indexing or search failed.
+
+    Inherits from :class:`RAGError` so callers catching the RAG hierarchy keep
+    working when they enable the multimodal engine.
+    """
+
+
+class MediaValidationError(PrismalError):
+    """Incoming media was rejected by :class:`MediaValidator`.
+
+    This is intentionally *not* a :class:`MultimodalError`: rejection happens
+    before any multimodal agent runs.
+    """
+
+
+class MissingDependencyError(PrismalError):
+    """Raised when a backend whose optional extra is not installed is requested.
+
+    Args:
+        message: Human-readable description of what is missing.
+        extra_to_install: The pip extra that provides the missing dependency
+            (e.g. ``"multimodal-embed"``), surfaced so the message can suggest
+            ``pip install "prismal[<extra>]"``.
+    """
+
+    def __init__(self, message: str, *, extra_to_install: str) -> None:
+        """Initialize MissingDependencyError."""
+        self.extra_to_install = extra_to_install
+        super().__init__(f'{message} (install with: pip install "prismal[{extra_to_install}]")')
+
+
 __all__ = [
+    "AdapterError",
     "AdaptiveRAGError",
+    "AudioAgentError",
     "CanaryLeakError",
     "CodeReviewError",
     "CompilerError",
@@ -415,26 +615,40 @@ __all__ = [
     "DebateError",
     "DocumentGenerationError",
     "DocumentLoadError",
+    "ExtensionError",
     "FusionError",
     "HierarchicalRAGError",
     "HyDEError",
     "HybridSearchError",
     "InjectionDetectedError",
     "LATSError",
-    "PrismalError",
+    "LangChainAdapterError",
     "MCPConnectionError",
     "MCPError",
     "MCPToolError",
+    "MediaValidationError",
     "MemoryError",
     "MemoryRedactionError",
+    "MissingDependencyError",
     "MoAError",
+    "ModalityRouterError",
     "ModelNotFoundError",
     "MultiVectorError",
+    "MultimodalError",
+    "MultimodalFusionError",
+    "MultimodalRAGError",
+    "NodeExecutionError",
+    "NodeTimeoutError",
+    "NodeValidationError",
     "PermissionDeniedError",
+    "PluginConflictError",
+    "PluginLoadError",
+    "PrismalError",
     "ProviderError",
     "ProviderTimeoutError",
     "RAGError",
     "RAGIndexError",
+    "STTError",
     "SchedulerError",
     "SecurityError",
     "SelfRAGError",
@@ -442,5 +656,9 @@ __all__ = [
     "SkillLoadError",
     "SkillValidationError",
     "SwarmError",
+    "TTSError",
     "ToTError",
+    "ToolProviderNotConfigured",
+    "VideoAgentError",
+    "VisionAgentError",
 ]

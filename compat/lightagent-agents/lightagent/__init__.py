@@ -21,12 +21,12 @@ import importlib.abc
 import importlib.util
 import sys
 import warnings
-from types import ModuleType
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from importlib.machinery import ModuleSpec
+    from types import ModuleType
 
 warnings.warn(
     "'lightagent' / 'lightagent-agents' is deprecated and was renamed to "
@@ -48,14 +48,14 @@ class _PrismalRedirector(importlib.abc.MetaPathFinder, importlib.abc.Loader):
     def find_spec(
         self,
         fullname: str,
-        path: "Sequence[str] | None" = None,
-        target: "ModuleType | None" = None,
-    ) -> "ModuleSpec | None":
+        path: Sequence[str] | None = None,
+        target: ModuleType | None = None,
+    ) -> ModuleSpec | None:
         if not fullname.startswith(_PREFIX):
             return None
         return importlib.util.spec_from_loader(fullname, self)
 
-    def create_module(self, spec: "ModuleSpec") -> ModuleType:
+    def create_module(self, spec: ModuleSpec) -> ModuleType:
         target_name = "prismal." + spec.name[len(_PREFIX) :]
         module = importlib.import_module(target_name)
         sys.modules[spec.name] = module

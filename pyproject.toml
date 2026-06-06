@@ -79,7 +79,7 @@ dependencies = [
   # ── Lexical Retrieval ─────────────────────────────────────
   "rank-bm25>=0.2.2",               # BM25 ranking for hybrid search (SPEC-RAG-003)
   # ── Scheduler ─────────────────────────────────────────────
-  "prefect>=3.1.10",                # Workflow orchestration
+  "prefect>=3.6.28",                # Workflow orchestration (CVE-2026-7724 SSRF DNS-rebinding fix)
   "watchdog>=6.0.0",                # Filesystem event monitoring
   "apscheduler>=3.10",              # AsyncIOScheduler for cron execution
   "croniter>=2.0",                  # Cron expression parsing
@@ -99,7 +99,7 @@ dependencies = [
   # ── HTTP & Networking ─────────────────────────────────────
   "httpx>=0.28.1",                  # Async HTTP client
   "httpx-sse>=0.4.0",               # SSE support for httpx
-  "aiohttp>=3.11.10",               # Async HTTP for MCP SSE transport
+  "aiohttp>=3.14.0",                # Async HTTP for MCP SSE transport (CVE-2026-34993/47265)
   # ── Observability ─────────────────────────────────────────
   "structlog>=24.4.0",              # Structured logging
   "loguru>=0.7.0",                  # Log sink: file rotation, retention, compression
@@ -138,7 +138,7 @@ mongodb = [
 
 # Full local embeddings (HuggingFace, no API required)
 local-embeddings = [
-  "torch>=2.5.1",
+  "torch>=2.6",            # >=2.6 neutralizes CVE-2026-1839 (transformers Trainer torch.load)
   "transformers>=4.47.1",
   "accelerate>=1.2.1",
 ]
@@ -172,7 +172,7 @@ ml = [
 # ML + Deep Learning (Phase 26)
 ml-dl = [
   "prismal[ml]",
-  "torch>=2.5.1",
+  "torch>=2.6",  # >=2.6 neutralizes CVE-2026-1839 (transformers Trainer torch.load)
   "lightning>=2.4.0",
 ]
 
@@ -194,9 +194,32 @@ maintenance = [
   "pip-audit>=2.7.0",
 ]
 
+# Multimodal layer — base media handling (Fase F)
+multimodal = [
+  "Pillow>=11.0.0",
+  "ffmpeg-python>=0.2.0",
+  "imagehash>=4.3.1",
+]
+
+# Multimodal — local STT (offline Whisper)
+multimodal-local = [
+  "faster-whisper>=1.1.0",
+]
+
+# Multimodal — premium TTS
+multimodal-premium = [
+  "elevenlabs>=1.13.0",
+]
+
+# Multimodal — cross-modal (CLIP) embeddings
+multimodal-embed = [
+  "open-clip-torch>=2.30.0",
+  "torch>=2.6",  # >=2.6 neutralizes CVE-2026-1839 (transformers Trainer torch.load)
+]
+
 # All optional extras combined
 all = [
-  "prismal[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance]",
+  "prismal[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance,multimodal,multimodal-local,multimodal-premium,multimodal-embed]",
 ]
 
 # Development tools
@@ -297,6 +320,9 @@ max-complexity = 40
 ]
 "prismal/skills/available/**/*.py" = ["S603", "S607"]
 "prismal/skills/custom/**/*.py" = ["S603", "S607"]
+# Deprecated lightagent->prismal bridge: find_spec/exec_module signatures are
+# mandated by importlib's MetaPathFinder/Loader ABCs, so unused args are unavoidable.
+"compat/**/*.py" = ["ARG002"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["prismal"]
@@ -339,6 +365,11 @@ module = [
   "motor", "motor.*", "aiosmtplib", "ntplib",
   "langgraph.checkpoint.postgres.*", "langgraph.store.postgres.*",
   "psutil", "jose", "joblib",
+  # Multimodal extras (Fase F) — lazy-imported inside functions.
+  "ffmpeg", "imagehash", "faster_whisper", "whisper",
+  "open_clip", "pyttsx3", "elevenlabs", "elevenlabs.*", "cv2",
+  # Optional notebook dependency for graph visualization.
+  "IPython", "IPython.*",
 ]
 ignore_missing_imports = true
 
@@ -407,6 +438,8 @@ exclude_lines = [
   "raise NotImplementedError",
   "@abstractmethod",
   "if __name__ == .__main__.:",
+  "^\\s*\\.\\.\\.$",
+  "@(typing\\.)?overload",
 ]
 fail_under = 80
 show_missing = true

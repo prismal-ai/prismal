@@ -245,5 +245,76 @@ class AuditLogger:
             },
         )
 
+    def log_event(self, event_type: str, payload: dict[str, object]) -> None:
+        """Log a generic structured event (used by the extension surface).
+
+        Args:
+            event_type: Event tag (e.g. ``"plugin_loaded"``).
+            payload: Arbitrary JSON-serialisable metadata. Never include
+                user content — only identifiers, hashes, and counts.
+        """
+        self._write(event_type, dict(payload))
+
+    def log_node(
+        self,
+        *,
+        node_name: str,
+        session_id: str,
+        status: str,
+        state_hash: str,
+        duration_ms: float,
+    ) -> None:
+        """Log execution of a node wrapped by ``@prismal_node``.
+
+        Records only metadata (name, status, state hash, duration) — never
+        the node's input or output content.
+
+        Args:
+            node_name: Name of the executed node.
+            session_id: Session identifier from the state.
+            status: ``"ok"`` or ``"error"``.
+            state_hash: sha256 hex digest of the returned state_update (empty
+                on failure).
+            duration_ms: Wall-clock execution time in milliseconds.
+        """
+        self._write(
+            "node",
+            {
+                "node_name": node_name,
+                "session_id": session_id,
+                "status": status,
+                "state_hash": state_hash,
+                "duration_ms": duration_ms,
+            },
+        )
+
+    def log_media(
+        self,
+        event: str,
+        sha256: str,
+        modality: str,
+        size_bytes: int,
+        duration_s: float | None,
+    ) -> None:
+        """Log a media operation by hash + modality (never the content).
+
+        Args:
+            event: Media event tag (e.g. ``"validated"``, ``"rejected"``).
+            sha256: Content hash of the media blob.
+            modality: ``"image"`` / ``"audio"`` / ``"video"``.
+            size_bytes: Size of the media in bytes.
+            duration_s: Duration in seconds for time-based media, else ``None``.
+        """
+        self._write(
+            "media",
+            {
+                "media_event": event,
+                "sha256": sha256,
+                "modality": modality,
+                "size_bytes": size_bytes,
+                "duration_s": duration_s,
+            },
+        )
+
 
 __all__ = ["AuditLogger"]

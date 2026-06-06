@@ -15,11 +15,15 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import Callable  # noqa: TC003
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class SubgraphDefinition(BaseModel):
@@ -64,6 +68,28 @@ class SubgraphDefinition(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
+    # ── Visualization (V2) ────────────────────────────────────────────────
+    # Thin delegations to ``prismal.agents.visualization`` (imported lazily to
+    # avoid an import cycle: that module resolves SubgraphDefinition itself).
+
+    def to_mermaid(self) -> str:
+        """Return the Mermaid source for this subgraph (offline)."""
+        from prismal.agents.visualization import to_mermaid
+
+        return to_mermaid(self)
+
+    def visualize(self) -> None:
+        """Display the subgraph as a PNG (notebook) or print its Mermaid text."""
+        from prismal.agents.visualization import visualize
+
+        visualize(self)
+
+    def save_image(self, path: str | Path) -> None:
+        """Render this subgraph to a PNG file at *path*."""
+        from prismal.agents.visualization import save_graph_image
+
+        save_graph_image(self, path)
+
 
 class SubgraphRegistry:
     """In-memory registry for dynamic LangGraph subgraphs.
@@ -83,6 +109,7 @@ class SubgraphRegistry:
         """Initialise an empty registry."""
         self._subgraphs: dict[str, SubgraphDefinition] = {}
         self._lock: asyncio.Lock = asyncio.Lock()
+        self._sync_lock: threading.Lock = threading.Lock()
         self._log = structlog.get_logger("prismal.subgraphs.registry")
 
     @classmethod
@@ -111,6 +138,27 @@ class SubgraphRegistry:
                 raise ValueError(f"Subgraph '{name}' already registered")
             self._subgraphs[name] = definition
             self._log.info("subgraph.registered", name=name)
+
+    def register_sync(self, name: str, definition: SubgraphDefinition) -> None:
+        """Register a subgraph synchronously (startup / plugin discovery).
+
+        Thread-safe via a ``threading.Lock``. Use this from plugin entry-point
+        callables, which run synchronously at import/startup time before any
+        event loop owns the registry. Runtime registration should use the
+        async :meth:`register`.
+
+        Args:
+            name: Unique identifier for the subgraph.
+            definition: The subgraph definition to store.
+
+        Raises:
+            ValueError: If ``name`` is already registered.
+        """
+        with self._sync_lock:
+            if name in self._subgraphs:
+                raise ValueError(f"Subgraph '{name}' already registered")
+            self._subgraphs[name] = definition
+            self._log.info("subgraph.registered_sync", name=name)
 
     async def unregister(self, name: str) -> None:
         """Remove a registered subgraph.

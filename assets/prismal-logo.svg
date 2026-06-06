@@ -1,0 +1,72 @@
+<svg viewBox="0 0 680 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Prismal logo">
+  <defs>
+    <linearGradient id="face-front" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e6091"/>
+      <stop offset="100%" stop-color="#0b3d5c"/>
+    </linearGradient>
+    <linearGradient id="face-right" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#168aad"/>
+      <stop offset="100%" stop-color="#0b3d5c"/>
+    </linearGradient>
+    <linearGradient id="face-top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#76c893"/>
+      <stop offset="100%" stop-color="#168aad"/>
+    </linearGradient>
+    <linearGradient id="white-in" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.95"/>
+    </linearGradient>
+    <linearGradient id="r-red" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#e63946" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#e63946"/>
+    </linearGradient>
+    <linearGradient id="r-orange" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f4a261" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#f4a261"/>
+    </linearGradient>
+    <linearGradient id="r-yellow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f1c40f" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#f1c40f"/>
+    </linearGradient>
+    <linearGradient id="r-green" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2a9d8f" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#2a9d8f"/>
+    </linearGradient>
+    <linearGradient id="r-blue" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1d3557" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#1d3557"/>
+    </linearGradient>
+    <linearGradient id="r-violet" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7209b7" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#7209b7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- White light entering -->
+  <line x1="40" y1="160" x2="248" y2="160" stroke="url(#white-in)" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- 3D prism: right face (drawn first so front overlaps) -->
+  <polygon points="300,80 332,62 432,212 400,230" fill="url(#face-right)" stroke="#0b3d5c" stroke-width="1"/>
+
+  <!-- 3D prism: top face (translucent) -->
+  <polygon points="200,230 300,80 332,62 232,212" fill="url(#face-top)" stroke="#0b3d5c" stroke-width="1" opacity="0.55"/>
+
+  <!-- 3D prism: front face (main) -->
+  <polygon points="200,230 300,80 400,230" fill="url(#face-front)" stroke="#0b3d5c" stroke-width="1.6"/>
+
+  <!-- Edge highlights -->
+  <line x1="300" y1="80" x2="332" y2="62" stroke="#b5e48c" stroke-width="1.2" opacity="0.85" stroke-linecap="round"/>
+  <line x1="400" y1="230" x2="432" y2="212" stroke="#168aad" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- Dispersed rays (ROYGBV) -->
+  <line x1="368" y1="155" x2="620" y2="60"  stroke="url(#r-red)"    stroke-width="5" stroke-linecap="round"/>
+  <line x1="368" y1="155" x2="620" y2="92"  stroke="url(#r-orange)" stroke-width="5" stroke-linecap="round"/>
+  <line x1="368" y1="155" x2="620" y2="124" stroke="url(#r-yellow)" stroke-width="5" stroke-linecap="round"/>
+  <line x1="368" y1="155" x2="620" y2="156" stroke="url(#r-green)"  stroke-width="5" stroke-linecap="round"/>
+  <line x1="368" y1="155" x2="620" y2="188" stroke="url(#r-blue)"   stroke-width="5" stroke-linecap="round"/>
+  <line x1="368" y1="155" x2="620" y2="220" stroke="url(#r-violet)" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Wordmark -->
+  <text x="40" y="305" font-family="ui-sans-serif, system-ui, sans-serif" font-size="44" font-weight="500" fill="#0b3d5c" letter-spacing="2">prismal</text>
+  <text x="245" y="305" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="400" fill="#168aad" letter-spacing="3">multi-agent orchestration</text>
+</svg>

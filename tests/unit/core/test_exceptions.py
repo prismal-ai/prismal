@@ -54,8 +54,8 @@ def test_canary_leak_error() -> None:
 def test_provider_error_hierarchy() -> None:
     """ProviderError, ModelNotFoundError, ProviderTimeoutError hierarchy."""
     from prismal.core.exceptions import (
-        PrismalError,
         ModelNotFoundError,
+        PrismalError,
         ProviderError,
         ProviderTimeoutError,
     )
@@ -120,10 +120,10 @@ def test_skill_validation_error() -> None:
 def test_mcp_error_hierarchy() -> None:
     """MCPError, MCPConnectionError, MCPToolError hierarchy."""
     from prismal.core.exceptions import (
-        PrismalError,
         MCPConnectionError,
         MCPError,
         MCPToolError,
+        PrismalError,
     )
 
     assert issubclass(MCPError, PrismalError)
@@ -153,9 +153,9 @@ def test_catch_as_base_class() -> None:
     """All custom exceptions can be caught as PrismalError."""
     from prismal.core.exceptions import (
         InjectionDetectedError,
-        PrismalError,
         MCPConnectionError,
         ModelNotFoundError,
+        PrismalError,
         SkillLoadError,
     )
 

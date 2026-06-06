@@ -92,6 +92,54 @@ Each subgraph exports both `build_<name>_subgraph()` (returns `SubgraphDefinitio
 
 `agents/subgraphs/gates.py::hitl_gate()` uses `interrupt()` for Human-in-the-Loop pauses.
 
+### Multimodal layer (Fase F — `specs/multimodal-agents/`, implemented, opt-in)
+
+A multimodal capability layer covers audio, image, and video on top of the existing text agents. It is **opt-in**: gated by `settings.multimodal_enabled` (default `False`). Without the toggle, the 26 text agents behave identically to today. When `multimodal_enabled=True`, `get_async_compiled_graph()` wires a single `multimodal_pipeline` supervisor route (the subgraph fans out to vision/audio/video internally and emits the answer); `effective_valid_routes`/`build_system_prompt` gate on the flag, and `intent_router.match_intent()` returns `multimodal_pipeline` for media intents. Incoming attachments reach the pipeline via `agents/multimodal/ingestion.py::ingest_media()`, which spills bytes to a content-addressed file and records a path-based descriptor under `state["metadata"]["mm"]["media"]` (never raw bytes in checkpointed state).
+
+- `providers/stt.py`, `providers/tts.py`, `providers/vision.py`, `providers/multimodal.py`, `providers/cross_modal_embeddings.py` — provider wrappers (Whisper, pyttsx3/openai/elevenlabs, vision LLM, Gemini/GPT-4o/Sonnet, CLIP). All provider SDK imports stay isolated here.
+- `agents/multimodal/vision_agent.py` — `VisionAgent` (analyze + optional OCR).
+- `agents/multimodal/audio_agent.py` — `AudioAgent` (STT → reason → optional TTS).
+- `agents/multimodal/video_agent.py` — `VideoAgent` (FFmpeg frame extraction via `SandboxExecutor` + audio transcribe + fusion).
+- `agents/multimodal/modality_router.py` — heuristic classifier `classify_modality()` + LangGraph node factory; LLM fallback opt-in.
+- `agents/multimodal/multimodal_fusion.py` — `MultimodalFusion` with `moa | moderator | concat` strategies (reuses `patterns/mixture_of_agents.py`).
+- `agents/subgraphs/multimodal_pipeline/` — `router → [vision | audio | video | text] → fusion → output_formatter`; exports `build_multimodal_subgraph()` + `register_multimodal_pipeline()`.
+- `rag/multimodal.py` — `MultimodalRAGEngine` with `MultimodalRetrievedChunk` and `modality` metadata on Chroma; cross-modal embeddings (CLIP) are an opt-in extra, otherwise the engine falls back to textual captions/transcripts.
+- `rag/loaders/{image,audio,video}_loader.py` — multimodal loaders composing the agents.
+- `security/media_validator.py` — `MediaValidator` (magic bytes, size/duration limits) runs **before** `InputSanitizer.sanitize_media()`; `AuditLogger.log_media()` records hash + modality (never content); FFmpeg always inside `SandboxExecutor`.
+
+Heavy dependencies (Whisper local, ElevenLabs, CLIP, FFmpeg wrappers, Pillow, imagehash) are gated by optional extras `[multimodal]`, `[multimodal-local]`, `[multimodal-premium]`, `[multimodal-embed]` so the base install stays slim.
+
+All multimodal state lives under `state["metadata"]["mm"]` to isolate the new layer from the rest of `AgentState`.
+
+### Extension surface (Fase X — `specs/extension-surface/`, implemented)
+
+A public extension API exposes LangGraph as a first-class build target for users and third-party plugins, without forcing them to fork the repo. It is opt-in and additive — existing nodes/subgraphs are unaffected. All public symbols are re-exported from `prismal/agents/extension/__init__.py`; user guide in `docs/extension.md`, runnable examples in `examples/extension/` + `examples/plugin_template/`.
+
+- `prismal/langgraph.py` — official re-export of `StateGraph`, `START`, `END`, `Send`, `interrupt`, `add_messages`, `CompiledStateGraph` plus `AgentState`, `SubgraphDefinition`, `SubgraphRegistry`, and a `VERSION` constant resolved dynamically from `importlib.metadata`. Importing from here (rather than `langgraph.*` directly) guarantees version compatibility.
+- `agents/extension/decorators.py` — `@prismal_node(name=..., capabilities=..., security=..., audit=..., retry=..., timeout_s=...)` wraps any `async (state) → state_update` with a middleware chain: `InputSanitizer`+`SecurePromptBuilder`+`ActionInterceptor` → OTel span → structured logger bind → retry/backoff → `asyncio.wait_for` → user fn → audit log → error mapping to `NodeExecutionError`. Side effect: registers the node's capabilities in `tool_registry.DEFAULT_CAPABILITY_MAP`.
+- `agents/extension/builder.py` — `PrismalStateGraphBuilder` fluent API over `StateGraph[AgentState]`. `add_node()` auto-wraps callables with `@prismal_node` if they lack the `__prismal_node__` attribute. `compile()` returns a `SubgraphDefinition` ready for `SubgraphRegistry`; `compile_raw()` is the escape hatch returning `CompiledStateGraph`.
+- `agents/extension/plugins.py` — `discover_plugins(settings)` iterates `importlib.metadata.entry_points()` across four groups (`prismal.subgraphs`, `prismal.nodes`, `prismal.tools`, `prismal.rag_engines`), applies allowlist/denylist, and registers each plugin in isolation (failures don't abort startup). `prismal/plugins.py` is a `python -m prismal.plugins` CLI (`list`, `info`, `doctor`).
+- `agents/extension/adapters.py` — `LangChainRunnableAdapter(runnable).as_node(name=..., capabilities=...)` converts any `Runnable` or `AgentExecutor` into a prismal node, with auto input/output mapping between `state["messages"]` and the Runnable's signature.
+- `agents/extension/ports.py` — formal `Protocol`s for `CheckpointPort`, `AuditPort`, `EmbeddingsPort`, `ToolPort`, `ToolProviderPort`. Existing implementations (`AsyncSqliteSaver`, `AuditLogger`, ChromaDB embeddings, `BaseTool`) conform structurally; users substitute with their own adapters without modifying the core.
+
+Plugin authors declare entry points in their `pyproject.toml` (e.g. `[project.entry-points."prismal.subgraphs"] my_pipeline = "my_pkg:register_my_pipeline"`); after `pip install`, `discover_plugins()` auto-registers them. Allowlist/denylist via `settings.plugins_allowlist` / `plugins_denylist`. Recommended convention: namespace plugins as `prismal-x-<domain>`.
+
+**Implementation notes (deviations from the spec text — keep in mind when editing):**
+- `Send` is imported from `langgraph.types` (not `langgraph.constants`, deprecated in LangGraph v1.0 and an error under `filterwarnings=error`).
+- The `@prismal_node` middleware order is **outermost→innermost: error_mapping → otel → logger → security → audit → retry → timeout → user fn** (intentional fix of the SPEC's contradictory ordering so retries run before error mapping and audit duration spans all attempts). `_middleware._tool_call_checker` is a monkeypatchable seam used by `security="strict"`.
+- `builder.compile()` returns the **real** `SubgraphDefinition` (`nodes`/`edges`/`conditional_edges`/`entry_point`), not a `compiled_graph`; `compile_raw()` returns a `CompiledStateGraph`.
+- Subgraph plugins register via the new **sync** `SubgraphRegistry.register_sync()` (the existing `register_<name>()` functions remain async and use the singleton). `discover_plugins()` is sync; a subgraph entry point either self-registers via `register_sync` or returns a `SubgraphDefinition`.
+- The 8th SPEC middleware "validation" is folded into `error_mapping` (`NodeValidationError` available for callers that validate explicitly).
+
+### Tool provider injection (Fase Y — `specs/tool-provider-injection/`, implemented)
+
+Tool resolution is inverted as a hexagonal port: the agent core asks an injected `ToolProviderPort` (`get_tools(*, agent_name, capabilities) -> list[BaseTool]`, sync, must not raise) and **no longer imports `prismal.mcp` / `prismal.skills`** — enforced by an AST architecture test (`tests/unit/agents/extension/test_no_mcp_skills_imports.py`; exemptions: `extension/providers.py` and `skill_manager.py`). User guide: `docs/tool-providers.md`; runnable examples: `examples/tool_provider_{host,custom}.py`.
+
+- `agents/extension/providers.py` — host-facing adapters (allowed to lazy-import mcp/skills): `McpToolProvider` (cap 60), `SkillToolProvider` (fresh `SkillsManager` per call), `StubToolProvider` (the old `stub_map`), `CompositeToolProvider` (exact merge parity: MCP→Skills→stubs priority, name dedupe, `max_total=120`, fixed-tool agents `{cron_manager, critic}` get stubs only), `FakeToolProvider` (tests), and async `build_default_tool_provider(settings)` for the host lifespan.
+- `agents/tool_registry.py` — `set_tool_provider()` / `get_tool_provider()` (variante A, global); `get_tools_for_agent()` keeps its signature and delegates; **no provider → stub-only fallback + `tool_registry.no_provider` warning** (behaviour change: skills are no longer loaded implicitly), or `ToolProviderNotConfigured` when `settings.tool_provider_strict`. Variante B (multi-tenant): `get_async_compiled_graph(tool_provider=...)` + `tool_provider_mode="context"` binds a per-session provider via `with_config`; nodes resolve with `get_tools_for_agent_ctx(name, config)` / `resolve_provider(config)`.
+- Deprecated shims (`init_mcp`, `get_mcp_tools`, `get_skill_tools`) delegate to the injected provider, emit `DeprecationWarning`, and are removed in the next minor. The policy caps live in `providers.py`; `tool_registry` keeps equal legacy constants (a parity test asserts both stay in sync).
+- Observability: span `prismal.tools.resolve` + counters `prismal.tool_provider_resolved_total{provider}`, `prismal.tools_injected_total{agent}`, `prismal.tool_provider_fallback_total`, `prismal.tool_provider_subprovider_errors_total{provider}` (registered in `OTelManager`).
+
 ### Security (5-layer defense-in-depth)
 
 All layers live in `prismal/security/` and are re-exported from its `__init__.py`:
@@ -118,16 +166,20 @@ All LLM calls go through `prismal/providers/` (LiteLLM wrapper + per-provider co
 - `sandbox/` — `SandboxExecutor` with docker/podman/nsjail/bwrap/firejail backends (Phase 43); AST denylist in `codeact_agent.py`.
 - `monitoring/` — Langfuse traces, OpenTelemetry spans, structlog.
 - `data/` — DuckDB + Polars utilities.
+- `agents/visualization.py` — `to_mermaid()`/`to_mermaid_png()`/`visualize()`/`save_graph_image()` for any graph-based architecture (compiled graph, `SubgraphDefinition`, `PrismalStateGraphBuilder`); re-exported from `prismal.langgraph`. `SubgraphDefinition` gains `.to_mermaid()`/`.visualize()`/`.save_image()`; `agents.graph.visualize_supervisor_graph()` renders the main graph. `subgraphs/factory.py::assemble_state_graph()` is the shared sync topology builder. Non-graph architectures (patterns, modal agents) raise `TypeError`.
 - `skills/` — `available/` (source, committed) · `active/` (runtime-enabled, gitignored) · `custom/` (AI-generated, gitignored).
 
 ## Critical rules
 
-1. **Never** concatenate user input into prompts — use `SecurePromptBuilder`.
+1. **Never** concatenate user input into prompts — use `SecurePromptBuilder`. This applies to STT transcripts, OCR text, and image captions as well — they are user-controlled content.
 2. **Never** bypass `GuardrailsEngine` / `ActionInterceptor`; they are the gateway.
 3. **Always** use `get_async_compiled_graph()` in async contexts (the sync variant uses a non-async SQLite saver).
-4. **Never** add provider-specific imports outside `prismal/providers/`.
-5. **Always** call `ActionInterceptor.check()` before tool calls that write files or execute code.
-6. **Never** add `__init__.py` to `prismal/` — it must remain a PEP 420 namespace package. (The repo-local `lightagent/__init__.py` shim is a deliberate, temporary migration exception and is not shipped.)
+4. **Never** add provider-specific imports outside `prismal/providers/`. This includes `whisper`, `pyttsx3`, `elevenlabs`, `open_clip_torch`, etc. for the multimodal layer.
+5. **Always** call `ActionInterceptor.check()` before tool calls that write files or execute code; call `ActionInterceptor.check_media_op()` before media read/write.
+6. **Always** validate incoming media with `MediaValidator.validate()` before passing it to a multimodal agent — `AuditLogger.log_media()` records hash + modality, never content.
+7. **Always** run FFmpeg via `SandboxExecutor` in `VideoAgent` and `VideoLoader` — never in-process.
+8. **Never** add `__init__.py` to `prismal/` — it must remain a PEP 420 namespace package. (The repo-local `lightagent/__init__.py` shim is a deliberate, temporary migration exception and is not shipped.)
+9. **Never** import `prismal.mcp` / `prismal.skills` from `prismal/agents/**` (Fase Y inversion; enforced by `test_no_mcp_skills_imports.py`). The only exemptions are `agents/extension/providers.py` (the adapters) and `agents/skill_manager.py` (the skills-administration agent). Tools reach agents only through the injected `ToolProviderPort` — in tests, inject `FakeToolProvider` instead of patching registry internals.
 
 ## Testing notes
 

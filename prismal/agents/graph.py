@@ -37,6 +37,8 @@ if TYPE_CHECKING:
 
     from langgraph.graph.state import CompiledStateGraph
 
+    from prismal.agents.extension.ports import ToolProviderPort
+
 from prismal.agents.codeact_agent import codeact_node
 from prismal.agents.coder import coder_node
 from prismal.agents.critic import critic_node
@@ -56,6 +58,7 @@ from prismal.agents.researcher import researcher_node
 from prismal.agents.skill_manager import skill_manager_node
 from prismal.agents.state import AgentState
 from prismal.agents.supervisor import supervisor_node, supervisor_router
+from prismal.agents.tool_registry import resolve_provider
 from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 
@@ -201,6 +204,8 @@ def build_supervisor_graph(
     dev_pipeline_graph: Any = None,
     ml_pipeline_graph: Any = None,
     financial_analyst_graph: Any = None,
+    advanced_nodes: dict[str, Any] | None = None,
+    multimodal_nodes: dict[str, Any] | None = None,
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Build and compile the LangGraph SUPERVISOR state machine.
@@ -305,6 +310,26 @@ def build_supervisor_graph(
     if _include_financial_analyst:
         builder.add_node("financial_analyst", financial_analyst_graph)
 
+    # Phase D (D1-01): advanced-architecture nodes — 6 reasoning patterns +
+    # 5 domain subgraphs. Opt-in via ``enable_subgraphs`` and only when the
+    # caller supplies the pre-built node map (built async in
+    # ``get_async_compiled_graph``). Each entry is either a plain async node
+    # callable (patterns) or a compiled subgraph (pipelines); LangGraph treats
+    # both identically as nodes.
+    _advanced_nodes: dict[str, Any] = (
+        dict(advanced_nodes) if (get_settings().enable_subgraphs and advanced_nodes) else {}
+    )
+    for _adv_name, _adv_node in _advanced_nodes.items():
+        builder.add_node(_adv_name, _adv_node)
+
+    # Fase F (P3): multimodal pipeline node. Opt-in via ``multimodal_enabled``
+    # and only when the caller supplies the pre-built (compiled) node map.
+    _multimodal_nodes: dict[str, Any] = (
+        dict(multimodal_nodes) if (get_settings().multimodal_enabled and multimodal_nodes) else {}
+    )
+    for _mm_name, _mm_node in _multimodal_nodes.items():
+        builder.add_node(_mm_name, _mm_node)
+
     # Entry point
     builder.set_entry_point("supervisor")
 
@@ -330,6 +355,10 @@ def build_supervisor_graph(
         conditional_edges["ml_pipeline"] = "ml_pipeline"
     if _include_financial_analyst:
         conditional_edges["financial_analyst"] = "financial_analyst"
+    for _adv_name in _advanced_nodes:
+        conditional_edges[_adv_name] = _adv_name
+    for _mm_name in _multimodal_nodes:
+        conditional_edges[_mm_name] = _mm_name
 
     builder.add_conditional_edges(
         "supervisor",
@@ -376,6 +405,10 @@ def build_supervisor_graph(
         builder.add_edge("ml_pipeline", "supervisor")
     if _include_financial_analyst:
         builder.add_edge("financial_analyst", "supervisor")
+    for _adv_name in _advanced_nodes:
+        builder.add_edge(_adv_name, "supervisor")
+    for _mm_name in _multimodal_nodes:
+        builder.add_edge(_mm_name, "supervisor")
 
     # ------------------------------------------------------------------ #
     # Compile with checkpointing                                           #
@@ -394,6 +427,99 @@ def build_supervisor_graph(
 
     logger.info("supervisor_graph_compiled", checkpoint_path=str(db_path))
     return compiled
+
+
+async def _build_advanced_nodes() -> dict[str, Any]:
+    """Build the advanced-architecture node map (Phase D / D1-01).
+
+    Returns a mapping of supervisor route name -> node, combining the 6
+    reasoning-pattern nodes (plain async callables with lazily-resolved LLM
+    defaults) and the 5 domain subgraphs (compiled via
+    :class:`~prismal.agents.subgraphs.factory.SubgraphFactory`). The names
+    match :data:`~prismal.agents.supervisor.ADVANCED_MEMBERS`.
+
+    Only invoked when ``settings.enable_subgraphs`` is ``True``; the subgraph
+    builders resolve their own LLM at build time, so this requires a configured
+    provider (consistent with the existing dev/ml/financial subgraphs).
+    """
+    from prismal.agents.patterns.nodes import (
+        make_constitutional_node,
+        make_debate_node,
+        make_lats_node,
+        make_llm_compiler_node,
+        make_mixture_node,
+        make_tot_agent_node,
+    )
+    from prismal.agents.subgraphs.code_review.builder import build_code_review_subgraph
+    from prismal.agents.subgraphs.customer_service.builder import (
+        build_customer_service_subgraph,
+    )
+    from prismal.agents.subgraphs.data_etl.builder import build_data_etl_subgraph
+    from prismal.agents.subgraphs.debate_consensus.builder import (
+        build_debate_consensus_subgraph,
+    )
+    from prismal.agents.subgraphs.document_generation.builder import (
+        build_document_generation_subgraph,
+    )
+    from prismal.agents.subgraphs.factory import SubgraphFactory
+
+    factory = SubgraphFactory()
+    nodes: dict[str, Any] = {
+        # Reasoning patterns (lazy LLM resolution at call time).
+        "tot_agent": make_tot_agent_node(),
+        "debate_agent": make_debate_node(),
+        "constitutional_filter": make_constitutional_node(),
+        "lats_agent": make_lats_node(),
+        "llm_compiler": make_llm_compiler_node(),
+        "mixture_agent": make_mixture_node(),
+        # Domain subgraph pipelines (compiled now).
+        "customer_service": await factory.build(build_customer_service_subgraph()),
+        "document_generation": await factory.build(build_document_generation_subgraph()),
+        "data_etl": await factory.build(build_data_etl_subgraph()),
+        "code_review": await factory.build(build_code_review_subgraph()),
+        "debate_consensus": await factory.build(build_debate_consensus_subgraph()),
+    }
+    logger.info("advanced_nodes_built", count=len(nodes))
+    return nodes
+
+
+async def _build_multimodal_nodes() -> dict[str, Any]:
+    """Build the multimodal node map (Fase F / P3).
+
+    Returns a single ``{"multimodal_pipeline": <compiled subgraph>}`` entry: the
+    multimodal pipeline (router → vision|audio|video|text → fusion → output)
+    compiled via :class:`~prismal.agents.subgraphs.factory.SubgraphFactory`. The
+    name matches :data:`~prismal.agents.supervisor.MULTIMODAL_MEMBERS`.
+
+    Only invoked when ``settings.multimodal_enabled`` is ``True``; the modal
+    agents resolve their providers lazily at call time, so compilation here
+    needs no network.
+    """
+    from prismal.agents.subgraphs.factory import SubgraphFactory
+    from prismal.agents.subgraphs.multimodal_pipeline.builder import (
+        build_multimodal_subgraph,
+    )
+
+    factory = SubgraphFactory()
+    nodes: dict[str, Any] = {
+        "multimodal_pipeline": await factory.build(build_multimodal_subgraph()),
+    }
+    logger.info("multimodal_nodes_built", count=len(nodes))
+    return nodes
+
+
+def visualize_supervisor_graph(
+    graph: CompiledStateGraph[AgentState, Any, Any, Any] | None = None,
+) -> None:
+    """Visualize the compiled supervisor graph (PNG in a notebook, else Mermaid).
+
+    Args:
+        graph: A compiled graph to render. When ``None``, the cached
+            :func:`get_compiled_graph` instance is used.
+    """
+    from prismal.agents.visualization import visualize
+
+    visualize(graph if graph is not None else get_compiled_graph())
 
 
 @lru_cache(maxsize=1)
@@ -418,7 +544,10 @@ def get_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any, Any]:
 _async_graph: CompiledStateGraph[AgentState, Any, Any, Any] | None = None
 
 
-async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any, Any]:
+async def get_async_compiled_graph(
+    *,
+    tool_provider: ToolProviderPort | None = None,
+) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Return the compiled LangGraph supervisor graph with an async checkpointer.
 
@@ -428,12 +557,22 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     The graph is built once and cached as a module-level singleton; subsequent
     calls return the same object without reopening the database.
 
+    Args:
+        tool_provider: Variante B (Fase Y4, SPEC-TPI-009) — when provided and
+            ``settings.tool_provider_mode == "context"``, the shared compiled
+            graph is returned bound (``with_config``) to
+            ``configurable.tool_provider``, so nodes using
+            ``get_tools_for_agent_ctx``/``resolve_provider`` see this
+            session's provider without touching global state. Ignored (with a
+            warning) in ``global`` mode.
+
     Returns:
-        A compiled graph backed by :class:`AsyncSqliteSaver`.
+        A compiled graph backed by :class:`AsyncSqliteSaver` — per-session
+        bound when a context ``tool_provider`` is given.
     """
     global _async_graph
     if _async_graph is not None:
-        return _async_graph
+        return _bind_tool_provider(_async_graph, tool_provider)
 
     # Phase 40 / SPEC-042 AC-042-4: flat mode is the default; hierarchical
     # mode is opt-in via ``PRISMAL_HIERARCHICAL_MODE=true``. The two
@@ -441,7 +580,7 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     # mechanism so callers never need to care which one is active.
     if get_settings().hierarchical_mode:
         _async_graph = await _build_hierarchical_graph()
-        return _async_graph
+        return _bind_tool_provider(_async_graph, tool_provider)
 
     # Phase 36: the checkpointer backend is now selected from
     # ``settings.db_url`` via ``build_checkpointer()``. For the default
@@ -454,6 +593,7 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
     dev_pipeline_graph: Any = None  # ANN401: no common base type for compiled subgraphs
     ml_pipeline_graph: Any = None  # ANN401: no common base type for compiled subgraphs
     financial_analyst_graph: Any = None  # ANN401: no common base type
+    advanced_nodes: dict[str, Any] | None = None
     if get_settings().enable_subgraphs:
         from prismal.agents.subgraphs.dev_pipeline.builder import (
             get_compiled_dev_pipeline,
@@ -472,14 +612,54 @@ async def get_async_compiled_graph() -> CompiledStateGraph[AgentState, Any, Any,
 
         financial_analyst_graph = await get_compiled_financial_analyst()
 
+        # Phase D (D1-01): build the advanced-architecture node map — 6 pattern
+        # nodes (lazy LLM defaults) + 5 compiled domain subgraphs.
+        advanced_nodes = await _build_advanced_nodes()
+
+    # Fase F (P3): build the multimodal pipeline node when the layer is enabled.
+    # Independent of ``enable_subgraphs`` — gated by its own toggle.
+    multimodal_nodes: dict[str, Any] | None = None
+    if get_settings().multimodal_enabled:
+        multimodal_nodes = await _build_multimodal_nodes()
+
     _async_graph = build_supervisor_graph(
         checkpointer=checkpointer,
         dev_pipeline_graph=dev_pipeline_graph,
         ml_pipeline_graph=ml_pipeline_graph,
         financial_analyst_graph=financial_analyst_graph,
+        advanced_nodes=advanced_nodes,
+        multimodal_nodes=multimodal_nodes,
     )
     logger.debug("async_graph_initialized")
-    return _async_graph
+    return _bind_tool_provider(_async_graph, tool_provider)
+
+
+def _bind_tool_provider(
+    graph: CompiledStateGraph[AgentState, Any, Any, Any],
+    tool_provider: ToolProviderPort | None,
+) -> CompiledStateGraph[AgentState, Any, Any, Any]:
+    """Bind *tool_provider* into the graph config (variante B helper).
+
+    Returns *graph* unchanged when no provider is given or the platform runs
+    in ``global`` mode. In ``context`` mode the shared compiled graph is
+    wrapped via ``with_config`` — a lightweight per-session view; the
+    underlying graph (and its checkpointer) stays a singleton.
+    """
+    if tool_provider is None:
+        return graph
+    if get_settings().tool_provider_mode != "context":
+        logger.warning(
+            "tool_provider_ignored_global_mode",
+            hint=(
+                "get_async_compiled_graph(tool_provider=...) requires "
+                "settings.tool_provider_mode='context'; use "
+                "set_tool_provider(...) in global mode."
+            ),
+        )
+        return graph
+    # ``with_config`` returns a lightweight per-session view of the shared
+    # compiled graph; the underlying graph and checkpointer stay a singleton.
+    return graph.with_config({"configurable": {"tool_provider": tool_provider}})
 
 
 # ---------------------------------------------------------------------------
@@ -614,6 +794,7 @@ def list_session_ids() -> list[str]:
 
 
 __all__ = [
+    "_build_advanced_nodes",
     "_build_hierarchical_graph",
     "_hierarchical_router",
     "build_checkpointer",
@@ -621,4 +802,5 @@ __all__ = [
     "get_async_compiled_graph",
     "get_compiled_graph",
     "list_session_ids",
+    "resolve_provider",
 ]

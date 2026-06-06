@@ -11,14 +11,18 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.callbacks import BaseCallbackHandler
 
 from prismal.core.exceptions import PermissionDeniedError
 from prismal.core.logging import get_logger
 from prismal.security.audit import AuditLogger
+from prismal.security.filesystem_guard import FilesystemGuard, PathViolation
 from prismal.security.permissions import PermissionManager, PermissionType
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = get_logger("prismal.security.action_interceptor")
 
@@ -158,6 +162,42 @@ class ActionInterceptor(BaseCallbackHandler):
                 "shell_execution_blocked",
                 cmd=cmd[0] if cmd else "",
             )
+            return False
+        return True
+
+    @staticmethod
+    def check_media_op(
+        op: str,
+        path: str | Path,
+        *,
+        workspace_root: str | None = None,
+    ) -> bool:
+        """Return True if a media read/write at *path* is permitted (Fase F).
+
+        Confines media filesystem operations using :class:`FilesystemGuard`:
+        blocked system prefixes are always rejected, and when *workspace_root*
+        is given the path must resolve inside it. Always call this before
+        reading or writing media to disk from a multimodal agent or loader.
+
+        Args:
+            op: ``"read"`` or ``"write"``.
+            path: Target media path.
+            workspace_root: Optional confinement root. ``None`` only enforces
+                the blocked-prefix policy.
+
+        Returns:
+            ``True`` when the operation is allowed, ``False`` when blocked.
+
+        Raises:
+            ValueError: If *op* is not ``"read"`` or ``"write"``.
+        """
+        if op not in ("read", "write"):
+            raise ValueError(f"unknown media op: {op!r} (expected 'read' or 'write')")
+        guard = FilesystemGuard(workspace_root=workspace_root)
+        try:
+            guard.validate(str(path), write=(op == "write"))
+        except PathViolation:
+            logger.warning("media_op_blocked", op=op, path=str(path))
             return False
         return True
 

@@ -163,6 +163,17 @@ def test_general_and_matching_both_included() -> None:
 # ── Integration: get_tools_for_agent plumbing ────────────────────────────────
 
 
+def _registry_provider_for(mgr: object):  # type: ignore[no-untyped-def]
+    """Build the Fase Y composite wrapping *mgr* as the MCP source."""
+    from prismal.agents.extension.providers import (
+        CompositeToolProvider,
+        McpToolProvider,
+        StubToolProvider,
+    )
+
+    return CompositeToolProvider([McpToolProvider(mgr), StubToolProvider()])
+
+
 def test_get_tools_for_agent_forwards_capabilities_to_manager() -> None:
     from prismal.agents import tool_registry
 
@@ -173,14 +184,7 @@ def test_get_tools_for_agent_forwards_capabilities_to_manager() -> None:
             captured["caps"] = capabilities
             return []
 
-    with (
-        patch.object(tool_registry, "_mcp_manager", FakeMgr()),
-        patch.object(tool_registry, "get_skill_tools", return_value=[]),
-        patch(
-            "prismal.mcp.client.MCPClientManager",
-            FakeMgr,
-        ),
-    ):
+    with patch.object(tool_registry, "_provider", _registry_provider_for(FakeMgr())):
         tool_registry.get_tools_for_agent("researcher", required_capabilities=["research", "rag"])
 
     assert captured["caps"] == ["research", "rag"]
@@ -197,11 +201,7 @@ def test_get_tools_for_agent_legacy_call_passes_none() -> None:
             captured["caps"] = capabilities
             return []
 
-    with (
-        patch.object(tool_registry, "_mcp_manager", FakeMgr()),
-        patch.object(tool_registry, "get_skill_tools", return_value=[]),
-        patch("prismal.mcp.client.MCPClientManager", FakeMgr),
-    ):
+    with patch.object(tool_registry, "_provider", _registry_provider_for(FakeMgr())):
         tool_registry.get_tools_for_agent("researcher")
 
     assert captured["caps"] is None
@@ -258,8 +258,7 @@ def test_get_tools_for_agent_code_review_excludes_customer_service_tools() -> No
     mgr = _manager_with_conns(conns)
 
     with (
-        patch.object(tool_registry, "_mcp_manager", mgr),
-        patch.object(tool_registry, "get_skill_tools", return_value=[]),
+        patch.object(tool_registry, "_provider", _registry_provider_for(mgr)),
         _adapter_passthrough(),
     ):
         tools = tool_registry.get_tools_for_agent(

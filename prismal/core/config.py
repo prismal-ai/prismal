@@ -678,6 +678,96 @@ class Settings(BaseSettings):
         description="Max recording duration per voice turn in seconds",
     )
 
+    # ── Multimodal layer (Fase F, opt-in) ──────────────────────────────
+    multimodal_enabled: bool = Field(
+        default=False,
+        description="Master toggle for the multimodal layer (vision/audio/video).",
+    )
+    vision_enabled: bool = Field(
+        default=False,
+        description="Enable VisionAgent and the vision_node.",
+    )
+    audio_enabled: bool = Field(
+        default=False,
+        description="Enable AudioAgent and the audio_node.",
+    )
+    video_enabled: bool = Field(
+        default=False,
+        description="Enable VideoAgent and the video_node.",
+    )
+
+    # Multimodal models
+    vision_model: str = Field(
+        default="",
+        description="VLM model string (LiteLLM). Reuses cua_vision_model when empty.",
+    )
+    multimodal_model: str = Field(
+        default="gemini/gemini-2.0-flash",
+        description="Natively multimodal model (audio+image+video+text).",
+    )
+    cross_modal_embedding_model: str = Field(
+        default="open_clip:ViT-B-32",
+        description="Cross-modal embedding model (CLIP-style), used by [multimodal-embed].",
+    )
+
+    # Media limits (inherited by MediaValidator)
+    max_image_bytes: int = Field(
+        default=10_485_760,
+        ge=1024,
+        description="Max image size in bytes (10 MB default).",
+    )
+    max_audio_bytes: int = Field(
+        default=52_428_800,
+        ge=1024,
+        description="Max audio size in bytes (50 MB default).",
+    )
+    max_video_bytes: int = Field(
+        default=209_715_200,
+        ge=1024,
+        description="Max video size in bytes (200 MB default).",
+    )
+    max_audio_duration_s: float = Field(
+        default=600.0,
+        ge=0.5,
+        description="Max audio duration in seconds.",
+    )
+    max_video_duration_s: float = Field(
+        default=300.0,
+        ge=0.5,
+        description="Max video duration in seconds.",
+    )
+    max_frames_per_video: int = Field(
+        default=60,
+        ge=1,
+        le=600,
+        description="Max frames sampled per video (caps LLM cost).",
+    )
+    video_sample_fps: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=10.0,
+        description="Frames-per-second sampled from video.",
+    )
+
+    # TTS / OCR
+    tts_max_chars: int = Field(
+        default=2000,
+        ge=1,
+        le=10_000,
+        description="Max characters per TTS synthesis call.",
+    )
+    vision_ocr_enabled: bool = Field(
+        default=False,
+        description="Run an OCR pass in VisionAgent by default.",
+    )
+    media_workspace: str = Field(
+        default="",
+        description=(
+            "Filesystem root where ingested media is spilled to content-addressed "
+            "files (per session). Empty string uses the system temp dir."
+        ),
+    )
+
     # ---------------------------------------------------------------------------
     # Channel gateway settings
     # ---------------------------------------------------------------------------
@@ -935,6 +1025,56 @@ class Settings(BaseSettings):
     enable_subgraphs: bool = Field(
         default=False,
         description="Enable dynamic sub-agent orchestration (Phase 24).",
+    )
+
+    # ── Extension surface (Fase X) ───────────────────────────────────
+    plugins_autodiscover: bool = Field(
+        default=True,
+        description="Enable plugin auto-discovery via entry points at startup.",
+    )
+    plugins_allowlist: list[str] = Field(
+        default_factory=list,
+        description=(
+            "If non-empty, only plugins whose entry-point name appears here "
+            "are loaded. Recommended in production."
+        ),
+    )
+    plugins_denylist: list[str] = Field(
+        default_factory=list,
+        description="Plugins to disable. Takes precedence over the allowlist.",
+    )
+    plugins_groups_enabled: list[str] = Field(
+        default_factory=lambda: ["subgraphs", "nodes", "tools", "rag_engines"],
+        description="Entry-point groups to discover. Default: all supported groups.",
+    )
+    extension_default_security: Literal["off", "standard", "strict"] = Field(
+        default="standard",
+        description="Default security level for @prismal_node when not set explicitly.",
+    )
+    extension_default_audit: bool = Field(
+        default=True,
+        description="Default audit flag for @prismal_node when not set explicitly.",
+    )
+    extension_default_timeout_s: float | None = Field(
+        default=None,
+        description="Default per-invocation timeout for @prismal_node (None = no timeout).",
+    )
+
+    # ── Tool provider injection (Fase Y) ─────────────────────────────
+    tool_provider_mode: Literal["global", "context"] = Field(
+        default="global",
+        description=(
+            "Tool provider resolution mode: 'global' uses the provider injected "
+            "via set_tool_provider() (variante A); 'context' resolves a per-session "
+            "provider from the graph config (variante B, multi-tenant)."
+        ),
+    )
+    tool_provider_strict: bool = Field(
+        default=False,
+        description=(
+            "If True, a missing tool provider raises ToolProviderNotConfigured "
+            "instead of degrading to static stubs with a warning."
+        ),
     )
 
     # Webhooks (Phase 25)

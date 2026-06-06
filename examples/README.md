@@ -77,6 +77,7 @@ uv run python examples/patterns/09_parallel_dispatcher.py
 | 6 | `06_hierarchical_rag.py` | Hierarchical RAG | **CUAD** (contratos legales) | Chunks hijo (~100 chars) para búsqueda + chunks padre (~500 chars) para generación |
 | 7 | `07_rag_fusion.py` | RAG-Fusion + RRF | **BEIR** (IR multi-dominio) | N queries en paralelo + Reciprocal Rank Fusion `score = Σ 1/(k+rank)` (Cormack 2009) |
 | 8 | `08_multi_vector_rag.py` | Multi-Vector RAG | **ArXiv Papers** (ML/AI) | Indexa chunk + resumen LLM + N preguntas hipotéticas por documento |
+| 9 | `09_multimodal_rag.py` | Multimodal RAG | **arXiv + MedQuAD + ATIS + ActivityNet** (mezcla) | Indexa text/image/audio/video con `modality`+`source_uri`; `search(modalities=[...])` filtra por modalidad |
 
 ### Ejecutar RAG
 
@@ -104,6 +105,9 @@ uv run python examples/rag/07_rag_fusion.py
 
 # Multi-Vector RAG en ArXiv
 uv run python examples/rag/08_multi_vector_rag.py
+
+# Multimodal RAG (text + image + audio + video)
+uv run python examples/rag/09_multimodal_rag.py
 ```
 
 ---
@@ -122,6 +126,8 @@ uv run python examples/rag/08_multi_vector_rag.py
 | 8 | `08_debate_consensus.py` | Debate Consensus | **AI Policy & Tech Ethics** | proponent → opponent → moderator → consensus [Jaccard agreement score] |
 | 9 | `09_hitl_approval.py` | HITL Approval | **AI Governance Decisions** (custom) | proposal_writer → risk_assessor → approval_seed → interrupt() → hitl_gate → approve \| reject \| request_changes |
 | 10 | `10_analysis_orchestrator.py` | Analysis Orchestrator | **Business Intelligence Center** (custom) | analysis_supervisor (LLM router) → data_analyst \| ml_pipeline \| dev_pipeline \| financial_analyst → END |
+| 11 | `11_engineering_orchestrator.py` | Engineering Orchestrator | **GitHub Issues** (LangChain) | engineering_supervisor → coder \| codeact \| planner \| file_manager \| skill_manager → END |
+| 12 | `12_research_orchestrator.py` | Research Orchestrator | **arXiv + MedQuAD** | research_supervisor → researcher \| rag_agent → END |
 
 ```bash
 uv run python examples/subgraphs/01_ml_pipeline.py
@@ -134,6 +140,8 @@ uv run python examples/subgraphs/07_document_generation.py
 uv run python examples/subgraphs/08_debate_consensus.py
 uv run python examples/subgraphs/09_hitl_approval.py
 uv run python examples/subgraphs/10_analysis_orchestrator.py
+uv run python examples/subgraphs/11_engineering_orchestrator.py
+uv run python examples/subgraphs/12_research_orchestrator.py
 ```
 
 ---
@@ -152,6 +160,8 @@ uv run python examples/subgraphs/10_analysis_orchestrator.py
 | Análisis de decisiones complejas con múltiples perspectivas | Debate Consensus |
 | Cambios críticos que requieren aprobación humana antes de ejecutar | HITL Approval |
 | Tareas analíticas mixtas (SQL, ML, dev, finanzas) con enrutamiento LLM | Analysis Orchestrator |
+| Peticiones de ingeniería que mezclan código, planning y filesystem | Engineering Orchestrator |
+| Preguntas de investigación (web/literatura + KB interna) | Research Orchestrator |
 
 ---
 
@@ -183,6 +193,52 @@ uv run python examples/subgraphs/10_analysis_orchestrator.py
 | Documentos muy largos (contratos, libros, papers) | Hierarchical RAG |
 | Recall es crítico (no puedes perder documentos relevantes) | RAG-Fusion |
 | Usuarios con diferentes estilos de pregunta | Multi-Vector RAG |
+| Corpus mixto (texto + imagen + audio + video) con filtrado por modalidad | Multimodal RAG |
+
+---
+
+## Multimodal (`examples/multimodal/`)
+
+Ejemplos granulares del *Fase F* multimodal layer — todos corren con
+*callables* inyectados (sin Whisper / VLM / FFmpeg reales).
+
+| # | Archivo | Componente | Dataset | Descripción |
+|---|---------|-----------|---------|-------------|
+| 1 | `01_vision_agent.py` | VisionAgent | **arXiv cs.CV** (figuras sintéticas) | Análisis con vision_fn inyectado, OCR opcional, fallback en validación |
+| 2 | `02_audio_agent.py` | AudioAgent  | **ATIS** (voice intents) | Pipeline STT → reason → TTS con clientes mock; WAV de silencio para validación |
+| 3 | `03_video_agent.py` | VideoAgent  | **ActivityNet Captions** (clips sintéticos) | Frame-extractor + transcribe + fusión, todo inyectable |
+| 4 | `04_modality_router.py` | classify_modality + router node | **ATIS + arXiv + ActivityNet** (mezclado) | 18 casos etiquetados: attachments → blocks → intent-regex |
+| 5 | `05_multimodal_fusion.py` | MultimodalFusion | **VQA-style** (3 escenas) | Estrategias `concat`, `moderator` (1 LLM), `moa` (N propositores) |
+
+Más el demo end-to-end existente `examples/multimodal_pipeline.py` que
+combina router + vision + fusion.
+
+```bash
+uv run python examples/multimodal/01_vision_agent.py
+uv run python examples/multimodal/02_audio_agent.py
+uv run python examples/multimodal/03_video_agent.py
+uv run python examples/multimodal/04_modality_router.py
+uv run python examples/multimodal/05_multimodal_fusion.py
+uv run python examples/multimodal_pipeline.py
+```
+
+---
+
+## Tool Providers (Fase Y)
+
+Inyección de proveedores de herramientas desde el host (`ToolProviderPort`) —
+guía completa en [`docs/tool-providers.md`](../docs/tool-providers.md). Ambos
+corren offline (sin LLM ni servidores MCP).
+
+| Archivo | Descripción |
+|---------|-------------|
+| `tool_provider_host.py` | Composición tipo host (MCP opcional + Skills + stubs) + `set_tool_provider` (variante A) y toolsets por sesión (variante B) |
+| `tool_provider_custom.py` | Proveedor propio que conforma `ToolProviderPort` estructuralmente y sustituye el merge completo |
+
+```bash
+uv run python examples/tool_provider_host.py     # EXAMPLE_USE_MCP=1 para conectar MCP real
+uv run python examples/tool_provider_custom.py
+```
 
 ---
 
