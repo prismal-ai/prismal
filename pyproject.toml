@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ============================================================
 [project]
 name = "prismal-ai"
-version = "3.0.1"
+version = "3.0.2"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"

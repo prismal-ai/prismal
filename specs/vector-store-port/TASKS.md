@@ -2,134 +2,134 @@
 
 ## Metadata
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-06-05 |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` |
+| **Version** | 1.0 |
+| **Date** | 2026-06-05 |
 | **PLAN** | `specs/vector-store-port/PLAN.md` |
 | **Architecture** | `specs/vector-store-port/ARCHITECTURE.md` |
 | **SPEC** | `specs/vector-store-port/SPEC.md` |
 
 ---
 
-## 1. Resumen de Implementación
+## 1. Implementation Summary
 
-Fase Z convierte `ChromaVectorStore` (clase concreta) en un `VectorStorePort` con adaptadores intercambiables, seleccionables por `settings.vector_store_backend`. **Chroma sigue default.** El trabajo es mayormente:
+Phase Z turns `ChromaVectorStore` (concrete class) into a `VectorStorePort` with interchangeable adapters, selectable by `settings.vector_store_backend`. **Chroma stays the default.** The work is mostly:
 
-- **Aditivo:** puerto, factory, 4 adaptadores nuevos, extras, settings, exceptions, docs, tests.
-- **Reubicación con shim:** `rag/vector_store.py` → `rag/stores/chroma.py` (re-export retrocompatible).
-- **Retipado sin lógica:** consumidores RAG + memoria cambian `ChromaVectorStore` → `VectorStorePort`.
+- **Additive:** port, factory, 4 new adapters, extras, settings, exceptions, docs, tests.
+- **Relocation with shim:** `rag/vector_store.py` → `rag/stores/chroma.py` (backward-compatible re-export).
+- **Retyping without logic:** RAG + memory consumers change `ChromaVectorStore` → `VectorStorePort`.
 
-Principio rector: **paridad de comportamiento con default chroma** + **contrato de score `[0,1]`** verificado contra Chroma como referencia.
-
----
-
-## 2. Pre-requisitos
-
-- Familia de puertos de Fase X/Y en `extension/ports.py` (`EmbeddingsPort`, etc.). ✅ Presente.
-- `EmbeddingsFactory.create(settings)` como espejo de la nueva factory. ✅ Presente.
-- `ChromaVectorStore` actual como referencia de API y de score `[0,1]`. ✅ Presente.
-- Inyección por constructor ya presente en consumidores RAG + memoria. ✅ Presente.
+Guiding principle: **behavioral parity with default chroma** + **score contract `[0,1]`** verified against Chroma as the reference.
 
 ---
 
-## 3. Fases de Implementación
+## 2. Prerequisites
 
-### FASE Z1 — `VectorStorePort`
-#### Z1-01 — Declarar el puerto
-- [ ] Añadir `VectorStorePort` (`@runtime_checkable Protocol`) a `extension/ports.py` con `collection_name`, `add_documents`, `similarity_search`, `delete_by_source`, `delete_collection`.
-- [ ] `__all__` + re-export desde `extension/__init__.py`.
-- **Done:** `conforms_to(ChromaVectorStore(), VectorStorePort)` es `True`.
+- Phase X/Y port family in `extension/ports.py` (`EmbeddingsPort`, etc.). ✅ Present.
+- `EmbeddingsFactory.create(settings)` as the mirror of the new factory. ✅ Present.
+- Current `ChromaVectorStore` as the API and `[0,1]` score reference. ✅ Present.
+- Constructor injection already present in RAG + memory consumers. ✅ Present.
 
-### FASE Z2 — Contrato de score
-#### Z2-01 — Definir contrato + helpers
-- [ ] Documentar `score ∈ [0,1]` mayor=mejor en el docstring del puerto.
-- [ ] Crear `rag/stores/_normalize.py` con `cosine_identity`, `from_l2`, `from_distance` helpers.
-#### Z2-02 — Test de referencia
-- [ ] Test que fija el corpus y captura el orden/score de Chroma como *golden* para paridad (Z7-02).
-- **Done:** referencia reproducible.
+---
 
-### FASE Z3 — Adaptadores
-#### Z3-01 — Reubicar Chroma (default) + shim
-- [ ] Mover `ChromaVectorStore`/`ChromaStoreError` a `rag/stores/chroma.py`.
-- [ ] `rag/vector_store.py` re-exporta (shim) → imports existentes no rompen.
-- [ ] `ChromaStoreError` subclasa `VectorStoreError`.
-- **Done:** suite existente verde sin cambios de comportamiento.
+## 3. Implementation Phases
+
+### PHASE Z1 — `VectorStorePort`
+#### Z1-01 — Declare the port
+- [ ] Add `VectorStorePort` (`@runtime_checkable Protocol`) to `extension/ports.py` with `collection_name`, `add_documents`, `similarity_search`, `delete_by_source`, `delete_collection`.
+- [ ] `__all__` + re-export from `extension/__init__.py`.
+- **Done:** `conforms_to(ChromaVectorStore(), VectorStorePort)` is `True`.
+
+### PHASE Z2 — Score contract
+#### Z2-01 — Define contract + helpers
+- [ ] Document `score ∈ [0,1]` higher=better in the port's docstring.
+- [ ] Create `rag/stores/_normalize.py` with `cosine_identity`, `from_l2`, `from_distance` helpers.
+#### Z2-02 — Reference test
+- [ ] Test that fixes the corpus and captures Chroma's order/score as the *golden* for parity (Z7-02).
+- **Done:** reproducible reference.
+
+### PHASE Z3 — Adapters
+#### Z3-01 — Relocate Chroma (default) + shim
+- [ ] Move `ChromaVectorStore`/`ChromaStoreError` to `rag/stores/chroma.py`.
+- [ ] `rag/vector_store.py` re-exports (shim) → existing imports do not break.
+- [ ] `ChromaStoreError` subclasses `VectorStoreError`.
+- **Done:** existing suite green with no behavior change.
 #### Z3-02 — `LanceDBVectorStore` (`[lancedb]`)
-- [ ] Implementar adaptador embebido; import diferido; normalizar score; traducir `delete_by_source`.
+- [ ] Implement the embedded adapter; deferred import; normalize score; translate `delete_by_source`.
 #### Z3-03 — `SqliteVecVectorStore` (`[sqlite-vec]`)
-- [ ] Implementar adaptador embebido; resolver vía SQL/extensión o integración LangChain (PA-2).
+- [ ] Implement the embedded adapter; resolve via SQL/extension or LangChain integration (PA-2).
 #### Z3-04 — `QdrantVectorStore` (`[qdrant]`)
-- [ ] Implementar adaptador embebido/servidor; auth desde settings; normalizar score.
+- [ ] Implement the embedded/server adapter; auth from settings; normalize score.
 #### Z3-05 — `PgVectorStore` (`[pgvector]`)
-- [ ] Implementar adaptador servidor (DSN); normalizar distancia `<=>`/`<->`.
-- **Done (Z3):** los 5 adaptadores conforman el puerto; cada uno con su normalización documentada.
+- [ ] Implement the server adapter (DSN); normalize distance `<=>`/`<->`.
+- **Done (Z3):** the 5 adapters conform to the port; each with its documented normalization.
 
-### FASE Z4 — Factory + Settings + Exceptions
+### PHASE Z4 — Factory + Settings + Exceptions
 #### Z4-01 — `VectorStoreFactory`
-- [ ] Crear `rag/vector_store_factory.py::VectorStoreFactory.create(settings, collection)`; import diferido por backend; espejo de `EmbeddingsFactory`.
-- [ ] `FakeVectorStore` para tests.
+- [ ] Create `rag/vector_store_factory.py::VectorStoreFactory.create(settings, collection)`; deferred import per backend; mirror of `EmbeddingsFactory`.
+- [ ] `FakeVectorStore` for tests.
 #### Z4-02 — Settings
-- [ ] `vector_store_backend` (default `chroma`), `vector_store_path`, `vector_store_url` (+ credenciales opt).
-- [ ] `chroma_path` como alias retrocompatible cuando backend == chroma.
+- [ ] `vector_store_backend` (default `chroma`), `vector_store_path`, `vector_store_url` (+ optional credentials).
+- [ ] `chroma_path` as a backward-compatible alias when backend == chroma.
 #### Z4-03 — Exceptions
-- [ ] `VectorStoreError`, `VectorStoreBackendUnavailable` (mensaje guía al extra).
-- **Done:** `create()` selecciona backend; ausencia de extra → error claro.
+- [ ] `VectorStoreError`, `VectorStoreBackendUnavailable` (message guiding to the extra).
+- **Done:** `create()` selects the backend; absence of the extra → clear error.
 
-### FASE Z5 — Retipado de consumidores
+### PHASE Z5 — Consumer retyping
 #### Z5-01 — RAG
-- [ ] `engine`, `hyde`, `self_rag`, `hybrid`, `hierarchical`, `multi_vector`, `multimodal`, `crag`: hint → `VectorStorePort`; construcción por defecto vía factory.
-#### Z5-02 — Memoria
-- [ ] `memory/long_term.py`, `memory/mongodb_store.py`: default vía factory; hint → `VectorStorePort`.
-- **Done:** `grep` no encuentra type hints `ChromaVectorStore` en consumidores (sí en el adaptador). Suite verde.
+- [ ] `engine`, `hyde`, `self_rag`, `hybrid`, `hierarchical`, `multi_vector`, `multimodal`, `crag`: hint → `VectorStorePort`; default construction via factory.
+#### Z5-02 — Memory
+- [ ] `memory/long_term.py`, `memory/mongodb_store.py`: default via factory; hint → `VectorStorePort`.
+- **Done:** `grep` does not find `ChromaVectorStore` type hints in consumers (only in the adapter). Suite green.
 
-### FASE Z6 — Extras
+### PHASE Z6 — Extras
 #### Z6-01 — `pyproject.toml`
-- [ ] Extras `[lancedb]`, `[sqlite-vec]`, `[qdrant]`, `[pgvector]`; base sin nuevas deps obligatorias; actualizar `all` si aplica.
-- [ ] `mypy` overrides para los nuevos SDKs opcionales si hace falta.
+- [ ] Extras `[lancedb]`, `[sqlite-vec]`, `[qdrant]`, `[pgvector]`; base without new mandatory deps; update `all` if applicable.
+- [ ] `mypy` overrides for the new optional SDKs if needed.
 
-### FASE Z7 — Tests
-#### Z7-01 — Unit por adaptador
-- [ ] add/search/delete por adaptador (embebidos reales; servidor con mock).
-#### Z7-02 — Paridad de score
-- [ ] Orden top-k de cada adaptador vs Chroma (referencia) dentro de tolerancia declarada.
-#### Z7-03 — Puerto + retipo
-- [ ] `conforms_to` de los 5; suite RAG+memoria verde con default chroma; `FakeVectorStore` en patrones.
+### PHASE Z7 — Tests
+#### Z7-01 — Unit per adapter
+- [ ] add/search/delete per adapter (real embedded; server with mock).
+#### Z7-02 — Score parity
+- [ ] Top-k order of each adapter vs Chroma (reference) within declared tolerance.
+#### Z7-03 — Port + retype
+- [ ] `conforms_to` for the 5; RAG+memory suite green with default chroma; `FakeVectorStore` in patterns.
 
-### FASE Z8 — Docs + Ejemplo
-#### Z8-01 — Documentación
-- [ ] `docs/vector-stores.md`: selección, extras, contrato de score, backend servidor (auth/red), migración.
-#### Z8-02 — Ejemplo
+### PHASE Z8 — Docs + Example
+#### Z8-01 — Documentation
+- [ ] `docs/vector-stores.md`: selection, extras, score contract, server backend (auth/network), migration.
+#### Z8-02 — Example
 - [ ] `examples/vector_store_lancedb.py`.
 
 ### HARDENING
-- [ ] Coverage ≥ 85% en `rag/stores/**` + factory.
+- [ ] Coverage ≥ 85% in `rag/stores/**` + factory.
 - [ ] `ruff` + `mypy --strict` + `bandit` clean; `pytest -m "not live_api"` 100%.
-- [ ] `CLAUDE.md` (sección rag/ + extras) y `README.md` actualizados.
+- [ ] `CLAUDE.md` (rag/ section + extras) and `README.md` updated.
 
 ---
 
-## 4. Dependencias Inter-Tareas
+## 4. Inter-Task Dependencies
 
 ```
-Z1 (puerto)
- └─▶ Z2 (contrato score)
-       └─▶ Z3-01 (Chroma reubicado + shim)  ──▶ Z5 (retipo) ──▶ Z7-03
-             └─▶ Z3-02..05 (adaptadores)    ──▶ Z7-01, Z7-02 (paridad)
-Z4 (factory+settings+exc)  ──▶ Z5 (consumidores usan factory)
-Z6 (extras)                ──▶ Z3-02..05 (resolución de deps)
-Z8 (docs/ejemplo)          [tras Z3..Z5]
+Z1 (port)
+ └─▶ Z2 (score contract)
+       └─▶ Z3-01 (Chroma relocated + shim)  ──▶ Z5 (retype) ──▶ Z7-03
+             └─▶ Z3-02..05 (adapters)    ──▶ Z7-01, Z7-02 (parity)
+Z4 (factory+settings+exc)  ──▶ Z5 (consumers use factory)
+Z6 (extras)                ──▶ Z3-02..05 (dependency resolution)
+Z8 (docs/example)          [after Z3..Z5]
 ```
 
-Ruta crítica: **Z1 → Z2 → Z3-01 → Z4 → Z5 → Z7** (default chroma verde). Los adaptadores nuevos (Z3-02..05) y su paridad son paralelizables tras Z4.
+Critical path: **Z1 → Z2 → Z3-01 → Z4 → Z5 → Z7** (default chroma green). The new adapters (Z3-02..05) and their parity are parallelizable after Z4.
 
 ---
 
-## 5. Matriz Tareas ↔ Requisitos
+## 5. Tasks ↔ Requirements Matrix
 
-| Tarea | RF cubiertos |
+| Task | RF covered |
 |---|---|
 | Z1 | RF-VS-001 |
 | Z2 | RF-VS-002 |
@@ -144,57 +144,57 @@ Ruta crítica: **Z1 → Z2 → Z3-01 → Z4 → Z5 → Z7** (default chroma verd
 | Z7 | RF-VS-002, RF-VS-013 |
 | Z8 | RF-VS-015 |
 
-Cobertura: RF-VS-001..015 mapeados.
+Coverage: RF-VS-001..015 mapped.
 
 ---
 
-## 6. Matriz de Riesgos
+## 6. Risk Matrix
 
-| Riesgo | Mitigación | Tarea |
+| Risk | Mitigation | Task |
 |---|---|---|
-| Score no comparable rompe hybrid | Contrato `[0,1]` + normalización por adaptador + paridad | Z2, Z7-02 |
-| Reubicación rompe imports | Shim en `rag/vector_store.py` | Z3-01 |
-| Backend opcional ausente | Import diferido + `VectorStoreBackendUnavailable` | Z4-03 |
-| `chroma_path` se rompe | Alias retrocompatible | Z4-02 |
-| sqlite-vec sin integración LangChain limpia | Evaluar SQL directo (PA-2) | Z3-03 |
-| Servidor sin auth (qdrant/pg) | Documentar auth+red; default embebido | Z8-01 |
+| Score not comparable breaks hybrid | Contract `[0,1]` + per-adapter normalization + parity | Z2, Z7-02 |
+| Relocation breaks imports | Shim in `rag/vector_store.py` | Z3-01 |
+| Optional backend absent | Deferred import + `VectorStoreBackendUnavailable` | Z4-03 |
+| `chroma_path` breaks | Backward-compatible alias | Z4-02 |
+| sqlite-vec without a clean LangChain integration | Evaluate direct SQL (PA-2) | Z3-03 |
+| Server without auth (qdrant/pg) | Document auth+network; default embedded | Z8-01 |
 
 ---
 
-## 7. Definición de Done (Global de Fase Z)
+## 7. Definition of Done (Global for Phase Z)
 
-- [ ] `VectorStorePort` declarado/re-exportado; Chroma conforma sin cambio de comportamiento.
-- [ ] 4 adaptadores nuevos conformes (LanceDB, sqlite-vec, Qdrant, pgvector).
-- [ ] Contrato de score `[0,1]` verificado por paridad contra Chroma.
-- [ ] `VectorStoreFactory` + `settings.vector_store_backend` (default chroma) + config generalizada; `chroma_path` alias.
-- [ ] RAG + memoria retipados al puerto; sin type hints `ChromaVectorStore` en consumidores.
-- [ ] Extras opcionales; base slim; imports diferidos.
+- [ ] `VectorStorePort` declared/re-exported; Chroma conforms without behavior change.
+- [ ] 4 new conforming adapters (LanceDB, sqlite-vec, Qdrant, pgvector).
+- [ ] Score contract `[0,1]` verified by parity against Chroma.
+- [ ] `VectorStoreFactory` + `settings.vector_store_backend` (default chroma) + generalized config; `chroma_path` alias.
+- [ ] RAG + memory retyped to the port; no `ChromaVectorStore` type hints in consumers.
+- [ ] Optional extras; slim base; deferred imports.
 - [ ] `FakeVectorStore` + tests; coverage ≥ 85%.
-- [ ] `docs/vector-stores.md` + ejemplo.
+- [ ] `docs/vector-stores.md` + example.
 - [ ] `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
-- [ ] `CLAUDE.md` + `README.md` actualizados; PR mergeado con review.
+- [ ] `CLAUDE.md` + `README.md` updated; PR merged with review.
 
 ---
 
-## 8. Estimación de Esfuerzo
+## 8. Effort Estimate
 
-| Sub-fase | Esfuerzo |
+| Sub-phase | Effort |
 |---|---|
-| Z1 Puerto | 0.2 sem |
-| Z2 Contrato score | 0.3 sem |
-| Z3 Adaptadores (Chroma+4) | 1.5 sem |
-| Z4 Factory+settings+exc | 0.5 sem |
-| Z5 Retipo consumidores | 0.5 sem |
-| Z6 Extras | 0.2 sem |
-| Z7 Tests + paridad | 0.6 sem |
-| Z8 Docs + ejemplo | 0.4 sem |
-| Hardening | 0.5 sem |
-| **Total** | **~4.7 sem** |
+| Z1 Port | 0.2 wk |
+| Z2 Score contract | 0.3 wk |
+| Z3 Adapters (Chroma+4) | 1.5 wk |
+| Z4 Factory+settings+exc | 0.5 wk |
+| Z5 Consumer retype | 0.5 wk |
+| Z6 Extras | 0.2 wk |
+| Z7 Tests + parity | 0.6 wk |
+| Z8 Docs + example | 0.4 wk |
+| Hardening | 0.5 wk |
+| **Total** | **~4.7 wk** |
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-06-05 | Ernesto Crespo | Plan de implementación inicial — Vector Store Port |
+| 1.0 | 2026-06-05 | Ernesto Crespo | Initial implementation plan — Vector Store Port |

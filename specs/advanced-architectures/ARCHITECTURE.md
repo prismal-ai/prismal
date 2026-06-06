@@ -2,78 +2,78 @@
 
 ## Metadata
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| **Autor** | Ernesto Crespo |
-| **Estado** | `DRAFT` |
-| **Versión** | 1.0 |
-| **Fecha** | 2026-04-19 |
-| **PRD Relacionado** | `specs/advanced-architectures/PRD.md` |
+| **Author** | Ernesto Crespo |
+| **Status** | `DRAFT` |
+| **Version** | 1.0 |
+| **Date** | 2026-04-19 |
+| **Related PRD** | `specs/advanced-architectures/PRD.md` |
 | **Reviewers** | Tech Lead, AI Architect |
 
 ---
 
-## 1. Contexto
+## 1. Context
 
-Prismal-agents es un namespace package Python (PEP 420) que implementa un framework de agentes IA sobre LangGraph. La arquitectura existente provee: Supervisor Hub-and-Spoke, CRAG, Federated RAG, Reflection Loop, Parallel Fan-out, HITL Gate, y 6 subgraph pipelines de dominio.
+Prismal-agents is a Python namespace package (PEP 420) that implements an AI agent framework on top of LangGraph. The existing architecture provides: Supervisor Hub-and-Spoke, CRAG, Federated RAG, Reflection Loop, Parallel Fan-out, HITL Gate, and 6 domain subgraph pipelines.
 
-Este documento describe el diseño técnico para integrar 19 nuevas arquitecturas manteniendo coherencia con las convenciones existentes: namespace package, `SecurePromptBuilder` para prompts, providers vía `ProviderRegistry`, OTel spans via `OTelManager`, y `get_logger()` para logging estructurado.
+This document describes the technical design for integrating 19 new architectures while maintaining consistency with the existing conventions: namespace package, `SecurePromptBuilder` for prompts, providers via `ProviderRegistry`, OTel spans via `OTelManager`, and `get_logger()` for structured logging.
 
-El principio de diseño central es **composición sobre herencia**: las nuevas arquitecturas se construyen sobre las primitivas ya existentes (`reflection_loop`, `make_parallel_dispatcher`, `CRAGPipeline`, `ChromaVectorStore`) extendiendo sus capacidades sin duplicar código.
-
----
-
-## 2. Objetivos Técnicos
-
-- **Correctitud:** Cada arquitectura implementa fielmente el algoritmo de referencia (paper o spec).
-- **Rendimiento:** Sin regresiones en arquitecturas existentes; nuevas dentro de los SLOs del PRD.
-- **Mantenibilidad:** `ruff`, `mypy --strict`, `bandit` pasan sin errores. Coverage ≥ 80%.
-- **Composabilidad:** Nuevas arquitecturas son usables como building blocks entre sí (ej: HyDE + RAG-Fusion).
-- **Operabilidad:** OTel spans + métricas + logs en todos los módulos nuevos.
+The central design principle is **composition over inheritance**: the new architectures are built on top of the already-existing primitives (`reflection_loop`, `make_parallel_dispatcher`, `CRAGPipeline`, `ChromaVectorStore`), extending their capabilities without duplicating code.
 
 ---
 
-## 3. Arquitectura Propuesta
+## 2. Technical Objectives
 
-### 3.1 Diagrama de Alto Nivel — Módulos Nuevos
+- **Correctness:** Each architecture faithfully implements the reference algorithm (paper or spec).
+- **Performance:** No regressions in existing architectures; new ones within the PRD's SLOs.
+- **Maintainability:** `ruff`, `mypy --strict`, `bandit` pass with no errors. Coverage ≥ 80%.
+- **Composability:** New architectures are usable as building blocks with each other (e.g., HyDE + RAG-Fusion).
+- **Operability:** OTel spans + metrics + logs in all new modules.
+
+---
+
+## 3. Proposed Architecture
+
+### 3.1 High-Level Diagram — New Modules
 
 ```
 prismal/
 ├── rag/
-│   ├── [EXISTENTE] engine.py          ← RAGEngine (Standard RAG)
-│   ├── [EXISTENTE] crag.py            ← CRAGPipeline
-│   ├── [EXISTENTE] federated.py       ← FederatedRAGEngine
-│   ├── [NUEVO] hyde.py                ← HyDERetriever
-│   ├── [NUEVO] fusion.py              ← RAGFusionEngine (Multi-Query + RRF)
-│   ├── [NUEVO] hybrid.py              ← HybridSearchEngine (BM25 + Embeddings)
-│   ├── [NUEVO] self_rag.py            ← SelfRAGPipeline
-│   ├── [NUEVO] hierarchical.py        ← HierarchicalRAGEngine (Parent-Child)
-│   ├── [NUEVO] adaptive.py            ← AdaptiveRAGEngine (facade)
-│   └── [NUEVO] multi_vector.py        ← MultiVectorRAGEngine
+│   ├── [EXISTING] engine.py            ← RAGEngine (Standard RAG)
+│   ├── [EXISTING] crag.py              ← CRAGPipeline
+│   ├── [EXISTING] federated.py         ← FederatedRAGEngine
+│   ├── [NEW] hyde.py                   ← HyDERetriever
+│   ├── [NEW] fusion.py                 ← RAGFusionEngine (Multi-Query + RRF)
+│   ├── [NEW] hybrid.py                 ← HybridSearchEngine (BM25 + Embeddings)
+│   ├── [NEW] self_rag.py               ← SelfRAGPipeline
+│   ├── [NEW] hierarchical.py           ← HierarchicalRAGEngine (Parent-Child)
+│   ├── [NEW] adaptive.py               ← AdaptiveRAGEngine (facade)
+│   └── [NEW] multi_vector.py           ← MultiVectorRAGEngine
 │
 ├── agents/
 │   ├── patterns/
-│   │   ├── [EXISTENTE] reflection.py
-│   │   ├── [EXISTENTE] parallel.py
-│   │   ├── [NUEVO] tree_of_thoughts.py ← tree_of_thoughts()
-│   │   ├── [NUEVO] debate.py           ← debate_round()
-│   │   ├── [NUEVO] constitutional.py   ← ConstitutionalFilter
-│   │   ├── [NUEVO] lats.py             ← LATSAgent
-│   │   ├── [NUEVO] llm_compiler.py     ← LLMCompiler
-│   │   ├── [NUEVO] mixture_of_agents.py← MixtureOfAgents
-│   │   └── [NUEVO] swarm.py            ← swarm_handoff()
+│   │   ├── [EXISTING] reflection.py
+│   │   ├── [EXISTING] parallel.py
+│   │   ├── [NEW] tree_of_thoughts.py  ← tree_of_thoughts()
+│   │   ├── [NEW] debate.py            ← debate_round()
+│   │   ├── [NEW] constitutional.py    ← ConstitutionalFilter
+│   │   ├── [NEW] lats.py              ← LATSAgent
+│   │   ├── [NEW] llm_compiler.py      ← LLMCompiler
+│   │   ├── [NEW] mixture_of_agents.py ← MixtureOfAgents
+│   │   └── [NEW] swarm.py             ← swarm_handoff()
 │   │
 │   └── subgraphs/
-│       ├── [EXISTENTE] dev_pipeline/
-│       ├── [EXISTENTE] ml_pipeline/
-│       ├── [NUEVO] customer_service/   ← CustomerServicePipeline
-│       ├── [NUEVO] document_generation/← DocumentGenerationPipeline
-│       ├── [NUEVO] data_etl/           ← DataETLPipeline
-│       ├── [NUEVO] code_review/        ← CodeReviewPipeline
-│       └── [NUEVO] debate_consensus/   ← DebateConsensusPipeline
+│       ├── [EXISTING] dev_pipeline/
+│       ├── [EXISTING] ml_pipeline/
+│       ├── [NEW] customer_service/    ← CustomerServicePipeline
+│       ├── [NEW] document_generation/ ← DocumentGenerationPipeline
+│       ├── [NEW] data_etl/            ← DataETLPipeline
+│       ├── [NEW] code_review/         ← CodeReviewPipeline
+│       └── [NEW] debate_consensus/    ← DebateConsensusPipeline
 ```
 
-### 3.2 Estructura de Integración con el Grafo Principal
+### 3.2 Integration Structure with the Main Graph
 
 ```
                      ┌──────────────────────────────────┐
@@ -84,7 +84,7 @@ prismal/
        ┌────────────────────┼────────────────────────────┐
        ▼                    ▼                            ▼
  ┌──────────┐       ┌──────────────┐            ┌──────────────┐
- │ rag_agent│       │ [NUEVOS]     │            │ [NUEVOS]     │
+ │ rag_agent│       │ [NEW]        │            │ [NEW]        │
  │  _node   │       │ tot_node     │            │ customer_    │
  │ (CRAG+   │       │ debate_node  │            │ service_node │
  │  Reflect)│       │ compiler_node│            │ code_review_ │
@@ -107,27 +107,27 @@ prismal/
                      │
               ┌──────▼───────┐
               │ ChromaVectorStore│
-              │ (existente)    │
+              │ (existing)     │
               └────────────────┘
 ```
 
-### 3.3 Componentes por Módulo
+### 3.3 Components per Module
 
-#### Fase A — RAG Engines
+#### Phase A — RAG Engines
 
-| Módulo | Clase Principal | Dependencias | Patrón |
+| Module | Main Class | Dependencies | Pattern |
 |--------|----------------|-------------|--------|
-| `rag/hyde.py` | `HyDERetriever` | `ProviderRegistry`, `ChromaVectorStore` | Generación → Embedding → Search |
+| `rag/hyde.py` | `HyDERetriever` | `ProviderRegistry`, `ChromaVectorStore` | Generation → Embedding → Search |
 | `rag/fusion.py` | `RAGFusionEngine` | `ProviderRegistry`, `RAGEngine`, `asyncio` | Multi-query fan-out + RRF |
-| `rag/hybrid.py` | `HybridSearchEngine` | `rank_bm25`, `ChromaVectorStore` | Score fusion lineal |
+| `rag/hybrid.py` | `HybridSearchEngine` | `rank_bm25`, `ChromaVectorStore` | Linear score fusion |
 | `rag/self_rag.py` | `SelfRAGPipeline` | `ProviderRegistry`, `CRAGPipeline` | Token control + conditional retrieval |
 | `rag/hierarchical.py` | `HierarchicalRAGEngine` | `ChromaVectorStore`, `DocumentProcessorFactory` | Parent-child index |
-| `rag/adaptive.py` | `AdaptiveRAGEngine` | Todos los engines RAG | Facade + query classifier |
+| `rag/adaptive.py` | `AdaptiveRAGEngine` | All RAG engines | Facade + query classifier |
 | `rag/multi_vector.py` | `MultiVectorRAGEngine` | `ProviderRegistry`, `ChromaVectorStore` | Multi-representation index |
 
-#### Fase B — Agent Patterns
+#### Phase B — Agent Patterns
 
-| Módulo | Clase/Función | Dependencias | Patrón |
+| Module | Class/Function | Dependencies | Pattern |
 |--------|--------------|-------------|--------|
 | `patterns/tree_of_thoughts.py` | `tree_of_thoughts()` | `ProviderRegistry`, `parallel.py` | BFS/DFS tree + beam search |
 | `patterns/debate.py` | `debate_round()` | `ProviderRegistry`, `reflection.py` | Multi-LLM + moderator synthesis |
@@ -135,22 +135,22 @@ prismal/
 | `patterns/lats.py` | `LATSAgent` | `ProviderRegistry`, `tool_registry` | MCTS: select→expand→simulate→backprop |
 | `patterns/llm_compiler.py` | `LLMCompiler` | `ProviderRegistry`, `tool_registry`, DAG | Planner→Compile DAG→Execute→Join |
 | `patterns/mixture_of_agents.py` | `MixtureOfAgents` | `ProviderRegistry` (multi-provider) | Layer N generate → Layer N+1 synthesize |
-| `patterns/swarm.py` | `swarm_handoff()` | `AgentState`, `ProviderRegistry` | Peer handoff sin supervisor |
+| `patterns/swarm.py` | `swarm_handoff()` | `AgentState`, `ProviderRegistry` | Peer handoff without supervisor |
 
-### 3.4 Flujos de Datos Detallados
+### 3.4 Detailed Data Flows
 
-#### Flujo A1: HyDE Retrieval
+#### Flow A1: HyDE Retrieval
 
 ```
-Query ──▶ [LLM: genera doc hipotético] ──▶ [EmbeddingsFactory.embed(doc)]
+Query ──▶ [LLM: generates hypothetical doc] ──▶ [EmbeddingsFactory.embed(doc)]
        ──▶ [ChromaVectorStore.similarity_search(hyp_embedding, k)]
        ──▶ [List[RetrievedChunk]] ──▶ downstream pipeline
 ```
 
-#### Flujo A2: RAG-Fusion con RRF
+#### Flow A2: RAG-Fusion with RRF
 
 ```
-Query ──▶ [LLM: genera N variantes Q1..QN]
+Query ──▶ [LLM: generates N variants Q1..QN]
        ──▶ asyncio.gather(
               search(Q1, k), search(Q2, k), ... search(QN, k)
            )
@@ -158,7 +158,7 @@ Query ──▶ [LLM: genera N variantes Q1..QN]
        ──▶ [sort descending] ──▶ [top-k chunks]
 ```
 
-#### Flujo A3: Hybrid Search
+#### Flow A3: Hybrid Search
 
 ```
 Query ──┬──▶ [BM25Index.search(query)] ──▶ [(doc_id, bm25_score)]
@@ -167,31 +167,31 @@ Query ──┬──▶ [BM25Index.search(query)] ──▶ [(doc_id, bm25_scor
         ──▶ [Dedup + sort] ──▶ [List[RetrievedChunk]]
 ```
 
-#### Flujo A4: Self-RAG
+#### Flow A4: Self-RAG
 
 ```
-Query ──▶ [LLM prompt: "¿Necesitas recuperar información? RETRIEVE / NO_RETRIEVE"]
-       ──┬── NO_RETRIEVE ──▶ [LLM genera respuesta directa]
+Query ──▶ [LLM prompt: "Do you need to retrieve information? RETRIEVE / NO_RETRIEVE"]
+       ──┬── NO_RETRIEVE ──▶ [LLM generates a direct response]
          └── RETRIEVE ──▶ [CRAGPipeline.run(query)]
-                       ──▶ [LLM evalúa: Supported / Unsupported / Utility:N]
-                       ──▶ [SelfRAGResult con tokens de control]
+                       ──▶ [LLM evaluates: Supported / Unsupported / Utility:N]
+                       ──▶ [SelfRAGResult with control tokens]
 ```
 
-#### Flujo A5: Parent-Child RAG
+#### Flow A5: Parent-Child RAG
 
 ```
 INDEXING:
   Doc ──▶ [split parent chunks ~500 tokens] ──▶ [split child chunks ~100 tokens]
-       ──▶ [store child en ChromaDB con metadata.parent_id]
-       ──▶ [store parent en dict/sqlite por parent_id]
+       ──▶ [store child in ChromaDB with metadata.parent_id]
+       ──▶ [store parent in dict/sqlite by parent_id]
 
 RETRIEVAL:
-  Query ──▶ [similarity_search en child chunks]
-         ──▶ [load parent chunk para cada child encontrado]
+  Query ──▶ [similarity_search on child chunks]
+         ──▶ [load parent chunk for each found child]
          ──▶ [List[ParentChunk]] ──▶ LLM context
 ```
 
-#### Flujo B1: Tree of Thoughts
+#### Flow B1: Tree of Thoughts
 
 ```
 State ──▶ [generate N thoughts (breadth)]
@@ -202,117 +202,117 @@ State ──▶ [generate N thoughts (breadth)]
        ──▶ [return best path: List[Thought] + final_answer]
 ```
 
-#### Flujo B2: Debate / Society of Mind
+#### Flow B2: Debate / Society of Mind
 
 ```
-Query ──▶ [Agent A genera posición A]
-       ──▶ [Agent B genera posición B (puede ser opuesta)]
-       ──▶ [Agent C genera posición neutral]
-       ──▶ [Ronda 2: cada agente responde a las otras posiciones]
-       ──▶ [Moderador: sintetiza consenso]
+Query ──▶ [Agent A generates position A]
+       ──▶ [Agent B generates position B (may be opposite)]
+       ──▶ [Agent C generates a neutral position]
+       ──▶ [Round 2: each agent responds to the other positions]
+       ──▶ [Moderator: synthesizes consensus]
        ──▶ [DebateResult: answer + agreement_score + dissenting_views]
 ```
 
-#### Flujo B3: LLM-Compiler
+#### Flow B3: LLM-Compiler
 
 ```
-Goal + Tools ──▶ [Planner LLM: genera Task DAG JSON]
-             ──▶ [Compiler: valida DAG, detecta ciclos]
+Goal + Tools ──▶ [Planner LLM: generates Task DAG JSON]
+             ──▶ [Compiler: validates DAG, detects cycles]
              ──▶ [Topological sort → execution waves]
-             ──▶ [Executor: asyncio.gather por wave]
-             ──▶ [Joiner LLM: sintetiza resultados]
-             ──▶ ¿Replanning necesario?
+             ──▶ [Executor: asyncio.gather per wave]
+             ──▶ [Joiner LLM: synthesizes results]
+             ──▶ Replanning needed?
                  ├── NO ──▶ [CompilerResult]
-                 └── SÍ ──▶ [volver a Planner con contexto]
+                 └── YES ──▶ [return to Planner with context]
 ```
 
-#### Flujo B4: LATS (MCTS)
+#### Flow B4: LATS (MCTS)
 
 ```
 Root State ──▶ [Selection: UCB1 = Q/N + C*sqrt(ln(N_parent)/N)]
-           ──▶ [Expansion: N acciones candidatas via LLM]
-           ──▶ [Simulation: ejecutar acción → reward via eval_fn]
-           ──▶ [Backpropagation: actualizar Q, N en camino root→nodo]
-           ──▶ [Repeat hasta budget (max_simulations) o terminal]
-           ──▶ [Return best path por mayor Q/N]
+           ──▶ [Expansion: N candidate actions via LLM]
+           ──▶ [Simulation: execute action → reward via eval_fn]
+           ──▶ [Backpropagation: update Q, N along root→node path]
+           ──▶ [Repeat until budget (max_simulations) or terminal]
+           ──▶ [Return best path by highest Q/N]
 ```
 
 ---
 
-## 4. Decisiones de Diseño
+## 4. Design Decisions
 
-### DD-001: AdaptiveRAGEngine como Facade, No Subclase
+### DD-001: AdaptiveRAGEngine as a Facade, Not a Subclass
 
-- **Decisión:** `AdaptiveRAGEngine` compone instancias de los engines específicos (recibe instancias ya configuradas) y delega, en vez de heredar de `RAGEngine`.
-- **Contexto:** Los engines tienen configuraciones distintas (BM25 requiere corpus, GraphRAG requiere grafo); no tienen interfaz común perfecta.
-- **Alternativas evaluadas:**
+- **Decision:** `AdaptiveRAGEngine` composes instances of the specific engines (receives already-configured instances) and delegates, instead of inheriting from `RAGEngine`.
+- **Context:** The engines have different configurations (BM25 requires a corpus, GraphRAG requires a graph); they do not have a perfect common interface.
+- **Alternatives evaluated:**
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **Facade (elegida)** | Configuración flexible, lazy init, composable | Más código de delegación |
-| Herencia múltiple | Menos código | Viola Liskov en algunos engines; Python MRO complejo |
-| Protocol/ABC único | API uniforme | Overhead de implementar todos los métodos en cada engine |
+| **Facade (chosen)** | Flexible configuration, lazy init, composable | More delegation code |
+| Multiple inheritance | Less code | Violates Liskov in some engines; complex Python MRO |
+| Single Protocol/ABC | Uniform API | Overhead of implementing all methods in each engine |
 
-- **Justificación:** La facade permite que los engines sean usables de forma independiente Y como parte de Adaptive, sin forzar herencia artificial.
+- **Rationale:** The facade allows the engines to be usable independently AND as part of Adaptive, without forcing artificial inheritance.
 
-### DD-002: BM25 In-Process (NetworkX para GraphRAG)
+### DD-002: In-Process BM25 (NetworkX for GraphRAG)
 
-- **Decisión:** BM25 se implementa in-process con `rank_bm25` (índice en memoria). GraphRAG usa `networkx` (in-process). No se requiere servidor externo en Fase A/B.
-- **Contexto:** Añadir Neo4j o ElasticSearch como dependencia requerida aumentaría drásticamente la complejidad de setup.
-- **Alternativas evaluadas:**
+- **Decision:** BM25 is implemented in-process with `rank_bm25` (in-memory index). GraphRAG uses `networkx` (in-process). No external server is required in Phase A/B.
+- **Context:** Adding Neo4j or ElasticSearch as a required dependency would drastically increase setup complexity.
+- **Alternatives evaluated:**
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **In-process (elegida)** | Zero-config, testeable sin servicios | Limitado a corpus que caben en RAM |
-| ElasticSearch | Escala a TB de datos | Requiere servidor, Docker, ops overhead |
-| Neo4j | Grafos nativos de producción | Requiere servidor; complejiza tests |
+| **In-process (chosen)** | Zero-config, testable without services | Limited to corpora that fit in RAM |
+| ElasticSearch | Scales to TB of data | Requires a server, Docker, ops overhead |
+| Neo4j | Production-native graphs | Requires a server; complicates tests |
 
-- **Consecuencias:** Documentar límite recomendado (~500K docs para BM25). Neo4j en Fase D.
+- **Consequences:** Document the recommended limit (~500K docs for BM25). Neo4j in Phase D.
 
-### DD-003: Tree of Thoughts — Beam Search sobre DFS puro
+### DD-003: Tree of Thoughts — Beam Search over Pure DFS
 
-- **Decisión:** ToT implementa beam search (mantener top-k mejores pensamientos por nivel) en vez de DFS puro o BFS completo.
-- **Contexto:** DFS puede quedar atrapado en caminos subóptimos; BFS completo es exponencialmente costoso. Beam search balancea exploración y costo.
-- **Alternativas evaluadas:**
+- **Decision:** ToT implements beam search (keep the top-k best thoughts per level) instead of pure DFS or full BFS.
+- **Context:** DFS can get stuck in suboptimal paths; full BFS is exponentially costly. Beam search balances exploration and cost.
+- **Alternatives evaluated:**
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **Beam Search (elegida)** | Costo controlado; mejor que greedy | Puede perder soluciones fuera del beam |
-| DFS puro | Simple de implementar | Puede ser subóptimo sin backtracking real |
-| BFS completo | Garantiza encontrar óptimo | Costo exponencial; inviable con LLMs |
-| MCTS | Óptimo teórico | Complejidad alta; ya es LATS |
+| **Beam Search (chosen)** | Controlled cost; better than greedy | May miss solutions outside the beam |
+| Pure DFS | Simple to implement | May be suboptimal without real backtracking |
+| Full BFS | Guarantees finding the optimum | Exponential cost; infeasible with LLMs |
+| MCTS | Theoretical optimum | High complexity; that is already LATS |
 
-### DD-004: Constitutional AI — Principios como Strings, No Hardcoded
+### DD-004: Constitutional AI — Principles as Strings, Not Hardcoded
 
-- **Decisión:** `ConstitutionalFilter` acepta `principles: list[str]` en el constructor, sin principios hardcodeados en el código.
-- **Contexto:** Distintos deployments necesitan distintos principios (regulatorios, de marca, de seguridad). Hardcodear viola el principio de configurabilidad.
-- **Consecuencias:** El conjunto de principios por defecto se define en `core/config.py` como `constitutional_principles: list[str]`.
+- **Decision:** `ConstitutionalFilter` accepts `principles: list[str]` in the constructor, with no principles hardcoded in the code.
+- **Context:** Different deployments need different principles (regulatory, brand, security). Hardcoding violates the configurability principle.
+- **Consequences:** The default set of principles is defined in `core/config.py` as `constitutional_principles: list[str]`.
 
-### DD-005: LLM-Compiler — DAG como JSON serializable
+### DD-005: LLM-Compiler — DAG as Serializable JSON
 
-- **Decisión:** El DAG de tareas se representa como `list[TaskNode]` donde cada `TaskNode` es un dataclass con `id`, `tool`, `args`, `depends_on: list[str]`. Serializable a JSON para debugging.
-- **Consecuencias:** Facilita logging, replay de planes, y testing sin ejecutar herramientas reales.
+- **Decision:** The task DAG is represented as `list[TaskNode]` where each `TaskNode` is a dataclass with `id`, `tool`, `args`, `depends_on: list[str]`. Serializable to JSON for debugging.
+- **Consequences:** Facilitates logging, plan replay, and testing without executing real tools.
 
-### DD-006: Swarm/Handoff — Estado compartido vía AgentState, No Memoria Global
+### DD-006: Swarm/Handoff — Shared State via AgentState, Not Global Memory
 
-- **Decisión:** El handoff entre agentes en `swarm.py` pasa el `AgentState` completo, no usa memoria global mutable.
-- **Contexto:** Memoria global introduce race conditions en ejecución paralela con `asyncio`.
-- **Consecuencias:** Cada handoff es un nuevo frame de `AgentState`; el historial de handoffs se registra en `state["metadata"]["handoff_history"]`.
+- **Decision:** The handoff between agents in `swarm.py` passes the complete `AgentState`; it does not use mutable global memory.
+- **Context:** Global memory introduces race conditions in parallel execution with `asyncio`.
+- **Consequences:** Each handoff is a new `AgentState` frame; the handoff history is recorded in `state["metadata"]["handoff_history"]`.
 
-### DD-007: Nuevos Nodos en graph.py — Registro Explícito
+### DD-007: New Nodes in graph.py — Explicit Registration
 
-- **Decisión:** Cada nueva arquitectura que necesita un nodo de LangGraph se registra explícitamente en `agents/graph.py` siguiendo el patrón existente. No hay registro dinámico/automático.
-- **Consecuencias:** `graph.py` sigue siendo el punto único de verdad de la topología del grafo. Los nuevos nodos siguen el naming convention `{nombre}_node`.
+- **Decision:** Each new architecture that needs a LangGraph node is registered explicitly in `agents/graph.py` following the existing pattern. There is no dynamic/automatic registration.
+- **Consequences:** `graph.py` remains the single source of truth for the graph topology. The new nodes follow the naming convention `{name}_node`.
 
 ---
 
-## 5. Estructura del Código
+## 5. Code Structure
 
 ```
 prismal/
 │
 ├── rag/
-│   ├── __init__.py          ← exporta: HyDERetriever, RAGFusionEngine,
+│   ├── __init__.py          ← exports: HyDERetriever, RAGFusionEngine,
 │   │                           HybridSearchEngine, SelfRAGPipeline,
 │   │                           HierarchicalRAGEngine, AdaptiveRAGEngine,
 │   │                           MultiVectorRAGEngine
@@ -326,7 +326,7 @@ prismal/
 │
 ├── agents/
 │   ├── patterns/
-│   │   ├── __init__.py      ← exporta todos los patrones
+│   │   ├── __init__.py      ← exports all patterns
 │   │   ├── tree_of_thoughts.py
 │   │   ├── debate.py
 │   │   ├── constitutional.py
@@ -345,16 +345,16 @@ prismal/
 │       │   └── ticket_node.py
 │       ├── document_generation/
 │       │   ├── __init__.py
-│       │   └── [nodos...]
+│       │   └── [nodes...]
 │       ├── data_etl/
 │       │   ├── __init__.py
-│       │   └── [nodos...]
+│       │   └── [nodes...]
 │       ├── code_review/
 │       │   ├── __init__.py
-│       │   └── [nodos...]
+│       │   └── [nodes...]
 │       └── debate_consensus/
 │           ├── __init__.py
-│           └── [nodos...]
+│           └── [nodes...]
 │
 tests/
 ├── unit/
@@ -379,64 +379,64 @@ tests/
     └── test_agent_patterns_integration.py
 ```
 
-### Patrones Aplicados
+### Applied Patterns
 
-| Patrón | Dónde | Por qué |
+| Pattern | Where | Why |
 |---|---|---|
-| Facade | `AdaptiveRAGEngine` | Unifica interfaz sobre múltiples engines |
-| Strategy | Todos los RAG engines | Intercambiables vía mismo método `search()` |
-| Template Method | `BaseRAGEngine` (nuevo ABC) | Pasos comunes: log → span → search → return |
-| Composite | `MixtureOfAgents` | Compone múltiples LLM providers |
-| Chain of Responsibility | `ConstitutionalFilter` | Cada principio procesa el output en cadena |
-| Interpreter | `LLMCompiler` DAG parser | Interpreta el plan JSON como grafo ejecutable |
+| Facade | `AdaptiveRAGEngine` | Unifies the interface over multiple engines |
+| Strategy | All RAG engines | Interchangeable via the same `search()` method |
+| Template Method | `BaseRAGEngine` (new ABC) | Common steps: log → span → search → return |
+| Composite | `MixtureOfAgents` | Composes multiple LLM providers |
+| Chain of Responsibility | `ConstitutionalFilter` | Each principle processes the output in a chain |
+| Interpreter | `LLMCompiler` DAG parser | Interprets the JSON plan as an executable graph |
 
-### Manejo de Errores
+### Error Handling
 
 ```python
-# Jerarquía de excepciones nuevas (en core/exceptions.py)
-class RAGError(PrismalError): ...           # ya existe
-class HyDEError(RAGError): ...                 # fallo en generación hipotética
-class FusionError(RAGError): ...               # fallo en multi-query
-class GraphRAGError(RAGError): ...             # fallo en grafo de conocimiento
+# New exception hierarchy (in core/exceptions.py)
+class RAGError(PrismalError): ...           # already exists
+class HyDEError(RAGError): ...                 # failure in hypothetical generation
+class FusionError(RAGError): ...               # failure in multi-query
+class GraphRAGError(RAGError): ...             # failure in the knowledge graph
 
-class PatternError(PrismalError): ...       # nuevo
-class ToTError(PatternError): ...              # fallo en tree of thoughts
-class DebateError(PatternError): ...           # fallo en debate
-class ConstitutionalError(PatternError): ...   # violación no resuelta
-class LATSError(PatternError): ...             # MCTS fallo
-class CompilerError(PatternError): ...         # DAG inválido o ciclo
+class PatternError(PrismalError): ...       # new
+class ToTError(PatternError): ...              # failure in tree of thoughts
+class DebateError(PatternError): ...           # failure in debate
+class ConstitutionalError(PatternError): ...   # unresolved violation
+class LATSError(PatternError): ...             # MCTS failure
+class CompilerError(PatternError): ...         # invalid DAG or cycle
 ```
 
 ---
 
-## 6. Seguridad
+## 6. Security
 
-### 6.1 Superficie de Ataque — Nuevas Arquitecturas
+### 6.1 Attack Surface — New Architectures
 
-| Vector | Arquitectura | Mitigación |
+| Vector | Architecture | Mitigation |
 |---|---|---|
-| Prompt injection en doc hipotético (HyDE) | HyDE | `SecurePromptBuilder` para el prompt de generación hipotética |
-| Variantes maliciosas de query (RAG-Fusion) | RAG-Fusion | Variantes pasan por `GuardrailsEngine` antes de search |
-| Ejecución de tool calls no autorizados (LLM-Compiler) | LLM-Compiler | Validar tool names contra `tool_registry`; `ActionInterceptor.check()` antes de cada ejecución |
-| Loop infinito en Constitutional AI | Constitutional AI | `max_revisions` hardcap = 5; timeout por revisión |
-| MCTS explosion de estados (LATS) | LATS | `max_simulations` hardcap; budget en segundos |
-| Handoff a agente no registrado (Swarm) | Swarm | Whitelist de agentes válidos para handoff |
-| Grafo de conocimiento con datos PII (GraphRAG) | GraphRAG | Sanitizar entidades antes de almacenar; respetar `InputSanitizer` |
+| Prompt injection in the hypothetical doc (HyDE) | HyDE | `SecurePromptBuilder` for the hypothetical generation prompt |
+| Malicious query variants (RAG-Fusion) | RAG-Fusion | Variants pass through `GuardrailsEngine` before search |
+| Execution of unauthorized tool calls (LLM-Compiler) | LLM-Compiler | Validate tool names against `tool_registry`; `ActionInterceptor.check()` before each execution |
+| Infinite loop in Constitutional AI | Constitutional AI | `max_revisions` hardcap = 5; per-revision timeout |
+| MCTS state explosion (LATS) | LATS | `max_simulations` hardcap; budget in seconds |
+| Handoff to an unregistered agent (Swarm) | Swarm | Whitelist of valid agents for handoff |
+| Knowledge graph with PII data (GraphRAG) | GraphRAG | Sanitize entities before storing; respect `InputSanitizer` |
 
-### 6.2 Reglas Transversales
+### 6.2 Cross-Cutting Rules
 
-1. **Ningún módulo nuevo importa providers directamente** — siempre vía `ProviderRegistry`.
-2. **Todos los prompts de usuario pasan por `SecurePromptBuilder`** — nunca f-strings con user input.
-3. **`ActionInterceptor.check()` antes de tool execution** en `LLMCompiler` y `LATSAgent`.
-4. **`AuditLogger` registra** cada revisión de `ConstitutionalFilter` y cada handoff de `swarm_handoff`.
+1. **No new module imports providers directly** — always via `ProviderRegistry`.
+2. **All user prompts pass through `SecurePromptBuilder`** — never f-strings with user input.
+3. **`ActionInterceptor.check()` before tool execution** in `LLMCompiler` and `LATSAgent`.
+4. **`AuditLogger` records** each `ConstitutionalFilter` revision and each `swarm_handoff` handoff.
 
 ---
 
-## 7. Observabilidad
+## 7. Observability
 
-### 7.1 OTel Spans por Arquitectura
+### 7.1 OTel Spans per Architecture
 
-| Arquitectura | Span Names |
+| Architecture | Span Names |
 |---|---|
 | HyDE | `hyde.generate_hypothesis`, `hyde.embed`, `hyde.search` |
 | RAG-Fusion | `fusion.generate_queries`, `fusion.search_parallel`, `fusion.rrf_merge` |
@@ -449,10 +449,10 @@ class CompilerError(PatternError): ...         # DAG inválido o ciclo
 | LATS | `lats.select`, `lats.expand`, `lats.simulate`, `lats.backpropagate` |
 | LLM-Compiler | `compiler.plan`, `compiler.compile_dag`, `compiler.execute_wave`, `compiler.join` |
 
-### 7.2 Métricas Clave
+### 7.2 Key Metrics
 
 ```
-# Contadores
+# Counters
 rag_hyde_requests_total{status="success|error"}
 rag_fusion_requests_total{n_queries="4"}
 hybrid_search_requests_total{alpha="0.5"}
@@ -463,7 +463,7 @@ constitutional_revisions_total{principle="..."}
 lats_simulations_total
 compiler_tasks_executed_total{status="success|failed"}
 
-# Histogramas
+# Histograms
 rag_hyde_latency_seconds
 rag_fusion_latency_seconds
 tot_latency_seconds
@@ -475,39 +475,39 @@ compiler_latency_seconds
 
 ## 8. Testing Strategy
 
-| Nivel | Cobertura | Herramientas | Qué cubre |
+| Level | Coverage | Tools | What it covers |
 |---|---|---|---|
-| Unit | ≥ 80% por módulo | pytest, unittest.mock | Algoritmos (RRF, UCB1, topological sort), dataclasses, validaciones |
-| Integration | Flujos críticos | pytest + AsyncMock + ChromaDB in-memory | RAG end-to-end con vector store real, patterns con LLM mockeado |
-| Markers | `@pytest.mark.unit`, `@pytest.mark.integration` | pytest | Separación de tiers |
-| Live API | `@pytest.mark.live_api` | pytest (skip por defecto) | Validación real contra LLM providers |
+| Unit | ≥ 80% per module | pytest, unittest.mock | Algorithms (RRF, UCB1, topological sort), dataclasses, validations |
+| Integration | Critical flows | pytest + AsyncMock + in-memory ChromaDB | RAG end-to-end with a real vector store, patterns with a mocked LLM |
+| Markers | `@pytest.mark.unit`, `@pytest.mark.integration` | pytest | Tier separation |
+| Live API | `@pytest.mark.live_api` | pytest (skipped by default) | Real validation against LLM providers |
 
-### Estrategia de Mock para LLMs
+### Mocking Strategy for LLMs
 
-Los tests de patrones de agente mockean `ProviderRegistry.get_llm()` para retornar un `AsyncMock` que devuelve respuestas deterministas. Esto permite:
-- Tests rápidos sin latencia de red.
-- Tests reproducibles (no dependientes de outputs del LLM).
-- Cobertura de flujos de error (mock raises `Exception`).
+The agent pattern tests mock `ProviderRegistry.get_llm()` to return an `AsyncMock` that yields deterministic responses. This enables:
+- Fast tests with no network latency.
+- Reproducible tests (not dependent on LLM outputs).
+- Coverage of error flows (mock raises `Exception`).
 
 ---
 
-## 9. Plan de Rollout
+## 9. Rollout Plan
 
-### 9.1 Estrategia de Integración en `graph.py`
+### 9.1 Integration Strategy in `graph.py`
 
-Los nuevos nodos se añaden al grafo existente de forma **aditiva**: se añaden como destinos válidos del supervisor sin eliminar nodos existentes. El supervisor aprende a rutear a ellos basándose en el intent de la query.
+The new nodes are added to the existing graph **additively**: they are added as valid supervisor destinations without removing existing nodes. The supervisor learns to route to them based on the query intent.
 
 ```python
-# En agents/graph.py — añadir después de los nodos existentes:
+# In agents/graph.py — add after the existing nodes:
 builder.add_node("tot_agent", tot_agent_node)
 builder.add_node("debate_agent", debate_agent_node)
 builder.add_node("constitutional_filter", constitutional_filter_node)
 builder.add_node("llm_compiler", llm_compiler_node)
 # etc.
 
-# En agents/supervisor.py — añadir a VALID_NEXT_NODES:
+# In agents/supervisor.py — add to VALID_NEXT_NODES:
 VALID_NEXT_NODES = {
-    ...,  # existentes
+    ...,  # existing
     "tot_agent", "debate_agent", "constitutional_filter",
     "llm_compiler", "lats_agent", "mixture_agent",
 }
@@ -515,24 +515,24 @@ VALID_NEXT_NODES = {
 
 ### 9.2 Backward Compatibility
 
-- Todos los engines RAG nuevos tienen interfaz compatible con `RAGEngine` (`search(query, k) → List[RetrievedChunk]`).
-- `AdaptiveRAGEngine` puede recibir `None` para engines no configurados y usará CRAG como fallback.
-- Los subgraph pipelines nuevos siguen el patrón `SubgraphFactory` y se registran en `SubgraphRegistry`.
+- All new RAG engines have an interface compatible with `RAGEngine` (`search(query, k) → List[RetrievedChunk]`).
+- `AdaptiveRAGEngine` can receive `None` for unconfigured engines and will use CRAG as a fallback.
+- The new subgraph pipelines follow the `SubgraphFactory` pattern and are registered in `SubgraphRegistry`.
 
 ---
 
-## 10. Preguntas Abiertas
+## 10. Open Questions
 
-- [ ] **GraphRAG**: ¿Usar NetworkX con pickle para persistencia o SQLite para el grafo? — Owner: Tech Lead, Deadline: inicio Fase A semana 2.
-- [ ] **AdaptiveRAG classifier**: ¿LLM call para clasificar (más preciso pero más lento) o regex + heurísticas (rápido pero menos preciso)? — Owner: AI Architect, Deadline: inicio Fase A semana 1.
-- [ ] **Constitutional principles defaults**: ¿Cuáles son los principios por defecto en `core/config.py`? — Owner: Ernesto Crespo, Deadline: inicio Fase B.
-- [ ] **LATS reward function**: ¿El reward lo define el caller o hay una función por defecto? — Owner: AI Architect, Deadline: inicio Fase B semana 2.
-- [ ] **MoA providers**: ¿Cuántos y cuáles providers en la capa de generación? ¿Cómo manejar si un provider falla? — Owner: Tech Lead, Deadline: inicio Fase B semana 3.
+- [ ] **GraphRAG**: Use NetworkX with pickle for persistence or SQLite for the graph? — Owner: Tech Lead, Deadline: start of Phase A week 2.
+- [ ] **AdaptiveRAG classifier**: An LLM call to classify (more precise but slower) or regex + heuristics (fast but less precise)? — Owner: AI Architect, Deadline: start of Phase A week 1.
+- [ ] **Constitutional principles defaults**: What are the default principles in `core/config.py`? — Owner: Ernesto Crespo, Deadline: start of Phase B.
+- [ ] **LATS reward function**: Is the reward defined by the caller or is there a default function? — Owner: AI Architect, Deadline: start of Phase B week 2.
+- [ ] **MoA providers**: How many and which providers in the generation layer? How to handle a provider failure? — Owner: Tech Lead, Deadline: start of Phase B week 3.
 
 ---
 
-## Historial de Cambios
+## Change History
 
-| Versión | Fecha | Autor | Cambios |
+| Version | Date | Author | Changes |
 |---|---|---|---|
-| 1.0 | 2026-04-19 | Ernesto Crespo | Versión inicial — diseño de 19 arquitecturas en 3 fases |
+| 1.0 | 2026-04-19 | Ernesto Crespo | Initial version — design of 19 architectures across 3 phases |
