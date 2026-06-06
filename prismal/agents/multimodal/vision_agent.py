@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from prismal.core.exceptions import VisionAgentError
 from prismal.core.logging import get_logger
@@ -26,8 +26,8 @@ logger = get_logger("prismal.agents.multimodal.vision_agent")
 _DEFAULT_PROMPT = "Describe la imagen y lista los objetos visibles."
 _OCR_PROMPT = "Extract all readable text from this image. Return only the text."
 
-type VisionFn = Callable[[bytes | Path, str], Awaitable[str]]
-type OcrFn = Callable[[bytes | Path], Awaitable[str]]
+VisionFn: TypeAlias = Callable[[bytes | Path, str], Awaitable[str]]
+OcrFn: TypeAlias = Callable[[bytes | Path], Awaitable[str]]
 
 
 @dataclass(frozen=True)
