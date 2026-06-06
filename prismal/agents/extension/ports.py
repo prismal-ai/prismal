@@ -75,7 +75,8 @@ class EmbeddingsPort(Protocol):
     Conforming implementations: any ``langchain_core.embeddings.Embeddings``.
     """
 
-    async def aembed_documents(self, texts: list[str]) -> list[list[float]]: ...
+    async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
+        pass
 
     async def aembed_query(self, text: str) -> list[float]: ...
 
