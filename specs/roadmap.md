@@ -9,8 +9,8 @@
 
 Living index of every SDD under `specs/`: what has shipped, what is pending,
 and in which order the pending work fits together. Statuses are verified
-against the codebase, not just each spec's own `Status` field (some
-implemented specs still carry a stale `DRAFT` marker — flagged below).
+against the codebase, not just each spec's own `Status` field (spec `Status`
+markers were reconciled with the codebase on 2026-06-07).
 
 Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented) ·
 🌱 `SEED` (PRD only; ARCHITECTURE/SPEC/TASKS missing).
@@ -21,13 +21,13 @@ Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented) ·
 
 | Spec | Phase | Status | Delivered |
 |---|---|---|---|
-| [`advanced-architectures/`](./advanced-architectures/) | A/B/C | ✅ (spec says `DRAFT` — stale) | 7 RAG engines (HyDE, Fusion, Hybrid, Self-RAG, Hierarchical, Multi-Vector, Adaptive), 7 agent patterns (ToT, Debate, Constitutional, LATS, LLM-Compiler, MoA, Swarm), 5 subgraph pipelines (customer_service, document_generation, data_etl, code_review, debate_consensus) |
-| [`multimodal-agents/`](./multimodal-agents/) | F | ✅ (spec says `DRAFT` — stale) | Vision/Audio/Video agents, modality router, multimodal fusion, `multimodal_pipeline` subgraph, multimodal RAG, `MediaValidator`. Opt-in: `multimodal_enabled` |
-| [`extension-surface/`](./extension-surface/) | X | ✅ (spec says `DRAFT` — stale) | `prismal.langgraph` re-export, `@prismal_node`, `PrismalStateGraphBuilder`, plugin discovery (entry points), `LangChainRunnableAdapter`, formal `Protocol` ports. Docs: `docs/extension.md` |
-| [`tool-provider-injection/`](./tool-provider-injection/) | Y | ✅ (spec says `DRAFT` — stale) | `ToolProviderPort` hexagonal inversion: `McpToolProvider`/`SkillToolProvider`/`CompositeToolProvider`/`FakeToolProvider`; `agents/**` no longer imports `prismal.mcp`/`prismal.skills` (AST-guarded). Docs: `docs/tool-providers.md` |
+| [`advanced-architectures/`](./advanced-architectures/) | A–E | ✅ | 7 RAG engines (HyDE, Fusion, Hybrid, Self-RAG, Hierarchical, Multi-Vector, Adaptive), 7 agent patterns (ToT, Debate, Constitutional, LATS, LLM-Compiler, MoA, Swarm), 5 subgraph pipelines (customer_service, document_generation, data_etl, code_review, debate_consensus) |
+| [`multimodal-agents/`](./multimodal-agents/) | F | ✅ | Vision/Audio/Video agents, modality router, multimodal fusion, `multimodal_pipeline` subgraph, multimodal RAG, `MediaValidator`. Opt-in: `multimodal_enabled` |
+| [`extension-surface/`](./extension-surface/) | X | ✅ | `prismal.langgraph` re-export, `@prismal_node`, `PrismalStateGraphBuilder`, plugin discovery (entry points), `LangChainRunnableAdapter`, formal `Protocol` ports. Docs: `docs/extension.md` |
+| [`tool-provider-injection/`](./tool-provider-injection/) | Y | ✅ | `ToolProviderPort` hexagonal inversion: `McpToolProvider`/`SkillToolProvider`/`CompositeToolProvider`/`FakeToolProvider`; `agents/**` no longer imports `prismal.mcp`/`prismal.skills` (AST-guarded). Docs: `docs/tool-providers.md` |
 | [`kokoro-deliberation/`](./kokoro-deliberation/) | K | ✅ | Souls tier (`prismal/souls/`), `SoulAgent`, bounded `deliberate()`, `KokoroJudgeAgent` (gated single action), `kokoro` subgraph + supervisor route. Opt-in: `kokoro_enabled`. Docs: `docs/kokoro.md` · **v3.1.0** |
 | [`skynet-swarm/`](./skynet-swarm/) | S | ✅ | `SkynetSupervisor` (dynamic/fixed swarm sizing, cap + deferred overflow), `SwarmWorker` (ToolProviderPort + gated actions), `reduce_results`, `skynet` subgraph (Send fan-out + bounded re-plan loop) + supervisor route. Opt-in: `skynet_enabled`. Docs: `docs/skynet.md` · **v3.1.0** |
-| [`dependency-security-remediation/`](./dependency-security-remediation/) | — | ✅ | 18 Dependabot alerts triaged and remediated (2026-06); decision matrix + `remediation-tracker.csv`. Landed on `security/dependency-remediation` — 12 lock-resolved alerts auto-close when it reaches `main` |
+| [`dependency-security-remediation/`](./dependency-security-remediation/) | — | ✅ | 18 Dependabot alerts triaged and remediated (2026-06); decision matrix + `remediation-tracker.csv`. **Merged to `main` (PR #10)** — Dependabot now reports 0 open alerts |
 
 Deferred to follow-up phases (noted in their specs): Skynet S+ (heterogeneous
 specialist swarms, token-budget *enforcement* — the `skynet_token_budget`
@@ -71,8 +71,9 @@ setting and `SkynetBudgetExceeded` already ship —, remote workers via A2A).
 ## Maintenance notes
 
 - When a phase ships: set `Status` → `IMPLEMENTED` in its four docs, mark its
-  TASKS rows `DONE`, and update this file (the A/B/C, F, X, Y specs still
-  need their stale `DRAFT` markers fixed).
+  TASKS rows `DONE`, and update this file. (Stale `DRAFT` markers in the A–E,
+  F, X, Y specs were fixed on 2026-06-07 — all implemented specs are now
+  consistent.)
 - New specs follow the same SDD layout: `PLAN.md` + `SPEC.md` +
   `ARCHITECTURE.md` + `TASKS.md` (see `kokoro-deliberation/` or
   `skynet-swarm/` as reference implementations of the full cycle).

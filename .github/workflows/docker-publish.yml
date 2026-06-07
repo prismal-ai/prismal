@@ -1,0 +1,53 @@
+# GitHub Actions — Container image (GHCR) for prismal-ai
+# ============================================================
+# Build the Docker image and push it to the GitHub Container Registry
+# (ghcr.io/prismal-ai/prismal), so it shows under the repo's "Packages" tab.
+#
+# Triggered by pushing a release tag `prismal/vX.Y.Z` (tags it as the version
+# + `latest`), or manually (workflow_dispatch → `dev` tag for a dry run).
+#
+# Auth uses the built-in GITHUB_TOKEN — no extra secret needed. The first push
+# creates a PRIVATE package; to make it public, go to the package page →
+# Package settings → Change visibility. Uses plain `docker` (preinstalled on
+# the runner) to avoid pulling unpinned third-party actions.
+# ============================================================
+name: Docker (GHCR)
+
+on:
+  push:
+    tags: ["prismal/v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push image
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"          # ghcr.io/prismal-ai/prismal
+          if [[ "${GITHUB_REF:-}" == refs/tags/prismal/v* ]]; then
+            VERSION="${GITHUB_REF_NAME##*/v}"              # prismal/v3.1.0 -> 3.1.0
+            TAGS=("$IMAGE:$VERSION" "$IMAGE:latest")
+          else
+            TAGS=("$IMAGE:dev")
+          fi
+          BUILD_ARGS=()
+          for t in "${TAGS[@]}"; do BUILD_ARGS+=(-t "$t"); done
+          docker build "${BUILD_ARGS[@]}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            .
+          for t in "${TAGS[@]}"; do
+            echo "Pushing $t"
+            docker push "$t"
+          done
