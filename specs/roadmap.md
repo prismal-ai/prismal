@@ -5,6 +5,7 @@
 | **Last updated** | 2026-06-07 |
 | **Package version** | 3.1.0 |
 | **Author** | Ernesto Crespo |
+| **Latest spec** | `config-source-injection/` (Phase W) — 2026-06-07 |
 
 Living index of every SDD under `specs/`: what has shipped, what is pending,
 and in which order the pending work fits together. Statuses are verified
@@ -38,6 +39,7 @@ setting and `SkynetBudgetExceeded` already ship —, remote workers via A2A).
 |---|---|---|---|
 | [`vector-store-port/`](./vector-store-port/) | Z | `VectorStorePort` (Protocol) + `VectorStoreFactory` selectable via `settings.vector_store_backend`, with adapters for Chroma (default, zero breakage), LanceDB, sqlite-vec, Qdrant, pgvector. Covers RAG + memory; consumers only change their type hint | — (additive; mirrors Fase Y) |
 | [`composition-root/`](./composition-root/) | — | `build_runtime(settings, *, org_id=None) -> RuntimeContext`: single composition point injecting all ports (tool provider Y, vector store Z, embeddings, checkpointer, audit) with per-tenant resolution. The contract `prismal-server` / `prismal-dashboard` build on | Y ✅, **Z** (vector-store-port) |
+| [`config-source-injection/`](./config-source-injection/) | W | `ConfigSourcePort` hexagonal inversion of configuration: the core stops reading `.env`/`os.environ` and consumes an injected source (`EnvConfigSource` default, `Mapping`/`Chained`/`Fake`, Vault/AWS host sources). `Settings` keeps its schema; `env_file` and import-time `env_compat` mutation removed; the ~6 direct `os.getenv` reads relocated onto `Settings`. Lets `prismal-server`/`dashboard`/secrets managers own config; threads per-tenant sources through the composition root. Additive, opt-in, byte-for-byte backward compatible | — (additive; mirrors Fase Y) |
 | [`a2a-interop/`](./a2a-interop/) | I | Bidirectional A2A (Agent2Agent) interoperability: JSON-RPC over HTTP(S)+SSE, Agent Card at `/.well-known/agent-card.json`, discovery/delegation with external agents (Google ADK, MS Agent Framework, …) | Benefits from agent-identity (DID) |
 
 ## 🌱 Seed PRDs (PLAN only — ARCHITECTURE/SPEC/TASKS must be written first)
@@ -54,6 +56,10 @@ setting and `SkynetBudgetExceeded` already ship —, remote workers via A2A).
    low-risk (same playbook as the already-shipped Fase Y).
 2. **`composition-root`** — composes Y + Z into one runtime facade; unblocks
    the `prismal-server` / `prismal-dashboard` ecosystem.
+2b. **`config-source-injection` (W)** — inverts configuration itself so the
+   core stops reading `.env`; additive and low-risk (same Fase Y playbook).
+   Independent of Z, but strengthens `composition-root` (per-tenant config
+   sources). Can land in parallel with Z.
 3. **`cost-budget-governance`** — first seed to mature into a full SDD: the
    expensive patterns (and now Skynet swarms) run uncapped on spend today.
 4. **`agent-identity-governance`** → **`a2a-interop` (I)** — identity first,
