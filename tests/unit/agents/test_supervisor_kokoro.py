@@ -5,11 +5,7 @@ from __future__ import annotations
 import pytest
 
 from prismal.agents.intent_router import match_intent
-from prismal.agents.supervisor import (
-    KOKORO_MEMBERS,
-    build_system_prompt,
-    effective_valid_routes,
-)
+import prismal.agents.supervisor as sup
 
 
 class TestIntentRouter:
@@ -40,35 +36,35 @@ class TestIntentRouter:
 
 class TestEffectiveValidRoutes:
     def test_kokoro_route_absent_by_default(self) -> None:
-        routes = effective_valid_routes(enable_advanced=False)
+        routes = sup.effective_valid_routes(enable_advanced=False)
         assert "kokoro" not in routes
 
     def test_kokoro_route_present_when_enabled(self) -> None:
-        routes = effective_valid_routes(enable_advanced=False, enable_kokoro=True)
-        for member in KOKORO_MEMBERS:
+        routes = sup.effective_valid_routes(enable_advanced=False, enable_kokoro=True)
+        for member in sup.KOKORO_MEMBERS:
             assert member in routes
 
     def test_zero_regression_when_kokoro_off(self) -> None:
         # New default param must not change the legacy result.
         for advanced in (False, True):
             for multimodal in (False, True):
-                assert effective_valid_routes(
+                assert sup.effective_valid_routes(
                     advanced, multimodal, enable_kokoro=False
-                ) == effective_valid_routes(advanced, multimodal)
+                ) == sup.effective_valid_routes(advanced, multimodal)
 
 
 class TestBuildSystemPrompt:
     def test_kokoro_section_appended_when_enabled(self) -> None:
-        prompt = build_system_prompt(enable_advanced=False, enable_kokoro=True)
+        prompt = sup.build_system_prompt(enable_advanced=False, enable_kokoro=True)
         assert "kokoro" in prompt
         assert "spirit/values" in prompt
 
     def test_prompt_byte_identical_when_kokoro_off(self) -> None:
         for advanced in (False, True):
             for multimodal in (False, True):
-                assert build_system_prompt(
+                assert sup.build_system_prompt(
                     advanced, multimodal, enable_kokoro=False
-                ) == build_system_prompt(advanced, multimodal)
+                ) == sup.build_system_prompt(advanced, multimodal)
 
 
 class TestIntentShortCircuitGating:
@@ -81,8 +77,6 @@ class TestIntentShortCircuitGating:
     def test_routes_to_kokoro_when_enabled(
         self, _trimmed: list, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import prismal.agents.supervisor as sup
-
         class _S:
             enable_subgraphs = False
             multimodal_enabled = False
@@ -97,8 +91,6 @@ class TestIntentShortCircuitGating:
     def test_falls_through_when_kokoro_disabled(
         self, _trimmed: list, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import prismal.agents.supervisor as sup
-
         class _S:
             enable_subgraphs = False
             multimodal_enabled = False
