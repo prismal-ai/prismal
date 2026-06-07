@@ -207,6 +207,7 @@ def build_supervisor_graph(
     advanced_nodes: dict[str, Any] | None = None,
     multimodal_nodes: dict[str, Any] | None = None,
     kokoro_nodes: dict[str, Any] | None = None,
+    skynet_nodes: dict[str, Any] | None = None,
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Build and compile the LangGraph SUPERVISOR state machine.
@@ -339,6 +340,14 @@ def build_supervisor_graph(
     for _kok_name, _kok_node in _kokoro_nodes.items():
         builder.add_node(_kok_name, _kok_node)
 
+    # Fase S (S5-02): skynet swarm node. Opt-in via ``skynet_enabled``
+    # and only when the caller supplies the pre-built (compiled) node map.
+    _skynet_nodes: dict[str, Any] = (
+        dict(skynet_nodes) if (get_settings().skynet_enabled and skynet_nodes) else {}
+    )
+    for _sky_name, _sky_node in _skynet_nodes.items():
+        builder.add_node(_sky_name, _sky_node)
+
     # Entry point
     builder.set_entry_point("supervisor")
 
@@ -370,6 +379,8 @@ def build_supervisor_graph(
         conditional_edges[_mm_name] = _mm_name
     for _kok_name in _kokoro_nodes:
         conditional_edges[_kok_name] = _kok_name
+    for _sky_name in _skynet_nodes:
+        conditional_edges[_sky_name] = _sky_name
 
     builder.add_conditional_edges(
         "supervisor",
@@ -422,6 +433,8 @@ def build_supervisor_graph(
         builder.add_edge(_mm_name, "supervisor")
     for _kok_name in _kokoro_nodes:
         builder.add_edge(_kok_name, "supervisor")
+    for _sky_name in _skynet_nodes:
+        builder.add_edge(_sky_name, "supervisor")
 
     # ------------------------------------------------------------------ #
     # Compile with checkpointing                                           #
@@ -541,6 +554,29 @@ async def _build_kokoro_nodes() -> dict[str, Any]:
         "kokoro": await factory.build(build_kokoro_subgraph()),
     }
     logger.info("kokoro_nodes_built", count=len(nodes))
+    return nodes
+
+
+async def _build_skynet_nodes() -> dict[str, Any]:
+    """Build the skynet node map (Fase S / S5-02).
+
+    Returns a single ``{"skynet": <compiled subgraph>}`` entry: the Skynet
+    swarm pipeline (plan → Send fan-out → worker ⇉ reduce → evaluate → output)
+    compiled via :class:`~prismal.agents.subgraphs.factory.SubgraphFactory`.
+    The name matches :data:`~prismal.agents.supervisor.SKYNET_MEMBERS`.
+
+    Only invoked when ``settings.skynet_enabled`` is ``True``; the planner,
+    worker, and reducer backends resolve their providers lazily at call time,
+    so compilation here needs no network.
+    """
+    from prismal.agents.subgraphs.factory import SubgraphFactory
+    from prismal.agents.subgraphs.skynet.builder import build_skynet_subgraph
+
+    factory = SubgraphFactory()
+    nodes: dict[str, Any] = {
+        "skynet": await factory.build(build_skynet_subgraph()),
+    }
+    logger.info("skynet_nodes_built", count=len(nodes))
     return nodes
 
 
@@ -664,6 +700,12 @@ async def get_async_compiled_graph(
     if get_settings().kokoro_enabled:
         kokoro_nodes = await _build_kokoro_nodes()
 
+    # Fase S (S5-02): build the skynet swarm node when the layer is enabled.
+    # Independent of ``enable_subgraphs`` — gated by its own toggle.
+    skynet_nodes: dict[str, Any] | None = None
+    if get_settings().skynet_enabled:
+        skynet_nodes = await _build_skynet_nodes()
+
     _async_graph = build_supervisor_graph(
         checkpointer=checkpointer,
         dev_pipeline_graph=dev_pipeline_graph,
@@ -672,6 +714,7 @@ async def get_async_compiled_graph(
         advanced_nodes=advanced_nodes,
         multimodal_nodes=multimodal_nodes,
         kokoro_nodes=kokoro_nodes,
+        skynet_nodes=skynet_nodes,
     )
     logger.debug("async_graph_initialized")
     return _bind_tool_provider(_async_graph, tool_provider)

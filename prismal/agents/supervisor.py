@@ -116,17 +116,28 @@ KOKORO_MEMBERS: list[str] = [
 ]
 
 
+# Fase S (S5-03): Skynet swarm route — a single member running the
+# plan → Send fan-out → reduce → evaluate → output subgraph. Appended to the
+# valid routes and the system prompt ONLY when ``settings.skynet_enabled`` is
+# on, so the default behaviour is byte-for-byte unchanged.
+SKYNET_MEMBERS: list[str] = [
+    "skynet",
+]
+
+
 def effective_valid_routes(
     enable_advanced: bool,
     enable_multimodal: bool = False,
     enable_kokoro: bool = False,
+    enable_skynet: bool = False,
 ) -> frozenset[str]:
     """Return the set of routes the supervisor may select.
 
     Always includes the base :data:`MEMBERS` plus ``END``; includes
     :data:`ADVANCED_MEMBERS` when *enable_advanced* is ``True``,
-    :data:`MULTIMODAL_MEMBERS` when *enable_multimodal* is ``True``, and
-    :data:`KOKORO_MEMBERS` when *enable_kokoro* is ``True``.
+    :data:`MULTIMODAL_MEMBERS` when *enable_multimodal* is ``True``,
+    :data:`KOKORO_MEMBERS` when *enable_kokoro* is ``True``, and
+    :data:`SKYNET_MEMBERS` when *enable_skynet* is ``True``.
     """
     routes = _VALID_ROUTES
     if enable_advanced:
@@ -135,6 +146,8 @@ def effective_valid_routes(
         routes = routes | frozenset(MULTIMODAL_MEMBERS)
     if enable_kokoro:
         routes = routes | frozenset(KOKORO_MEMBERS)
+    if enable_skynet:
+        routes = routes | frozenset(SKYNET_MEMBERS)
     return routes
 
 
@@ -363,19 +376,31 @@ for a multi-perspective deliberation or a panel-style decision):
   "have the panel decide"."""
 
 
+# Appended only when ``settings.skynet_enabled`` is True.
+_SKYNET_PROMPT_SECTION: str = """
+
+Skynet swarm (opt-in — route here only when the request decomposes into many
+independent sub-tasks that should run in parallel):
+- skynet: Decomposes the order into sub-orders, dispatches a bounded swarm of
+  parallel workers, and reduces their outputs into one answer. Route here for
+  "research these N things in parallel", "fan this out", "run a swarm over
+  these items", "split this across agents"."""
+
+
 def build_system_prompt(
     enable_advanced: bool,
     enable_multimodal: bool = False,
     enable_kokoro: bool = False,
+    enable_skynet: bool = False,
 ) -> str:
     """Return the supervisor routing prompt.
 
     When *enable_advanced* is ``True`` the advanced-architecture agents
     (:data:`ADVANCED_MEMBERS`) are appended; when *enable_multimodal* is ``True``
     the multimodal pipeline section is appended; when *enable_kokoro* is ``True``
-    the Kokoro deliberation section is appended. With all flags ``False`` the
-    prompt is byte-identical to the legacy default so base-agent routing is
-    unchanged.
+    the Kokoro deliberation section is appended; when *enable_skynet* is ``True``
+    the Skynet swarm section is appended. With all flags ``False`` the prompt is
+    byte-identical to the legacy default so base-agent routing is unchanged.
     """
     prompt = _SYSTEM_PROMPT
     if enable_advanced:
@@ -384,6 +409,8 @@ def build_system_prompt(
         prompt += _MULTIMODAL_PROMPT_SECTION
     if enable_kokoro:
         prompt += _KOKORO_PROMPT_SECTION
+    if enable_skynet:
+        prompt += _SKYNET_PROMPT_SECTION
     return prompt
 
 
@@ -588,6 +615,7 @@ def _intent_short_circuit(
         _settings.enable_subgraphs,
         _settings.multimodal_enabled,
         _settings.kokoro_enabled,
+        _settings.skynet_enabled,
     )
     if matched_intent is None or matched_intent not in valid_routes:
         return None
@@ -616,6 +644,7 @@ def _match_route(raw: str, session_id: str) -> str:
         _settings.enable_subgraphs,
         _settings.multimodal_enabled,
         _settings.kokoro_enabled,
+        _settings.skynet_enabled,
     )
     for valid in valid_routes:
         if valid.upper() == normalised:
@@ -798,6 +827,7 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
                     get_settings().enable_subgraphs,
                     get_settings().multimodal_enabled,
                     get_settings().kokoro_enabled,
+                    get_settings().skynet_enabled,
                 )
                 + memory_context
             ),

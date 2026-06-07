@@ -10,6 +10,58 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Skynet swarm supervisor (Fase S, opt-in)
+
+A swarm map-reduce layer over agents (`specs/skynet-swarm/`, user guide in
+`docs/skynet.md`). Gated by `settings.skynet_enabled` (default `False`) — with
+the flag off the compiled supervisor graph is byte-for-byte unchanged
+(snapshot-tested).
+
+- **Value objects** (`agents/skynet/types.py`) — frozen `SwarmOrder`,
+  `SwarmPlan` (with `.size` and the `deferred` overflow set), `WorkerResult`,
+  `SwarmResult`.
+- **`SkynetSupervisor`** (`agents/skynet/supervisor.py`) — owns swarm sizing
+  and the control loop: `plan()` decomposes a goal into N sub-orders (dynamic
+  by default; fixed-K via `skynet_swarm_size`), hard-caps N at
+  `min(skynet_max_swarm, parallel_max_workers)` and **defers** the overflow
+  (never drops it); re-plans unmet orders deterministically (attempt+1, no
+  LLM call). `evaluate()` returns `(complete, answer)`. Goal and worker
+  outputs reach the model only through `SecurePromptBuilder`; audit is
+  hash-first (`skynet_plan` / `skynet_evaluate`).
+- **`SwarmWorker`** (`agents/skynet/worker.py`) — executes one order: tools
+  resolved per `order.role` through the injected `ToolProviderPort`
+  (`agent_name="skynet_worker"`); every requested tool action passes the
+  `ActionInterceptor` gateway (denial → noted, never fatal); any backend
+  failure is captured as `WorkerResult(success=False)` — one worker's failure
+  never aborts the swarm.
+- **`reduce_results()`** (`agents/skynet/reduce.py`) — `synthesis` (default) |
+  `concat` | `first_success`; failures are excluded from the reduction but
+  retained for re-planning; a failing synthesis degrades to the deterministic
+  concat.
+- **`skynet` subgraph** (`agents/subgraphs/skynet/`) — `plan → Send fan-out →
+  worker ⇉ reduce → evaluate → output` with a bounded re-plan loop
+  (`skynet_max_rounds`), exported as `build_skynet_subgraph()` + idempotent
+  `register_skynet()`. Fan-out reuses `make_parallel_dispatcher` over the new
+  top-level `AgentState.skynet_orders` field; concurrent worker results merge
+  through the Phase 34 `parallel_results` `operator.add` channel (tagged);
+  durable state under `state["metadata"]["skynet"]`; per-stage OTel spans
+  (`skynet.plan` / `skynet.worker` / `skynet.reduce` / `skynet.evaluate`).
+- **Supervisor integration (opt-in)** — `intent_router.match_intent()` returns
+  `skynet` for swarm/parallel intents (EN/ES); `get_async_compiled_graph()`
+  wires the route, and `effective_valid_routes` / `build_system_prompt` gate
+  on `skynet_enabled`; `DEFAULT_CAPABILITY_MAP["skynet"/"skynet_worker"]`
+  resolve tools through the injected `ToolProviderPort`.
+- **Settings** — `skynet_enabled`, `skynet_swarm_size` (0 = dynamic),
+  `skynet_max_swarm` (clamped to `parallel_max_workers`; fixed size > cap →
+  `SkynetConfigError`), `skynet_max_rounds`, `skynet_reduce_strategy`,
+  `skynet_worker_model`, `skynet_planner_model`, `skynet_token_budget`.
+- **Exceptions** — `SkynetError` hierarchy (`SkynetPlanError`,
+  `SwarmWorkerError`, `SkynetConfigError`, `SkynetBudgetExceeded`).
+- **Example** — `examples/skynet_swarm.py` runs the full swarm with injected
+  fakes (no LLM/network); architecture guard tests enforce no module-level
+  provider imports and no `prismal.mcp`/`prismal.skills` anywhere in the
+  Skynet modules.
+
 ### Added — Kokoro deliberation agents (Fase K, opt-in)
 
 A persona-driven deliberation-and-decision layer (`specs/kokoro-deliberation/`,

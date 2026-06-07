@@ -276,6 +276,53 @@ class Settings(BaseSettings):
         description="Max SOUL.md body length in characters (sanitizer cap).",
     )
 
+    # ── Skynet swarm supervisor (Fase S, opt-in — SPEC-SKY-CFG-001) ───
+    skynet_enabled: bool = Field(
+        default=False,
+        description="Master opt-in toggle for the Skynet swarm supervisor.",
+    )
+    skynet_swarm_size: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Swarm sizing mode: 0 = dynamic (the supervisor chooses N from "
+            "the goal); >0 = fixed N sub-orders (load-balanced)."
+        ),
+    )
+    skynet_max_swarm: int = Field(
+        default=8,
+        ge=1,
+        description=(
+            "Hard cap on workers per round. Clamped to parallel_max_workers "
+            "(the operator-visible ceiling always wins)."
+        ),
+    )
+    skynet_max_rounds: int = Field(
+        default=3,
+        ge=1,
+        description="Hard cap on plan→dispatch→evaluate iterations.",
+    )
+    skynet_reduce_strategy: Literal["synthesis", "concat", "first_success"] = Field(
+        default="synthesis",
+        description=(
+            "How worker outputs merge: synthesis (LLM combine), concat "
+            "(deterministic join), or first_success (earliest success)."
+        ),
+    )
+    skynet_worker_model: str = Field(
+        default="",
+        description="Optional worker model override (empty = default_model).",
+    )
+    skynet_planner_model: str = Field(
+        default="",
+        description="Optional planner/evaluator model override (empty = default_model).",
+    )
+    skynet_token_budget: int = Field(
+        default=0,
+        ge=0,
+        description="0 = unlimited; >0 = soft per-run token budget.",
+    )
+
     # ── Sandbox multi-lenguaje ────────────────────────────────────────
     sandbox_path: str = Field(
         default="sandbox",
@@ -1404,6 +1451,31 @@ class Settings(BaseSettings):
                         f"{value} is not a valid IANA timezone"
                         f" (field: PRISMAL_{field_name.upper()})"
                     ) from exc
+        return self
+
+    @model_validator(mode="after")
+    def _validate_skynet(self) -> "Settings":
+        """Validate and clamp the Skynet swarm settings (S1-04 / RF-SKY-03).
+
+        1. ``skynet_max_swarm`` is clamped to ``parallel_max_workers`` — the
+           operator-visible ceiling always wins.
+        2. A fixed ``skynet_swarm_size`` larger than the effective cap is a
+           configuration contradiction and raises ``SkynetConfigError``
+           (overflow *orders* are deferred at runtime, but a fixed size that
+           can never dispatch in one round is an operator error).
+        """
+        from prismal.core.exceptions import SkynetConfigError
+
+        if self.skynet_max_swarm > self.parallel_max_workers:
+            self.skynet_max_swarm = self.parallel_max_workers
+
+        # skynet_max_swarm is ≥ 1 (Field ge=1), so a dynamic size (0) never trips this.
+        if self.skynet_swarm_size > self.skynet_max_swarm:
+            raise SkynetConfigError(
+                f"PRISMAL_SKYNET_SWARM_SIZE={self.skynet_swarm_size} exceeds the "
+                f"effective swarm cap min(skynet_max_swarm, parallel_max_workers)"
+                f"={self.skynet_max_swarm}. Lower the fixed size or raise the cap."
+            )
         return self
 
 

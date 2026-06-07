@@ -69,6 +69,12 @@ class AgentState(TypedDict):
             modules in parallel.  An empty list means the developer produced
             a single-module artifact and the sequential ``unit_tester`` path
             is used instead.
+        skynet_orders: Serialized ``SwarmOrder`` dicts staged for the skynet
+            subgraph's ``Send`` fan-out (Fase S).  A top-level field because
+            ``make_parallel_dispatcher`` reads its ``tasks_field`` from the
+            state root (same pattern as ``dev_pipeline_modules``); the durable
+            Skynet state lives under ``metadata["skynet"]``.  Empty outside a
+            skynet run.
         risk_score: Aggregate risk score (0.0-100.0) set by the Security
             Gateway; values >= ``settings.risk_threshold`` block execution.
         permissions_granted: Permission tokens approved for the current turn.
@@ -99,6 +105,7 @@ class AgentState(TypedDict):
     tool_errors: list[dict[str, Any]]
     parallel_results: Annotated[list[dict[str, Any]], operator.add]
     dev_pipeline_modules: list[dict[str, Any]]
+    skynet_orders: list[dict[str, Any]]
     risk_score: float
     permissions_granted: list[str]
     security_flags: list[str]
@@ -147,6 +154,7 @@ def create_initial_state(session_id: str) -> AgentState:
         tool_errors=[],
         parallel_results=[],
         dev_pipeline_modules=[],
+        skynet_orders=[],
         risk_score=0.0,
         permissions_granted=[],
         security_flags=[],

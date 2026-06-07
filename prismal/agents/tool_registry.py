@@ -261,6 +261,12 @@ DEFAULT_CAPABILITY_MAP: dict[str, list[str]] = {
     # The judge's optional tool set resolves through the injected
     # ToolProviderPort (Fase Y) — Kokoro never imports prismal.mcp/skills.
     "kokoro": ["general", "research"],
+    # Skynet swarm from Fase S (opt-in; gated by settings.skynet_enabled).
+    # Each SwarmWorker resolves its tools through the injected ToolProviderPort
+    # (Fase Y) under agent_name="skynet_worker" — Skynet never imports
+    # prismal.mcp/skills.
+    "skynet": ["general", "research"],
+    "skynet_worker": ["general", "research"],
 }
 
 

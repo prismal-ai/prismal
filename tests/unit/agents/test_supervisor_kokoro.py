@@ -87,6 +87,7 @@ class TestIntentShortCircuitGating:
             enable_subgraphs = False
             multimodal_enabled = False
             kokoro_enabled = True
+            skynet_enabled = False
 
         monkeypatch.setattr(sup, "get_settings", lambda: _S())
         result = sup._intent_short_circuit(_trimmed, "sess")
@@ -102,6 +103,7 @@ class TestIntentShortCircuitGating:
             enable_subgraphs = False
             multimodal_enabled = False
             kokoro_enabled = False
+            skynet_enabled = False
 
         monkeypatch.setattr(sup, "get_settings", lambda: _S())
         # Route not in valid set → None → supervisor falls through to the LLM.

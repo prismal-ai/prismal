@@ -627,6 +627,34 @@ class JudgeError(KokoroError):
     """Raised when the Kokoro judge fails to render or execute a verdict."""
 
 
+class SkynetError(PrismalError):
+    """Base for errors raised by the Skynet swarm supervisor (Fase S)."""
+
+
+class SkynetPlanError(SkynetError):
+    """Raised when the supervisor fails to decompose a goal into a SwarmPlan."""
+
+
+class SwarmWorkerError(SkynetError):
+    """A worker failed executing its order.
+
+    Captured per-worker as ``WorkerResult(success=False)`` — never raised out
+    of the worker node, so one worker's failure does not abort the swarm.
+    """
+
+
+class SkynetConfigError(SkynetError):
+    """Raised when the Skynet configuration is invalid.
+
+    For example a fixed ``skynet_swarm_size`` larger than the effective swarm
+    cap, or an invalid token budget.
+    """
+
+
+class SkynetBudgetExceeded(SkynetError):  # noqa: N818 — SPEC-SKY-ERR-001 name
+    """Raised when a Skynet run exceeds its ``skynet_token_budget``."""
+
+
 class MissingDependencyError(PrismalError):
     """Raised when a backend whose optional extra is not installed is requested.
 
@@ -703,9 +731,14 @@ __all__ = [
     "SkillError",
     "SkillLoadError",
     "SkillValidationError",
+    "SkynetBudgetExceeded",
+    "SkynetConfigError",
+    "SkynetError",
+    "SkynetPlanError",
     "SoulNotFoundError",
     "SoulValidationError",
     "SwarmError",
+    "SwarmWorkerError",
     "TTSError",
     "ToTError",
     "ToolProviderNotConfigured",
