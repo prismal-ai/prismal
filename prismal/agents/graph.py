@@ -198,6 +198,58 @@ async def build_checkpointer(db_url: str | None = None) -> Any:
     return saver
 
 
+def _collect_optional_nodes(
+    dev_pipeline_graph: Any = None,
+    ml_pipeline_graph: Any = None,
+    financial_analyst_graph: Any = None,
+    advanced_nodes: dict[str, Any] | None = None,
+    multimodal_nodes: dict[str, Any] | None = None,
+    kokoro_nodes: dict[str, Any] | None = None,
+    skynet_nodes: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Collect the opt-in supervisor routes into a single ``name -> node`` map.
+
+    Applies the per-layer gating in one place: the pipeline subgraphs and the
+    advanced-architecture map require ``settings.enable_subgraphs``, while the
+    multimodal (Fase F), kokoro (Fase K) and skynet (Fase S) maps are gated by
+    their own toggles. Entries whose graph/map was not supplied by the caller
+    are skipped, so the result contains exactly the nodes to register.
+
+    Args:
+        dev_pipeline_graph: Pre-compiled dev_pipeline subgraph (Phase 24).
+        ml_pipeline_graph: Pre-compiled ml_pipeline subgraph (Phase 26).
+        financial_analyst_graph: Pre-compiled financial_analyst subgraph (Phase 27).
+        advanced_nodes: Advanced-architecture node map (Phase D / D1-01).
+        multimodal_nodes: Multimodal pipeline node map (Fase F / P3).
+        kokoro_nodes: Kokoro deliberation node map (Fase K / K7-02).
+        skynet_nodes: Skynet swarm node map (Fase S / S5-02).
+
+    Returns:
+        Mapping of supervisor route name -> node (callable or compiled
+        subgraph) for every enabled optional layer.
+    """
+    settings = get_settings()
+    optional: dict[str, Any] = {}
+
+    if settings.enable_subgraphs:
+        pipeline_graphs = (
+            ("dev_pipeline", dev_pipeline_graph),
+            ("ml_pipeline", ml_pipeline_graph),
+            ("financial_analyst", financial_analyst_graph),
+        )
+        optional.update({name: graph for name, graph in pipeline_graphs if graph is not None})
+        optional.update(advanced_nodes or {})
+
+    if settings.multimodal_enabled:
+        optional.update(multimodal_nodes or {})
+    if settings.kokoro_enabled:
+        optional.update(kokoro_nodes or {})
+    if settings.skynet_enabled:
+        optional.update(skynet_nodes or {})
+
+    return optional
+
+
 def build_supervisor_graph(
     checkpoint_path: Path | None = None,
     checkpointer: Any = None,
@@ -206,6 +258,8 @@ def build_supervisor_graph(
     financial_analyst_graph: Any = None,
     advanced_nodes: dict[str, Any] | None = None,
     multimodal_nodes: dict[str, Any] | None = None,
+    kokoro_nodes: dict[str, Any] | None = None,
+    skynet_nodes: dict[str, Any] | None = None,
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Build and compile the LangGraph SUPERVISOR state machine.
@@ -292,43 +346,24 @@ def build_supervisor_graph(
     builder.add_node("parallel_researcher_worker", parallel_researcher_worker)
     builder.add_node("research_aggregator", research_aggregator_node)
 
-    # Phase 24: dev_pipeline subgraph node (opt-in via enable_subgraphs setting).
-    # The compiled subgraph must be built externally (async) and passed in.
-    _include_dev_pipeline = get_settings().enable_subgraphs and dev_pipeline_graph is not None
-    if _include_dev_pipeline:
-        builder.add_node("dev_pipeline", dev_pipeline_graph)
-
-    # Phase 26: ml_pipeline subgraph node (opt-in via enable_subgraphs setting).
-    _include_ml_pipeline = get_settings().enable_subgraphs and ml_pipeline_graph is not None
-    if _include_ml_pipeline:
-        builder.add_node("ml_pipeline", ml_pipeline_graph)
-
-    # Phase 27: financial_analyst subgraph node (opt-in via enable_subgraphs setting).
-    _include_financial_analyst = (
-        get_settings().enable_subgraphs and financial_analyst_graph is not None
+    # Opt-in routes — pipeline subgraphs (Phases 24/26/27, gated by
+    # ``enable_subgraphs``), advanced architectures (Phase D, same gate) and
+    # the multimodal / kokoro / skynet layers (Fases F/K/S, own toggles).
+    # Each entry is either a plain async node callable (patterns) or a
+    # compiled subgraph (pipelines); LangGraph treats both identically as
+    # nodes. The caller builds the graphs/maps asynchronously (see
+    # ``get_async_compiled_graph``) before calling this function.
+    optional_nodes = _collect_optional_nodes(
+        dev_pipeline_graph=dev_pipeline_graph,
+        ml_pipeline_graph=ml_pipeline_graph,
+        financial_analyst_graph=financial_analyst_graph,
+        advanced_nodes=advanced_nodes,
+        multimodal_nodes=multimodal_nodes,
+        kokoro_nodes=kokoro_nodes,
+        skynet_nodes=skynet_nodes,
     )
-    if _include_financial_analyst:
-        builder.add_node("financial_analyst", financial_analyst_graph)
-
-    # Phase D (D1-01): advanced-architecture nodes — 6 reasoning patterns +
-    # 5 domain subgraphs. Opt-in via ``enable_subgraphs`` and only when the
-    # caller supplies the pre-built node map (built async in
-    # ``get_async_compiled_graph``). Each entry is either a plain async node
-    # callable (patterns) or a compiled subgraph (pipelines); LangGraph treats
-    # both identically as nodes.
-    _advanced_nodes: dict[str, Any] = (
-        dict(advanced_nodes) if (get_settings().enable_subgraphs and advanced_nodes) else {}
-    )
-    for _adv_name, _adv_node in _advanced_nodes.items():
-        builder.add_node(_adv_name, _adv_node)
-
-    # Fase F (P3): multimodal pipeline node. Opt-in via ``multimodal_enabled``
-    # and only when the caller supplies the pre-built (compiled) node map.
-    _multimodal_nodes: dict[str, Any] = (
-        dict(multimodal_nodes) if (get_settings().multimodal_enabled and multimodal_nodes) else {}
-    )
-    for _mm_name, _mm_node in _multimodal_nodes.items():
-        builder.add_node(_mm_name, _mm_node)
+    for _opt_name, _opt_node in optional_nodes.items():
+        builder.add_node(_opt_name, _opt_node)
 
     # Entry point
     builder.set_entry_point("supervisor")
@@ -349,16 +384,8 @@ def build_supervisor_graph(
         "parallel_researcher": "parallel_researcher",
         "__end__": END,
     }
-    if _include_dev_pipeline:
-        conditional_edges["dev_pipeline"] = "dev_pipeline"
-    if _include_ml_pipeline:
-        conditional_edges["ml_pipeline"] = "ml_pipeline"
-    if _include_financial_analyst:
-        conditional_edges["financial_analyst"] = "financial_analyst"
-    for _adv_name in _advanced_nodes:
-        conditional_edges[_adv_name] = _adv_name
-    for _mm_name in _multimodal_nodes:
-        conditional_edges[_mm_name] = _mm_name
+    for _opt_name in optional_nodes:
+        conditional_edges[_opt_name] = _opt_name
 
     builder.add_conditional_edges(
         "supervisor",
@@ -399,16 +426,8 @@ def build_supervisor_graph(
     builder.add_edge("parallel_researcher_worker", "research_aggregator")
     builder.add_edge("research_aggregator", "supervisor")
 
-    if _include_dev_pipeline:
-        builder.add_edge("dev_pipeline", "supervisor")
-    if _include_ml_pipeline:
-        builder.add_edge("ml_pipeline", "supervisor")
-    if _include_financial_analyst:
-        builder.add_edge("financial_analyst", "supervisor")
-    for _adv_name in _advanced_nodes:
-        builder.add_edge(_adv_name, "supervisor")
-    for _mm_name in _multimodal_nodes:
-        builder.add_edge(_mm_name, "supervisor")
+    for _opt_name in optional_nodes:
+        builder.add_edge(_opt_name, "supervisor")
 
     # ------------------------------------------------------------------ #
     # Compile with checkpointing                                           #
@@ -505,6 +524,52 @@ async def _build_multimodal_nodes() -> dict[str, Any]:
         "multimodal_pipeline": await factory.build(build_multimodal_subgraph()),
     }
     logger.info("multimodal_nodes_built", count=len(nodes))
+    return nodes
+
+
+async def _build_kokoro_nodes() -> dict[str, Any]:
+    """Build the kokoro node map (Fase K / K7-02).
+
+    Returns a single ``{"kokoro": <compiled subgraph>}`` entry: the Kokoro
+    deliberation pipeline (load_souls → deliberate → judge → act → output)
+    compiled via :class:`~prismal.agents.subgraphs.factory.SubgraphFactory`.
+    The name matches :data:`~prismal.agents.supervisor.KOKORO_MEMBERS`.
+
+    Only invoked when ``settings.kokoro_enabled`` is ``True``; the soul and
+    judge backends resolve their providers lazily at call time, so compilation
+    here needs no network.
+    """
+    from prismal.agents.subgraphs.factory import SubgraphFactory
+    from prismal.agents.subgraphs.kokoro.builder import build_kokoro_subgraph
+
+    factory = SubgraphFactory()
+    nodes: dict[str, Any] = {
+        "kokoro": await factory.build(build_kokoro_subgraph()),
+    }
+    logger.info("kokoro_nodes_built", count=len(nodes))
+    return nodes
+
+
+async def _build_skynet_nodes() -> dict[str, Any]:
+    """Build the skynet node map (Fase S / S5-02).
+
+    Returns a single ``{"skynet": <compiled subgraph>}`` entry: the Skynet
+    swarm pipeline (plan → Send fan-out → worker ⇉ reduce → evaluate → output)
+    compiled via :class:`~prismal.agents.subgraphs.factory.SubgraphFactory`.
+    The name matches :data:`~prismal.agents.supervisor.SKYNET_MEMBERS`.
+
+    Only invoked when ``settings.skynet_enabled`` is ``True``; the planner,
+    worker, and reducer backends resolve their providers lazily at call time,
+    so compilation here needs no network.
+    """
+    from prismal.agents.subgraphs.factory import SubgraphFactory
+    from prismal.agents.subgraphs.skynet.builder import build_skynet_subgraph
+
+    factory = SubgraphFactory()
+    nodes: dict[str, Any] = {
+        "skynet": await factory.build(build_skynet_subgraph()),
+    }
+    logger.info("skynet_nodes_built", count=len(nodes))
     return nodes
 
 
@@ -622,6 +687,18 @@ async def get_async_compiled_graph(
     if get_settings().multimodal_enabled:
         multimodal_nodes = await _build_multimodal_nodes()
 
+    # Fase K (K7-02): build the kokoro deliberation node when the layer is
+    # enabled. Independent of ``enable_subgraphs`` — gated by its own toggle.
+    kokoro_nodes: dict[str, Any] | None = None
+    if get_settings().kokoro_enabled:
+        kokoro_nodes = await _build_kokoro_nodes()
+
+    # Fase S (S5-02): build the skynet swarm node when the layer is enabled.
+    # Independent of ``enable_subgraphs`` — gated by its own toggle.
+    skynet_nodes: dict[str, Any] | None = None
+    if get_settings().skynet_enabled:
+        skynet_nodes = await _build_skynet_nodes()
+
     _async_graph = build_supervisor_graph(
         checkpointer=checkpointer,
         dev_pipeline_graph=dev_pipeline_graph,
@@ -629,6 +706,8 @@ async def get_async_compiled_graph(
         financial_analyst_graph=financial_analyst_graph,
         advanced_nodes=advanced_nodes,
         multimodal_nodes=multimodal_nodes,
+        kokoro_nodes=kokoro_nodes,
+        skynet_nodes=skynet_nodes,
     )
     logger.debug("async_graph_initialized")
     return _bind_tool_provider(_async_graph, tool_provider)

@@ -20,6 +20,8 @@ This package is the **agent framework layer** extracted from the larger monorepo
 - **7 agent reasoning patterns** — Tree of Thoughts, Debate, Constitutional AI, LATS (MCTS), LLM-Compiler (parallel DAG), Mixture of Agents, Swarm/Handoff
 - **5 domain subgraph pipelines** — Customer Service, Document Generation, Data ETL, Code Review, Debate/Consensus — on top of the existing dev/ml/financial pipelines
 - **Multimodal layer (implemented, opt-in)** — Vision / Audio / Video agents, modality router, multimodal fusion, multimodal subgraph, multimodal RAG engine with cross-modal embeddings, and `MediaValidator` security gate — gated by `settings.multimodal_enabled` (default `False`); see [`specs/multimodal-agents/`](./specs/multimodal-agents/)
+- **Kokoro deliberation (implemented, opt-in)** — three Markdown-authored persona souls (spirit 魂 / mind 知 / heart 情) deliberate toward agreement and a `KokoroJudgeAgent` renders the final, accountable verdict (optionally executing one `ActionInterceptor`-gated action) — gated by `settings.kokoro_enabled` (default `False`); see [`docs/kokoro.md`](./docs/kokoro.md) and [`specs/kokoro-deliberation/`](./specs/kokoro-deliberation/)
+- **Skynet swarm supervisor (implemented, opt-in)** — a meta-supervisor that decomposes one order into N sub-orders, dispatches a dynamically-sized worker swarm via LangGraph `Send` fan-out (supervisor-sized, hard-capped, overflow deferred), reduces the results, and re-plans unmet work in a bounded loop — gated by `settings.skynet_enabled` (default `False`); see [`docs/skynet.md`](./docs/skynet.md) and [`specs/skynet-swarm/`](./specs/skynet-swarm/)
 - **Extension surface (implemented, opt-in)** — `prismal.langgraph` re-export, `@prismal_node` decorator (security/OTel/audit/retry middleware), `PrismalStateGraphBuilder` fluent API, plugin discovery via `importlib.metadata` entry points, `LangChainRunnableAdapter`, and formal `Protocol`s for ports (checkpoint/audit/embeddings/tools) — see [`docs/extension.md`](./docs/extension.md) and [`specs/extension-surface/`](./specs/extension-surface/)
 - **MCP client with capability routing** — [Model Context Protocol](https://modelcontextprotocol.io) with auto-discovery and per-agent capability-based tool filtering (`config/mcp_servers.yaml`)
 - **Process isolation** — `SandboxExecutor` with docker/podman/nsjail/bwrap/firejail backends
@@ -461,7 +463,7 @@ This package follows [Semantic Versioning](https://semver.org/).
 Tag format for releases: `prismal/vMAJOR.MINOR.PATCH`
 
 ```bash
-git tag prismal/v3.0.2
+git tag prismal/v3.1.0
 git push --tags
 ```
 
@@ -489,7 +491,7 @@ twine upload --repository testpypi dist/*          # validate on TestPyPI first
 # 3) Push history and publish prismal-ai
 git push origin main
 twine upload dist/*                                 # publish to PyPI
-git tag prismal/v3.0.2 && git push --tags         # tag format: prismal/vMAJOR.MINOR.PATCH
+git tag prismal/v3.1.0 && git push --tags         # tag format: prismal/vMAJOR.MINOR.PATCH
 
 # 4) Publish the deprecated compatibility bridge (lightagent-agents -> prismal-ai)
 cd compat/lightagent-agents
