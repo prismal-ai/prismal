@@ -10,6 +10,58 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Kokoro deliberation agents (Fase K, opt-in)
+
+A persona-driven deliberation-and-decision layer (`specs/kokoro-deliberation/`,
+user guide in `docs/kokoro.md`). Gated by `settings.kokoro_enabled` (default
+`False`) — with the flag off the compiled supervisor graph is byte-for-byte
+unchanged (snapshot-tested).
+
+- **Souls tier** (`prismal/souls/`) — Markdown-authored personas mirroring the
+  `skills/` layout (`available/` committed, `active/` allow-list, `custom/`
+  gitignored). `SoulMetadata` + `Soul` value objects, `parse_soul_md()` /
+  `load_soul()` (schema validation, `soul_max_body_chars` cap, path
+  confinement), and `SoulsManager` (`list_souls` / `load` / `load_triad` —
+  exactly three souls or `KokoroConfigError`). Three defaults shipped:
+  `spirit` (魂 *tamashii* — values), `mind` (知 *chi* — logic), `heart`
+  (情 *jō* — empathy).
+- **`SoulAgent`** (`agents/kokoro/soul_agent.py`) — persona-conditioned
+  position generator. The soul body (and every user-controlled field) reaches
+  the model only through `SecurePromptBuilder`; backend callable-injected
+  (`generate_fn`), default lazily wires `ProviderRegistry().get_llm()` with
+  per-soul `metadata.model` override.
+- **`deliberate()`** (`agents/kokoro/deliberation.py`) — bounded
+  agreement-seeking rounds reusing the `debate` primitives (`DebatePosition`,
+  `pairwise_jaccard`): round 1 concurrent independent positions, later rounds
+  cross-revision (each soul sees only the others); early-stop at
+  `kokoro_agreement_threshold`, hard cap `kokoro_max_rounds`; revision
+  failures degrade to the soul's previous position.
+- **`KokoroJudgeAgent`** (`agents/kokoro/judge.py`) — renders a `Verdict`
+  (decision, rationale, one `lens_summaries` entry per soul, retained
+  dissent); `act()` executes at most one `KokoroAction` gated by
+  `kokoro_execute_actions` **and** the `ActionInterceptor` gateway (denial →
+  `blocked_reason`, no exception); `AuditLogger` records verdict + action
+  hash-first (`kokoro_verdict` / `kokoro_action` events).
+- **`kokoro` subgraph** (`agents/subgraphs/kokoro/`) —
+  `load_souls → deliberate → judge → act → output`, exported as
+  `build_kokoro_subgraph()` + idempotent `register_kokoro()`; all runtime
+  state under `state["metadata"]["kokoro"]`; per-stage OTel spans
+  (`kokoro.load_souls` / `kokoro.deliberate` / `kokoro.judge` / `kokoro.act`).
+- **Supervisor integration (opt-in)** — `intent_router.match_intent()` returns
+  `kokoro` for deliberation intents (EN/ES); `get_async_compiled_graph()`
+  wires the route, and `effective_valid_routes` / `build_system_prompt` gate
+  on `kokoro_enabled`; `DEFAULT_CAPABILITY_MAP["kokoro"]` resolves judge tools
+  through the injected `ToolProviderPort`.
+- **Settings** — `kokoro_enabled`, `souls_dir`, `kokoro_souls` (exactly 3),
+  `kokoro_max_rounds`, `kokoro_agreement_threshold` (∈ [0,1]),
+  `kokoro_execute_actions`, `kokoro_judge_model`, `soul_max_body_chars`.
+- **Exceptions** — `KokoroError` hierarchy (`SoulValidationError`,
+  `SoulNotFoundError`, `KokoroConfigError`, `DeliberationError`, `JudgeError`).
+- **Example** — `examples/kokoro_deliberation.py` runs the full pipeline with
+  injected fakes (no LLM/network); architecture guard tests enforce no
+  module-level provider imports and no `prismal.mcp`/`prismal.skills` anywhere
+  in the Kokoro modules.
+
 ### Security — Dependabot remediation (18 alerts, 2026-06)
 
 Full triage and remediation of the 2026-06-05 Dependabot report

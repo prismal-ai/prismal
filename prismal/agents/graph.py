@@ -206,6 +206,7 @@ def build_supervisor_graph(
     financial_analyst_graph: Any = None,
     advanced_nodes: dict[str, Any] | None = None,
     multimodal_nodes: dict[str, Any] | None = None,
+    kokoro_nodes: dict[str, Any] | None = None,
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Build and compile the LangGraph SUPERVISOR state machine.
@@ -330,6 +331,14 @@ def build_supervisor_graph(
     for _mm_name, _mm_node in _multimodal_nodes.items():
         builder.add_node(_mm_name, _mm_node)
 
+    # Fase K (K7-02): kokoro deliberation node. Opt-in via ``kokoro_enabled``
+    # and only when the caller supplies the pre-built (compiled) node map.
+    _kokoro_nodes: dict[str, Any] = (
+        dict(kokoro_nodes) if (get_settings().kokoro_enabled and kokoro_nodes) else {}
+    )
+    for _kok_name, _kok_node in _kokoro_nodes.items():
+        builder.add_node(_kok_name, _kok_node)
+
     # Entry point
     builder.set_entry_point("supervisor")
 
@@ -359,6 +368,8 @@ def build_supervisor_graph(
         conditional_edges[_adv_name] = _adv_name
     for _mm_name in _multimodal_nodes:
         conditional_edges[_mm_name] = _mm_name
+    for _kok_name in _kokoro_nodes:
+        conditional_edges[_kok_name] = _kok_name
 
     builder.add_conditional_edges(
         "supervisor",
@@ -409,6 +420,8 @@ def build_supervisor_graph(
         builder.add_edge(_adv_name, "supervisor")
     for _mm_name in _multimodal_nodes:
         builder.add_edge(_mm_name, "supervisor")
+    for _kok_name in _kokoro_nodes:
+        builder.add_edge(_kok_name, "supervisor")
 
     # ------------------------------------------------------------------ #
     # Compile with checkpointing                                           #
@@ -505,6 +518,29 @@ async def _build_multimodal_nodes() -> dict[str, Any]:
         "multimodal_pipeline": await factory.build(build_multimodal_subgraph()),
     }
     logger.info("multimodal_nodes_built", count=len(nodes))
+    return nodes
+
+
+async def _build_kokoro_nodes() -> dict[str, Any]:
+    """Build the kokoro node map (Fase K / K7-02).
+
+    Returns a single ``{"kokoro": <compiled subgraph>}`` entry: the Kokoro
+    deliberation pipeline (load_souls → deliberate → judge → act → output)
+    compiled via :class:`~prismal.agents.subgraphs.factory.SubgraphFactory`.
+    The name matches :data:`~prismal.agents.supervisor.KOKORO_MEMBERS`.
+
+    Only invoked when ``settings.kokoro_enabled`` is ``True``; the soul and
+    judge backends resolve their providers lazily at call time, so compilation
+    here needs no network.
+    """
+    from prismal.agents.subgraphs.factory import SubgraphFactory
+    from prismal.agents.subgraphs.kokoro.builder import build_kokoro_subgraph
+
+    factory = SubgraphFactory()
+    nodes: dict[str, Any] = {
+        "kokoro": await factory.build(build_kokoro_subgraph()),
+    }
+    logger.info("kokoro_nodes_built", count=len(nodes))
     return nodes
 
 
@@ -622,6 +658,12 @@ async def get_async_compiled_graph(
     if get_settings().multimodal_enabled:
         multimodal_nodes = await _build_multimodal_nodes()
 
+    # Fase K (K7-02): build the kokoro deliberation node when the layer is
+    # enabled. Independent of ``enable_subgraphs`` — gated by its own toggle.
+    kokoro_nodes: dict[str, Any] | None = None
+    if get_settings().kokoro_enabled:
+        kokoro_nodes = await _build_kokoro_nodes()
+
     _async_graph = build_supervisor_graph(
         checkpointer=checkpointer,
         dev_pipeline_graph=dev_pipeline_graph,
@@ -629,6 +671,7 @@ async def get_async_compiled_graph(
         financial_analyst_graph=financial_analyst_graph,
         advanced_nodes=advanced_nodes,
         multimodal_nodes=multimodal_nodes,
+        kokoro_nodes=kokoro_nodes,
     )
     logger.debug("async_graph_initialized")
     return _bind_tool_provider(_async_graph, tool_provider)

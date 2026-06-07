@@ -583,6 +583,50 @@ class MediaValidationError(PrismalError):
     """
 
 
+class KokoroError(PrismalError):
+    """Base for errors raised by the Kokoro deliberation layer (Fase K)."""
+
+
+class SoulValidationError(KokoroError):
+    """Raised when a soul fails validation at load time.
+
+    Args:
+        soul_id: Identifier (or directory name) of the offending soul.
+        reason: Human-readable reason for the failure.
+    """
+
+    def __init__(self, soul_id: str, reason: str) -> None:
+        """Initialize SoulValidationError."""
+        self.soul_id = soul_id
+        self.reason = reason
+        super().__init__(f"Soul '{soul_id}' failed validation: {reason}")
+
+
+class SoulNotFoundError(KokoroError):
+    """Raised when a soul id cannot be resolved in any souls tier.
+
+    Args:
+        soul_id: The soul identifier that was not found.
+    """
+
+    def __init__(self, soul_id: str) -> None:
+        """Initialize SoulNotFoundError."""
+        self.soul_id = soul_id
+        super().__init__(f"Soul '{soul_id}' not found")
+
+
+class KokoroConfigError(KokoroError):
+    """Raised when the Kokoro configuration is invalid (e.g. triad arity != 3)."""
+
+
+class DeliberationError(KokoroError):
+    """Raised when the multi-soul deliberation fails."""
+
+
+class JudgeError(KokoroError):
+    """Raised when the Kokoro judge fails to render or execute a verdict."""
+
+
 class MissingDependencyError(PrismalError):
     """Raised when a backend whose optional extra is not installed is requested.
 
@@ -613,6 +657,7 @@ __all__ = [
     "DataETLError",
     "DebateConsensusError",
     "DebateError",
+    "DeliberationError",
     "DocumentGenerationError",
     "DocumentLoadError",
     "ExtensionError",
@@ -621,6 +666,9 @@ __all__ = [
     "HyDEError",
     "HybridSearchError",
     "InjectionDetectedError",
+    "JudgeError",
+    "KokoroConfigError",
+    "KokoroError",
     "LATSError",
     "LangChainAdapterError",
     "MCPConnectionError",
@@ -655,6 +703,8 @@ __all__ = [
     "SkillError",
     "SkillLoadError",
     "SkillValidationError",
+    "SoulNotFoundError",
+    "SoulValidationError",
     "SwarmError",
     "TTSError",
     "ToTError",

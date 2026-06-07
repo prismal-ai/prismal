@@ -227,6 +227,55 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Souls / Kokoro (Fase K, opt-in — SPEC-KOK-CFG-001) ───────────
+    kokoro_enabled: bool = Field(
+        default=False,
+        description="Master opt-in toggle for the Kokoro deliberation layer.",
+    )
+    souls_dir: str = Field(
+        default="",
+        description=(
+            "Root of the souls tiers (available/active/custom). "
+            "Empty string uses the packaged prismal/souls directory."
+        ),
+    )
+    kokoro_souls: list[str] = Field(
+        default_factory=lambda: ["spirit", "mind", "heart"],
+        min_length=3,
+        max_length=3,
+        description=(
+            "The three soul ids the Kokoro judge convenes. "
+            "Set via env var as a JSON array: "
+            'PRISMAL_KOKORO_SOULS=\'["spirit", "mind", "heart"]\''
+        ),
+    )
+    kokoro_max_rounds: int = Field(
+        default=2,
+        ge=1,
+        description="Hard cap on Kokoro deliberation rounds.",
+    )
+    kokoro_agreement_threshold: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        description="Early-stop agreement score (0-1) for the deliberation.",
+    )
+    kokoro_execute_actions: bool = Field(
+        default=False,
+        description=(
+            "Allow the Kokoro judge to execute one tool action (gated by ActionInterceptor)."
+        ),
+    )
+    kokoro_judge_model: str = Field(
+        default="",
+        description="Optional judge model override (empty = default_model).",
+    )
+    soul_max_body_chars: int = Field(
+        default=20_000,
+        ge=1,
+        description="Max SOUL.md body length in characters (sanitizer cap).",
+    )
+
     # ── Sandbox multi-lenguaje ────────────────────────────────────────
     sandbox_path: str = Field(
         default="sandbox",

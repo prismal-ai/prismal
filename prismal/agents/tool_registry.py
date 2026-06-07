@@ -257,6 +257,10 @@ DEFAULT_CAPABILITY_MAP: dict[str, list[str]] = {
     "vision_agent": ["vision", "general"],
     "audio_agent": ["audio", "general"],
     "video_agent": ["vision", "audio", "video", "general"],
+    # Kokoro deliberation from Fase K (opt-in; gated by settings.kokoro_enabled).
+    # The judge's optional tool set resolves through the injected
+    # ToolProviderPort (Fase Y) — Kokoro never imports prismal.mcp/skills.
+    "kokoro": ["general", "research"],
 }
 
 

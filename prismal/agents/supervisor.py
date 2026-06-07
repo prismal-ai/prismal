@@ -107,21 +107,34 @@ MULTIMODAL_MEMBERS: list[str] = [
 ]
 
 
+# Fase K (K7-03): Kokoro deliberation route — a single member running the
+# load_souls → deliberate → judge → act → output subgraph. Appended to the
+# valid routes and the system prompt ONLY when ``settings.kokoro_enabled`` is
+# on, so the default behaviour is byte-for-byte unchanged.
+KOKORO_MEMBERS: list[str] = [
+    "kokoro",
+]
+
+
 def effective_valid_routes(
     enable_advanced: bool,
     enable_multimodal: bool = False,
+    enable_kokoro: bool = False,
 ) -> frozenset[str]:
     """Return the set of routes the supervisor may select.
 
     Always includes the base :data:`MEMBERS` plus ``END``; includes
-    :data:`ADVANCED_MEMBERS` when *enable_advanced* is ``True`` and
-    :data:`MULTIMODAL_MEMBERS` when *enable_multimodal* is ``True``.
+    :data:`ADVANCED_MEMBERS` when *enable_advanced* is ``True``,
+    :data:`MULTIMODAL_MEMBERS` when *enable_multimodal* is ``True``, and
+    :data:`KOKORO_MEMBERS` when *enable_kokoro* is ``True``.
     """
     routes = _VALID_ROUTES
     if enable_advanced:
         routes = routes | frozenset(ADVANCED_MEMBERS)
     if enable_multimodal:
         routes = routes | frozenset(MULTIMODAL_MEMBERS)
+    if enable_kokoro:
+        routes = routes | frozenset(KOKORO_MEMBERS)
     return routes
 
 
@@ -339,19 +352,38 @@ such media):
   for "transcribe this", "what's in this image", "summarise this video"."""
 
 
-def build_system_prompt(enable_advanced: bool, enable_multimodal: bool = False) -> str:
+# Appended only when ``settings.kokoro_enabled`` is True.
+_KOKORO_PROMPT_SECTION: str = """
+
+Kokoro deliberation (opt-in — route here only when the user explicitly asks
+for a multi-perspective deliberation or a panel-style decision):
+- kokoro: Three persona souls (spirit/values, mind/logic, heart/empathy)
+  deliberate toward agreement and a single judge renders the final, accountable
+  decision. Route here for "deliberate on this", "weigh the perspectives",
+  "have the panel decide"."""
+
+
+def build_system_prompt(
+    enable_advanced: bool,
+    enable_multimodal: bool = False,
+    enable_kokoro: bool = False,
+) -> str:
     """Return the supervisor routing prompt.
 
     When *enable_advanced* is ``True`` the advanced-architecture agents
     (:data:`ADVANCED_MEMBERS`) are appended; when *enable_multimodal* is ``True``
-    the multimodal pipeline section is appended. With both ``False`` the prompt
-    is byte-identical to the legacy default so base-agent routing is unchanged.
+    the multimodal pipeline section is appended; when *enable_kokoro* is ``True``
+    the Kokoro deliberation section is appended. With all flags ``False`` the
+    prompt is byte-identical to the legacy default so base-agent routing is
+    unchanged.
     """
     prompt = _SYSTEM_PROMPT
     if enable_advanced:
         prompt += _ADVANCED_PROMPT_SECTION
     if enable_multimodal:
         prompt += _MULTIMODAL_PROMPT_SECTION
+    if enable_kokoro:
+        prompt += _KOKORO_PROMPT_SECTION
     return prompt
 
 
@@ -552,7 +584,11 @@ def _intent_short_circuit(
             break
     matched_intent = match_intent(last_human_text)
     _settings = get_settings()
-    valid_routes = effective_valid_routes(_settings.enable_subgraphs, _settings.multimodal_enabled)
+    valid_routes = effective_valid_routes(
+        _settings.enable_subgraphs,
+        _settings.multimodal_enabled,
+        _settings.kokoro_enabled,
+    )
     if matched_intent is None or matched_intent not in valid_routes:
         return None
     logger.info(
@@ -576,7 +612,11 @@ def _match_route(raw: str, session_id: str) -> str:
     """
     normalised = raw.strip("\"' \t\n").upper()
     _settings = get_settings()
-    valid_routes = effective_valid_routes(_settings.enable_subgraphs, _settings.multimodal_enabled)
+    valid_routes = effective_valid_routes(
+        _settings.enable_subgraphs,
+        _settings.multimodal_enabled,
+        _settings.kokoro_enabled,
+    )
     for valid in valid_routes:
         if valid.upper() == normalised:
             return valid
@@ -755,7 +795,9 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
         routing_messages = [
             SystemMessage(
                 content=build_system_prompt(
-                    get_settings().enable_subgraphs, get_settings().multimodal_enabled
+                    get_settings().enable_subgraphs,
+                    get_settings().multimodal_enabled,
+                    get_settings().kokoro_enabled,
                 )
                 + memory_context
             ),
