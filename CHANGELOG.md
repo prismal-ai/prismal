@@ -12,6 +12,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [3.1.1] — 2026-06-07
+
+Patch release: container image and release automation. No changes to the
+Python package's runtime behaviour.
+
+### Added
+
+- **Dockerfile** — multi-stage container image (build wheel + venv on
+  `python:3.13-slim`, copy only the venv into a slim runtime; base install
+  only — derive an image and `pip install "prismal-ai[all]"` for extras).
+- **`.github/workflows/docker-publish.yml`** — builds and publishes the image
+  to GHCR (`ghcr.io/prismal-ai/prismal`) on `prismal/v*` tags
+  (`X.Y.Z` + `latest`) and on manual dispatch (`dev` when no version is
+  given), using plain `docker` and the built-in `GITHUB_TOKEN`.
+
+### Changed
+
+- **`.github/workflows/release.yml`** — extracts the version's section from
+  `CHANGELOG.md` as the GitHub Release notes when a `prismal/v*` tag is
+  pushed.
+
+---
+
 ## [3.1.0] — 2026-06-07
 
 Two new opt-in agent layers — the **Kokoro deliberation agents** (Fase K) and

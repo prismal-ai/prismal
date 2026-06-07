@@ -3,13 +3,19 @@
 # Build the Docker image and push it to the GitHub Container Registry
 # (ghcr.io/prismal-ai/prismal), so it shows under the repo's "Packages" tab.
 #
-# Triggered by pushing a release tag `prismal/vX.Y.Z` (tags it as the version
-# + `latest`), or manually (workflow_dispatch → `dev` tag for a dry run).
+# Triggers:
+#   - push tag `prismal/vX.Y.Z`  → tags image `X.Y.Z` + `latest`
+#   - workflow_dispatch          → manual run:
+#         * with `version` input  → tags `<version>` + `latest`
+#         * without it            → tags `dev`
+#     (lets you publish a versioned image from `main` without re-tagging.)
 #
 # Auth uses the built-in GITHUB_TOKEN — no extra secret needed. The first push
 # creates a PRIVATE package; to make it public, go to the package page →
-# Package settings → Change visibility. Uses plain `docker` (preinstalled on
-# the runner) to avoid pulling unpinned third-party actions.
+# Package settings → Change visibility. If the push is denied with
+# "installation not allowed to Create organization package", enable Actions
+# package creation in the org/repo settings (see notes below).
+# Uses plain `docker` (preinstalled on the runner) to avoid unpinned actions.
 # ============================================================
 name: Docker (GHCR)
 
@@ -17,6 +23,12 @@ on:
   push:
     tags: ["prismal/v*"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to tag the image (e.g. 3.1.0). Empty → 'dev'."
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -32,12 +44,16 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Build and push image
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"          # ghcr.io/prismal-ai/prismal
           if [[ "${GITHUB_REF:-}" == refs/tags/prismal/v* ]]; then
-            VERSION="${GITHUB_REF_NAME##*/v}"              # prismal/v3.1.0 -> 3.1.0
+            VERSION="${GITHUB_REF_NAME##*/v}"             # prismal/v3.1.0 -> 3.1.0
             TAGS=("$IMAGE:$VERSION" "$IMAGE:latest")
+          elif [[ -n "${INPUT_VERSION}" ]]; then
+            TAGS=("$IMAGE:${INPUT_VERSION}" "$IMAGE:latest")
           else
             TAGS=("$IMAGE:dev")
           fi

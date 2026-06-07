@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `prismal` is the **agent framework layer** extracted from the larger `lightagent` monorepo. It is a standalone, publishable PyPI package containing everything needed to build and run AI agents — no web server, dashboard, or CLI. It was published as `lightagent-agents` through v2.x and **rebranded to `prismal` in v3.0.0** (distribution name plus the `lightagent.*` → `prismal.*` import namespace; see `propuesta.md` / `PLAN_MIGRACION.md`). The sibling app package (still named `lightagent`) historically depended on this one and shared the import namespace — see the namespace note below.
 
+Current version: **3.1.1** (single source of truth: `pyproject.toml`; history in `CHANGELOG.md`; release tag format `prismal/vMAJOR.MINOR.PATCH`). Pushing a release tag triggers both `release.yml` (PyPI + GitHub Release with notes extracted from the CHANGELOG section) and `docker-publish.yml` (container image to GHCR `ghcr.io/prismal-ai/prismal`, tagged `X.Y.Z` + `latest`; manual dispatch publishes `dev`).
+
 ## Common commands
 
 All commands assume `uv` and Python 3.13+. Dev tooling lives in `pyproject.toml` under `[project.optional-dependencies].dev`.
@@ -37,6 +39,9 @@ uv run bandit -r prismal -c pyproject.toml
 
 # Build distribution
 uv run python -m build
+
+# Container image (multi-stage; base install only — extras via a derived image)
+docker build -t prismal .
 ```
 
 `live_api` tests call real LLM APIs and require provider keys; skip them locally with `-m "not live_api"`.
@@ -140,6 +145,30 @@ Tool resolution is inverted as a hexagonal port: the agent core asks an injected
 - Deprecated shims (`init_mcp`, `get_mcp_tools`, `get_skill_tools`) delegate to the injected provider, emit `DeprecationWarning`, and are removed in the next minor. The policy caps live in `providers.py`; `tool_registry` keeps equal legacy constants (a parity test asserts both stay in sync).
 - Observability: span `prismal.tools.resolve` + counters `prismal.tool_provider_resolved_total{provider}`, `prismal.tools_injected_total{agent}`, `prismal.tool_provider_fallback_total`, `prismal.tool_provider_subprovider_errors_total{provider}` (registered in `OTelManager`).
 
+### Kokoro deliberation (Fase K — `specs/kokoro-deliberation/`, implemented, opt-in)
+
+A persona-driven deliberation layer: three Markdown-authored **souls** (心 — Spirit / Mind / Heart) argue a question toward agreement, then a single **judge** ("the whole, more than the sum of its parts") renders the accountable decision and optionally executes one gated tool action. Gated by `settings.kokoro_enabled` (default `False`) — with the flag off the compiled supervisor graph is byte-for-byte unchanged. User guide: `docs/kokoro.md`; example: `examples/kokoro_deliberation.py`.
+
+- `prismal/souls/` — the **souls tier** (mirrors `skills/`): `available/{spirit,mind,heart}/SOUL.md` Markdown personas (committed), `base.py` (`Soul`, `parse_soul_md()`, `load_soul()`), `manager.py` (`SoulsManager.load_triad()`). Souls are user-controlled content — their bodies reach the model only through `SecurePromptBuilder`.
+- `agents/kokoro/soul_agent.py` — `SoulAgent` (one persona's argument turn).
+- `agents/kokoro/deliberation.py::deliberate()` — bounded multi-round argue→agree loop (`kokoro_max_rounds`, `kokoro_agreement_threshold`).
+- `agents/kokoro/judge.py` — `KokoroJudgeAgent` renders the `Verdict`; executes at most one action, only when `kokoro_execute_actions=True`, through the existing security gates.
+- `agents/subgraphs/kokoro/` — `load_souls → deliberate → judge → (act?) → output`; exports `build_kokoro_subgraph()` + `register_kokoro()`. Intent routing: `intent_router.match_intent()` returns `kokoro` for deliberation intents ("deliberate on…", "weigh the perspectives", or any mention of *kokoro*).
+
+All Kokoro state lives under `state["metadata"]["kokoro"]` (e.g. `["verdict"]`). Settings: `kokoro_souls`, `kokoro_max_rounds`, `kokoro_agreement_threshold`, `kokoro_execute_actions`, `kokoro_judge_model`.
+
+### Skynet swarm supervisor (Fase S — `specs/skynet-swarm/`, implemented, opt-in)
+
+A swarm map-reduce layer over agents: a meta-supervisor decomposes one goal into N independent sub-orders, fans out a dynamically-sized worker swarm (LangGraph `Send`), reduces their outputs into one answer, and re-plans unmet orders until done — bounded, observable, audited. Gated by `settings.skynet_enabled` (default `False`) — flag off ⇒ supervisor graph byte-for-byte unchanged (snapshot-tested). User guide: `docs/skynet.md`; example: `examples/skynet_swarm.py`.
+
+- `agents/skynet/types.py` — frozen value objects: `SwarmOrder`, `SwarmPlan` (`.size`, `deferred` overflow set), `WorkerResult`, `SwarmResult`.
+- `agents/skynet/supervisor.py` — `SkynetSupervisor` owns sizing + control loop: `plan()` decomposes a goal into N sub-orders (dynamic by default; fixed-K via `skynet_swarm_size`), hard-caps N at `min(skynet_max_swarm, parallel_max_workers)` and **defers** the overflow (never drops it); re-plans unmet orders deterministically (attempt+1, no LLM call). `evaluate()` returns `(complete, answer)`. Goal + worker outputs reach the model only via `SecurePromptBuilder`; audit is hash-first (`skynet_plan` / `skynet_evaluate`).
+- `agents/skynet/worker.py` — `SwarmWorker` (resolves tools via `ToolProviderPort`; actions pass the security gates).
+- `agents/skynet/reduce.py::reduce_results()` — `synthesis | concat | first_success` (`skynet_reduce_strategy`).
+- `agents/subgraphs/skynet/` — `skynet_plan ──[one Send per order, ≤ cap]──► worker ⇉ … → reduce → evaluate` with a bounded re-plan conditional edge (`skynet_max_rounds`); exports `build_skynet_subgraph()` + `register_skynet()`. Intent routing: `match_intent()` returns `skynet` for swarm intents ("fan this out", "run a swarm over…", or any mention of *skynet*).
+
+`Settings._validate_skynet()` clamps `skynet_max_swarm` to `parallel_max_workers` and rejects a fixed `skynet_swarm_size` above the effective cap. All Skynet state lives under `state["metadata"]["skynet"]` (e.g. `["result"]` → `SwarmResult`). Settings also: `skynet_worker_model`, `skynet_planner_model`, `skynet_token_budget`.
+
 ### Security (5-layer defense-in-depth)
 
 All layers live in `prismal/security/` and are re-exported from its `__init__.py`:
@@ -168,10 +197,11 @@ All LLM calls go through `prismal/providers/` (LiteLLM wrapper + per-provider co
 - `data/` — DuckDB + Polars utilities.
 - `agents/visualization.py` — `to_mermaid()`/`to_mermaid_png()`/`visualize()`/`save_graph_image()` for any graph-based architecture (compiled graph, `SubgraphDefinition`, `PrismalStateGraphBuilder`); re-exported from `prismal.langgraph`. `SubgraphDefinition` gains `.to_mermaid()`/`.visualize()`/`.save_image()`; `agents.graph.visualize_supervisor_graph()` renders the main graph. `subgraphs/factory.py::assemble_state_graph()` is the shared sync topology builder. Non-graph architectures (patterns, modal agents) raise `TypeError`.
 - `skills/` — `available/` (source, committed) · `active/` (runtime-enabled, gitignored) · `custom/` (AI-generated, gitignored).
+- `souls/` — Kokoro personas (Fase K): `available/{spirit,mind,heart}/SOUL.md` (committed). Loaded via `SoulsManager`; bodies are user content (route through `SecurePromptBuilder`).
 
 ## Critical rules
 
-1. **Never** concatenate user input into prompts — use `SecurePromptBuilder`. This applies to STT transcripts, OCR text, and image captions as well — they are user-controlled content.
+1. **Never** concatenate user input into prompts — use `SecurePromptBuilder`. This applies to STT transcripts, OCR text, image captions, **and Kokoro soul (`SOUL.md`) bodies** as well — they are user-controlled content.
 2. **Never** bypass `GuardrailsEngine` / `ActionInterceptor`; they are the gateway.
 3. **Always** use `get_async_compiled_graph()` in async contexts (the sync variant uses a non-async SQLite saver).
 4. **Never** add provider-specific imports outside `prismal/providers/`. This includes `whisper`, `pyttsx3`, `elevenlabs`, `open_clip_torch`, etc. for the multimodal layer.
