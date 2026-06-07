@@ -38,7 +38,7 @@ class TestGraphWiring:
     def test_node_added_when_skynet_enabled(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr(graph_module, "get_settings", lambda: _Settings())
+        monkeypatch.setattr(graph_module, "get_settings", _Settings)
 
         compiled = build_supervisor_graph(
             checkpoint_path=tmp_path / "cp.db",
