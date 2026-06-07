@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-import prismal.core.exceptions as exceptions_module
 from prismal.core.exceptions import (
+    __all__,
     PrismalError,
     SkynetBudgetExceeded,
     SkynetConfigError,
@@ -37,7 +37,7 @@ def test_skynet_exceptions_subclass_skynet_error(exc: type[Exception]) -> None:
 @pytest.mark.parametrize("exc", ALL_SKYNET_EXCEPTIONS)
 def test_skynet_exceptions_exported(exc: type[Exception]) -> None:
     """Every Skynet exception is listed in __all__."""
-    assert exc.__name__ in exceptions_module.__all__
+    assert exc.__name__ in __all__
 
 
 def test_skynet_exceptions_carry_message() -> None:
