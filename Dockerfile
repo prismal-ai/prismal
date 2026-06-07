@@ -1,33 +1,37 @@
 # syntax=docker/dockerfile:1
 # ============================================================
 # Prismal — container image (published to GHCR)
-# Multi-stage: build the wheel with uv, install it into a slim runtime.
-# Base install only (no heavy extras) to keep the image small; pass
-# `pip install "prismal-ai[all]"` in a derived image if you need extras.
+# Multi-stage: build the wheel + install all deps into a venv (with the C
+# toolchain available), then copy only that venv into a slim runtime — no
+# build tools, no uv image dependency. Base install only (no heavy extras);
+# derive an image and `pip install "prismal-ai[all]"` if you need them.
 # ============================================================
 
 FROM python:3.13-slim AS builder
-ENV UV_LINK_MODE=copy
+ENV PIP_NO_CACHE_DIR=1
+# Toolchain for any base dependency shipped only as an sdist (no cp313 wheel).
 RUN apt-get update -qq \
  && apt-get install -y -qq --no-install-recommends build-essential \
  && rm -rf /var/lib/apt/lists/*
-# uv from its official image (pinned by tag; bump as needed)
-COPY --from=ghcr.io/astral-sh/uv:0.7.13 /uv /usr/local/bin/uv
 WORKDIR /src
 COPY . .
-RUN uv build --wheel --out-dir /dist
+# Build our wheel (pure-Python, hatchling) and install it + deps into /opt/venv.
+RUN python -m venv /opt/venv \
+ && /opt/venv/bin/pip install --upgrade pip build \
+ && /opt/venv/bin/python -m build --wheel --outdir /tmp/dist \
+ && /opt/venv/bin/pip install /tmp/dist/*.whl
 
 FROM python:3.13-slim AS runtime
 LABEL org.opencontainers.image.title="prismal" \
       org.opencontainers.image.description="Prismal — LangGraph supervisor agent framework" \
       org.opencontainers.image.source="https://github.com/prismal-ai/prismal" \
       org.opencontainers.image.licenses="MIT"
-# Non-root runtime user
+# Copy only the built virtualenv from the builder (no compilers in the runtime).
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 RUN useradd --create-home --uid 1000 prismal
-COPY --from=builder /dist/*.whl /tmp/
-RUN pip install --no-cache-dir /tmp/*.whl && rm -rf /tmp/*.whl
 USER prismal
 WORKDIR /home/prismal
-# Default: show the plugin doctor; override `docker run <image> -m prismal.plugins list`
+# Default: list installed plugins; override e.g. `docker run <image> -m prismal.plugins doctor`
 ENTRYPOINT ["python"]
-CMD ["-m", "prismal.plugins", "doctor"]
+CMD ["-m", "prismal.plugins", "list"]

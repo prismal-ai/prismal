@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Last updated** | 2026-06-07 |
-| **Package version** | 3.1.0 |
+| **Package version** | 3.1.1 |
 | **Author** | Ernesto Crespo |
 | **Latest spec** | `config-source-injection/` (Phase W) — 2026-06-07 |
 
