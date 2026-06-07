@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from prismal.agents.intent_router import match_intent
 import prismal.agents.supervisor as sup
+from prismal.agents.intent_router import match_intent
 
 
 class TestIntentRouter:

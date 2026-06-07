@@ -5,13 +5,13 @@ from __future__ import annotations
 import pytest
 
 from prismal.core.exceptions import (
-    __all__,
     PrismalError,
     SkynetBudgetExceeded,
     SkynetConfigError,
     SkynetError,
     SkynetPlanError,
     SwarmWorkerError,
+    __all__,
 )
 
 ALL_SKYNET_EXCEPTIONS = [

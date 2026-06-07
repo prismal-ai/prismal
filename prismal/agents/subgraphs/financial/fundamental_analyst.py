@@ -10,7 +10,7 @@ under ``state["metadata"]["financial_analyst"]["fundamental_analysis"]``.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import structlog
 from langchain_core.messages import AIMessage, SystemMessage
@@ -24,6 +24,9 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger("prismal.subgraphs.financial.fundamental_analyst")
 otel = OTelManager()
+
+#: Asset classes accepted by ``FundamentalAnalysis.asset_type`` (see artifacts.py).
+AssetType = Literal["equity", "crypto", "forex"]
 
 _SYSTEM = """You are a Fundamental Analyst for the financial subgraph.
 
@@ -161,7 +164,7 @@ async def fundamental_analyst_node(state: AgentState) -> dict[str, Any]:
         except Exception:
             analysis = FundamentalAnalysis(
                 symbol=symbol,
-                asset_type=cast("Literal['equity', 'crypto', 'forex']", asset_type),
+                asset_type=cast("AssetType", asset_type),
             )
 
         fin["fundamental_analysis"] = analysis.model_dump()

@@ -78,3 +78,6 @@ packaging/
 *.pptx
 *.ipynb
 .pypirc.tmp
+
+# Claude Code (artefactos locales del harness)
+.claude/
