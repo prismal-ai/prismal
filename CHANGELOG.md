@@ -10,6 +10,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [3.1.0] — 2026-06-07
+
+Two new opt-in agent layers — the **Kokoro deliberation agents** (Fase K) and
+the **Skynet swarm supervisor** (Fase S) — plus the dependency-security
+remediation. Both layers are gated by their own settings flags (default
+`False`); with the flags off the compiled supervisor graph is byte-for-byte
+unchanged.
+
 ### Added — Skynet swarm supervisor (Fase S, opt-in)
 
 A swarm map-reduce layer over agents (`specs/skynet-swarm/`, user guide in
