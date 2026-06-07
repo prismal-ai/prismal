@@ -63,6 +63,10 @@ data/backups/
 prismal/skills/custom/
 prismal/skills/active/
 
+# Souls (runtime-enabled / AI-generated, not committed)
+prismal/souls/active/
+prismal/souls/custom/
+
 # Secrets
 .env
 env.example

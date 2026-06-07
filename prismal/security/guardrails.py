@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 import yaml
 
@@ -86,11 +87,11 @@ class GuardrailsEngine:
         with _PATTERNS_FILE.open(encoding="utf-8") as f:
             data: dict[str, dict[str, object]] = yaml.safe_load(f)
 
-        raw_patterns: dict[str, list[str]] = data.get("patterns") or {}  # type: ignore[assignment]
+        raw_patterns = cast("dict[str, list[str]]", data.get("patterns") or {})
         for category, patterns in raw_patterns.items():
             self._input_patterns[category] = [re.compile(p, _RE_FLAGS) for p in patterns]
 
-        raw_output: dict[str, dict[str, str]] = data.get("output_patterns") or {}  # type: ignore[assignment]
+        raw_output = cast("dict[str, dict[str, str]]", data.get("output_patterns") or {})
         for group, group_patterns in raw_output.items():
             self._output_patterns[group] = {
                 name: re.compile(p, _RE_FLAGS) for name, p in group_patterns.items()

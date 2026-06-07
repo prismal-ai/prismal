@@ -112,6 +112,36 @@ _IMAGE_RE: re.Pattern[str] = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+# Fase K (K7-01): conservative Kokoro deliberation intent patterns. Gated
+# downstream — only honoured when ``settings.kokoro_enabled`` puts ``kokoro``
+# in ``effective_valid_routes``, otherwise the supervisor falls through to the
+# LLM. Checked AFTER the debate/consensus patterns so existing routing for
+# "debate"/"consensus" phrasing is unchanged.
+_KOKORO_RE: re.Pattern[str] = re.compile(
+    r"\bkokoro\b|"
+    r"\bdeliberat\w*\b|\bdeliber[ae]\w*\b|"
+    r"\bweigh\b.{0,40}\bperspectives?\b|"
+    r"\bsopes\w+\b.{0,40}\bperspectivas?\b|"
+    r"\bpanel\b.{0,40}\bdecid\w+\b|"
+    r"\b(?:three|tres)\s+(?:voices|voces)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Fase S (S5-01): conservative Skynet swarm intent patterns. Gated downstream —
+# only honoured when ``settings.skynet_enabled`` puts ``skynet`` in
+# ``effective_valid_routes``, otherwise the supervisor falls through to the
+# LLM. Checked AFTER the debate/consensus/kokoro patterns so existing routing
+# is unchanged.
+_SKYNET_RE: re.Pattern[str] = re.compile(
+    r"\bskynet\b|"
+    r"\bswarm\b|\benjambre\b|"
+    r"\bfan\b.{0,20}\bout\b|"
+    r"\bin\s+parallel\b|\ben\s+paralelo\b|"
+    r"\bsplit\b.{0,40}\bacross\b.{0,20}\b(?:agents?|workers?)\b|"
+    r"\brepart\w+\b.{0,40}\b(?:agentes?|workers?)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
 
 def match_intent(text: str | None) -> str | None:
     """Return a supervisor member name for high-confidence intents.
@@ -126,8 +156,9 @@ def match_intent(text: str | None) -> str | None:
     Returns:
         The target agent name (``"cron_manager"``; an advanced-architecture
         node such as ``"code_review"`` / ``"data_etl"`` / ``"tot_agent"`` /
-        ``"debate_agent"`` / ``"debate_consensus"``; or ``"multimodal_pipeline"``
-        for media intents) or ``None`` when no high-confidence rule fires.
+        ``"debate_agent"`` / ``"debate_consensus"``; ``"multimodal_pipeline"``
+        for media intents; or ``"kokoro"`` for deliberation intents) or
+        ``None`` when no high-confidence rule fires.
     """
     if text is None:
         return None
@@ -157,4 +188,11 @@ def match_intent(text: str | None) -> str | None:
     # fans out to the vision/audio/video agents internally.
     if _VIDEO_RE.search(normalised) or _AUDIO_RE.search(normalised) or _IMAGE_RE.search(normalised):
         return "multimodal_pipeline"
+    # Kokoro deliberation (opt-in; gated downstream by ``kokoro_enabled``).
+    if _KOKORO_RE.search(normalised):
+        return "kokoro"
+    # Skynet swarm (opt-in; gated downstream by ``skynet_enabled``): the order
+    # is decomposed into sub-orders and fanned out to a worker swarm.
+    if _SKYNET_RE.search(normalised):
+        return "skynet"
     return None

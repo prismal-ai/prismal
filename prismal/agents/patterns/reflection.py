@@ -201,7 +201,7 @@ def with_reflection(
         )
 
     def decorator(node_fn: F) -> F:
-        node_name = node_fn.__name__
+        node_name: str = getattr(node_fn, "__name__", "node")
 
         @functools.wraps(node_fn)
         async def wrapper(

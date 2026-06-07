@@ -121,14 +121,14 @@ repos:
   - repo: local
     hooks:
       - id: ty-check
-        name: "types: ty (informational)"
+        name: "types: ty (blocking, paridad con CI)"
         language: system
-        # ty (Astral) aun en alpha v0.0.x — los errores actuales son informativos
-        # y no bloquean el commit. El type-check autoritativo es `mypy --strict`
-        # (ver CLAUDE.md > "Before Every Commit"). Migrar a `ty` cuando estabilice.
+        # Bloqueante: CI (ci.yml job lint) corre `ty check` SIN --exit-zero, asi
+        # que pre-commit debe fallar igual o el pipeline rompe tras el push.
+        # El type-check autoritativo sigue siendo `mypy --strict`; ty complementa.
         # Se invoca por path al venv para no depender de `uv` ni del PATH del IDE.
         entry: .venv/bin/ty
-        args: [check, --exit-zero, --output-format=concise, prismal/]
+        args: [check, --output-format=concise, prismal/]
         pass_filenames: false
         types: [python]
         files: ^prismal/
@@ -170,6 +170,22 @@ repos:
         pass_filenames: false
         files: ^prismal/
         verbose: true
+
+  # ----------------------------------------------------------
+  # 7b. COMPLEJIDAD — Radon rango E (bloquea, paridad con CI)
+  # CI (ci.yml) falla si `radon cc -n E` reporta cualquier bloque,
+  # asi que pre-commit debe fallar igual o el pipeline rompe tras
+  # el push. Con `-n E` la salida es vacia cuando no hay bloques
+  # E/F; cualquier salida (o un fallo de radon) bloquea el commit.
+  # ----------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: radon-e-gate
+        name: "complexity: Radon rango E gate (blocking, paridad con CI)"
+        language: system
+        entry: bash -c 'out=$(.venv/bin/radon cc prismal/ -n E -s) || { echo "radon fallo"; exit 1; }; if [ -n "$out" ]; then echo "$out"; echo "Bloques con CC rango E/F — el CI fallara. Refactoriza antes de commitear."; exit 1; fi'
+        pass_filenames: false
+        files: ^prismal/
 
   # ----------------------------------------------------------
   # 8. COMPLEJIDAD — Lizard (bloquea)
