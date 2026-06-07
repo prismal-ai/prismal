@@ -7,6 +7,7 @@ import pytest
 from prismal.agents.intent_router import match_intent
 from prismal.agents.supervisor import (
     SKYNET_MEMBERS,
+    _intent_short_circuit,
     build_system_prompt,
     effective_valid_routes,
 )
@@ -88,33 +89,29 @@ class TestIntentShortCircuitGating:
     def test_routes_to_skynet_when_enabled(
         self, _trimmed: list, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import prismal.agents.supervisor as sup
-
         class _S:
             enable_subgraphs = False
             multimodal_enabled = False
             kokoro_enabled = False
             skynet_enabled = True
 
-        monkeypatch.setattr(sup, "get_settings", lambda: _S())
-        result = sup._intent_short_circuit(_trimmed, "sess")
+        monkeypatch.setattr("prismal.agents.supervisor.get_settings", lambda: _S())
+        result = _intent_short_circuit(_trimmed, "sess")
         assert result is not None
         assert result[0] == "skynet"
 
     def test_falls_through_when_skynet_disabled(
         self, _trimmed: list, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import prismal.agents.supervisor as sup
-
         class _S:
             enable_subgraphs = False
             multimodal_enabled = False
             kokoro_enabled = False
             skynet_enabled = False
 
-        monkeypatch.setattr(sup, "get_settings", lambda: _S())
+        monkeypatch.setattr("prismal.agents.supervisor.get_settings", lambda: _S())
         # Route not in valid set → None → supervisor falls through to the LLM.
-        assert sup._intent_short_circuit(_trimmed, "sess") is None
+        assert _intent_short_circuit(_trimmed, "sess") is None
 
 
 class TestCapabilityMap:
