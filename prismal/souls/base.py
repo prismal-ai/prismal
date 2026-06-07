@@ -202,7 +202,7 @@ def load_soul(
         raise SoulValidationError(soul_id, "missing or invalid YAML frontmatter")
 
     try:
-        metadata = SoulMetadata(**meta_dict)  # type: ignore[arg-type]
+        metadata = SoulMetadata.model_validate(meta_dict)
     except (ValidationError, TypeError) as exc:
         raise SoulValidationError(soul_id, f"invalid metadata: {exc}") from exc
 

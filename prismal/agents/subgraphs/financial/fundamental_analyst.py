@@ -10,7 +10,7 @@ under ``state["metadata"]["financial_analyst"]["fundamental_analysis"]``.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import structlog
 from langchain_core.messages import AIMessage, SystemMessage
@@ -161,7 +161,7 @@ async def fundamental_analyst_node(state: AgentState) -> dict[str, Any]:
         except Exception:
             analysis = FundamentalAnalysis(
                 symbol=symbol,
-                asset_type=asset_type,  # type: ignore[arg-type]
+                asset_type=cast("Literal['equity', 'crypto', 'forex']", asset_type),
             )
 
         fin["fundamental_analysis"] = analysis.model_dump()

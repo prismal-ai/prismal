@@ -35,7 +35,7 @@ import hashlib
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from prismal.agents.skynet.types import SwarmOrder, SwarmPlan, WorkerResult
 from prismal.core.exceptions import SkynetError, SkynetPlanError
@@ -358,10 +358,11 @@ def _parse_plan_response(raw: str) -> tuple[list[SwarmOrder], str]:
     for index, entry in enumerate(raw_orders, start=1):
         if not isinstance(entry, dict):
             continue
-        instruction = str(entry.get("instruction") or "").strip()
+        order = cast("dict[str, Any]", entry)
+        instruction = str(order.get("instruction") or "").strip()
         if not instruction:
             continue
-        role = str(entry.get("role") or "worker").strip() or "worker"
+        role = str(order.get("role") or "worker").strip() or "worker"
         orders.append(SwarmOrder(order_id=f"ord-{index}", instruction=instruction, role=role))
     return orders, rationale
 
