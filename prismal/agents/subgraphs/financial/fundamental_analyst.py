@@ -10,7 +10,7 @@ under ``state["metadata"]["financial_analyst"]["fundamental_analysis"]``.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from langchain_core.messages import AIMessage, SystemMessage
