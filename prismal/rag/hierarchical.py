@@ -38,8 +38,8 @@ from prismal.rag.loaders import DocumentProcessorFactory
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from prismal.agents.extension.ports import VectorStorePort
     from prismal.core.config import Settings
-    from prismal.rag.vector_store import ChromaVectorStore
 
 logger = get_logger("prismal.rag.hierarchical")
 
@@ -119,7 +119,7 @@ class HierarchicalRAGEngine:
 
     def __init__(
         self,
-        vector_store: ChromaVectorStore,
+        vector_store: VectorStorePort,
         parent_chunk_size: int = 500,
         child_chunk_size: int = 100,
         child_overlap: int = 20,

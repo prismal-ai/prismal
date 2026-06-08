@@ -29,8 +29,11 @@ from prismal.rag.vector_store import ChromaStoreError, ChromaVectorStore
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-CHROMA_PATH = "prismal.rag.vector_store.Chroma"
-EMBEDDINGS_FACTORY_PATH = "prismal.rag.vector_store.EmbeddingsFactory"
+# Phase Z relocated the implementation to ``prismal.rag.stores.chroma``; the
+# public import path ``prismal.rag.vector_store`` remains a shim. Patch targets
+# point at the module that owns the ``Chroma`` / ``EmbeddingsFactory`` symbols.
+CHROMA_PATH = "prismal.rag.stores.chroma.Chroma"
+EMBEDDINGS_FACTORY_PATH = "prismal.rag.stores.chroma.EmbeddingsFactory"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -181,7 +184,7 @@ def test_init_calls_get_settings_when_settings_is_none() -> None:
     fake_settings = _make_settings()
 
     with (
-        patch("prismal.rag.vector_store.get_settings", return_value=fake_settings) as mock_gs,
+        patch("prismal.rag.stores.chroma.get_settings", return_value=fake_settings) as mock_gs,
         patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
         patch(CHROMA_PATH) as mock_chroma_cls,
     ):
@@ -263,7 +266,7 @@ def test_add_documents_logs_document_count() -> None:
     with (
         patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
         patch(CHROMA_PATH) as mock_chroma_cls,
-        patch("prismal.rag.vector_store.logger") as mock_logger,
+        patch("prismal.rag.stores.chroma.logger") as mock_logger,
     ):
         mock_factory.create.return_value = MagicMock()
         mock_chroma_cls.return_value = mock_chroma_instance
@@ -351,7 +354,7 @@ def test_similarity_search_logs_query_and_k() -> None:
     with (
         patch(EMBEDDINGS_FACTORY_PATH) as mock_factory,
         patch(CHROMA_PATH) as mock_chroma_cls,
-        patch("prismal.rag.vector_store.logger") as mock_logger,
+        patch("prismal.rag.stores.chroma.logger") as mock_logger,
     ):
         mock_factory.create.return_value = MagicMock()
         mock_chroma_cls.return_value = mock_chroma_instance

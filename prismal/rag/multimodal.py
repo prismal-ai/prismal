@@ -26,11 +26,11 @@ if TYPE_CHECKING:
     from langchain_core.documents import Document
     from langchain_core.embeddings import Embeddings
 
+    from prismal.agents.extension.ports import VectorStorePort
     from prismal.core.config import Settings
     from prismal.rag.loaders.audio_loader import AudioLoader
     from prismal.rag.loaders.image_loader import ImageLoader
     from prismal.rag.loaders.video_loader import VideoLoader
-    from prismal.rag.vector_store import ChromaVectorStore
 
 logger = get_logger("prismal.rag.multimodal")
 
@@ -79,7 +79,7 @@ class MultimodalRAGEngine:
 
     def __init__(
         self,
-        vector_store: ChromaVectorStore,
+        vector_store: VectorStorePort,
         *,
         cross_modal_embedder: Embeddings | None = None,
         image_loader: ImageLoader | None = None,

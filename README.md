@@ -64,6 +64,10 @@ pip install "prismal-ai[multimodal]"         # Pillow + ffmpeg-python + imagehas
 pip install "prismal-ai[multimodal-local]"   # faster-whisper (local STT)
 pip install "prismal-ai[multimodal-premium]" # elevenlabs TTS
 pip install "prismal-ai[multimodal-embed]"   # open-clip-torch (CLIP cross-modal embeddings)
+pip install "prismal-ai[lancedb]"            # LanceDB embedded vector store (Phase Z)
+pip install "prismal-ai[sqlite-vec]"         # sqlite-vec embedded vector store (Phase Z)
+pip install "prismal-ai[qdrant]"             # Qdrant vector store, embedded or server (Phase Z)
+pip install "prismal-ai[pgvector]"           # PostgreSQL + pgvector vector store (Phase Z)
 pip install "prismal-ai[all]"                # Everything above
 ```
 
@@ -280,12 +284,12 @@ Runnable examples: [`examples/tool_provider_host.py`](./examples/tool_provider_h
 
 ## Roadmap — features to build
 
-Already implemented: extension surface (Phase X), advanced architectures (Phase A/B/C), multimodal (Phase F), and the dependency remediation (18/18 alerts in a terminal state).
+Already implemented: extension surface (Phase X), tool provider injection (Phase Y), advanced architectures (Phase A/B/C), multimodal (Phase F), Kokoro (Phase K), Skynet (Phase S), the **vector store port (Phase Z)**, and the dependency remediation (18/18 alerts in a terminal state).
 
 What remains, **ordered from fast-and-necessary → complex-and-less-necessary**. Each feature has its SDD contract in [`specs/`](./specs/). Status: `spec ready` = ready to build (PLAN/ARCHITECTURE/SPEC/TASKS); `PRD seed` = PRD only, needs expansion before building.
 
 1. **Finish Tool Provider Injection (Phase Y)** — *fast · necessary · in progress* — [`specs/tool-provider-injection/`](./specs/tool-provider-injection/). The Y1–Y5 code has already landed; what's left is closing Y6–Y8 (settings/observability, docs/examples, parity tests) and marking the spec `IMPLEMENTED`.
-2. **Vector Store Port (Phase Z)** — *moderate · necessary · spec ready* — [`specs/vector-store-port/`](./specs/vector-store-port/). Removes the ChromaDB lock-in behind a `VectorStorePort` with adapters (Chroma default + LanceDB, sqlite-vec, Qdrant, pgvector). Reduces the security surface and opens up embedded backends.
+2. **Vector Store Port (Phase Z)** — *moderate · necessary · ✅ implemented* — [`specs/vector-store-port/`](./specs/vector-store-port/). Removes the ChromaDB lock-in behind a `VectorStorePort` with adapters (Chroma default + LanceDB, sqlite-vec, Qdrant, pgvector), selectable via `settings.vector_store_backend`. Reduces the security surface and opens up embedded backends. See [`docs/vector-stores.md`](./docs/vector-stores.md).
 3. **Runtime Composition Root (Phase R)** — *moderate · necessary · spec ready* — [`specs/composition-root/`](./specs/composition-root/). `build_runtime()` composes and injects every port (tools, vector store, embeddings, checkpoint, audit) in a single call; **unblocks `prismal-server` / `prismal-dashboard`**. Depends on Phase Y + Z.
 4. **Cost & Budget Governance** — *fast-to-moderate · useful · PRD seed* — [`specs/cost-budget-governance/`](./specs/cost-budget-governance/). Per-run/session/tenant budgets + cost/token/call circuit-breakers in `react_loop` and the expensive patterns (debate, ToT, LATS, MoA). A cheap insurance policy against runaway spend.
 5. **A2A / Agent Cards interop (Phase I)** — *complex · necessary (ecosystem) · spec ready* — [`specs/a2a-interop/`](./specs/a2a-interop/). Bidirectional agent-to-agent interop: expose prismal as an A2A agent (Agent Card at `/.well-known/agent-card.json`, JSON-RPC + SSE) and consume remote agents as nodes/tools. Complements MCP; closes the gap with MS Agent Framework / Google ADK.
@@ -414,7 +418,9 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 │   ├── federated.py       ← federated search
 │   ├── multimodal.py      ← (Phase F) MultimodalRAGEngine — text + image captions + audio/video transcripts
 │   ├── loaders/           ← (Phase F) document/image/audio/video loaders
-│   └── vector_store.py    ← ChromaDB vector store (extended with modality metadata in Phase F)
+│   ├── stores/            ← (Phase Z) VectorStorePort adapters: chroma (default), lancedb, sqlite_vec, qdrant, pgvector
+│   ├── vector_store_factory.py ← (Phase Z) VectorStoreFactory + FakeVectorStore
+│   └── vector_store.py    ← (Phase Z) backward-compatible shim re-exporting ChromaVectorStore from stores/chroma.py
 ├── skills/                ← available/ (source) · active/ (gitignored) · custom/ (gitignored)
 ├── scheduler/             ← APScheduler CronExecutor, DateTimeService, Prefect flows
 ├── monitoring/            ← Langfuse, OpenTelemetry, structlog
@@ -463,7 +469,7 @@ This package follows [Semantic Versioning](https://semver.org/).
 Tag format for releases: `prismal/vMAJOR.MINOR.PATCH`
 
 ```bash
-git tag prismal/v3.1.1
+git tag prismal/v3.1.2
 git push --tags
 ```
 
@@ -491,7 +497,7 @@ twine upload --repository testpypi dist/*          # validate on TestPyPI first
 # 3) Push history and publish prismal-ai
 git push origin main
 twine upload dist/*                                 # publish to PyPI
-git tag prismal/v3.1.1 && git push --tags         # tag format: prismal/vMAJOR.MINOR.PATCH
+git tag prismal/v3.1.2 && git push --tags         # tag format: prismal/vMAJOR.MINOR.PATCH
 
 # 4) Publish the deprecated compatibility bridge (lightagent-agents -> prismal-ai)
 cd compat/lightagent-agents

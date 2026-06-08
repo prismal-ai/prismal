@@ -37,8 +37,8 @@ from prismal.monitoring.otel import OTelManager
 from prismal.rag.crag import RetrievedChunk
 
 if TYPE_CHECKING:
+    from prismal.agents.extension.ports import VectorStorePort
     from prismal.core.config import Settings
-    from prismal.rag.vector_store import ChromaVectorStore
 
 logger = get_logger("prismal.rag.hybrid")
 
@@ -69,7 +69,7 @@ class HybridSearchEngine:
 
     def __init__(
         self,
-        vector_store: ChromaVectorStore,
+        vector_store: VectorStorePort,
         alpha: float = 0.5,
         settings: Settings | None = None,
     ) -> None:

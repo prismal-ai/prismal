@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `prismal` is the **agent framework layer** extracted from the larger `lightagent` monorepo. It is a standalone, publishable PyPI package containing everything needed to build and run AI agents — no web server, dashboard, or CLI. It was published as `lightagent-agents` through v2.x and **rebranded to `prismal` in v3.0.0** (distribution name plus the `lightagent.*` → `prismal.*` import namespace; see `propuesta.md` / `PLAN_MIGRACION.md`). The sibling app package (still named `lightagent`) historically depended on this one and shared the import namespace — see the namespace note below.
 
-Current version: **3.1.1** (single source of truth: `pyproject.toml`; history in `CHANGELOG.md`; release tag format `prismal/vMAJOR.MINOR.PATCH`). Pushing a release tag triggers both `release.yml` (PyPI + GitHub Release with notes extracted from the CHANGELOG section) and `docker-publish.yml` (container image to GHCR `ghcr.io/prismal-ai/prismal`, tagged `X.Y.Z` + `latest`; manual dispatch publishes `dev`).
+Current version: **3.1.2** (single source of truth: `pyproject.toml`; history in `CHANGELOG.md`; release tag format `prismal/vMAJOR.MINOR.PATCH`). Pushing a release tag triggers both `release.yml` (PyPI + GitHub Release with notes extracted from the CHANGELOG section) and `docker-publish.yml` (container image to GHCR `ghcr.io/prismal-ai/prismal`, tagged `X.Y.Z` + `latest`; manual dispatch publishes `dev`).
 
 ## Common commands
 
@@ -169,6 +169,17 @@ A swarm map-reduce layer over agents: a meta-supervisor decomposes one goal into
 
 `Settings._validate_skynet()` clamps `skynet_max_swarm` to `parallel_max_workers` and rejects a fixed `skynet_swarm_size` above the effective cap. All Skynet state lives under `state["metadata"]["skynet"]` (e.g. `["result"]` → `SwarmResult`). Settings also: `skynet_worker_model`, `skynet_planner_model`, `skynet_token_budget`.
 
+### Vector store port (Fase Z — `specs/vector-store-port/`, implemented)
+
+Vector search is inverted as a hexagonal port (mirror of Fase Y): RAG patterns and the memory layer depend on `VectorStorePort` and never construct a backend — `VectorStoreFactory.create(settings, collection_name)` selects the adapter from `settings.vector_store_backend`. **Chroma stays the default** (zero breakage, base install); alternatives are opt-in via extras. Additive and backward-compatible. User guide: `docs/vector-stores.md`; example: `examples/vector_store_lancedb.py`.
+
+- `agents/extension/ports.py::VectorStorePort` — `@runtime_checkable Protocol` (`collection_name`, `add_documents`, `similarity_search`, `delete_by_source`, `delete_collection`); re-exported from `agents/extension/__init__.py`. **Score contract (SPEC-VS-002):** `similarity_search` returns `(Document, score)` with `score ∈ [0, 1]`, higher = more relevant — the port *defines* it, each adapter *normalizes* its native metric.
+- `rag/stores/` — adapters: `chroma.py` (default, **moved** from `rag/vector_store.py`, which stays a re-export shim), `lancedb.py`, `sqlite_vec.py` (both embedded, no server), `qdrant.py` (embedded/server), `pgvector.py` (server). Backend SDK imports are **deferred** inside each adapter; absent extra → `VectorStoreBackendUnavailable`. Score normalization lives in `rag/stores/_normalize.py`.
+- `rag/vector_store_factory.py` — `VectorStoreFactory` (mirror of `EmbeddingsFactory`) + `FakeVectorStore` (deterministic, I/O-free test double).
+- `core/config.py` — `vector_store_backend` (default `chroma`), `vector_store_path` (embedded), `vector_store_url` + `vector_store_api_key`/`user`/`password` (server). `chroma_path` is kept as a backward-compatible alias via `Settings.resolve_vector_store_path()`.
+- `core/exceptions.py` — `VectorStoreError` (generalizes `ChromaStoreError`, which now subclasses it) + `VectorStoreBackendUnavailable`.
+- Consumers (`rag/engine`, `hyde`, `fusion`, `self_rag`, `hybrid`, `hierarchical`, `multi_vector`, `multimodal`, `crag`, `memory/long_term`, `memory/mongodb_store`) type against `VectorStorePort` and build defaults via the factory. Extras: `[lancedb]`, `[sqlite-vec]`, `[qdrant]`, `[pgvector]`.
+
 ### Security (5-layer defense-in-depth)
 
 All layers live in `prismal/security/` and are re-exported from its `__init__.py`:
@@ -190,7 +201,7 @@ All LLM calls go through `prismal/providers/` (LiteLLM wrapper + per-provider co
 - `core/` — Pydantic Settings config (`get_settings()`), logging (`get_logger()`), exceptions, SQLAlchemy database, user model.
 - `memory/` — short-term conversation history + long-term PII-sanitized store (SQLite + ChromaDB; optional MongoDB via `[mongodb]`).
 - `mcp/` — Model Context Protocol client, adapter, connection manager.
-- `rag/` — RAG engine, CRAG pipeline, ChromaDB vector store, document loaders, embeddings, federated search.
+- `rag/` — RAG engine, CRAG pipeline, interchangeable vector store (`VectorStorePort` + `rag/stores/` adapters, default Chroma; Fase Z), document loaders, embeddings, federated search.
 - `scheduler/` — APScheduler-based `CronExecutor`, `DateTimeService` (single time-of-truth, timezone-aware), Prefect flows.
 - `sandbox/` — `SandboxExecutor` with docker/podman/nsjail/bwrap/firejail backends (Phase 43); AST denylist in `codeact_agent.py`.
 - `monitoring/` — Langfuse traces, OpenTelemetry spans, structlog.
