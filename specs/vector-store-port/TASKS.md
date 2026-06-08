@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-06-05 |
 | **PLAN** | `specs/vector-store-port/PLAN.md` |
@@ -39,75 +39,75 @@ Guiding principle: **behavioral parity with default chroma** + **score contract 
 
 ### PHASE Z1 — `VectorStorePort`
 #### Z1-01 — Declare the port
-- [ ] Add `VectorStorePort` (`@runtime_checkable Protocol`) to `extension/ports.py` with `collection_name`, `add_documents`, `similarity_search`, `delete_by_source`, `delete_collection`.
-- [ ] `__all__` + re-export from `extension/__init__.py`.
+- [x] Add `VectorStorePort` (`@runtime_checkable Protocol`) to `extension/ports.py` with `collection_name`, `add_documents`, `similarity_search`, `delete_by_source`, `delete_collection`.
+- [x] `__all__` + re-export from `extension/__init__.py`.
 - **Done:** `conforms_to(ChromaVectorStore(), VectorStorePort)` is `True`.
 
 ### PHASE Z2 — Score contract
 #### Z2-01 — Define contract + helpers
-- [ ] Document `score ∈ [0,1]` higher=better in the port's docstring.
-- [ ] Create `rag/stores/_normalize.py` with `cosine_identity`, `from_l2`, `from_distance` helpers.
+- [x] Document `score ∈ [0,1]` higher=better in the port's docstring.
+- [x] Create `rag/stores/_normalize.py` with `cosine_identity`, `from_l2`, `from_distance` helpers.
 #### Z2-02 — Reference test
-- [ ] Test that fixes the corpus and captures Chroma's order/score as the *golden* for parity (Z7-02).
+- [x] Test that fixes the corpus and captures Chroma's order/score as the *golden* for parity (Z7-02).
 - **Done:** reproducible reference.
 
 ### PHASE Z3 — Adapters
 #### Z3-01 — Relocate Chroma (default) + shim
-- [ ] Move `ChromaVectorStore`/`ChromaStoreError` to `rag/stores/chroma.py`.
-- [ ] `rag/vector_store.py` re-exports (shim) → existing imports do not break.
-- [ ] `ChromaStoreError` subclasses `VectorStoreError`.
+- [x] Move `ChromaVectorStore`/`ChromaStoreError` to `rag/stores/chroma.py`.
+- [x] `rag/vector_store.py` re-exports (shim) → existing imports do not break.
+- [x] `ChromaStoreError` subclasses `VectorStoreError`.
 - **Done:** existing suite green with no behavior change.
 #### Z3-02 — `LanceDBVectorStore` (`[lancedb]`)
-- [ ] Implement the embedded adapter; deferred import; normalize score; translate `delete_by_source`.
+- [x] Implement the embedded adapter; deferred import; normalize score; translate `delete_by_source`.
 #### Z3-03 — `SqliteVecVectorStore` (`[sqlite-vec]`)
-- [ ] Implement the embedded adapter; resolve via SQL/extension or LangChain integration (PA-2).
+- [x] Implement the embedded adapter; resolve via SQL/extension or LangChain integration (PA-2).
 #### Z3-04 — `QdrantVectorStore` (`[qdrant]`)
-- [ ] Implement the embedded/server adapter; auth from settings; normalize score.
+- [x] Implement the embedded/server adapter; auth from settings; normalize score.
 #### Z3-05 — `PgVectorStore` (`[pgvector]`)
-- [ ] Implement the server adapter (DSN); normalize distance `<=>`/`<->`.
+- [x] Implement the server adapter (DSN); normalize distance `<=>`/`<->`.
 - **Done (Z3):** the 5 adapters conform to the port; each with its documented normalization.
 
 ### PHASE Z4 — Factory + Settings + Exceptions
 #### Z4-01 — `VectorStoreFactory`
-- [ ] Create `rag/vector_store_factory.py::VectorStoreFactory.create(settings, collection)`; deferred import per backend; mirror of `EmbeddingsFactory`.
-- [ ] `FakeVectorStore` for tests.
+- [x] Create `rag/vector_store_factory.py::VectorStoreFactory.create(settings, collection)`; deferred import per backend; mirror of `EmbeddingsFactory`.
+- [x] `FakeVectorStore` for tests.
 #### Z4-02 — Settings
-- [ ] `vector_store_backend` (default `chroma`), `vector_store_path`, `vector_store_url` (+ optional credentials).
-- [ ] `chroma_path` as a backward-compatible alias when backend == chroma.
+- [x] `vector_store_backend` (default `chroma`), `vector_store_path`, `vector_store_url` (+ optional credentials).
+- [x] `chroma_path` as a backward-compatible alias when backend == chroma.
 #### Z4-03 — Exceptions
-- [ ] `VectorStoreError`, `VectorStoreBackendUnavailable` (message guiding to the extra).
+- [x] `VectorStoreError`, `VectorStoreBackendUnavailable` (message guiding to the extra).
 - **Done:** `create()` selects the backend; absence of the extra → clear error.
 
 ### PHASE Z5 — Consumer retyping
 #### Z5-01 — RAG
-- [ ] `engine`, `hyde`, `self_rag`, `hybrid`, `hierarchical`, `multi_vector`, `multimodal`, `crag`: hint → `VectorStorePort`; default construction via factory.
+- [x] `engine`, `hyde`, `self_rag`, `hybrid`, `hierarchical`, `multi_vector`, `multimodal`, `crag`: hint → `VectorStorePort`; default construction via factory.
 #### Z5-02 — Memory
-- [ ] `memory/long_term.py`, `memory/mongodb_store.py`: default via factory; hint → `VectorStorePort`.
+- [x] `memory/long_term.py`, `memory/mongodb_store.py`: default via factory; hint → `VectorStorePort`.
 - **Done:** `grep` does not find `ChromaVectorStore` type hints in consumers (only in the adapter). Suite green.
 
 ### PHASE Z6 — Extras
 #### Z6-01 — `pyproject.toml`
-- [ ] Extras `[lancedb]`, `[sqlite-vec]`, `[qdrant]`, `[pgvector]`; base without new mandatory deps; update `all` if applicable.
-- [ ] `mypy` overrides for the new optional SDKs if needed.
+- [x] Extras `[lancedb]`, `[sqlite-vec]`, `[qdrant]`, `[pgvector]`; base without new mandatory deps; update `all` if applicable.
+- [x] `mypy` overrides for the new optional SDKs if needed.
 
 ### PHASE Z7 — Tests
 #### Z7-01 — Unit per adapter
-- [ ] add/search/delete per adapter (real embedded; server with mock).
+- [x] add/search/delete per adapter (real embedded; server with mock).
 #### Z7-02 — Score parity
-- [ ] Top-k order of each adapter vs Chroma (reference) within declared tolerance.
+- [x] Top-k order of each adapter vs Chroma (reference) within declared tolerance.
 #### Z7-03 — Port + retype
-- [ ] `conforms_to` for the 5; RAG+memory suite green with default chroma; `FakeVectorStore` in patterns.
+- [x] `conforms_to` for the 5; RAG+memory suite green with default chroma; `FakeVectorStore` in patterns.
 
 ### PHASE Z8 — Docs + Example
 #### Z8-01 — Documentation
-- [ ] `docs/vector-stores.md`: selection, extras, score contract, server backend (auth/network), migration.
+- [x] `docs/vector-stores.md`: selection, extras, score contract, server backend (auth/network), migration.
 #### Z8-02 — Example
-- [ ] `examples/vector_store_lancedb.py`.
+- [x] `examples/vector_store_lancedb.py`.
 
 ### HARDENING
-- [ ] Coverage ≥ 85% in `rag/stores/**` + factory.
-- [ ] `ruff` + `mypy --strict` + `bandit` clean; `pytest -m "not live_api"` 100%.
-- [ ] `CLAUDE.md` (rag/ section + extras) and `README.md` updated.
+- [x] Coverage ≥ 85% in `rag/stores/**` + factory.
+- [x] `ruff` + `mypy --strict` + `bandit` clean; `pytest -m "not live_api"` 100%.
+- [x] `CLAUDE.md` (rag/ section + extras) and `README.md` updated.
 
 ---
 
@@ -163,15 +163,15 @@ Coverage: RF-VS-001..015 mapped.
 
 ## 7. Definition of Done (Global for Phase Z)
 
-- [ ] `VectorStorePort` declared/re-exported; Chroma conforms without behavior change.
-- [ ] 4 new conforming adapters (LanceDB, sqlite-vec, Qdrant, pgvector).
-- [ ] Score contract `[0,1]` verified by parity against Chroma.
-- [ ] `VectorStoreFactory` + `settings.vector_store_backend` (default chroma) + generalized config; `chroma_path` alias.
-- [ ] RAG + memory retyped to the port; no `ChromaVectorStore` type hints in consumers.
-- [ ] Optional extras; slim base; deferred imports.
-- [ ] `FakeVectorStore` + tests; coverage ≥ 85%.
-- [ ] `docs/vector-stores.md` + example.
-- [ ] `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
+- [x] `VectorStorePort` declared/re-exported; Chroma conforms without behavior change.
+- [x] 4 new conforming adapters (LanceDB, sqlite-vec, Qdrant, pgvector).
+- [x] Score contract `[0,1]` verified by parity against Chroma.
+- [x] `VectorStoreFactory` + `settings.vector_store_backend` (default chroma) + generalized config; `chroma_path` alias.
+- [x] RAG + memory retyped to the port; no `ChromaVectorStore` type hints in consumers.
+- [x] Optional extras; slim base; deferred imports.
+- [x] `FakeVectorStore` + tests; coverage ≥ 85%.
+- [x] `docs/vector-stores.md` + example.
+- [x] `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
 - [ ] `CLAUDE.md` + `README.md` updated; PR merged with review.
 
 ---

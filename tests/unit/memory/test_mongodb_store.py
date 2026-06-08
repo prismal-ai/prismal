@@ -84,9 +84,9 @@ def test_init_uses_custom_retention() -> None:
 
 
 def test_init_creates_vector_store_when_not_provided() -> None:
-    """MongoDBMemoryStore creates a ChromaVectorStore when vector_store=None."""
-    with patch("prismal.rag.vector_store.ChromaVectorStore") as mock_cls:
-        mock_cls.return_value = MagicMock()
+    """MongoDBMemoryStore builds the store via VectorStoreFactory when vector_store=None."""
+    with patch("prismal.rag.vector_store_factory.VectorStoreFactory") as mock_factory:
+        mock_factory.create.return_value = MagicMock()
         with patch("prismal.core.config.get_settings") as mock_cfg:
             mock_settings = MagicMock()
             mock_settings.mongodb_url = "mongodb://localhost"
@@ -94,7 +94,7 @@ def test_init_creates_vector_store_when_not_provided() -> None:
             mock_cfg.return_value = mock_settings
             store = MongoDBMemoryStore()
 
-    mock_cls.assert_called_once()
+    mock_factory.create.assert_called_once()
     assert store._vector_store is not None
 
 

@@ -12,6 +12,50 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [3.1.2] — 2026-06-08
+
+Interchangeable vector store (**Fase Z** — `specs/vector-store-port/`). Vector
+search is inverted as a hexagonal port: RAG patterns and the memory layer depend
+on `VectorStorePort` and never construct a backend — `VectorStoreFactory` selects
+the adapter from `settings.vector_store_backend`. **Chroma stays the default**, so
+existing deployments are byte-for-byte unchanged; the alternatives are opt-in via
+extras. Additive and backward-compatible.
+
+### Added — vector store port (Fase Z)
+
+- **`VectorStorePort`** (`agents/extension/ports.py`) — `@runtime_checkable`
+  Protocol (`collection_name`, `add_documents`, `similarity_search`,
+  `delete_by_source`, `delete_collection`), re-exported from
+  `prismal.agents.extension`. Score contract (SPEC-VS-002): `similarity_search`
+  returns `(Document, score)` with `score ∈ [0, 1]`, higher = more relevant.
+- **Adapters** (`rag/stores/`) — `chroma.py` (default; **moved** from
+  `rag/vector_store.py`, which stays a re-export shim), `lancedb.py`,
+  `sqlite_vec.py` (both embedded, no server), `qdrant.py` (embedded/server),
+  `pgvector.py` (server). Backend SDK imports are **deferred**; a missing extra
+  raises `VectorStoreBackendUnavailable`. Score normalization lives in
+  `rag/stores/_normalize.py`.
+- **`VectorStoreFactory`** + **`FakeVectorStore`** (`rag/vector_store_factory.py`)
+  — backend selection (mirror of `EmbeddingsFactory`) and a deterministic,
+  I/O-free test double.
+- **Settings** (`core/config.py`) — `vector_store_backend` (default `chroma`),
+  `vector_store_path` (embedded), `vector_store_url` + `vector_store_api_key` /
+  `vector_store_user` / `vector_store_password` (server). `chroma_path` is kept
+  as a backward-compatible alias via `Settings.resolve_vector_store_path()`.
+- **Exceptions** (`core/exceptions.py`) — `VectorStoreError` (generalizes
+  `ChromaStoreError`, which now subclasses it) and `VectorStoreBackendUnavailable`.
+- **Extras** (`pyproject.toml`) — `[lancedb]`, `[sqlite-vec]`, `[qdrant]`,
+  `[pgvector]`; base install gains no mandatory dependency.
+- **Docs & example** — `docs/vector-stores.md`, `examples/vector_store_lancedb.py`.
+
+### Changed
+
+- RAG consumers (`engine`, `hyde`, `fusion`, `self_rag`, `hybrid`, `hierarchical`,
+  `multi_vector`, `multimodal`, `crag`) and the memory layer (`long_term`,
+  `mongodb_store`) type against `VectorStorePort` and build their default store
+  through `VectorStoreFactory` — no logic change.
+
+---
+
 ## [3.1.1] — 2026-06-07
 
 Patch release: container image and release automation. No changes to the

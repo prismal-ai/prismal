@@ -36,7 +36,7 @@ from prismal.rag.crag import CRAGResult, RetrievedChunk
 
 # ── Patch paths ───────────────────────────────────────────────────────────────
 
-CHROMA_VECTOR_STORE_PATH = "prismal.rag.engine.ChromaVectorStore"
+VECTOR_STORE_FACTORY_PATH = "prismal.rag.engine.VectorStoreFactory"
 DOCUMENT_PROCESSOR_FACTORY_PATH = "prismal.rag.engine.DocumentProcessorFactory"
 CRAG_PIPELINE_PATH = "prismal.rag.engine.CRAGPipeline"
 
@@ -74,8 +74,8 @@ def _build_engine(
 
     mock_store_instance = MagicMock()
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = mock_store_instance
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = mock_store_instance
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name=collection_name, settings=settings)
@@ -87,29 +87,29 @@ def _build_engine(
 
 
 def test_init_creates_chroma_vector_store_with_collection_name() -> None:
-    """__init__ must create ChromaVectorStore with the given collection_name."""
+    """__init__ must build the store via VectorStoreFactory with the collection_name."""
     settings = _make_settings()
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = MagicMock()
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = MagicMock()
         from prismal.rag.engine import RAGEngine
 
         RAGEngine(collection_name="my_col", settings=settings)
 
-    mock_store_cls.assert_called_once_with(collection_name="my_col", settings=settings)
+    mock_store_cls.create.assert_called_once_with(collection_name="my_col", settings=settings)
 
 
 def test_init_creates_chroma_vector_store_with_settings() -> None:
-    """__init__ must pass the settings to ChromaVectorStore."""
+    """__init__ must pass the settings to VectorStoreFactory.create."""
     settings = _make_settings()
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = MagicMock()
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = MagicMock()
         from prismal.rag.engine import RAGEngine
 
         RAGEngine(collection_name="col", settings=settings)
 
-    call_kwargs = mock_store_cls.call_args.kwargs
+    call_kwargs = mock_store_cls.create.call_args.kwargs
     assert call_kwargs["settings"] is settings
 
 
@@ -117,8 +117,8 @@ def test_init_default_collection_name_is_default() -> None:
     """RAGEngine() with no collection_name arg must use 'default'."""
     settings = _make_settings()
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = MagicMock()
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = MagicMock()
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
@@ -130,8 +130,8 @@ def test_init_stores_settings_when_provided() -> None:
     """__init__ must store the provided settings."""
     settings = _make_settings()
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = MagicMock()
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = MagicMock()
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name="col", settings=settings)
@@ -146,9 +146,9 @@ def test_init_calls_get_settings_when_none() -> None:
     get_settings_path = "prismal.rag.engine.get_settings"
     with (
         patch(get_settings_path, return_value=fake_settings) as mock_gs,
-        patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+        patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
     ):
-        mock_store_cls.return_value = MagicMock()
+        mock_store_cls.create.return_value = MagicMock()
         from prismal.rag.engine import RAGEngine
 
         RAGEngine(settings=None)
@@ -185,10 +185,10 @@ def test_index_file_calls_delete_by_source_before_adding() -> None:
     mock_store.add_documents.return_value = ["id1"]
 
     with (
-        patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+        patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
         patch(DOCUMENT_PROCESSOR_FACTORY_PATH) as mock_factory_cls,
     ):
-        mock_store_cls.return_value = mock_store
+        mock_store_cls.create.return_value = mock_store
         mock_factory_instance = MagicMock()
         mock_factory_instance.load.return_value = docs
         mock_factory_cls.return_value = mock_factory_instance
@@ -213,10 +213,10 @@ def test_index_file_delete_by_source_called_before_add_documents() -> None:
     mock_store.add_documents.side_effect = lambda _: call_order.append("add") or ["id1"]
 
     with (
-        patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+        patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
         patch(DOCUMENT_PROCESSOR_FACTORY_PATH) as mock_factory_cls,
     ):
-        mock_store_cls.return_value = mock_store
+        mock_store_cls.create.return_value = mock_store
         mock_factory_instance = MagicMock()
         mock_factory_instance.load.return_value = docs
         mock_factory_cls.return_value = mock_factory_instance
@@ -237,10 +237,10 @@ def test_index_file_calls_factory_load_with_path() -> None:
     mock_store.add_documents.return_value = ["id1", "id2"]
 
     with (
-        patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+        patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
         patch(DOCUMENT_PROCESSOR_FACTORY_PATH) as mock_factory_cls,
     ):
-        mock_store_cls.return_value = mock_store
+        mock_store_cls.create.return_value = mock_store
         mock_factory_instance = MagicMock()
         mock_factory_instance.load.return_value = docs
         mock_factory_cls.return_value = mock_factory_instance
@@ -262,10 +262,10 @@ def test_index_file_calls_store_add_documents() -> None:
     mock_store.add_documents.return_value = ["id1", "id2"]
 
     with (
-        patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+        patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
         patch(DOCUMENT_PROCESSOR_FACTORY_PATH) as mock_factory_cls,
     ):
-        mock_store_cls.return_value = mock_store
+        mock_store_cls.create.return_value = mock_store
         mock_factory_instance = MagicMock()
         mock_factory_instance.load.return_value = docs
         mock_factory_cls.return_value = mock_factory_instance
@@ -286,10 +286,10 @@ def test_index_file_returns_chunk_count() -> None:
     mock_store.add_documents.return_value = ["id1", "id2", "id3"]
 
     with (
-        patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+        patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
         patch(DOCUMENT_PROCESSOR_FACTORY_PATH) as mock_factory_cls,
     ):
-        mock_store_cls.return_value = mock_store
+        mock_store_cls.create.return_value = mock_store
         mock_factory_instance = MagicMock()
         mock_factory_instance.load.return_value = docs
         mock_factory_cls.return_value = mock_factory_instance
@@ -310,10 +310,10 @@ def test_index_file_propagates_unsupported_document_type_error() -> None:
     mock_store = MagicMock()
 
     with (
-        patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+        patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
         patch(DOCUMENT_PROCESSOR_FACTORY_PATH) as mock_factory_cls,
     ):
-        mock_store_cls.return_value = mock_store
+        mock_store_cls.create.return_value = mock_store
         mock_factory_instance = MagicMock()
         mock_factory_instance.load.side_effect = UnsupportedDocumentTypeError(".xlsx")
         mock_factory_cls.return_value = mock_factory_instance
@@ -349,10 +349,10 @@ def test_index_directory_indexes_supported_files_recursively() -> None:
         mock_factory_instance.load.return_value = [_make_document()]
 
         with (
-            patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+            patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
             patch(DOCUMENT_PROCESSOR_FACTORY_PATH) as mock_factory_cls,
         ):
-            mock_store_cls.return_value = mock_store
+            mock_store_cls.create.return_value = mock_store
             mock_factory_cls.return_value = mock_factory_instance
 
             from prismal.rag.engine import RAGEngine
@@ -383,10 +383,10 @@ def test_index_directory_skips_unsupported_files() -> None:
         mock_factory_instance.load.return_value = [_make_document()]
 
         with (
-            patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+            patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
             patch(DOCUMENT_PROCESSOR_FACTORY_PATH) as mock_factory_cls,
         ):
-            mock_store_cls.return_value = mock_store
+            mock_store_cls.create.return_value = mock_store
             mock_factory_cls.return_value = mock_factory_instance
 
             from prismal.rag.engine import RAGEngine
@@ -420,10 +420,10 @@ def test_index_directory_returns_total_chunk_count() -> None:
         ]
 
         with (
-            patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+            patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
             patch(DOCUMENT_PROCESSOR_FACTORY_PATH) as mock_factory_cls,
         ):
-            mock_store_cls.return_value = mock_store
+            mock_store_cls.create.return_value = mock_store
             mock_factory_cls.return_value = mock_factory_instance
 
             from prismal.rag.engine import RAGEngine
@@ -453,10 +453,10 @@ def test_index_directory_catches_per_file_errors_without_crashing() -> None:
         ]
 
         with (
-            patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+            patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
             patch(DOCUMENT_PROCESSOR_FACTORY_PATH) as mock_factory_cls,
         ):
-            mock_store_cls.return_value = mock_store
+            mock_store_cls.create.return_value = mock_store
             mock_factory_cls.return_value = mock_factory_instance
 
             from prismal.rag.engine import RAGEngine
@@ -480,10 +480,10 @@ def test_index_directory_returns_zero_for_empty_directory() -> None:
         mock_store = MagicMock()
 
         with (
-            patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+            patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
             patch(DOCUMENT_PROCESSOR_FACTORY_PATH) as mock_factory_cls,
         ):
-            mock_store_cls.return_value = mock_store
+            mock_store_cls.create.return_value = mock_store
             mock_factory_instance = MagicMock()
             mock_factory_cls.return_value = mock_factory_instance
 
@@ -505,8 +505,8 @@ def test_search_calls_store_similarity_search() -> None:
     mock_store = MagicMock()
     mock_store.similarity_search.return_value = []
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = mock_store
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = mock_store
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
@@ -521,8 +521,8 @@ def test_search_uses_default_k_of_5() -> None:
     mock_store = MagicMock()
     mock_store.similarity_search.return_value = []
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = mock_store
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = mock_store
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
@@ -538,8 +538,8 @@ def test_search_returns_list_of_retrieved_chunks() -> None:
     mock_store = MagicMock()
     mock_store.similarity_search.return_value = [(doc, 0.85)]
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = mock_store
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = mock_store
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
@@ -556,8 +556,8 @@ def test_search_converts_document_float_tuples_to_retrieved_chunks() -> None:
     mock_store = MagicMock()
     mock_store.similarity_search.return_value = [(doc, 0.92)]
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = mock_store
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = mock_store
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
@@ -580,8 +580,8 @@ def test_search_source_falls_back_to_unknown_when_missing() -> None:
     mock_store = MagicMock()
     mock_store.similarity_search.return_value = [(doc, 0.7)]
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = mock_store
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = mock_store
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
@@ -599,8 +599,8 @@ def test_search_chunk_id_falls_back_to_index_when_missing() -> None:
     mock_store = MagicMock()
     mock_store.similarity_search.return_value = [(doc, 0.7)]
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = mock_store
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = mock_store
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
@@ -618,8 +618,8 @@ def test_search_returns_multiple_chunks_in_order() -> None:
     mock_store = MagicMock()
     mock_store.similarity_search.return_value = [(doc1, 0.9), (doc2, 0.8), (doc3, 0.7)]
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = mock_store
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = mock_store
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
@@ -642,10 +642,10 @@ async def test_query_creates_crag_pipeline_with_store_and_settings() -> None:
     mock_crag_result = CRAGResult(answer="the answer", sources=[], used_web_fallback=False)
 
     with (
-        patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+        patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
         patch(CRAG_PIPELINE_PATH) as mock_pipeline_cls,
     ):
-        mock_store_cls.return_value = mock_store
+        mock_store_cls.create.return_value = mock_store
         mock_pipeline_instance = MagicMock()
         mock_pipeline_instance.run = AsyncMock(return_value=mock_crag_result)
         mock_pipeline_cls.return_value = mock_pipeline_instance
@@ -666,10 +666,10 @@ async def test_query_calls_pipeline_run_with_query() -> None:
     mock_crag_result = CRAGResult(answer="answer", sources=[], used_web_fallback=False)
 
     with (
-        patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+        patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
         patch(CRAG_PIPELINE_PATH) as mock_pipeline_cls,
     ):
-        mock_store_cls.return_value = mock_store
+        mock_store_cls.create.return_value = mock_store
         mock_pipeline_instance = MagicMock()
         mock_pipeline_instance.run = AsyncMock(return_value=mock_crag_result)
         mock_pipeline_cls.return_value = mock_pipeline_instance
@@ -690,10 +690,10 @@ async def test_query_returns_crag_result() -> None:
     expected_result = CRAGResult(answer="specific answer text", sources=[], used_web_fallback=True)
 
     with (
-        patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls,
+        patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls,
         patch(CRAG_PIPELINE_PATH) as mock_pipeline_cls,
     ):
-        mock_store_cls.return_value = mock_store
+        mock_store_cls.create.return_value = mock_store
         mock_pipeline_instance = MagicMock()
         mock_pipeline_instance.run = AsyncMock(return_value=expected_result)
         mock_pipeline_cls.return_value = mock_pipeline_instance
@@ -713,8 +713,8 @@ def test_create_collection_returns_new_rag_engine() -> None:
     """create_collection() must return a new RAGEngine instance."""
     settings = _make_settings()
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = MagicMock()
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = MagicMock()
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name="old_col", settings=settings)
@@ -728,8 +728,8 @@ def test_create_collection_new_engine_has_correct_collection_name() -> None:
     """create_collection(name) must create an engine with collection_name=name."""
     settings = _make_settings()
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = MagicMock()
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = MagicMock()
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name="original", settings=settings)
@@ -742,8 +742,8 @@ def test_create_collection_new_engine_reuses_settings() -> None:
     """create_collection() must pass the current settings to the new RAGEngine."""
     settings = _make_settings()
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = MagicMock()
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = MagicMock()
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name="original", settings=settings)
@@ -756,8 +756,8 @@ def test_create_collection_does_not_mutate_original() -> None:
     """create_collection() must not change the original engine's collection name."""
     settings = _make_settings()
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = MagicMock()
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = MagicMock()
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(collection_name="original", settings=settings)
@@ -774,8 +774,8 @@ def test_delete_collection_calls_store_delete_collection() -> None:
     settings = _make_settings()
     mock_store = MagicMock()
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = mock_store
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = mock_store
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)
@@ -790,8 +790,8 @@ def test_delete_collection_returns_none() -> None:
     mock_store = MagicMock()
     mock_store.delete_collection.return_value = None
 
-    with patch(CHROMA_VECTOR_STORE_PATH) as mock_store_cls:
-        mock_store_cls.return_value = mock_store
+    with patch(VECTOR_STORE_FACTORY_PATH) as mock_store_cls:
+        mock_store_cls.create.return_value = mock_store
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=settings)

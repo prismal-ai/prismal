@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    from langchain_core.documents import Document
     from langchain_core.tools import BaseTool
 
 
@@ -124,6 +125,43 @@ class ToolProviderPort(Protocol):
         pass
 
 
+@runtime_checkable
+class VectorStorePort(Protocol):
+    """Interchangeable vector store (SPEC-VS-001).
+
+    Conforming implementations: ``ChromaVectorStore`` (default),
+    ``LanceDBVectorStore``, ``SqliteVecVectorStore``, ``QdrantVectorStore``,
+    ``PgVectorStore``, ``FakeVectorStore``. The core only invokes these methods;
+    it never constructs a backend — :class:`prismal.rag.vector_store_factory.VectorStoreFactory`
+    selects and builds the concrete adapter from ``settings.vector_store_backend``.
+
+    Score contract (SPEC-VS-002): :meth:`similarity_search` returns
+    ``(Document, score)`` tuples with ``score ∈ [0, 1]``, **higher = more
+    relevant**. Adapters whose native metric is a distance convert it; Chroma
+    (cosine ``[0, 1]``) is the reference. The port *defines* the contract; each
+    adapter *implements* the normalization (see ``rag/stores/_normalize.py``).
+    """
+
+    @property
+    def collection_name(self) -> str: ...
+
+    def add_documents(self, documents: list[Document]) -> list[str]:
+        """Index *documents* and return the backend-assigned IDs."""
+        ...
+
+    def similarity_search(self, query: str, k: int = 5) -> list[tuple[Document, float]]:
+        """Return the top-*k* ``(Document, score)`` with ``score ∈ [0, 1]`` (SPEC-VS-002)."""
+        ...
+
+    def delete_by_source(self, source: str) -> None:
+        """Delete documents where ``metadata["source"] == source`` (best-effort)."""
+        ...
+
+    def delete_collection(self) -> None:
+        """Delete the entire collection."""
+        ...
+
+
 def conforms_to(obj: Any, port: type) -> bool:
     """Return ``True`` if ``obj`` structurally satisfies ``port``.
 
@@ -142,5 +180,6 @@ __all__ = [
     "EmbeddingsPort",
     "ToolPort",
     "ToolProviderPort",
+    "VectorStorePort",
     "conforms_to",
 ]

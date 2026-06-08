@@ -49,8 +49,8 @@ from prismal.security.prompt_builder import SecurePromptBuilder
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from prismal.agents.extension.ports import VectorStorePort
     from prismal.core.config import Settings
-    from prismal.rag.vector_store import ChromaVectorStore
 
 logger = get_logger("prismal.rag.multi_vector")
 
@@ -95,7 +95,7 @@ class MultiVectorRAGEngine:
 
     def __init__(
         self,
-        vector_store: ChromaVectorStore,
+        vector_store: VectorStorePort,
         n_questions: int = 3,
         settings: Settings | None = None,
     ) -> None:

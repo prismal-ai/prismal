@@ -48,7 +48,7 @@ from prismal.memory.long_term import MemoryEntry, _redact_sensitive
 if TYPE_CHECKING:
     from motor.motor_asyncio import AsyncIOMotorCollection
 
-    from prismal.rag.vector_store import ChromaVectorStore
+    from prismal.agents.extension.ports import VectorStorePort
 
 logger = structlog.get_logger("prismal.memory.mongodb_store")
 
@@ -81,7 +81,7 @@ class MongoDBMemoryStore:
         self,
         mongodb_url: str | None = None,
         db_name: str = "prismal",
-        vector_store: ChromaVectorStore | None = None,
+        vector_store: VectorStorePort | None = None,
         retention_days: int | None = None,
     ) -> None:
         """Initialise store — does not connect until :meth:`initialize` is called."""
@@ -99,9 +99,11 @@ class MongoDBMemoryStore:
         if vector_store is not None:
             self._vector_store = vector_store
         else:
-            from prismal.rag.vector_store import ChromaVectorStore
+            from prismal.rag.vector_store_factory import VectorStoreFactory
 
-            self._vector_store = ChromaVectorStore(collection_name=f"{_COLLECTION_NAME}_mongo")
+            self._vector_store = VectorStoreFactory.create(
+                collection_name=f"{_COLLECTION_NAME}_mongo"
+            )
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 

@@ -55,10 +55,10 @@ def test_rag_engine_search_creates_otel_span() -> None:
     mock_store.similarity_search.return_value = []
 
     with (
-        patch("prismal.rag.engine.ChromaVectorStore") as mock_store_cls,
+        patch("prismal.rag.engine.VectorStoreFactory") as mock_store_cls,
         patch("prismal.rag.engine.OTelManager", return_value=mock_otel),
     ):
-        mock_store_cls.return_value = mock_store
+        mock_store_cls.create.return_value = mock_store
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=MagicMock())
@@ -78,10 +78,10 @@ def test_rag_engine_search_increments_rag_queries_counter() -> None:
     mock_store.similarity_search.return_value = []
 
     with (
-        patch("prismal.rag.engine.ChromaVectorStore") as mock_store_cls,
+        patch("prismal.rag.engine.VectorStoreFactory") as mock_store_cls,
         patch("prismal.rag.engine.OTelManager", return_value=mock_otel),
     ):
-        mock_store_cls.return_value = mock_store
+        mock_store_cls.create.return_value = mock_store
         from prismal.rag.engine import RAGEngine
 
         engine = RAGEngine(settings=MagicMock())
@@ -106,11 +106,11 @@ async def test_rag_engine_query_creates_otel_span() -> None:
     mock_pipeline_instance.run = AsyncMock(return_value=mock_crag_result)
 
     with (
-        patch("prismal.rag.engine.ChromaVectorStore") as mock_store_cls,
+        patch("prismal.rag.engine.VectorStoreFactory") as mock_store_cls,
         patch("prismal.rag.engine.CRAGPipeline") as mock_pipeline_cls,
         patch("prismal.rag.engine.OTelManager", return_value=mock_otel),
     ):
-        mock_store_cls.return_value = mock_store
+        mock_store_cls.create.return_value = mock_store
         mock_pipeline_cls.return_value = mock_pipeline_instance
 
         from prismal.rag.engine import RAGEngine

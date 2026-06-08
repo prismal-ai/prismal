@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ============================================================
 [project]
 name = "prismal-ai"
-version = "3.1.1"
+version = "3.1.2"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -194,6 +194,23 @@ maintenance = [
   "pip-audit>=2.7.0",
 ]
 
+# Vector store backends (Phase Z — interchangeable VectorStorePort)
+# Chroma is a base dependency (default backend); these are opt-in alternatives.
+lancedb = [
+  "lancedb>=0.15.0",
+]
+sqlite-vec = [
+  "sqlite-vec>=0.1.6",
+]
+qdrant = [
+  "langchain-qdrant>=0.2.0",
+  "qdrant-client>=1.12.0",
+]
+pgvector = [
+  "langchain-postgres>=0.0.13",
+  "psycopg[binary]>=3.2.0",
+]
+
 # Multimodal layer — base media handling (Fase F)
 multimodal = [
   "Pillow>=11.0.0",
@@ -219,7 +236,7 @@ multimodal-embed = [
 
 # All optional extras combined
 all = [
-  "prismal-ai[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance,multimodal,multimodal-local,multimodal-premium,multimodal-embed]",
+  "prismal-ai[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance,lancedb,sqlite-vec,qdrant,pgvector,multimodal,multimodal-local,multimodal-premium,multimodal-embed]",
 ]
 
 # Development tools
@@ -368,6 +385,9 @@ module = [
   # Multimodal extras (Fase F) — lazy-imported inside functions.
   "ffmpeg", "imagehash", "faster_whisper", "whisper",
   "open_clip", "pyttsx3", "elevenlabs", "elevenlabs.*", "cv2",
+  # Vector store backends (Phase Z) — lazy-imported inside adapters.
+  "lancedb", "lancedb.*", "sqlite_vec", "qdrant_client", "qdrant_client.*",
+  "langchain_qdrant", "langchain_qdrant.*", "langchain_postgres", "langchain_postgres.*",
   # Optional notebook dependency for graph visualization.
   "IPython", "IPython.*",
 ]

@@ -360,8 +360,44 @@ class Settings(BaseSettings):
     )
     chroma_path: str = Field(
         default="data/db/chroma",
-        description="ChromaDB persistence directory",
+        description=(
+            "ChromaDB persistence directory. Backward-compatible alias: when "
+            "vector_store_backend == 'chroma' and vector_store_path was left at "
+            "its default, this value feeds the embedded store path (SPEC-VS-010)."
+        ),
     )
+
+    # ── Vector store (Phase Z — interchangeable backend) ──────────────
+    vector_store_backend: Literal["chroma", "lancedb", "sqlite_vec", "qdrant", "pgvector"] = Field(
+        default="chroma",
+        description=(
+            "Vector store backend selected by VectorStoreFactory. 'chroma' (default) "
+            "and embedded 'lancedb'/'sqlite_vec' need no server; 'qdrant'/'pgvector' "
+            "are server backends needing vector_store_url. Non-default backends "
+            "require their optional extra (pip install 'prismal[<backend>]')."
+        ),
+    )
+    vector_store_path: str = Field(
+        default="data/db/vectors",
+        description="Persistence directory for embedded backends (lancedb, sqlite_vec).",
+    )
+    vector_store_url: str | None = Field(
+        default=None,
+        description="Connection URL/DSN for server backends (qdrant, pgvector).",
+    )
+    vector_store_api_key: SecretStr | None = Field(
+        default=None,
+        description="API key for server backends (e.g. Qdrant). Treated as a secret.",
+    )
+    vector_store_user: str | None = Field(
+        default=None,
+        description="Username for server backends that authenticate with user/password.",
+    )
+    vector_store_password: SecretStr | None = Field(
+        default=None,
+        description="Password for server backends. Treated as a secret.",
+    )
+
     mongodb_url: str = Field(
         default="",
         description=(
@@ -1477,6 +1513,19 @@ class Settings(BaseSettings):
                 f"={self.skynet_max_swarm}. Lower the fixed size or raise the cap."
             )
         return self
+
+    # ── Vector store helpers (Phase Z) ───────────────────────────────
+    def resolve_vector_store_path(self) -> str:
+        """Return the persistence path for an embedded vector-store backend.
+
+        Honours the ``chroma_path`` backward-compatible alias (SPEC-VS-010): when
+        the backend is ``chroma`` the existing ``chroma_path`` always wins (zero
+        behaviour change for current deployments); for the other embedded
+        backends (``lancedb``, ``sqlite_vec``) ``vector_store_path`` is used.
+        """
+        if self.vector_store_backend == "chroma":
+            return self.chroma_path
+        return self.vector_store_path
 
 
 @lru_cache(maxsize=1)
