@@ -45,7 +45,7 @@ from pydantic import BaseModel
 from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
-    from prismal.rag.vector_store import ChromaVectorStore
+    from prismal.agents.extension.ports import VectorStorePort
 
 logger = get_logger("prismal.memory.long_term")
 
@@ -152,7 +152,7 @@ class LongTermMemory:
     def __init__(
         self,
         db_path: Path | None = None,
-        vector_store: ChromaVectorStore | None = None,
+        vector_store: VectorStorePort | None = None,
         retention_days: int | None = None,
     ) -> None:
         """Initialise LongTermMemory and ensure the SQLite schema exists."""
@@ -163,9 +163,9 @@ class LongTermMemory:
         if vector_store is not None:
             self._store = vector_store
         else:
-            from prismal.rag.vector_store import ChromaVectorStore
+            from prismal.rag.vector_store_factory import VectorStoreFactory
 
-            self._store = ChromaVectorStore(collection_name=_COLLECTION)
+            self._store = VectorStoreFactory.create(collection_name=_COLLECTION)
 
         if retention_days is not None:
             self._retention = retention_days

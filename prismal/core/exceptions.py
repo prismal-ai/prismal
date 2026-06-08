@@ -270,6 +270,33 @@ class AdaptiveRAGError(RAGError):
     """Raised when adaptive RAG routing or dispatch fails."""
 
 
+class VectorStoreError(RAGError):
+    """Generic failure of a vector store (SPEC-VS-011).
+
+    Generalizes the legacy ``ChromaStoreError`` (which now subclasses this) so
+    that callers can catch any backend's failure uniformly. Inherits from
+    :class:`RAGError` so existing ``except RAGError`` handlers keep working.
+    """
+
+
+class VectorStoreBackendUnavailable(VectorStoreError):  # noqa: N818 — SPEC-VS-011 name
+    """The selected vector-store backend's optional extra is not installed.
+
+    Args:
+        backend: The ``settings.vector_store_backend`` value that was requested.
+        extra: The pip extra that provides it (e.g. ``"lancedb"``).
+    """
+
+    def __init__(self, backend: str, extra: str) -> None:
+        """Initialize VectorStoreBackendUnavailable."""
+        self.backend = backend
+        self.extra = extra
+        super().__init__(
+            f"Vector store backend '{backend}' is not available. "
+            f"Install it with: pip install 'prismal[{extra}]'."
+        )
+
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 
@@ -742,6 +769,8 @@ __all__ = [
     "TTSError",
     "ToTError",
     "ToolProviderNotConfigured",
+    "VectorStoreBackendUnavailable",
+    "VectorStoreError",
     "VideoAgentError",
     "VisionAgentError",
 ]

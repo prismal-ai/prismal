@@ -33,8 +33,8 @@ from prismal.rag.crag import CRAGPipeline, RetrievedChunk
 from prismal.security.prompt_builder import SecurePromptBuilder
 
 if TYPE_CHECKING:
+    from prismal.agents.extension.ports import VectorStorePort
     from prismal.core.config import Settings
-    from prismal.rag.vector_store import ChromaVectorStore
 
 logger = get_logger("prismal.rag.self_rag")
 
@@ -113,7 +113,7 @@ class SelfRAGPipeline:
 
     def __init__(
         self,
-        vector_store: ChromaVectorStore,
+        vector_store: VectorStorePort,
         crag_pipeline: CRAGPipeline | None = None,
         settings: Settings | None = None,
     ) -> None:

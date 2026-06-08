@@ -34,11 +34,12 @@ from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
 from prismal.rag.crag import CRAGPipeline, RetrievedChunk
 from prismal.rag.loaders import SUPPORTED_EXTENSIONS, DocumentProcessorFactory
-from prismal.rag.vector_store import ChromaVectorStore
+from prismal.rag.vector_store_factory import VectorStoreFactory
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from prismal.agents.extension.ports import VectorStorePort
     from prismal.core.config import Settings
     from prismal.rag.crag import CRAGResult
 
@@ -69,9 +70,11 @@ class RAGEngine:
     ) -> None:
         """Initialise the RAGEngine.
 
-        Creates a :class:`~prismal.rag.vector_store.ChromaVectorStore` for
-        the given collection and stores the resolved settings for later use by
-        the CRAG pipeline and sub-components.
+        Builds the configured vector store via
+        :meth:`~prismal.rag.vector_store_factory.VectorStoreFactory.create`
+        (``settings.vector_store_backend``, default Chroma) for the given
+        collection and stores the resolved settings for later use by the CRAG
+        pipeline and sub-components.
 
         Args:
             collection_name: ChromaDB collection to use.  Defaults to
@@ -80,9 +83,9 @@ class RAGEngine:
         """
         self._settings: Settings = settings if settings is not None else get_settings()
         self._collection_name = collection_name
-        self._store: ChromaVectorStore = ChromaVectorStore(
-            collection_name=collection_name,
+        self._store: VectorStorePort = VectorStoreFactory.create(
             settings=self._settings,
+            collection_name=collection_name,
         )
 
     # ── Properties ────────────────────────────────────────────────────────────
