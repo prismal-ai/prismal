@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-06-05 |
 | **Reviewers** | Tech Lead, AI Architect, Security Lead |
@@ -87,31 +87,31 @@ The pieces already exist: `build_default_tool_provider` (Y), `VectorStoreFactory
 ### 5.1 In Scope (Phase R)
 
 **R1 — `RuntimeConfig` + `RuntimeContext` (`prismal/composition.py`):**
-- [ ] `RuntimeContext`: container of the composed ports (tool provider, vector store provider, embeddings, checkpointer, audit) + `org_id` + `aclose()`.
-- [ ] `RuntimeConfig`: resolved view of config (paths, backend, mcp config path, skills source, per-org overrides).
+- [x] `RuntimeContext`: container of the composed ports (tool provider, vector store provider, embeddings, checkpointer, audit) + `org_id` + `aclose()`.
+- [x] `RuntimeConfig`: resolved view of config (paths, backend, mcp config path, skills source, per-org overrides).
 
 **R2 — `build_runtime` (composition root):**
-- [ ] `async build_runtime(settings=None, *, org_id=None, overrides=None) -> RuntimeContext` that composes all ports reusing `build_default_tool_provider` (Y), `VectorStoreFactory`/provider (Z), `EmbeddingsFactory`, `build_checkpointer`, `AuditLogger`.
-- [ ] Injects the global providers (`set_tool_provider`, `set_vector_store_provider`) or returns a per-session bound context (context mode).
+- [x] `async build_runtime(settings=None, *, org_id=None, overrides=None) -> RuntimeContext` that composes all ports reusing `build_default_tool_provider` (Y), `VectorStoreFactory`/provider (Z), `EmbeddingsFactory`, `build_checkpointer`, `AuditLogger`.
+- [x] Injects the global providers (`set_tool_provider`, `set_vector_store_provider`) or returns a per-session bound context (context mode).
 
 **R3 — Centralized config loaders (`prismal/composition/config_sources.py`):**
-- [ ] `load_mcp_config(path)`, `resolve_skills_source(settings)`, `resolve_vector_store(settings, org_id)`, `apply_org_overrides(settings, org_id, overrides)`.
+- [x] `load_mcp_config(path)`, `resolve_skills_source(settings)`, `resolve_vector_store(settings, org_id)`, `apply_org_overrides(settings, org_id, overrides)`.
 
 **R4 — Tenant resolution:**
-- [ ] Derive `collection_name` per `org_id` for RAG and memory consistently (`f"{base}_{org_id}"`).
-- [ ] Per-tenant provider policy (tools/skills) opt-in.
+- [x] Derive `collection_name` per `org_id` for RAG and memory consistently (`f"{base}_{org_id}"`).
+- [x] Per-tenant provider policy (tools/skills) opt-in.
 
 **R5 — Global vs context modes:**
-- [ ] `runtime_mode: Literal["global","context"]`: global = injects singletons; context = `RuntimeContext` per session without global state (aligned with Phase Y var. B and Phase Z var. B).
+- [x] `runtime_mode: Literal["global","context"]`: global = injects singletons; context = `RuntimeContext` per session without global state (aligned with Phase Y var. B and Phase Z var. B).
 
 **R6 — Lifecycle:**
-- [ ] `RuntimeContext.aclose()` closes MCP, vector store, checkpointer; `build_runtime` usable as an async context manager.
+- [x] `RuntimeContext.aclose()` closes MCP, vector store, checkpointer; `build_runtime` usable as an async context manager.
 
 **R7 — Host and dashboard contract:**
-- [ ] Document the *lifespan* of `prismal-server` and the config schema that `prismal-dashboard` reads/edits.
+- [x] Document the *lifespan* of `prismal-server` and the config schema that `prismal-dashboard` reads/edits.
 
 **R8 — Tests + example:**
-- [ ] `build_test_runtime(...)` with fakes; example `examples/composition_root.py`; docs `docs/composition-root.md`.
+- [x] `build_test_runtime(...)` with fakes; example `examples/composition_root.py`; docs `docs/composition-root.md`.
 
 ### 5.2 Out of Scope
 
@@ -198,7 +198,7 @@ ctx = await build_runtime(settings, org_id="acme")   # collection = "<base>_acme
 ```
 
 **US-CR-003:** As a dashboard, I read/edit the config that the runtime consumes.
-- [ ] Stable schema of MCP servers / skills / vector_store_backend / settings.
+- [x] Stable schema of MCP servers / skills / vector_store_backend / settings.
 
 **US-CR-004:** As a Test Author, I compose a runtime with fakes.
 ```python
@@ -239,16 +239,16 @@ ctx = build_test_runtime(tool_provider=FakeToolProvider({...}),
 
 ## 12. Definition of Done (Global for Phase R)
 
-- [ ] `RuntimeContext` + `RuntimeConfig` + `build_runtime` implemented.
-- [ ] Composes tools (Y), vector store (Z), embeddings, checkpointer, audit — without duplicating logic.
-- [ ] Global and context modes; resolution of `collection_name` per `org_id` (RAG + memory).
-- [ ] `aclose()` releases resources; usable as an async context manager.
-- [ ] `build_test_runtime` with fakes; individual Y/Z injection still valid.
-- [ ] Documented contract for `prismal-server` (lifespan) and `prismal-dashboard` (config).
-- [ ] `docs/composition-root.md` + `examples/composition_root.py`.
-- [ ] Coverage ≥ 85%; `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
-- [ ] `CLAUDE.md` + `README.md` + Obsidian notes updated.
-- [ ] PR merged with review.
+- [x] `RuntimeContext` + `RuntimeConfig` + `build_runtime` implemented.
+- [x] Composes tools (Y), vector store (Z), embeddings, checkpointer, audit — without duplicating logic.
+- [x] Global and context modes; resolution of `collection_name` per `org_id` (RAG + memory).
+- [x] `aclose()` releases resources; usable as an async context manager.
+- [x] `build_test_runtime` with fakes; individual Y/Z injection still valid.
+- [x] Documented contract for `prismal-server` (lifespan) and `prismal-dashboard` (config).
+- [x] `docs/composition-root.md` + `examples/composition_root.py`.
+- [x] Coverage ≥ 85%; `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
+- [x] `CLAUDE.md` + `README.md` + Obsidian notes updated.
+- [x] PR merged with review.
 
 ---
 
@@ -257,6 +257,7 @@ ctx = build_test_runtime(tool_provider=FakeToolProvider({...}),
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | 1.0 | 2026-06-05 | Ernesto Crespo | Initial version — composition root unifying Phase Y + Z |
+| 1.1 | 2026-06-09 | Ernesto Crespo | **IMPLEMENTED** in v3.1.3 — see `CHANGELOG.md` and `docs/composition-root.md`. |
 
 ## Approvals
 

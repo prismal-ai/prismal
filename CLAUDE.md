@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `prismal` is the **agent framework layer** extracted from the larger `lightagent` monorepo. It is a standalone, publishable PyPI package containing everything needed to build and run AI agents — no web server, dashboard, or CLI. It was published as `lightagent-agents` through v2.x and **rebranded to `prismal` in v3.0.0** (distribution name plus the `lightagent.*` → `prismal.*` import namespace; see `propuesta.md` / `PLAN_MIGRACION.md`). The sibling app package (still named `lightagent`) historically depended on this one and shared the import namespace — see the namespace note below.
 
-Current version: **3.1.2** (single source of truth: `pyproject.toml`; history in `CHANGELOG.md`; release tag format `prismal/vMAJOR.MINOR.PATCH`). Pushing a release tag triggers both `release.yml` (PyPI + GitHub Release with notes extracted from the CHANGELOG section) and `docker-publish.yml` (container image to GHCR `ghcr.io/prismal-ai/prismal`, tagged `X.Y.Z` + `latest`; manual dispatch publishes `dev`).
+Current version: **3.1.3** (single source of truth: `pyproject.toml`; history in `CHANGELOG.md`; release tag format `prismal/vMAJOR.MINOR.PATCH`). Pushing a release tag triggers both `release.yml` (PyPI + GitHub Release with notes extracted from the CHANGELOG section) and `docker-publish.yml` (container image to GHCR `ghcr.io/prismal-ai/prismal`, tagged `X.Y.Z` + `latest`; manual dispatch publishes `dev`).
 
 ## Common commands
 
@@ -179,6 +179,19 @@ Vector search is inverted as a hexagonal port (mirror of Fase Y): RAG patterns a
 - `core/config.py` — `vector_store_backend` (default `chroma`), `vector_store_path` (embedded), `vector_store_url` + `vector_store_api_key`/`user`/`password` (server). `chroma_path` is kept as a backward-compatible alias via `Settings.resolve_vector_store_path()`.
 - `core/exceptions.py` — `VectorStoreError` (generalizes `ChromaStoreError`, which now subclasses it) + `VectorStoreBackendUnavailable`.
 - Consumers (`rag/engine`, `hyde`, `fusion`, `self_rag`, `hybrid`, `hierarchical`, `multi_vector`, `multimodal`, `crag`, `memory/long_term`, `memory/mongodb_store`) type against `VectorStorePort` and build defaults via the factory. Extras: `[lancedb]`, `[sqlite-vec]`, `[qdrant]`, `[pgvector]`.
+
+### Runtime composition root (Fase R — `specs/composition-root/`, implemented)
+
+A single composition *facade* that assembles every core port from `settings` plus an optional tenant (`org_id`): tool provider (Y), vector store (Z), embeddings, checkpointer, audit. The host (`prismal-server`) calls `build_runtime()` once in its lifespan and gets a `RuntimeContext` grouping the ports with a coordinated teardown. **Additive and opt-in** — code using `set_tool_provider`/`VectorStoreFactory` directly is unaffected. Guiding principle: **orchestrate, do not reimplement** (it reuses the Y/Z builders + existing factories). User guide: `docs/composition-root.md`; example: `examples/composition_root.py`.
+
+- `prismal/composition/` — package. `__init__.py` is a **thin re-export**; the logic lives in `runtime.py` (so it is covered — the repo omits `*/__init__.py` from coverage).
+- `composition/runtime.py` — `build_runtime(settings=None, *, org_id=None, overrides=None, mode=None, collection_base="default", mcp_config_path=None)` composes the 5 ports reusing `build_default_tool_provider` (Y), `VectorStoreFactory` (Z), `EmbeddingsFactory`, `build_checkpointer`, `AuditLogger`. On any sub-port failure it tears down what was created and raises `RuntimeCompositionError`. Also `RuntimeContext` (groups ports + `org_id`; idempotent `aclose()` disconnects MCP / closes checkpointer / releases built stores; async context manager), `RuntimeConfig` (frozen resolved view; sensitive fields stay referenced from `settings`), `VectorStoreProvider`, and `build_test_runtime(...)` (deterministic fakes, no I/O, no-op `aclose`).
+- `composition/config_sources.py` — pure, side-effect-free loaders the dashboard reads too: `load_mcp_config`, `resolve_skills_source`, `resolve_vector_store`, `apply_org_overrides`, `collection_for`.
+- **Two modes** via `settings.runtime_mode` (`core/config.py`): `global` injects the tool-provider singleton (`set_tool_provider`); `context` keeps every port in the `RuntimeContext` (no global state). Backward-compat: derived from `tool_provider_mode` when unset (`_derive_runtime_mode` before-validator).
+- **Tenant resolution** — `collection_for(base, org_id)` = `f"{base}_{org_id}"`, applied identically to RAG and memory; parallel tenants stay isolated.
+- `agents/extension/ports.py` — adds `VectorStoreProviderPort` (`get_store(collection_name=None) -> VectorStorePort`); `core/exceptions.py` — `RuntimeCompositionError(port, cause)`.
+
+**Implementation note (deviation from the SPEC text):** Fase Z ships a *factory*, not a process singleton or a graph-bound provider, so the vector store is **always** carried in the `RuntimeContext` via `VectorStoreProvider` — there is no `set_vector_store_provider` global to inject in global mode (the SPEC assumed a Z singleton + `get_async_compiled_graph(vector_store_provider=...)`). Consumers resolve tenant stores with `ctx.vector_store_provider.get_store(...)`; the graph signature is unchanged.
 
 ### Security (5-layer defense-in-depth)
 

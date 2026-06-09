@@ -297,6 +297,30 @@ class VectorStoreBackendUnavailable(VectorStoreError):  # noqa: N818 — SPEC-VS
         )
 
 
+# ── Runtime composition (Phase R) ───────────────────────────────────────────
+
+
+class RuntimeCompositionError(PrismalError):
+    """Failure composing the runtime (SPEC-CR-007).
+
+    Raised by :func:`prismal.composition.build_runtime` when a sub-port cannot
+    be assembled. Carries the name of the port that failed so the host can
+    pinpoint the broken dependency; ``build_runtime`` first tears down whatever
+    it already created before raising, so no resources leak.
+
+    Args:
+        port: The port being composed when the failure happened
+            (e.g. ``"tool_provider"``, ``"vector_store"``, ``"checkpointer"``).
+        cause: Human-readable description of the underlying failure.
+    """
+
+    def __init__(self, port: str, cause: str) -> None:
+        """Initialize RuntimeCompositionError."""
+        self.port = port
+        self.cause = cause
+        super().__init__(f"Failed to compose runtime port '{port}': {cause}")
+
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 
@@ -751,6 +775,7 @@ __all__ = [
     "ProviderTimeoutError",
     "RAGError",
     "RAGIndexError",
+    "RuntimeCompositionError",
     "STTError",
     "SchedulerError",
     "SecurityError",

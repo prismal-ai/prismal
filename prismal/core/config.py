@@ -6,7 +6,7 @@ configuration is validated at startup.
 """
 
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AliasChoices, Field, SecretStr, model_validator
@@ -1209,6 +1209,19 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Runtime composition root (Phase R — SPEC-CR-006)
+    runtime_mode: Literal["global", "context"] = Field(
+        default="global",
+        description=(
+            "Runtime composition mode used by build_runtime(): 'global' injects "
+            "process singletons (set_tool_provider); 'context' keeps every port "
+            "inside the returned RuntimeContext for per-session/per-tenant use. "
+            "Unifies tool_provider_mode (Y) and the vector-store mode (Z). "
+            "Backward-compat: when runtime_mode is not set explicitly but "
+            "tool_provider_mode is, runtime_mode is derived from it."
+        ),
+    )
+
     # Webhooks (Phase 25)
     webhooks_enabled: bool = Field(
         default=True,
@@ -1368,6 +1381,22 @@ class Settings(BaseSettings):
             "capped at 60 s."
         ),
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _derive_runtime_mode(cls, data: Any) -> Any:
+        """Derive ``runtime_mode`` from ``tool_provider_mode`` (SPEC-CR-006).
+
+        Backward-compat: a host that already set ``tool_provider_mode='context'``
+        (Phase Y) but never heard of ``runtime_mode`` (Phase R) should get a
+        context runtime by default. Only fills ``runtime_mode`` when it is
+        absent from the input; an explicit ``runtime_mode`` always wins.
+        """
+        if isinstance(data, dict) and "runtime_mode" not in data:
+            tool_mode = data.get("tool_provider_mode")
+            if tool_mode in ("global", "context"):
+                data["runtime_mode"] = tool_mode
+        return data
 
     @model_validator(mode="after")
     def _validate_telegram_webhook(self) -> "Settings":
