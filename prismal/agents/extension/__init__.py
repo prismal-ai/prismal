@@ -38,6 +38,7 @@ from prismal.agents.extension.ports import (
     ToolPort,
     ToolProviderPort,
     VectorStorePort,
+    VectorStoreProviderPort,
     conforms_to,
 )
 from prismal.agents.extension.providers import (
@@ -72,6 +73,7 @@ __all__ = [
     "ToolPort",
     "ToolProviderPort",
     "VectorStorePort",
+    "VectorStoreProviderPort",
     "build_default_tool_provider",
     "conforms_to",
     "discover_plugins",

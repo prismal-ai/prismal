@@ -12,6 +12,67 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [3.1.3] — 2026-06-09
+
+Runtime composition root (**Fase R** — `specs/composition-root/`). A single
+composition *facade* — `build_runtime()` — assembles every core port from
+`settings` plus an optional tenant (`org_id`): tool provider (Fase Y), vector
+store (Fase Z), embeddings, checkpointer, and audit. The host (`prismal-server`)
+calls it once in its lifespan and gets back a `RuntimeContext` grouping the ports
+with a coordinated teardown. **Additive and opt-in**: code using
+`set_tool_provider` / `VectorStoreFactory` directly is unaffected. Guiding
+principle — *orchestrate, do not reimplement*: it reuses the Fase Y/Z builders and
+the existing factories. Docs: `docs/composition-root.md`; example:
+`examples/composition_root.py`.
+
+### Added — composition root (Fase R)
+
+- **`prismal.composition`** package — re-exports the composition root
+  (`composition/runtime.py`) and the config loaders (`composition/config_sources.py`).
+- **`build_runtime(settings=None, *, org_id=None, overrides=None, mode=None,
+  collection_base="default", mcp_config_path=None)`** (`composition/runtime.py`)
+  — composes the five ports in one call, reusing `build_default_tool_provider`
+  (Y), `VectorStoreFactory` (Z), `EmbeddingsFactory`, `build_checkpointer`, and
+  `AuditLogger`. On any sub-port failure it tears down what was already created
+  and raises `RuntimeCompositionError`.
+- **`RuntimeContext`** — groups `tool_provider`, `vector_store_provider`,
+  `embeddings`, `checkpointer`, `audit`, `config`, `org_id`; idempotent
+  `aclose()` (disconnects MCP, closes the checkpointer, releases built stores)
+  and async-context-manager support.
+- **`RuntimeConfig`** — frozen, resolved view (backend, collection name, mode,
+  org); sensitive fields stay referenced from `settings`, never copied in clear.
+- **`VectorStoreProvider`** + **`VectorStoreProviderPort`**
+  (`agents/extension/ports.py`) — factory-backed, tenant-scoped vector-store
+  source (`get_store(collection_name=None)` applies `collection_for(base, org_id)`).
+- **Two modes** via **`settings.runtime_mode`** (`core/config.py`): `global`
+  injects the tool-provider singleton; `context` keeps every port in the
+  `RuntimeContext`. Backward-compat: derived from `tool_provider_mode` when unset.
+- **Tenant resolution** — `collection_for(base, org_id)` (`base_<org_id>`)
+  applied identically to RAG and memory; parallel tenants stay isolated.
+- **Config loaders** (`composition/config_sources.py`) — `load_mcp_config`,
+  `resolve_skills_source`, `resolve_vector_store`, `apply_org_overrides`,
+  `collection_for` (pure, side-effect-free; the dashboard reads the same sources).
+- **`build_test_runtime(...)`** — deterministic `RuntimeContext` with fakes
+  (`FakeToolProvider`, `FakeVectorStore`, in-module embeddings/checkpointer/audit
+  doubles); no I/O, `aclose()` is a no-op.
+- **`RuntimeCompositionError`** (`core/exceptions.py`) — carries the failing
+  port name.
+- Observability: `composition.runtime_built` / `composition.runtime_teardown`
+  logs.
+
+### Notes — composition root (Fase R)
+
+- Fase Z ships a *factory*, not a process singleton or graph-bound provider, so
+  the vector store is always carried in the `RuntimeContext` via
+  `VectorStoreProvider`; there is no `set_vector_store_provider` global to inject
+  in global mode (deviation from the SPEC text, which assumed a Z singleton).
+  Consumers resolve tenant stores with `ctx.vector_store_provider.get_store(...)`.
+- The logic lives in `composition/runtime.py` (the package `__init__.py` is a thin
+  re-export) so it is covered by the suite — the repo omits `*/__init__.py` from
+  coverage.
+
+---
+
 ## [3.1.2] — 2026-06-08
 
 Interchangeable vector store (**Fase Z** — `specs/vector-store-port/`). Vector

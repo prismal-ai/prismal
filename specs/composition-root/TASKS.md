@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-06-05 |
 | **PLAN** | `specs/composition-root/PLAN.md` |
@@ -37,54 +37,54 @@ Guiding principle: **orchestrate, do not reimplement**. The sources of truth are
 
 ### PHASE R1 — `RuntimeConfig` / `RuntimeContext`
 #### R1-01 — Types
-- [ ] Create `prismal/composition.py` with `RuntimeConfig` (frozen) and `RuntimeContext` (dataclass + `aclose` + async context manager).
+- [x] Create `prismal/composition.py` with `RuntimeConfig` (frozen) and `RuntimeContext` (dataclass + `aclose` + async context manager).
 - **Done:** `RuntimeContext` groups the 5 ports + `org_id`; `aclose` idempotent.
 
 ### PHASE R2 — `build_runtime`
 #### R2-01 — Global composition
-- [ ] Implement `build_runtime(settings, *, org_id, overrides, mode)` reusing the Y/Z builders + EmbeddingsFactory + build_checkpointer + AuditLogger.
-- [ ] Global mode: `set_tool_provider` + `set_vector_store_provider`.
-- [ ] On failure: `aclose()` of what was created + `RuntimeCompositionError`.
+- [x] Implement `build_runtime(settings, *, org_id, overrides, mode)` reusing the Y/Z builders + EmbeddingsFactory + build_checkpointer + AuditLogger.
+- [x] Global mode: `set_tool_provider` + `set_vector_store_provider`.
+- [x] On failure: `aclose()` of what was created + `RuntimeCompositionError`.
 #### R2-02 — Context mode
-- [ ] Context mode: does not touch globals; the context is passed to `get_async_compiled_graph(...)`.
-- [ ] `build_test_runtime(...)` with fakes.
+- [x] Context mode: does not touch globals; the context is passed to `get_async_compiled_graph(...)`.
+- [x] `build_test_runtime(...)` with fakes.
 - **Done:** `ctx = await build_runtime(settings)` returns a context with 5 non-null ports.
 
 ### PHASE R3 — Config loaders
 #### R3-01 — `config_sources.py`
-- [ ] `load_mcp_config`, `resolve_skills_source`, `resolve_vector_store`, `apply_org_overrides`, `collection_for`.
+- [x] `load_mcp_config`, `resolve_skills_source`, `resolve_vector_store`, `apply_org_overrides`, `collection_for`.
 - **Done:** pure loaders (sync), no connection, tested.
 
 ### PHASE R4 — Tenant resolution
 #### R4-01 — collection_for in RAG and memory
-- [ ] `collection_for(base, org_id)` applied consistently when building RAG (`RAGEngine`) and memory (`LongTermMemory`) from the runtime.
+- [x] `collection_for(base, org_id)` applied consistently when building RAG (`RAGEngine`) and memory (`LongTermMemory`) from the runtime.
 - **Done:** same tenant → same collection in RAG and memory; different tenant → different.
 
 ### PHASE R5 — Settings (unified mode)
 #### R5-01 — `runtime_mode`
-- [ ] `settings.runtime_mode: Literal["global","context"] = "global"`; `build_runtime` propagates it to Y and Z.
-- [ ] Backward-compat: derive from `tool_provider_mode` if set.
+- [x] `settings.runtime_mode: Literal["global","context"] = "global"`; `build_runtime` propagates it to Y and Z.
+- [x] Backward-compat: derive from `tool_provider_mode` if set.
 
 ### PHASE R6 — Lifecycle
 #### R6-01 — aclose + context manager
-- [ ] `aclose()` closes MCP/vstore/checkpointer; `async with build_runtime(...)`.
+- [x] `aclose()` closes MCP/vstore/checkpointer; `async with build_runtime(...)`.
 - **Done:** teardown test verifies the close calls.
 
 ### PHASE R7 — Exception + graph integration
 #### R7-01 — `RuntimeCompositionError`
-- [ ] In `core/exceptions.py`.
+- [x] In `core/exceptions.py`.
 #### R7-02 — graph accepts context providers
-- [ ] Confirm/adjust `get_async_compiled_graph(tool_provider=, vector_store_provider=)` (consistency with Z).
+- [x] Confirm/adjust `get_async_compiled_graph(tool_provider=, vector_store_provider=)` (consistency with Z).
 
 ### PHASE R8 — Tests + Docs + Example
 #### R8-01 — Tests
-- [ ] Composition (5 ports), non-duplication (uses Y/Z builders), tenant (collection_for), context isolation (`asyncio.gather`), lifecycle (aclose), backward-compat (without build_runtime).
+- [x] Composition (5 ports), non-duplication (uses Y/Z builders), tenant (collection_for), context isolation (`asyncio.gather`), lifecycle (aclose), backward-compat (without build_runtime).
 #### R8-02 — Docs + example
-- [ ] `docs/composition-root.md` (server lifespan + dashboard contract); `examples/composition_root.py`.
+- [x] `docs/composition-root.md` (server lifespan + dashboard contract); `examples/composition_root.py`.
 
 ### HARDENING
-- [ ] Coverage ≥ 85% in `composition*`; `ruff`/`mypy --strict`/`bandit` clean; `pytest -m "not live_api"` 100%.
-- [ ] `CLAUDE.md` + `README.md` + Obsidian notes updated with the composition root.
+- [x] Coverage ≥ 85% in `composition*`; `ruff`/`mypy --strict`/`bandit` clean; `pytest -m "not live_api"` 100%.
+- [x] `CLAUDE.md` + `README.md` + Obsidian notes updated with the composition root.
 
 ---
 
@@ -136,15 +136,15 @@ Coverage: RF-CR-001..012 mapped.
 
 ## 7. Definition of Done (Global for Phase R)
 
-- [ ] `RuntimeContext`/`RuntimeConfig`/`build_runtime` implemented; composes 5 ports without duplicating Y/Z.
-- [ ] Global and context modes; `runtime_mode` in settings; `collection_for` per `org_id` in RAG+memory.
-- [ ] `aclose()` + async context manager; `RuntimeCompositionError`.
-- [ ] `build_test_runtime` with fakes; backward-compat (individual injection still valid).
-- [ ] Host contract (`prismal-server` lifespan) and dashboard documented.
-- [ ] `docs/composition-root.md` + `examples/composition_root.py`.
-- [ ] Coverage ≥ 85%; `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
-- [ ] `CLAUDE.md` + `README.md` + Obsidian notes updated.
-- [ ] PR merged with review.
+- [x] `RuntimeContext`/`RuntimeConfig`/`build_runtime` implemented; composes 5 ports without duplicating Y/Z.
+- [x] Global and context modes; `runtime_mode` in settings; `collection_for` per `org_id` in RAG+memory.
+- [x] `aclose()` + async context manager; `RuntimeCompositionError`.
+- [x] `build_test_runtime` with fakes; backward-compat (individual injection still valid).
+- [x] Host contract (`prismal-server` lifespan) and dashboard documented.
+- [x] `docs/composition-root.md` + `examples/composition_root.py`.
+- [x] Coverage ≥ 85%; `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
+- [x] `CLAUDE.md` + `README.md` + Obsidian notes updated.
+- [x] PR merged with review.
 
 ---
 
@@ -170,3 +170,4 @@ Coverage: RF-CR-001..012 mapped.
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | 1.0 | 2026-06-05 | Ernesto Crespo | Initial implementation plan — composition root |
+| 1.1 | 2026-06-09 | Ernesto Crespo | **IMPLEMENTED** in v3.1.3 (`prismal/composition/`). All tasks DONE. Deviation: vector store carried in `RuntimeContext` via `VectorStoreProvider` (Fase Z is factory-based — no `set_vector_store_provider` global / graph binding); logic in `runtime.py` (`__init__.py` thin re-export) for coverage. |
