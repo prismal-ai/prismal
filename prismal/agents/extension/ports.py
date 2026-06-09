@@ -162,6 +162,33 @@ class VectorStorePort(Protocol):
         ...
 
 
+@runtime_checkable
+class VectorStoreProviderPort(Protocol):
+    """Source of :class:`VectorStorePort` instances, resolvable per collection.
+
+    The composition root (Phase R) injects a provider that builds a vector store
+    for a given logical collection, applying per-tenant naming. Mirrors
+    :class:`ToolProviderPort` for the vector-store side: the core asks for a
+    store rather than constructing a backend.
+
+    Conforming implementation: ``prismal.composition.VectorStoreProvider`` (wraps
+    :class:`prismal.rag.vector_store_factory.VectorStoreFactory`). Phase Z ships a
+    factory rather than a process singleton, so the provider is always carried in
+    the :class:`~prismal.composition.RuntimeContext`.
+
+    ``get_store`` resolves the effective collection name (``collection_for`` with
+    the runtime's ``org_id``) and returns a backend adapter conforming to
+    :class:`VectorStorePort`.
+    """
+
+    @property
+    def org_id(self) -> str | None: ...
+
+    def get_store(self, collection_name: str | None = None) -> VectorStorePort:
+        """Return a vector store for *collection_name* (tenant-suffixed)."""
+        ...
+
+
 def conforms_to(obj: Any, port: type) -> bool:
     """Return ``True`` if ``obj`` structurally satisfies ``port``.
 
@@ -181,5 +208,6 @@ __all__ = [
     "ToolPort",
     "ToolProviderPort",
     "VectorStorePort",
+    "VectorStoreProviderPort",
     "conforms_to",
 ]
