@@ -79,7 +79,7 @@ class ConfigSourcePort(Protocol):
 
     def load(self) -> Mapping[str, ConfigValue]:
         """Return the raw configuration mapping. Sync; must not raise."""
-        ...
+        raise NotImplementedError
 
 
 def _parse_dotenv(path: Path) -> dict[str, str]:
