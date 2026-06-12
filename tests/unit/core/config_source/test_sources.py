@@ -72,9 +72,7 @@ class TestChainedConfigSource:
             def load(self) -> dict[str, str]:
                 raise RuntimeError("backing store down")
 
-        chained = ChainedConfigSource(
-            [Boom(), MappingConfigSource({"K": "survives"})]
-        )
+        chained = ChainedConfigSource([Boom(), MappingConfigSource({"K": "survives"})])
         # must not raise; the broken source is skipped
         assert dict(chained.load()) == {"K": "survives"}
 
@@ -94,9 +92,7 @@ class TestEnvConfigSource:
     def test_env_wins_over_dotenv(self, tmp_path) -> None:
         dotenv = tmp_path / ".env"
         dotenv.write_text("PRISMAL_DEFAULT_MODEL=from-file\n")
-        src = EnvConfigSource(
-            env={"PRISMAL_DEFAULT_MODEL": "from-env"}, dotenv_path=dotenv
-        )
+        src = EnvConfigSource(env={"PRISMAL_DEFAULT_MODEL": "from-env"}, dotenv_path=dotenv)
         assert src.load()["PRISMAL_DEFAULT_MODEL"] == "from-env"
 
     def test_reads_dotenv_when_env_absent(self, tmp_path) -> None:
@@ -106,9 +102,7 @@ class TestEnvConfigSource:
         assert src.load()["PRISMAL_DEFAULT_MODEL"] == "from-file"
 
     def test_missing_dotenv_is_silently_skipped(self, tmp_path) -> None:
-        src = EnvConfigSource(
-            env={"PRISMAL_DEFAULT_MODEL": "v"}, dotenv_path=tmp_path / "nope.env"
-        )
+        src = EnvConfigSource(env={"PRISMAL_DEFAULT_MODEL": "v"}, dotenv_path=tmp_path / "nope.env")
         assert dict(src.load()) == {"PRISMAL_DEFAULT_MODEL": "v"}
 
     def test_legacy_alias_mirrored_when_prismal_unset(self) -> None:

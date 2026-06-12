@@ -43,11 +43,15 @@ class TestApplyOrgOverridesWithSource:
         global_before = get_config_source()
         base = build_settings(MappingConfigSource({}))
         acme = apply_org_overrides(
-            base, "acme", None,
+            base,
+            "acme",
+            None,
             source=MappingConfigSource({"PRISMAL_DEFAULT_MODEL": "acme"}),
         )
         globex = apply_org_overrides(
-            base, "globex", None,
+            base,
+            "globex",
+            None,
             source=MappingConfigSource({"PRISMAL_DEFAULT_MODEL": "globex"}),
         )
         assert acme.default_model == "acme"

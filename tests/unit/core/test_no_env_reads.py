@@ -96,9 +96,7 @@ def _literal_config_key_reads(tree: ast.AST) -> list[str]:
 def _is_exempt(relative: Path) -> bool:
     if relative in _EXEMPT_FILES:
         return True
-    return any(
-        relative == d or d in relative.parents for d in _EXEMPT_DIRS
-    )
+    return any(relative == d or d in relative.parents for d in _EXEMPT_DIRS)
 
 
 def test_core_does_not_read_config_from_os_environ() -> None:

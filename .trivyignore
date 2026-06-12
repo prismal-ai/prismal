@@ -59,3 +59,16 @@ CVE-2026-3219
 # TRIGGER de re-evaluacion: chromadb publica first_patched_version ->
 # quitar ignore y subir. Triage: `prismal doctor security-check`.
 CVE-2026-45829
+
+# --- torch 2.11.0 -> CVE-2025-3000 (sin fix upstream) --------
+# CRITICAL — memory corruption en `torch.jit.script` (first_patched=None:
+# no existe version parcheada). El vector exige compilar/scriptar codigo
+# controlado por el atacante en el host local ("It is possible to launch the
+# attack on the local host"). Surface: prismal solo hace inferencia/embeddings
+# (sentence-transformers / open-clip), NO scripta modelos con torch.jit desde
+# entrada de usuario, y torch entra solo via los extras opcionales
+# [multimodal-*]/[ml]. Riesgo residual local aceptado. Mismo ignore en
+# pip-audit (.pre-commit-config.yaml + ci.yml).
+# TRIGGER de re-evaluacion: PyTorch publica first_patched_version para
+# CVE-2025-3000 -> subir y quitar este ignore.
+CVE-2025-3000

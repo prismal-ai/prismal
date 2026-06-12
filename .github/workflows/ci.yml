@@ -140,6 +140,7 @@ jobs:
         --ignore-vuln=CVE-2026-1839
         --ignore-vuln=CVE-2026-3219
         --ignore-vuln=CVE-2026-45829
+        --ignore-vuln=CVE-2025-3000
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: ./.github/actions/setup-python-env

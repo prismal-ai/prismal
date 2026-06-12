@@ -493,7 +493,7 @@ This package follows [Semantic Versioning](https://semver.org/).
 Tag format for releases: `prismal/vMAJOR.MINOR.PATCH`
 
 ```bash
-git tag prismal/v3.1.3
+git tag prismal/v3.1.4
 git push --tags
 ```
 
@@ -521,7 +521,7 @@ twine upload --repository testpypi dist/*          # validate on TestPyPI first
 # 3) Push history and publish prismal-ai
 git push origin main
 twine upload dist/*                                 # publish to PyPI
-git tag prismal/v3.1.3 && git push --tags         # tag format: prismal/vMAJOR.MINOR.PATCH
+git tag prismal/v3.1.4 && git push --tags         # tag format: prismal/vMAJOR.MINOR.PATCH
 
 # 4) Publish the deprecated compatibility bridge (lightagent-agents -> prismal-ai)
 cd compat/lightagent-agents

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `prismal` is the **agent framework layer** extracted from the larger `lightagent` monorepo. It is a standalone, publishable PyPI package containing everything needed to build and run AI agents — no web server, dashboard, or CLI. It was published as `lightagent-agents` through v2.x and **rebranded to `prismal` in v3.0.0** (distribution name plus the `lightagent.*` → `prismal.*` import namespace; see `propuesta.md` / `PLAN_MIGRACION.md`). The sibling app package (still named `lightagent`) historically depended on this one and shared the import namespace — see the namespace note below.
 
-Current version: **3.1.3** (single source of truth: `pyproject.toml`; history in `CHANGELOG.md`; release tag format `prismal/vMAJOR.MINOR.PATCH`). Pushing a release tag triggers both `release.yml` (PyPI + GitHub Release with notes extracted from the CHANGELOG section) and `docker-publish.yml` (container image to GHCR `ghcr.io/prismal-ai/prismal`, tagged `X.Y.Z` + `latest`; manual dispatch publishes `dev`).
+Current version: **3.1.4** (single source of truth: `pyproject.toml`; history in `CHANGELOG.md`; release tag format `prismal/vMAJOR.MINOR.PATCH`). Pushing a release tag triggers both `release.yml` (PyPI + GitHub Release with notes extracted from the CHANGELOG section) and `docker-publish.yml` (container image to GHCR `ghcr.io/prismal-ai/prismal`, tagged `X.Y.Z` + `latest`; manual dispatch publishes `dev`).
 
 ## Common commands
 

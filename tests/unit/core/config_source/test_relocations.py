@@ -28,9 +28,7 @@ class TestTavilyRelocation:
 
         fake_mod = types.ModuleType("langchain_community.tools.tavily_search")
         fake_mod.TavilySearchResults = _FakeTavily
-        monkeypatch.setitem(
-            sys.modules, "langchain_community.tools.tavily_search", fake_mod
-        )
+        monkeypatch.setitem(sys.modules, "langchain_community.tools.tavily_search", fake_mod)
 
         from prismal.agents.tools import web_search
 
@@ -59,9 +57,7 @@ class TestTavilyRelocation:
 
         tavily_mod = types.ModuleType("langchain_community.tools.tavily_search")
         tavily_mod.TavilySearchResults = _FakeTavily
-        monkeypatch.setitem(
-            sys.modules, "langchain_community.tools.tavily_search", tavily_mod
-        )
+        monkeypatch.setitem(sys.modules, "langchain_community.tools.tavily_search", tavily_mod)
 
         class _FakeDDG:
             def run(self, query: str) -> str:
