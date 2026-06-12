@@ -29,6 +29,36 @@ from prismal.core.exceptions import MCPConnectionError, MCPToolError
 from prismal.core.logging import get_logger
 
 
+def resolve_secret(name: str) -> str:
+    """Resolve a named secret for MCP auth (Phase W — SPEC-CSI-010).
+
+    ``token_env`` on an MCP server config names *where* the bearer token lives.
+    Resolution prefers the injected :class:`ConfigSourcePort` (so a host that owns
+    configuration — Vault, AWS Secrets Manager, a tenant row — controls MCP auth
+    too), and falls back to ``os.environ`` for parity when no source is injected
+    or the name is absent from it.
+
+    Args:
+        name: The env-var / secret name (e.g. ``"SERPAPI_TOKEN"``).
+
+    Returns:
+        The resolved secret value, or ``""`` when unavailable. Never raises.
+    """
+    from pydantic import SecretStr
+
+    from prismal.core.config_source import get_config_source
+
+    source = get_config_source()
+    if source is not None:
+        try:
+            value = source.load().get(name)
+        except Exception:  # config source must never break MCP auth
+            value = None
+        if value is not None:
+            return value.get_secret_value() if isinstance(value, SecretStr) else str(value)
+    return os.environ.get(name, "")
+
+
 def _kill_process_tree(pids: list[int]) -> None:
     """Terminate a list of PIDs and all their descendants.
 
@@ -454,7 +484,7 @@ class MCPServerConnection:
         url: str = os.path.expandvars(self._config.url or "")
         headers: dict[str, str] = {}
         if self._config.auth and self._config.auth.type == "bearer":
-            token = os.environ.get(self._config.auth.token_env, "")
+            token = resolve_secret(self._config.auth.token_env)
             if not token:
                 logger.warning(
                     "mcp_sse_auth_token_missing",
@@ -492,7 +522,7 @@ class MCPServerConnection:
         url: str = os.path.expandvars(self._config.url or "")
         headers: dict[str, str] = {}
         if self._config.auth and self._config.auth.type == "bearer":
-            token = os.environ.get(self._config.auth.token_env, "")
+            token = resolve_secret(self._config.auth.token_env)
             if not token:
                 logger.warning(
                     "mcp_streamable_http_auth_token_missing",

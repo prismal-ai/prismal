@@ -271,6 +271,8 @@ repos:
           - --ignore-vuln=CVE-2026-3219
           # chromadb 1.5.8: CVE-2026-45829 sin first_patched_version
           - --ignore-vuln=CVE-2026-45829
+          # torch 2.11.0: CVE-2025-3000 (torch.jit.script, local-only) sin fix
+          - --ignore-vuln=CVE-2025-3000
           - --skip-editable
         pass_filenames: false
         files: ^(pyproject\.toml|uv\.lock)$

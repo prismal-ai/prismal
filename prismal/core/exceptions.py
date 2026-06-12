@@ -321,6 +321,30 @@ class RuntimeCompositionError(PrismalError):
         super().__init__(f"Failed to compose runtime port '{port}': {cause}")
 
 
+# ── Configuration source injection (Fase W) ────────────────────────────────────
+
+
+class ConfigSourceError(PrismalError):
+    """No usable configuration source (Phase W — SPEC-CSI-012).
+
+    Raised by :func:`prismal.core.config.build_settings` when no
+    :class:`~prismal.core.config_source.ConfigSourcePort` is injected and
+    ``settings.config_source_strict`` is ``True`` (a host that must never read
+    the ambient environment), or when an injected source fails irrecoverably.
+
+    Args:
+        source: The failing source name (e.g. ``"none"``, ``"vault"``).
+        cause: Optional human-readable description of the underlying failure.
+    """
+
+    def __init__(self, source: str, cause: str = "") -> None:
+        """Initialize ConfigSourceError."""
+        self.source = source
+        self.cause = cause
+        msg = f"Configuration source '{source}' unavailable"
+        super().__init__(f"{msg}: {cause}" if cause else msg + ".")
+
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 

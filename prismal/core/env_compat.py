@@ -1,62 +1,39 @@
-"""Backward-compatibility for the legacy ``LIGHTAGENT_`` environment prefix.
+"""Deprecated shim for the legacy ``LIGHTAGENT_`` environment prefix (Phase W).
 
-Prismal reads configuration from ``PRISMAL_*`` environment variables (renamed
-from ``LIGHTAGENT_*`` in v3.0.0). To avoid breaking existing deployments, this
-module mirrors any still-present ``LIGHTAGENT_<NAME>`` variable onto
-``PRISMAL_<NAME>`` — but only when the new name is unset — and emits a single
-``DeprecationWarning`` listing what was mirrored.
+Historically this module mirrored any still-present ``LIGHTAGENT_<NAME>`` variable
+onto ``PRISMAL_<NAME>`` by **mutating ``os.environ`` on import** of
+:mod:`prismal.core`. Phase W removed that global, import-time side effect: the
+legacy ``LIGHTAGENT_* → PRISMAL_*`` mirror now lives inside
+:class:`prismal.core.config_source.EnvConfigSource.load`, where it is explicit,
+local, and active only when that source is actually used (the default).
 
-The mirror runs once, on first import of :mod:`prismal.core` (which every
-settings consumer and built-in skill imports transitively), so it is active
-before any :func:`os.getenv` call or ``Settings`` instantiation reads the
-environment.
-
-This shim is transitional and will be removed in a future major release once
-users have migrated their environment to the ``PRISMAL_`` prefix.
+:func:`apply_legacy_env_aliases` is retained only as a backward-compatible
+**no-op** shim that emits a ``DeprecationWarning`` and no longer touches
+``os.environ``. It is **not** called at import time. It will be removed in a
+future major release.
 """
 
 from __future__ import annotations
 
-import os
 import warnings
-
-_LEGACY_PREFIX = "LIGHTAGENT_"
-_NEW_PREFIX = "PRISMAL_"
-_applied = False
 
 
 def apply_legacy_env_aliases() -> list[str]:
-    """Mirror ``LIGHTAGENT_*`` env vars onto ``PRISMAL_*`` (idempotent).
+    """DEPRECATED no-op (Phase W). Returns ``[]`` and mutates nothing.
 
-    For each ``LIGHTAGENT_<NAME>`` present in the environment whose
-    ``PRISMAL_<NAME>`` counterpart is unset, copies the value across so legacy
-    configuration keeps working. Returns the list of legacy names mirrored.
+    The legacy ``LIGHTAGENT_* → PRISMAL_*`` mirror now happens inside
+    :meth:`prismal.core.config_source.EnvConfigSource.load`. This shim no longer
+    reads or writes ``os.environ`` and is not invoked at import time.
+
+    Returns:
+        An empty list (kept for signature compatibility with the old API).
     """
-    global _applied
-    if _applied:
-        return []
-    _applied = True
-
-    mirrored: list[str] = []
-    for key, value in list(os.environ.items()):
-        if not key.startswith(_LEGACY_PREFIX):
-            continue
-        new_key = _NEW_PREFIX + key[len(_LEGACY_PREFIX) :]
-        if new_key not in os.environ:
-            os.environ[new_key] = value
-            mirrored.append(key)
-
-    if mirrored:
-        warnings.warn(
-            "The 'LIGHTAGENT_' environment-variable prefix is deprecated; "
-            "rename these to 'PRISMAL_': " + ", ".join(sorted(mirrored)) + ". "
-            "Legacy names still work for now but will be removed in a future "
-            "major release.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-    return mirrored
-
-
-# Activate on import (see module docstring).
-apply_legacy_env_aliases()
+    warnings.warn(
+        "prismal.core.env_compat.apply_legacy_env_aliases() is deprecated and is "
+        "now a no-op: the LIGHTAGENT_ -> PRISMAL_ mirror moved into "
+        "EnvConfigSource.load() (Phase W). It no longer mutates os.environ and "
+        "will be removed in a future major release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return []

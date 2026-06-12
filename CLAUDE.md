@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `prismal` is the **agent framework layer** extracted from the larger `lightagent` monorepo. It is a standalone, publishable PyPI package containing everything needed to build and run AI agents — no web server, dashboard, or CLI. It was published as `lightagent-agents` through v2.x and **rebranded to `prismal` in v3.0.0** (distribution name plus the `lightagent.*` → `prismal.*` import namespace; see `propuesta.md` / `PLAN_MIGRACION.md`). The sibling app package (still named `lightagent`) historically depended on this one and shared the import namespace — see the namespace note below.
 
-Current version: **3.1.3** (single source of truth: `pyproject.toml`; history in `CHANGELOG.md`; release tag format `prismal/vMAJOR.MINOR.PATCH`). Pushing a release tag triggers both `release.yml` (PyPI + GitHub Release with notes extracted from the CHANGELOG section) and `docker-publish.yml` (container image to GHCR `ghcr.io/prismal-ai/prismal`, tagged `X.Y.Z` + `latest`; manual dispatch publishes `dev`).
+Current version: **3.1.4** (single source of truth: `pyproject.toml`; history in `CHANGELOG.md`; release tag format `prismal/vMAJOR.MINOR.PATCH`). Pushing a release tag triggers both `release.yml` (PyPI + GitHub Release with notes extracted from the CHANGELOG section) and `docker-publish.yml` (container image to GHCR `ghcr.io/prismal-ai/prismal`, tagged `X.Y.Z` + `latest`; manual dispatch publishes `dev`).
 
 ## Common commands
 
@@ -192,6 +192,18 @@ A single composition *facade* that assembles every core port from `settings` plu
 - `agents/extension/ports.py` — adds `VectorStoreProviderPort` (`get_store(collection_name=None) -> VectorStorePort`); `core/exceptions.py` — `RuntimeCompositionError(port, cause)`.
 
 **Implementation note (deviation from the SPEC text):** Fase Z ships a *factory*, not a process singleton or a graph-bound provider, so the vector store is **always** carried in the `RuntimeContext` via `VectorStoreProvider` — there is no `set_vector_store_provider` global to inject in global mode (the SPEC assumed a Z singleton + `get_async_compiled_graph(vector_store_provider=...)`). Consumers resolve tenant stores with `ctx.vector_store_provider.get_store(...)`; the graph signature is unchanged.
+
+### Config source injection (Fase W — `specs/config-source-injection/`, implemented)
+
+Configuration is inverted as a hexagonal port (mirror of Y/Z): the core stops *reading* `.env`/`os.environ` and instead *consumes* an injected `ConfigSourcePort` that *supplies* raw values; `Settings` keeps its schema and only validates. **Additive and opt-in** — with no source injected the default `EnvConfigSource` reproduces today's behaviour byte-for-byte, so the ~151 `get_settings()` call sites are untouched. User guide: `docs/configuration.md`; examples: `examples/config_source_{env,custom}.py`.
+
+- `core/config_source.py` — `ConfigSourcePort` (`@runtime_checkable` Protocol, sync `load() -> Mapping[str, str|SecretStr]`, must not raise) + sources: `EnvConfigSource` (the **only** core reader of `os.environ`/`.env`; folds in the legacy `LIGHTAGENT_` mirror **into the returned mapping**, no global mutation; honours unprefixed provider keys), `MappingConfigSource`, `ChainedConfigSource` (first-wins, sub-error skipped), `FakeConfigSource`. Global registry `set_config_source()`/`get_config_source()` (invalidates the `get_settings` cache).
+- `core/config.py` — `env_file` dropped from `Settings.model_config`; `settings_customise_sources()` adapts the injected port via a `_ConfigSourceSettingsSource(EnvSettingsSource)` subclass (preserves prefix/`AliasChoices`/JSON-list decoding); init kwargs still win. `build_settings(source=None)` (pure, per-tenant; uses a `ContextVar` for isolation), `get_settings()` delegates behind `@lru_cache`, `reload_settings()`. New fields `tavily_api_key`, `config_source_strict`.
+- `core/env_compat.py` — the legacy `LIGHTAGENT_` mirror moved into `EnvConfigSource`; `apply_legacy_env_aliases()` is a deprecated **no-op** shim and is **no longer called at import** (`core/__init__.py` import-time side effect removed → importing `prismal.core` mutates zero `os.environ`).
+- `core/exceptions.py` — `ConfigSourceError(source, cause)` (raised by `build_settings` when `config_source_strict` and no source).
+- **Relocated reads (W4):** `agents/tools.py` `TAVILY_API_KEY` → `settings.tavily_api_key`; `mcp/connection.py` `token_env` → `resolve_secret(name)` (prefers injected source, falls back to `os.environ`). The single LiteLLM `os.environ.setdefault` write-bridge in `providers/registry.py` stays, fed only from injected `Settings`.
+- `composition/config_sources.py` — `apply_org_overrides(settings, org_id, overrides, *, source=None)` threads a per-tenant source via `build_settings(source)` (no global mutation).
+- **AST guard** `tests/unit/core/test_no_env_reads.py` forbids new literal config `os.getenv`/`os.environ` reads in `prismal/**` (exempt: `core/config_source.py`, `providers/registry.py`, `skills/` plugins, `mcp/servers/` standalone subprocesses). Test `.env` isolation is now handled by an autouse fixture in `tests/conftest.py` that injects `EnvConfigSource(dotenv_path=None)` + clears LLM-provider env keys (Phase W replaced the old `model_config["env_file"]=None` patch, which is now a no-op).
 
 ### Security (5-layer defense-in-depth)
 

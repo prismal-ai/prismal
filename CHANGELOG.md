@@ -12,6 +12,73 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [3.1.4] — 2026-06-12
+
+Config source injection (**Fase W** — `specs/config-source-injection/`).
+Configuration is inverted into a hexagonal port (mirror of Fase Y/Z): the core
+stops *reading* `.env`/`os.environ` and instead *consumes* an injected
+`ConfigSourcePort` that *supplies* raw values; `Settings` keeps its schema and
+only validates. **Additive and opt-in**: with no source injected the default
+`EnvConfigSource` reproduces today's behaviour byte-for-byte, so the ~151
+`get_settings()` call sites are untouched. Docs: `docs/configuration.md`;
+examples: `examples/config_source_{env,custom}.py`.
+
+### Added — config source injection (Fase W)
+
+- **`prismal.core.config_source`** module — `ConfigSourcePort`
+  (`@runtime_checkable` Protocol, sync `load() -> Mapping[str, str | SecretStr]`,
+  must not raise) plus sources: `EnvConfigSource` (the only core reader of
+  `os.environ`/`.env`; folds the legacy `LIGHTAGENT_` mirror into its returned
+  mapping with no global mutation; honours unprefixed provider keys),
+  `MappingConfigSource`, `ChainedConfigSource` (first-wins, sub-error skipped),
+  and `FakeConfigSource`. Global registry `set_config_source()` /
+  `get_config_source()` (invalidates the `get_settings` cache).
+- **`build_settings(source=None)`** (`core/config.py`) — pure, per-tenant
+  constructor (`ContextVar`-isolated); `get_settings()` delegates behind
+  `@lru_cache`; `reload_settings()`. New fields `tavily_api_key`,
+  `config_source_strict`.
+- **`ConfigSourceError(source, cause)`** (`core/exceptions.py`) — raised by
+  `build_settings` when `config_source_strict` and no source is available.
+- **`apply_org_overrides(settings, org_id, overrides, *, source=None)`**
+  (`composition/config_sources.py`) — threads a per-tenant source via
+  `build_settings(source)` with no global mutation (Fase R consumer).
+- **AST guard** `tests/unit/core/test_no_env_reads.py` — forbids new direct
+  config `os.getenv`/`os.environ` reads in `prismal/**` (exempt:
+  `EnvConfigSource`, the LiteLLM write-bridge).
+
+### Changed — config source injection (Fase W)
+
+- `Settings` drops `env_file` from `model_config`; `settings_customise_sources()`
+  adapts the injected port via a `_ConfigSourceSettingsSource(EnvSettingsSource)`
+  subclass (preserves prefix / `AliasChoices` / JSON-list decoding); init kwargs
+  still win.
+- Relocated raw config reads: `agents/tools.py` `TAVILY_API_KEY` →
+  `settings.tavily_api_key`; `mcp/connection.py` `token_env` →
+  `resolve_secret(name)` (injected source first, `os.environ` fallback).
+- `core/env_compat.py`: the legacy `LIGHTAGENT_` mirror moved into
+  `EnvConfigSource`; `apply_legacy_env_aliases()` is now a deprecated no-op and
+  is no longer called at import — importing `prismal.core` mutates zero
+  `os.environ`.
+
+### Fixed
+
+- `reload_settings()` no longer raises `AttributeError` when `get_settings` is
+  monkeypatched with a plain function (clears the cache only when present);
+  fixes 7 unrelated tests that errored at teardown under the autouse `.env`
+  isolation fixture.
+
+### Security
+
+- Bump `pypdf` to `>=6.12.0` (installed 6.13.2) — fixes **CVE-2026-48155** and
+  **CVE-2026-48156** (crafted-PDF DoS via layout-mode extraction / `/W [0 0 0]`
+  cross-reference streams).
+- Triage **CVE-2025-3000** (`torch` `torch.jit.script` memory corruption,
+  local-only, no upstream fix) — added to the mirrored ignore list
+  (`.trivyignore` + `.pre-commit-config.yaml` + `ci.yml`) with justification and
+  re-evaluation trigger.
+
+---
+
 ## [3.1.3] — 2026-06-09
 
 Runtime composition root (**Fase R** — `specs/composition-root/`). A single

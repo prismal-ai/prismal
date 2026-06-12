@@ -106,9 +106,9 @@ def web_search(query: str) -> str:
         Formatted search results with titles, URLs and snippets, or an
         error message if both backends are unavailable.
     """
-    import os
-
-    tavily_key = os.environ.get("TAVILY_API_KEY", "")
+    # Phase W: resolved from Settings (the injected ConfigSourcePort), not a raw
+    # os.environ read — so a host that owns config controls web search too.
+    tavily_key = get_settings().tavily_api_key.get_secret_value()
     if tavily_key:
         try:
             from langchain_community.tools.tavily_search import TavilySearchResults
