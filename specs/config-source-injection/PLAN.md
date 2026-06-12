@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-06-07 |
 | **Reviewers** | Tech Lead, AI Architect, Security Lead |
@@ -93,37 +93,37 @@ The schema already exists (`Settings`, fully typed and validated). Pydantic Sett
 ### 5.1 In Scope (Phase W)
 
 **W1 — `ConfigSourcePort` (`prismal/core/config_source.py`):**
-- [ ] `ConfigSourcePort` Protocol: `load() -> Mapping[str, str | SecretStr]` (sync, must not raise; returns what it can).
-- [ ] Concrete sources: `EnvConfigSource` (default — env + optional `.env` + legacy `LIGHTAGENT_` mirror), `MappingConfigSource` (dict / in-memory), `ChainedConfigSource` (ordered precedence), `FakeConfigSource` (tests).
+- [x] `ConfigSourcePort` Protocol: `load() -> Mapping[str, str | SecretStr]` (sync, must not raise; returns what it can).
+- [x] Concrete sources: `EnvConfigSource` (default — env + optional `.env` + legacy `LIGHTAGENT_` mirror), `MappingConfigSource` (dict / in-memory), `ChainedConfigSource` (ordered precedence), `FakeConfigSource` (tests).
 
 **W2 — Settings consumes the port (`prismal/core/config.py`):**
-- [ ] Remove `env_file=".env"` from `model_config`; the file/env reading lives only in `EnvConfigSource`.
-- [ ] `settings_customise_sources()` plugs the injected `ConfigSourcePort` as highest-priority source.
-- [ ] `build_settings(source: ConfigSourcePort | None = None) -> Settings` — pure constructor over a source.
-- [ ] `get_settings()` delegates to the injected/default source; `reload_settings()` clears the cache.
+- [x] Remove `env_file=".env"` from `model_config`; the file/env reading lives only in `EnvConfigSource`.
+- [x] `settings_customise_sources()` plugs the injected `ConfigSourcePort` as highest-priority source.
+- [x] `build_settings(source: ConfigSourcePort | None = None) -> Settings` — pure constructor over a source.
+- [x] `get_settings()` delegates to the injected/default source; `reload_settings()` clears the cache.
 
 **W3 — Injection registry (`prismal/core/config_source.py`):**
-- [ ] `set_config_source(source)` / `get_config_source()` (global, variant A); `config_source_strict` behaviour.
-- [ ] Context variant (B): `build_settings(source=...)` threaded by the composition root per tenant.
+- [x] `set_config_source(source)` / `get_config_source()` (global, variant A); `config_source_strict` behaviour.
+- [x] Context variant (B): `build_settings(source=...)` threaded by the composition root per tenant.
 
 **W4 — Relocate direct `os.getenv` reads onto Settings/port:**
-- [ ] `agents/tools.py` `TAVILY_API_KEY` → `settings.tavily_api_key` (new field).
-- [ ] `mcp/connection.py` `token_env` → resolved via a host-injected secret resolver / config source.
-- [ ] `providers/registry.py` LiteLLM bridge reads only from injected `Settings` (keeps the single `os.environ.setdefault` write LiteLLM requires).
-- [ ] `sandbox/manager.py`, `sandbox/isolation.py` config reads → `Settings` fields (already declared, e.g. `sandbox_env_allowlist`).
+- [x] `agents/tools.py` `TAVILY_API_KEY` → `settings.tavily_api_key` (new field).
+- [x] `mcp/connection.py` `token_env` → resolved via a host-injected secret resolver / config source.
+- [x] `providers/registry.py` LiteLLM bridge reads only from injected `Settings` (keeps the single `os.environ.setdefault` write LiteLLM requires).
+- [x] `sandbox/manager.py`, `sandbox/isolation.py` config reads → `Settings` fields (already declared, e.g. `sandbox_env_allowlist`).
 
 **W5 — Legacy shim relocation (`prismal/core/env_compat.py`):**
-- [ ] Move `LIGHTAGENT_*` → `PRISMAL_*` aliasing **into** `EnvConfigSource` (no global `os.environ` mutation); keep a deprecated, no-op-on-double-call shim that emits the same `DeprecationWarning`.
+- [x] Move `LIGHTAGENT_*` → `PRISMAL_*` aliasing **into** `EnvConfigSource` (no global `os.environ` mutation); keep a deprecated, no-op-on-double-call shim that emits the same `DeprecationWarning`.
 
 **W6 — Exception + settings flags (`core/exceptions.py`, `core/config.py`):**
-- [ ] `ConfigSourceError` (carries the failing source name).
-- [ ] `config_source_strict: bool = False` (no source + strict → raise instead of default-env fallback).
+- [x] `ConfigSourceError` (carries the failing source name).
+- [x] `config_source_strict: bool = False` (no source + strict → raise instead of default-env fallback).
 
 **W7 — Host/dashboard contract:**
-- [ ] Document how `prismal-server` builds a source (env/Vault) and injects it; how `composition-root` threads per-tenant sources; the stable schema `prismal-dashboard` edits.
+- [x] Document how `prismal-server` builds a source (env/Vault) and injects it; how `composition-root` threads per-tenant sources; the stable schema `prismal-dashboard` edits.
 
 **W8 — Tests + docs + example:**
-- [ ] AST guard test (no new direct config `os.getenv` in core); parity test (default source == today's behaviour); per-tenant isolation test; `docs/configuration.md`; `examples/config_source_{env,custom}.py`.
+- [x] AST guard test (no new direct config `os.getenv` in core); parity test (default source == today's behaviour); per-tenant isolation test; `docs/configuration.md`; `examples/config_source_{env,custom}.py`.
 
 ### 5.2 Out of Scope
 
@@ -260,17 +260,17 @@ s = build_settings(FakeConfigSource({"PRISMAL_DEFAULT_MODEL": "claude-test"}))
 
 ## 12. Definition of Done (Global for Phase W)
 
-- [ ] `ConfigSourcePort` + `EnvConfigSource`/`MappingConfigSource`/`ChainedConfigSource`/`FakeConfigSource` implemented.
-- [ ] `Settings` consumes the injected source; `env_file` removed from core `model_config`; `build_settings`/`reload_settings` in place.
-- [ ] `set_config_source`/`get_config_source` + `config_source_strict`; context variant threadable by the composition root.
-- [ ] All in-scope direct `os.getenv` config reads relocated (W4); legacy mirror moved into `EnvConfigSource` (no import-time `os.environ` write).
-- [ ] Default deployment behaves byte-for-byte as today (parity test green).
-- [ ] AST guard forbids new direct config `os.getenv` in core; `ConfigSourceError` defined.
-- [ ] Host contract (`prismal-server`, `composition-root`) and dashboard schema documented.
-- [ ] `docs/configuration.md` + `examples/config_source_env.py` + `examples/config_source_custom.py`.
-- [ ] Coverage ≥ 85%; `pytest -m "not live_api"` 100%; `ruff` / `mypy --strict` / `bandit` clean.
-- [ ] `CLAUDE.md` + `README.md` + `specs/roadmap.md` updated.
-- [ ] PR merged with review.
+- [x] `ConfigSourcePort` + `EnvConfigSource`/`MappingConfigSource`/`ChainedConfigSource`/`FakeConfigSource` implemented.
+- [x] `Settings` consumes the injected source; `env_file` removed from core `model_config`; `build_settings`/`reload_settings` in place.
+- [x] `set_config_source`/`get_config_source` + `config_source_strict`; context variant threadable by the composition root.
+- [x] All in-scope direct `os.getenv` config reads relocated (W4); legacy mirror moved into `EnvConfigSource` (no import-time `os.environ` write).
+- [x] Default deployment behaves byte-for-byte as today (parity test green).
+- [x] AST guard forbids new direct config `os.getenv` in core; `ConfigSourceError` defined.
+- [x] Host contract (`prismal-server`, `composition-root`) and dashboard schema documented.
+- [x] `docs/configuration.md` + `examples/config_source_env.py` + `examples/config_source_custom.py`.
+- [x] Coverage ≥ 85%; `pytest -m "not live_api"` 100%; `ruff` / `mypy --strict` / `bandit` clean.
+- [x] `CLAUDE.md` + `README.md` + `specs/roadmap.md` updated.
+- [x] PR merged with review.
 
 ---
 
