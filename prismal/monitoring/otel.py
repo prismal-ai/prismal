@@ -261,6 +261,24 @@ class OTelManager:
             "prismal.tool_provider_subprovider_errors_total",
             description="Sub-provider failures swallowed by CompositeToolProvider",
         )
+        # Cost & Budget Governance (Phase C — SPEC-CST-OTEL-001)
+        self._counters["budget_tokens"] = self._meter.create_counter(
+            "prismal.budget_tokens_total",
+            description="Tokens metered by the budget engine (attributed)",
+        )
+        self._counters["budget_cost_usd"] = self._meter.create_counter(
+            "prismal.budget_cost_usd_total",
+            description="Cost metered by the budget engine, in micro-USD (attributed)",
+        )
+        self._counters["budget_cutoffs"] = self._meter.create_counter(
+            "prismal.budget_cutoffs_total",
+            description="Budget cutoffs by dimension and action (degrade|abort)",
+        )
+        self._histograms["cost_per_call_usd"] = self._meter.create_histogram(
+            "prismal.cost_per_call_usd",
+            description="Estimated USD cost per individual LLM call",
+            unit="USD",
+        )
         self._histograms["agent_latency"] = self._meter.create_histogram(
             "prismal.agent_latency_seconds",
             description="Agent execution latency in seconds",
