@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-06-07 |
 | **PLAN** | `specs/config-source-injection/PLAN.md` |
@@ -36,64 +36,64 @@ Guiding principle: **invert the source, not the schema**. `Settings` (fields/def
 
 ### PHASE W1 — Port + sources
 #### W1-01 — Protocol + concrete sources
-- [ ] Create `prismal/core/config_source.py` with `ConfigSourcePort`, `EnvConfigSource`, `MappingConfigSource`, `ChainedConfigSource`, `FakeConfigSource`.
-- [ ] `EnvConfigSource` reads `os.environ` + optional `.env` + folds in the `LIGHTAGENT_*` mirror (no global mutation); honours unprefixed provider keys.
+- [x] Create `prismal/core/config_source.py` with `ConfigSourcePort`, `EnvConfigSource`, `MappingConfigSource`, `ChainedConfigSource`, `FakeConfigSource`.
+- [x] `EnvConfigSource` reads `os.environ` + optional `.env` + folds in the `LIGHTAGENT_*` mirror (no global mutation); honours unprefixed provider keys.
 - **Done:** each source's `load()` is sync, never raises; `EnvConfigSource` parity fixture matches today.
 #### W1-02 — Injection registry
-- [ ] `set_config_source` (invalidates cache via `reload_settings`), `get_config_source`, `_default_source`.
+- [x] `set_config_source` (invalidates cache via `reload_settings`), `get_config_source`, `_default_source`.
 - **Done:** injecting then `get_config_source()` returns the source.
 
 ### PHASE W2 — Settings wiring
 #### W2-01 — `settings_customise_sources`
-- [ ] Adapt the injected port into a `PydanticBaseSettingsSource`; precedence init kwargs > injected source; drop `env_file` from `model_config`.
+- [x] Adapt the injected port into a `PydanticBaseSettingsSource`; precedence init kwargs > injected source; drop `env_file` from `model_config`.
 - **Done:** `Settings(field=...)` still wins; env/.env read only via the source.
 #### W2-02 — Constructors
-- [ ] `build_settings(source=None)`; `get_settings()` delegates (`@lru_cache`); `reload_settings()`.
+- [x] `build_settings(source=None)`; `get_settings()` delegates (`@lru_cache`); `reload_settings()`.
 - **Done:** `build_settings(FakeConfigSource({...}))` builds without touching env.
 
 ### PHASE W3 — New fields + exception
 #### W3-01 — Fields
-- [ ] `tavily_api_key: SecretStr`; `config_source_strict: bool`.
+- [x] `tavily_api_key: SecretStr`; `config_source_strict: bool`.
 #### W3-02 — Exception
-- [ ] `ConfigSourceError` in `core/exceptions.py`.
+- [x] `ConfigSourceError` in `core/exceptions.py`.
 - **Done:** strict + no source → `ConfigSourceError`.
 
 ### PHASE W4 — Relocate raw reads
 #### W4-01 — tavily
-- [ ] `agents/tools.py`: `os.environ["TAVILY_API_KEY"]` → `get_settings().tavily_api_key`.
+- [x] `agents/tools.py`: `os.environ["TAVILY_API_KEY"]` → `get_settings().tavily_api_key`.
 #### W4-02 — mcp token_env
-- [ ] `mcp/connection.py`: resolve `token_env` via a `resolve_secret(name)` helper backed by the injected source (deferred default = os.environ lookup for parity).
+- [x] `mcp/connection.py`: resolve `token_env` via a `resolve_secret(name)` helper backed by the injected source (deferred default = os.environ lookup for parity).
 #### W4-03 — providers/registry LiteLLM bridge
-- [ ] Confirm the bridge reads only `self._settings`; keep the single `os.environ.setdefault` write; remove any direct `getenv`.
+- [x] Confirm the bridge reads only `self._settings`; keep the single `os.environ.setdefault` write; remove any direct `getenv`.
 #### W4-04 — sandbox
-- [ ] `sandbox/manager.py`, `sandbox/isolation.py`: config reads via `Settings` fields (e.g. `sandbox_env_allowlist`, `is_production`).
+- [x] `sandbox/manager.py`, `sandbox/isolation.py`: config reads via `Settings` fields (e.g. `sandbox_env_allowlist`, `is_production`).
 - **Done:** only `os.environ` *read* of config left in core is inside `EnvConfigSource`; only *write* is the LiteLLM bridge.
 
 ### PHASE W5 — Legacy shim relocation
 #### W5-01 — env_compat
-- [ ] Remove the import-time `apply_legacy_env_aliases()` call; turn it into a deprecated no-op shim; emit the `DeprecationWarning` from `EnvConfigSource` on first mirror.
+- [x] Remove the import-time `apply_legacy_env_aliases()` call; turn it into a deprecated no-op shim; emit the `DeprecationWarning` from `EnvConfigSource` on first mirror.
 - **Done:** importing `prismal.core` performs zero `os.environ` writes (snapshot test).
 
 ### PHASE W6 — Composition-root integration (Phase R consumer)
 #### W6-01 — apply_org_overrides
-- [ ] `composition/config_sources.py`: `apply_org_overrides(..., *, source=None)` builds from `build_settings(source)` then applies overrides; no global mutation.
+- [x] `composition/config_sources.py`: `apply_org_overrides(..., *, source=None)` builds from `build_settings(source)` then applies overrides; no global mutation.
 - **Done:** two tenants via `build_runtime(build_settings(MappingConfigSource(...)), mode="context")` share no config state.
 
 ### PHASE W7 — Host/dashboard contract
 #### W7-01 — Docs
-- [ ] `docs/configuration.md`: global injection, secrets-manager chain, per-tenant context, dashboard schema table.
+- [x] `docs/configuration.md`: global injection, secrets-manager chain, per-tenant context, dashboard schema table.
 
 ### PHASE W8 — Tests + Docs + Examples
 #### W8-01 — Tests
-- [ ] Parity (default source == today), sources (mapping/chained precedence/sub-error skip/fake purity), injection (cache invalidation), strict, relocation (tavily/token_env/sandbox/LiteLLM), no-import-time-mutation, isolation, backward-compat.
+- [x] Parity (default source == today), sources (mapping/chained precedence/sub-error skip/fake purity), injection (cache invalidation), strict, relocation (tavily/token_env/sandbox/LiteLLM), no-import-time-mutation, isolation, backward-compat.
 #### W8-02 — AST guard
-- [ ] `tests/unit/core/test_no_env_reads.py`: forbid new direct config `os.getenv` in `prismal/**` (exempt `EnvConfigSource`, LiteLLM bridge).
+- [x] `tests/unit/core/test_no_env_reads.py`: forbid new direct config `os.getenv` in `prismal/**` (exempt `EnvConfigSource`, LiteLLM bridge).
 #### W8-03 — Examples
-- [ ] `examples/config_source_env.py`, `examples/config_source_custom.py` (Vault-style).
+- [x] `examples/config_source_env.py`, `examples/config_source_custom.py` (Vault-style).
 
 ### HARDENING
-- [ ] Coverage ≥ 85% on `config_source*`; `ruff` / `mypy --strict` / `bandit` clean; `pytest -m "not live_api"` 100%.
-- [ ] `CLAUDE.md` (Provider isolation / core one-liners) + `README.md` + `specs/roadmap.md` updated.
+- [x] Coverage ≥ 85% on `config_source*`; `ruff` / `mypy --strict` / `bandit` clean; `pytest -m "not live_api"` 100%.
+- [x] `CLAUDE.md` (Provider isolation / core one-liners) + `README.md` + `specs/roadmap.md` updated.
 
 ---
 
@@ -146,15 +146,15 @@ Coverage: RF-CSI-001..013 mapped.
 
 ## 7. Definition of Done (Global for Phase W)
 
-- [ ] `ConfigSourcePort` + `EnvConfigSource`/`MappingConfigSource`/`ChainedConfigSource`/`FakeConfigSource` + registry implemented.
-- [ ] `Settings` consumes the source; `env_file` removed; `build_settings`/`reload_settings`; `get_settings()` signature unchanged.
-- [ ] All in-scope raw `os.getenv` config reads relocated; legacy mirror in `EnvConfigSource`; no import-time `os.environ` write.
-- [ ] `ConfigSourceError` + `config_source_strict` + `tavily_api_key`; composition-root `apply_org_overrides(*, source=)`.
-- [ ] Parity, isolation, AST guard, and backward-compat tests green; default deployment byte-for-byte identical.
-- [ ] `docs/configuration.md` + two examples; host/dashboard contract documented.
-- [ ] Coverage ≥ 85%; `pytest -m "not live_api"` 100%; `ruff` / `mypy --strict` / `bandit` clean.
-- [ ] `CLAUDE.md` + `README.md` + `specs/roadmap.md` updated.
-- [ ] PR merged with review.
+- [x] `ConfigSourcePort` + `EnvConfigSource`/`MappingConfigSource`/`ChainedConfigSource`/`FakeConfigSource` + registry implemented.
+- [x] `Settings` consumes the source; `env_file` removed; `build_settings`/`reload_settings`; `get_settings()` signature unchanged.
+- [x] All in-scope raw `os.getenv` config reads relocated; legacy mirror in `EnvConfigSource`; no import-time `os.environ` write.
+- [x] `ConfigSourceError` + `config_source_strict` + `tavily_api_key`; composition-root `apply_org_overrides(*, source=)`.
+- [x] Parity, isolation, AST guard, and backward-compat tests green; default deployment byte-for-byte identical.
+- [x] `docs/configuration.md` + two examples; host/dashboard contract documented.
+- [x] Coverage ≥ 85%; `pytest -m "not live_api"` 100%; `ruff` / `mypy --strict` / `bandit` clean.
+- [x] `CLAUDE.md` + `README.md` + `specs/roadmap.md` updated.
+- [x] PR merged with review.
 
 ---
 

@@ -5,12 +5,56 @@ Loads from environment variables (prefix: PRISMAL_) and optional .env file. All
 configuration is validated at startup.
 """
 
+from collections.abc import Mapping
+from contextvars import ContextVar
 from functools import lru_cache
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AliasChoices, Field, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+from pydantic_settings.sources import EnvSettingsSource
+from pydantic_settings.sources.providers.env import parse_env_vars  # type: ignore[attr-defined]
+
+if TYPE_CHECKING:
+    from prismal.core.config_source import ConfigSourcePort
+
+# Per-construction config source, set by ``build_settings`` and read by
+# ``Settings.settings_customise_sources``. A ContextVar (not a plain global) so
+# concurrent per-tenant ``build_settings(source)`` calls never clobber each
+# other (SPEC-CSI-008 isolation).
+_active_source: "ContextVar[ConfigSourcePort | None]" = ContextVar(
+    "_prismal_active_config_source", default=None
+)
+
+
+class _ConfigSourceSettingsSource(EnvSettingsSource):
+    """Adapt a :class:`ConfigSourcePort` into a Pydantic settings source.
+
+    Subclasses ``EnvSettingsSource`` and overrides only the raw key/value
+    loading so Pydantic's prefix handling, ``validation_alias`` /
+    ``AliasChoices`` resolution, case-insensitivity and JSON decoding of complex
+    fields (``list[str]``, …) all keep working — the only thing that changes is
+    *where the raw strings come from* (the injected port instead of
+    ``os.environ``). ``SecretStr`` values from the source are unwrapped to their
+    plaintext so the env decoder can coerce them; ``Settings`` re-wraps secret
+    fields as ``SecretStr``.
+    """
+
+    def __init__(self, settings_cls: type[BaseSettings], mapping: Mapping[str, Any]) -> None:
+        self._port_mapping: dict[str, str] = {
+            key: (value.get_secret_value() if isinstance(value, SecretStr) else str(value))
+            for key, value in mapping.items()
+        }
+        super().__init__(settings_cls)
+
+    def _load_env_vars(self) -> Mapping[str, str | None]:
+        return parse_env_vars(
+            self._port_mapping,
+            self.case_sensitive,
+            self.env_ignore_empty,
+            self.env_parse_none_str,
+        )
 
 
 class MaintenanceSettings(BaseSettings):
@@ -77,7 +121,9 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="PRISMAL_",
-        env_file=".env",
+        # NOTE: ``env_file`` is intentionally NOT set (Phase W). All env / .env
+        # reading is funnelled through the injected ``ConfigSourcePort`` (the
+        # default ``EnvConfigSource`` reproduces the old ``.env`` behaviour).
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -87,6 +133,34 @@ class Settings(BaseSettings):
         # code that constructs ``Settings(default_model=...)`` directly.
         populate_by_name=True,
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,  # noqa: ARG003 — replaced by the port
+        dotenv_settings: PydanticBaseSettingsSource,  # noqa: ARG003 — replaced by the port
+        file_secret_settings: PydanticBaseSettingsSource,  # noqa: ARG003 — replaced
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Plug the injected ``ConfigSourcePort`` as the configuration source (Phase W).
+
+        Precedence: init kwargs > injected ``ConfigSourcePort`` > nothing. The
+        native ``env_settings`` / ``dotenv_settings`` are dropped — all env / file
+        reading is funnelled through the source (the default ``EnvConfigSource``
+        preserves today's resolution). When no source is active (e.g. a bare
+        ``Settings()`` not routed through ``build_settings``), the default source
+        is used, keeping the ~151 existing call sites byte-for-byte compatible.
+        """
+        from prismal.core.config_source import get_config_source
+
+        source = _active_source.get() or get_config_source()
+        if source is None:
+            from prismal.core.config_source import _default_source
+
+            source = _default_source()
+        mapping = source.load()
+        return (init_settings, _ConfigSourceSettingsSource(settings_cls, mapping))
 
     # ── LLM ──────────────────────────────────────────────────────────
     llm_provider: str = Field(
@@ -184,6 +258,17 @@ class Settings(BaseSettings):
             "GOOGLE_API_KEY",
         ),
         description="Google AI API key (PRISMAL_GOOGLE_API_KEY or GOOGLE_API_KEY)",
+    )
+    tavily_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices(
+            "PRISMAL_TAVILY_API_KEY",
+            "TAVILY_API_KEY",
+        ),
+        description=(
+            "Tavily web-search API key (PRISMAL_TAVILY_API_KEY or TAVILY_API_KEY). "
+            "Relocated from a direct os.environ read in agents/tools.py (Fase W)."
+        ),
     )
 
     # ── Security ──────────────────────────────────────────────────────
@@ -1209,6 +1294,16 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Config source injection (Fase W) ─────────────────────────────
+    config_source_strict: bool = Field(
+        default=False,
+        description=(
+            "If True, a missing injected ConfigSourcePort raises ConfigSourceError "
+            "instead of falling back to EnvConfigSource — for hosts that must "
+            "never read ambient environment."
+        ),
+    )
+
     # Runtime composition root (Phase R — SPEC-CR-006)
     runtime_mode: Literal["global", "context"] = Field(
         default="global",
@@ -1557,18 +1652,82 @@ class Settings(BaseSettings):
         return self.vector_store_path
 
 
+def build_settings(source: "ConfigSourcePort | None" = None) -> Settings:
+    """Build a :class:`Settings` from a configuration source (Phase W).
+
+    Pure constructor over a source — no global state, no caching — which makes
+    it the per-tenant / per-test path:
+
+    - *source* given → ``Settings`` is built from that source only.
+    - *source* ``None`` → uses the injected global source
+      (:func:`get_config_source`) or the default :class:`EnvConfigSource`.
+
+    Raises:
+        ConfigSourceError: when no source is available (none passed, none
+            injected) and ``config_source_strict`` is enabled — for hosts that
+            must never read ambient environment.
+    """
+    from prismal.core.config_source import _default_source, get_config_source
+
+    if source is None and get_config_source() is None:
+        # No explicit and no injected source: consult the default once to honour
+        # strict mode (the one allowed ambient read is the strict flag itself).
+        probe = _build_with_source(_default_source())
+        if probe.config_source_strict:
+            from prismal.core.exceptions import ConfigSourceError
+
+            raise ConfigSourceError(
+                "none",
+                "config_source_strict is set but no ConfigSourcePort was injected",
+            )
+        return probe
+
+    resolved = source or get_config_source()
+    assert resolved is not None  # narrowed by the branch above
+    return _build_with_source(resolved)
+
+
+def _build_with_source(source: "ConfigSourcePort") -> Settings:
+    """Construct ``Settings`` with *source* active for ``settings_customise_sources``."""
+    token = _active_source.set(source)
+    try:
+        return Settings()
+    finally:
+        _active_source.reset(token)
+
+
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """
     Return the cached application settings instance.
 
-    Uses lru_cache to ensure a single Settings object is created
-    and reused across the application lifetime.
+    Uses lru_cache to ensure a single Settings object is created and reused
+    across the application lifetime. Delegates to :func:`build_settings`, which
+    resolves the injected :class:`~prismal.core.config_source.ConfigSourcePort`
+    (or the default :class:`~prismal.core.config_source.EnvConfigSource`).
 
     Returns:
-        The singleton Settings instance loaded from env / .env file.
+        The singleton Settings instance built from the active config source.
     """
-    return Settings()
+    return build_settings()
+
+
+def reload_settings() -> None:
+    """Clear the :func:`get_settings` cache (Phase W).
+
+    Called by :func:`prismal.core.config_source.set_config_source` so the next
+    :func:`get_settings` call rebuilds ``Settings`` from the newly-injected
+    configuration source.
+
+    Defensive: tests frequently ``monkeypatch`` ``get_settings`` with a plain
+    function that has no ``cache_clear``. Because the autouse ``.env`` isolation
+    fixture runs ``set_config_source(None)`` during teardown *before* monkeypatch
+    restores the original, clearing a cache that no longer exists is a no-op
+    rather than an :class:`AttributeError`.
+    """
+    cache_clear = getattr(get_settings, "cache_clear", None)
+    if cache_clear is not None:
+        cache_clear()
 
 
 @lru_cache(maxsize=1)

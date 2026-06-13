@@ -22,6 +22,7 @@ from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
     from prismal.core.config import Settings
+    from prismal.core.config_source import ConfigSourcePort
 
 logger = get_logger("prismal.composition.config_sources")
 
@@ -163,6 +164,8 @@ def apply_org_overrides(
     settings: Settings,
     org_id: str | None,
     overrides: dict[str, Any] | None,
+    *,
+    source: ConfigSourcePort | None = None,
 ) -> Settings:
     """Return effective per-tenant settings without mutating the global (SPEC-CR-005).
 
@@ -171,16 +174,30 @@ def apply_org_overrides(
     are applied as a validated copy so a tenant can pin, e.g., a different
     ``vector_store_backend`` or model.
 
+    Phase W (SPEC-CSI-013): when *source* is given, the effective settings are
+    built from that per-tenant :class:`~prismal.core.config_source.ConfigSourcePort`
+    via :func:`~prismal.core.config.build_settings` (no global ``set_config_source``,
+    so parallel tenants never share config state), and *overrides* are layered on
+    top. When *source* is ``None`` the original behaviour is preserved exactly.
+
     Args:
-        settings: Base settings (left untouched).
+        settings: Base settings (left untouched). Used when *source* is ``None``.
         org_id: Tenant id, accepted for symmetry / future per-org policy.
-        overrides: Field overrides to apply on top of *settings*.
+        overrides: Field overrides to apply on top of the resolved settings.
+        source: Optional per-tenant config source (Phase W).
 
     Returns:
-        ``settings`` itself when there are no overrides, otherwise a new
-        validated ``Settings`` copy carrying them.
+        ``settings`` itself when there is neither a source nor overrides;
+        otherwise a new validated ``Settings`` copy carrying the tenant's config.
     """
     del org_id  # reserved — collection naming is handled by collection_for
+
+    if source is not None:
+        from prismal.core.config import build_settings
+
+        tenant = build_settings(source)
+        return tenant.model_copy(update=overrides) if overrides else tenant
+
     if not overrides:
         return settings
     # model_copy keeps the global untouched and avoids re-reading env / re-running

@@ -33,6 +33,7 @@ This package is the **agent framework layer** extracted from the larger monorepo
 - **Deterministic intent routing** — regex-based `match_intent()` ahead of LLM supervision
 - **Tool provider injection (implemented)** — `ToolProviderPort` hexagonal port: the host composes MCP/Skills/stub providers and injects them (`set_tool_provider` or per-session via graph config); the agent core no longer imports `prismal.mcp`/`prismal.skills` — see [`docs/tool-providers.md`](./docs/tool-providers.md) and [`specs/tool-provider-injection/`](./specs/tool-provider-injection/)
 - **Runtime composition root (implemented)** — `build_runtime(settings, *, org_id=None)` composes every core port (tool provider, vector store, embeddings, checkpointer, audit) into a `RuntimeContext` in a single call, with `global`/`context` modes (`settings.runtime_mode`), per-`org_id` collection isolation, coordinated `aclose()`, and `build_test_runtime` fakes — the one composition contract `prismal-server`/`prismal-dashboard` build on; see [`docs/composition-root.md`](./docs/composition-root.md) and [`specs/composition-root/`](./specs/composition-root/)
+- **Config source injection (implemented)** — `ConfigSourcePort` hexagonal port: the core stops reading `.env`/`os.environ` and consumes an injected source (`EnvConfigSource` default keeps byte-for-byte parity; `MappingConfigSource`/`ChainedConfigSource` compose secrets managers; per-tenant via `build_settings(source)`); `set_config_source` invalidates the `get_settings` cache, an AST guard forbids new config `os.getenv` in the core — see [`docs/configuration.md`](./docs/configuration.md) and [`specs/config-source-injection/`](./specs/config-source-injection/)
 - **120-tool global cap** enforced by the official `CompositeToolProvider` (legacy constants kept in `tool_registry.py`)
 - **Graph visualization** — `to_mermaid()` / `visualize()` / `save_graph_image()` (from `prismal.langgraph`) render any compiled graph or `SubgraphDefinition`; `SubgraphDefinition.to_mermaid()` and `visualize_supervisor_graph()` are one-line shortcuts (see `examples/visualize_graphs.py`)
 
@@ -283,9 +284,30 @@ Runnable examples: [`examples/tool_provider_host.py`](./examples/tool_provider_h
 
 ---
 
+### Config source injection (Phase W — implemented)
+
+Configuration is a hexagonal port (user guide: [`docs/configuration.md`](./docs/configuration.md); contracts: [`specs/config-source-injection/`](./specs/config-source-injection/)): the core stops *reading* `.env`/`os.environ` and instead *consumes* an injected `ConfigSourcePort` that *supplies* raw values. `Settings` keeps its schema and only validates. **Additive and opt-in** — with no source injected the default `EnvConfigSource` reproduces today's behaviour byte-for-byte, so the ~151 `get_settings()` call sites are untouched.
+
+```python
+from prismal.core.config_source import ChainedConfigSource, EnvConfigSource, set_config_source
+
+# Front a secrets manager, fall back to the environment (first-wins).
+set_config_source(ChainedConfigSource([VaultConfigSource(), EnvConfigSource()]))
+```
+
+- **Sources** (`prismal.core.config_source`): `EnvConfigSource` (the only core reader of `os.environ`/`.env`; folds the legacy `LIGHTAGENT_` mirror into its mapping, no global mutation), `MappingConfigSource`, `ChainedConfigSource` (first-wins, sub-error skipped), `FakeConfigSource` for tests.
+- **Global** — `set_config_source(source)` once per process; invalidates the `get_settings` cache so the next read rebuilds `Settings`.
+- **Per-tenant** — `build_settings(source)` is a pure constructor (no global state, `ContextVar`-isolated); composition-root threads it via `apply_org_overrides(*, source=...)`.
+- **Strict** — `config_source_strict=True` makes `build_settings` raise `ConfigSourceError` when no source is available instead of falling back.
+- **Guardrail** — an AST guard (`tests/unit/core/test_no_env_reads.py`) forbids new direct config `os.getenv`/`os.environ` reads in `prismal/**` (exempt: `EnvConfigSource`, the LiteLLM write-bridge).
+
+Runnable examples: [`examples/config_source_env.py`](./examples/config_source_env.py), [`examples/config_source_custom.py`](./examples/config_source_custom.py).
+
+---
+
 ## Roadmap — features to build
 
-Already implemented: extension surface (Phase X), tool provider injection (Phase Y), advanced architectures (Phase A/B/C), multimodal (Phase F), Kokoro (Phase K), Skynet (Phase S), the **vector store port (Phase Z)**, and the dependency remediation (18/18 alerts in a terminal state).
+Already implemented: extension surface (Phase X), tool provider injection (Phase Y), advanced architectures (Phase A/B/C), multimodal (Phase F), Kokoro (Phase K), Skynet (Phase S), the **vector store port (Phase Z)**, the **runtime composition root (Phase R)**, the **config source injection (Phase W)**, and the dependency remediation (18/18 alerts in a terminal state).
 
 What remains, **ordered from fast-and-necessary → complex-and-less-necessary**. Each feature has its SDD contract in [`specs/`](./specs/). Status: `spec ready` = ready to build (PLAN/ARCHITECTURE/SPEC/TASKS); `PRD seed` = PRD only, needs expansion before building.
 
@@ -307,6 +329,7 @@ Rule: **contract/logic → framework (`prismal/`); serving HTTP, authenticating,
 | 1 | Tool Provider (Phase Y) | ✅ ports/providers (`agents/extension`) | composes and injects at startup |
 | 2 | Vector Store Port (Phase Z) | ✅ `rag/stores/` + `VectorStorePort` | picks the backend via config |
 | 3 | Composition Root (Phase R) | ✅ `prismal/composition/` · `build_runtime()` / `RuntimeContext` | calls it in the lifespan |
+| 3b | Config Source Injection (Phase W) | ✅ `core/config_source.py` · `ConfigSourcePort` / `build_settings(source)` | owns secrets/`.env`, injects per-tenant sources |
 | 4 | Cost & Budget Governance | ✅ guard in `react_loop` + patterns | per-tenant quotas |
 | 5 | A2A / Agent Cards (Phase I) | ✅ types · card · client · `A2AToolProvider` · handler | **HTTP endpoint (`/a2a`, `/.well-known/agent-card.json`) + auth** |
 | 6 | Agent Identity & Governance | ✅ `PolicyEngine` + identity port (`security/`) | **IdP/OAuth + credential vault + DID issuance/rotation** |
@@ -470,7 +493,7 @@ This package follows [Semantic Versioning](https://semver.org/).
 Tag format for releases: `prismal/vMAJOR.MINOR.PATCH`
 
 ```bash
-git tag prismal/v3.1.3
+git tag prismal/v3.1.4
 git push --tags
 ```
 
@@ -498,7 +521,7 @@ twine upload --repository testpypi dist/*          # validate on TestPyPI first
 # 3) Push history and publish prismal-ai
 git push origin main
 twine upload dist/*                                 # publish to PyPI
-git tag prismal/v3.1.3 && git push --tags         # tag format: prismal/vMAJOR.MINOR.PATCH
+git tag prismal/v3.1.4 && git push --tags         # tag format: prismal/vMAJOR.MINOR.PATCH
 
 # 4) Publish the deprecated compatibility bridge (lightagent-agents -> prismal-ai)
 cd compat/lightagent-agents
