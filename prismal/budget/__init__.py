@@ -11,7 +11,13 @@ from __future__ import annotations
 
 from prismal.budget.guard import BudgetGuard, make_budget_guard_fn
 from prismal.budget.meter import CostMeter
-from prismal.budget.resolve import get_budget_guard, resolve_budget, seed_budget_run
+from prismal.budget.resolve import (
+    clear_budget_run,
+    get_budget_guard,
+    maybe_seed_budget_run,
+    resolve_budget,
+    seed_budget_run,
+)
 from prismal.budget.types import (
     Budget,
     BudgetScope,
@@ -31,9 +37,11 @@ __all__ = [
     "Degradation",
     "TokenCounts",
     "Usage",
+    "clear_budget_run",
     "extract_token_usage",
     "get_budget_guard",
     "make_budget_guard_fn",
+    "maybe_seed_budget_run",
     "resolve_budget",
     "seed_budget_run",
 ]

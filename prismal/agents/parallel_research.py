@@ -36,6 +36,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 
 from prismal.agents.patterns.parallel import make_parallel_dispatcher
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
+from prismal.budget.resolve import get_budget_guard
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
 
@@ -144,6 +145,7 @@ async def parallel_researcher_worker(state: AgentState) -> dict[str, Any]:
             agent_name="parallel_researcher_worker",
             max_iterations=_MAX_WORKER_ITERATIONS,
             session_id=str(session_id) if session_id else None,
+            budget_guard=get_budget_guard(state),
         ),
     )
 

@@ -40,8 +40,71 @@ if TYPE_CHECKING:
 
     from prismal.agents.extension.ports import ToolProviderPort
     from prismal.agents.extension.providers import StubToolProvider
+    from prismal.budget.guard import BudgetGuard
 
 logger = get_logger("prismal.agents.tool_registry")
+
+
+def _resolve_model_name(llm: object) -> str:
+    """Best-effort model id for cost attribution from a (possibly bound) LLM."""
+    for obj in (llm, getattr(llm, "bound", None)):
+        model = getattr(obj, "model", None) or getattr(obj, "model_name", None)
+        if isinstance(model, str) and model:
+            return model
+    return "unknown"
+
+
+def _meter_response(
+    budget_guard: BudgetGuard | None, response: object, llm: object, agent_name: str
+) -> None:
+    """Record one LLM response against the per-run meter (no-op without a guard)."""
+    if budget_guard is None:
+        return
+    from contextlib import suppress
+
+    with suppress(Exception):
+        budget_guard.meter.record_response(
+            response, _resolve_model_name(llm), agent=agent_name
+        )
+
+
+def _budget_partial_or_none(
+    budget_guard: BudgetGuard | None,
+    response: object,
+    *,
+    agent_name: str,
+    session_id: str | None,
+) -> object | None:
+    """Pre-call hard-cap check: return a best-effort partial AIMessage to stop the
+    loop when the budget is exhausted, else None to proceed.
+
+    The cutoff is audited via the guard; the hard-cap exception is swallowed so a
+    metered turn ends with a partial answer rather than crashing.
+    """
+    if budget_guard is None:
+        return None
+    status = budget_guard.check()
+    if not status.hard_exceeded:
+        return None
+
+    from contextlib import suppress
+
+    from langchain_core.messages import AIMessage
+
+    from prismal.core.exceptions import BudgetExceeded
+
+    with suppress(BudgetExceeded):
+        budget_guard.enforce()  # audits the cutoff; raise swallowed for graceful exit
+    logger.warning(
+        "react_loop.budget_exhausted",
+        agent=agent_name,
+        dimension=status.breached_dimension,
+        session_id=session_id,
+    )
+    prior = str(getattr(response, "content", "") or "").strip()
+    notice = "[Response truncated: budget exhausted.]"
+    content = f"{prior}\n\n{notice}".strip() if prior else notice
+    return AIMessage(content=content)
 
 # ---------------------------------------------------------------------------
 # Injected tool provider (variante A — SPEC-TPI-008)
@@ -671,6 +734,7 @@ async def react_loop(
     agent_name: str = "agent",
     max_iterations: int = _MAX_REACT_ITERATIONS,
     session_id: str | None = None,
+    budget_guard: BudgetGuard | None = None,
 ) -> object:
     """Execute a ReAct (Reason + Act) tool loop until the LLM returns a final answer.
 
@@ -703,6 +767,10 @@ async def react_loop(
         agent_name: Agent name, used only for structured log entries.
         max_iterations: Maximum number of LLM + tool-execution cycles.
         session_id: Optional session ID for log correlation.
+        budget_guard: Optional cost/budget guard (Phase C). When provided, each
+            LLM response is metered and a hard cap before a call returns a
+            best-effort partial answer instead of calling the model. ``None``
+            (the default) leaves behaviour unchanged.
 
     Returns:
         The final :class:`~langchain_core.messages.AIMessage` produced by
@@ -719,6 +787,11 @@ async def react_loop(
     _tool_fail_counts: dict[str, int] = {}
 
     for iteration in range(max_iterations):
+        partial = _budget_partial_or_none(
+            budget_guard, response, agent_name=agent_name, session_id=session_id
+        )
+        if partial is not None:
+            return partial
         try:
             response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
                 llm,
@@ -754,6 +827,8 @@ async def react_loop(
                     )
                 )
             raise
+
+        _meter_response(budget_guard, response, llm, agent_name)
 
         tool_calls = getattr(response, "tool_calls", None) or []
         if not tool_calls:
@@ -922,6 +997,7 @@ async def react_loop(
                         )
                     )
                 raise
+            _meter_response(budget_guard, response, llm, agent_name)
             break
 
     else:
@@ -978,6 +1054,7 @@ async def react_loop(
                     )
                 )
             raise
+        _meter_response(budget_guard, response, llm, agent_name)
 
     return _sanitise_final_response(response)
 

@@ -109,6 +109,7 @@ async def test_cron_manager_node_calls_react_loop_with_system_prompt() -> None:
         agent_name: str,
         max_iterations: int,
         session_id: str | None,
+        budget_guard: object = None,
     ) -> AIMessage:
         """Capture the messages argument and return a stub AIMessage."""
         captured_calls.append(list(messages))
@@ -168,6 +169,7 @@ async def test_cron_manager_node_passes_session_id() -> None:
         agent_name: str,
         max_iterations: int,
         session_id: str | None,
+        budget_guard: object = None,
     ) -> AIMessage:
         """Capture session_id and return a stub AIMessage."""
         passed_session_ids.append(session_id)

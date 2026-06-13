@@ -792,6 +792,12 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
         message_count=len(state["messages"]),
     )
 
+    # Cost & budget governance (Phase C): seed the per-run meter/guard once per
+    # turn. No-op unless settings.budget_enabled — disabled path is unchanged.
+    from prismal.budget.resolve import maybe_seed_budget_run
+
+    maybe_seed_budget_run(state, get_settings())
+
     otel = OTelManager()
     with otel.start_span(
         "agent.supervisor",
