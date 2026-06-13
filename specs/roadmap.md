@@ -5,8 +5,8 @@
 | **Last updated** | 2026-06-12 |
 | **Package version** | 3.1.4 |
 | **Author** | Ernesto Crespo |
-| **Latest spec** | `config-source-injection/` (Phase W) — 2026-06-07 |
-| **Latest shipped** | `config-source-injection/` (Phase W) — 2026-06-12 (v3.1.4) |
+| **Latest spec** | `cost-budget-governance/` (Phase C) — 2026-06-12 |
+| **Latest shipped** | `cost-budget-governance/` (Phase C) — 2026-06-12 |
 
 Living index of every SDD under `specs/`: what has shipped, what is pending,
 and in which order the pending work fits together. Statuses are verified
@@ -32,10 +32,12 @@ Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented) ·
 | [`vector-store-port/`](./vector-store-port/) | Z | ✅ | `VectorStorePort` (Protocol) + `VectorStoreFactory` selectable via `settings.vector_store_backend` (default `chroma`); adapters in `rag/stores/` (chroma moved + shim, lancedb, sqlite_vec, qdrant, pgvector) with deferred imports + normalized score `[0,1]`; RAG + memory retyped; `FakeVectorStore`; extras `[lancedb]`/`[sqlite-vec]`/`[qdrant]`/`[pgvector]`. Docs: `docs/vector-stores.md` |
 | [`composition-root/`](./composition-root/) | R | ✅ | `build_runtime(settings, *, org_id=None)` composition facade in `prismal/composition/` — assembles all ports (tool provider Y, vector store Z, embeddings, checkpointer, audit) into a `RuntimeContext` with coordinated `aclose()`; `global`/`context` modes (`settings.runtime_mode`); per-`org_id` collection isolation (`collection_for`); `VectorStoreProvider`/`VectorStoreProviderPort`; `build_test_runtime` fakes; pure config loaders. Additive/opt-in. Docs: `docs/composition-root.md` · **v3.1.3** |
 | [`config-source-injection/`](./config-source-injection/) | W | ✅ | `ConfigSourcePort` hexagonal inversion of configuration: the core stops reading `.env`/`os.environ` and consumes an injected source. `EnvConfigSource` (default, byte-for-byte parity) + `MappingConfigSource`/`ChainedConfigSource`/`FakeConfigSource`; `set_config_source`/`build_settings`/`reload_settings`; `env_file` dropped from `Settings`; import-time `env_compat` mutation removed (legacy `LIGHTAGENT_` mirror folded into `EnvConfigSource`); `tavily_api_key`/`config_source_strict` fields + `ConfigSourceError`; raw `os.getenv` reads relocated (tavily, mcp `resolve_secret`); composition-root `apply_org_overrides(*, source=)`; AST guard. Additive/opt-in. Docs: `docs/configuration.md` · **v3.1.4** |
+| [`cost-budget-governance/`](./cost-budget-governance/) | C | ✅ | `prismal/budget/` enforcement layer (opt-in `budget_enabled`): `Budget`/`Usage`/`BudgetStatus` value objects (`0`=unlimited), `CostMeter` (auto token+cost extraction; `providers/cost.py` litellm-native + pricing-table fallback; OTel + `CostTracker` bridge), `BudgetGuard` (soft-cap degrade / hard-cap abort) + `make_budget_guard_fn`; `react_loop` metering + graceful partial; `budget_guard_fn` in the 5 expensive patterns (debate/ToT/LATS/MoA/reflection); per-turn seeding via an in-process registry (no live objects in checkpointed state); **unifies the dormant `skynet_token_budget`** under `BudgetExceeded`. Docs: `docs/budget.md` |
 
 Deferred to follow-up phases (noted in their specs): Skynet S+ (heterogeneous
-specialist swarms, token-budget *enforcement* — the `skynet_token_budget`
-setting and `SkynetBudgetExceeded` already ship —, remote workers via A2A).
+specialist swarms; metering *worker* token usage into the shared swarm budget —
+Phase C already enforces `skynet_token_budget` at the supervisor's planner/
+evaluator boundary via the unified budget engine; remote workers via A2A).
 
 ## 📋 Ready to implement (full SDD: PLAN + SPEC + ARCHITECTURE + TASKS)
 
@@ -47,7 +49,6 @@ setting and `SkynetBudgetExceeded` already ship —, remote workers via A2A).
 
 | Spec | What it adds | Depends on |
 |---|---|---|
-| [`cost-budget-governance/`](./cost-budget-governance/) | Per-run/session/tenant budgets, real-time cost/token metering, soft/hard circuit-breakers. Critical for the expensive patterns (debate, ToT, LATS, MoA, **Skynet swarms**) | — (Skynet's `skynet_token_budget` is a ready integration point) |
 | [`agent-eval-harness/`](./agent-eval-harness/) | System-level evaluation (the "scaffold gap"): trajectories, tool usage, RAG fidelity, adversarial robustness, cross-version regression | — |
 | [`agent-identity-governance/`](./agent-identity-governance/) | Per-agent identity (W3C DID), scoped per-agent credentials, OAuth-on-behalf delegation, auditable access policies | Foundation for A2A (I) and multi-tenant (R) |
 
@@ -66,8 +67,10 @@ setting and `SkynetBudgetExceeded` already ship —, remote workers via A2A).
    `build_settings` (per-tenant); import-time `env_compat` mutation removed; AST
    guard forbids new config `os.getenv` in the core. Strengthens
    `composition-root` (per-tenant config sources via `apply_org_overrides(*, source=)`).
-3. **`cost-budget-governance`** — first seed to mature into a full SDD: the
-   expensive patterns (and now Skynet swarms) run uncapped on spend today.
+3. ~~**`cost-budget-governance` (C)**~~ — ✅ **shipped**: `prismal/budget/`
+   meters real usage per run and enforces soft/hard caps in `react_loop` and the
+   expensive patterns; unifies the dormant `skynet_token_budget`. Opt-in via
+   `budget_enabled`.
 4. **`agent-identity-governance`** → **`a2a-interop` (I)** — identity first,
    then the interop layer that consumes it (and enables Skynet S+ remote
    workers).
