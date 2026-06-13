@@ -53,6 +53,9 @@ GenerateFn = Callable[..., Awaitable[str]]
 CritiqueFn = Callable[[str, "AgentState"], Awaitable[tuple[str, float]]]
 """Signature: ``critique_fn(draft, state) -> (feedback, score)``."""
 
+BudgetGuardFn = Callable[[dict[str, object]], Awaitable[bool]]
+"""Budget pre-check: ``await fn(ctx) -> bool`` (False = stop expanding)."""
+
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 
@@ -62,6 +65,7 @@ async def reflection_loop(
     state: AgentState,
     threshold: float = 0.85,
     max_iterations: int = 3,
+    budget_guard_fn: BudgetGuardFn | None = None,
 ) -> tuple[str, float]:
     """Run a generate-critique-refine loop and return the best draft.
 
@@ -129,6 +133,16 @@ async def reflection_loop(
     previous_critique: str | None = None
 
     for iteration in range(1, effective_max + 1):
+        # Budget pre-check before each *refinement* (iteration 1 always runs so a
+        # draft exists). A soft cap returns False → stop with the best draft so far.
+        if (
+            iteration > 1
+            and budget_guard_fn is not None
+            and not await budget_guard_fn({"pattern": "reflection", "iteration": iteration})
+        ):
+            logger.debug("reflection_budget_stop", iteration=iteration)
+            break
+
         if previous_draft is None:
             draft = await generate_fn(state)
         else:

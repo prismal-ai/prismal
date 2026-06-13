@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 from langchain_core.messages import AIMessage, HumanMessage
 
 from prismal.agents.tool_registry import react_loop
