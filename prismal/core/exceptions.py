@@ -45,9 +45,7 @@ class BudgetExceeded(PrismalError):  # noqa: N818 — SPEC-CST-ERR-001 name
             the unified Skynet budget, ``"skynet"``).
     """
 
-    def __init__(
-        self, dimension: str, used: float, limit: float, scope: str = "turn"
-    ) -> None:
+    def __init__(self, dimension: str, used: float, limit: float, scope: str = "turn") -> None:
         """Initialize BudgetExceeded."""
         self.dimension = dimension
         self.used = used

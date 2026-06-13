@@ -63,9 +63,7 @@ def _meter_response(
     from contextlib import suppress
 
     with suppress(Exception):
-        budget_guard.meter.record_response(
-            response, _resolve_model_name(llm), agent=agent_name
-        )
+        budget_guard.meter.record_response(response, _resolve_model_name(llm), agent=agent_name)
 
 
 def _budget_partial_or_none(
@@ -105,6 +103,7 @@ def _budget_partial_or_none(
     notice = "[Response truncated: budget exhausted.]"
     content = f"{prior}\n\n{notice}".strip() if prior else notice
     return AIMessage(content=content)
+
 
 # ---------------------------------------------------------------------------
 # Injected tool provider (variante A — SPEC-TPI-008)

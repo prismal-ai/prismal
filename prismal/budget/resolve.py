@@ -11,6 +11,7 @@ it back at the enforcement sites; ``clear_budget_run`` releases it.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from prismal.budget.guard import BudgetGuard
@@ -18,6 +19,7 @@ from prismal.budget.meter import CostMeter
 from prismal.budget.types import Budget, BudgetScope
 
 if TYPE_CHECKING:
+    from prismal.agents.state import AgentState
     from prismal.core.config import Settings
     from prismal.monitoring.cost_tracker import CostTracker
     from prismal.security.audit import AuditLogger
@@ -28,7 +30,7 @@ _RUN_ENGINES: dict[str, dict[str, Any]] = {}
 _DEFAULT_KEY = "_default"
 
 
-def _run_key(state: dict[str, Any]) -> str:
+def _run_key(state: Mapping[str, Any]) -> str:
     """Derive the registry key for a run from its state (the session id)."""
     if isinstance(state, dict):
         sid = state.get("session_id")
@@ -37,7 +39,7 @@ def _run_key(state: dict[str, Any]) -> str:
     return _DEFAULT_KEY
 
 
-def _turn_signature(state: dict[str, Any]) -> int:
+def _turn_signature(state: Mapping[str, Any]) -> int:
     """Count user turns (``HumanMessage``s) — a cheap per-turn signature.
 
     Stays constant across the supervisor's many hops within one turn and
@@ -66,7 +68,7 @@ def resolve_budget(settings: Settings, *, org_id: str | None = None) -> Budget: 
 
 
 def seed_budget_run(
-    state: dict[str, Any],
+    state: AgentState,
     settings: Settings,
     *,
     org_id: str | None = None,
@@ -103,7 +105,7 @@ def seed_budget_run(
 
 
 def maybe_seed_budget_run(
-    state: dict[str, Any],
+    state: AgentState,
     settings: Settings,
     *,
     org_id: str | None = None,
@@ -121,12 +123,10 @@ def maybe_seed_budget_run(
     existing = _RUN_ENGINES.get(_run_key(state))
     if existing is not None and existing.get("turn") == _turn_signature(state):
         return
-    seed_budget_run(
-        state, settings, org_id=org_id, cost_tracker=cost_tracker, audit=audit
-    )
+    seed_budget_run(state, settings, org_id=org_id, cost_tracker=cost_tracker, audit=audit)
 
 
-def get_budget_guard(state: dict[str, Any]) -> BudgetGuard | None:
+def get_budget_guard(state: AgentState) -> BudgetGuard | None:
     """Return the per-run :class:`BudgetGuard`, or None when disabled/unseeded."""
     bucket = _RUN_ENGINES.get(_run_key(state))
     if not bucket:
@@ -135,6 +135,6 @@ def get_budget_guard(state: dict[str, Any]) -> BudgetGuard | None:
     return guard if isinstance(guard, BudgetGuard) else None
 
 
-def clear_budget_run(state: dict[str, Any]) -> None:
+def clear_budget_run(state: AgentState) -> None:
     """Release the per-run engine for *state* (idempotent)."""
     _RUN_ENGINES.pop(_run_key(state), None)
