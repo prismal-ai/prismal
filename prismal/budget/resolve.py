@@ -11,7 +11,6 @@ it back at the enforcement sites; ``clear_budget_run`` releases it.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from prismal.budget.guard import BudgetGuard
@@ -19,6 +18,8 @@ from prismal.budget.meter import CostMeter
 from prismal.budget.types import Budget, BudgetScope
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from prismal.agents.state import AgentState
     from prismal.core.config import Settings
     from prismal.monitoring.cost_tracker import CostTracker
