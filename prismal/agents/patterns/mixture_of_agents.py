@@ -37,6 +37,8 @@ from prismal.providers.registry import ProviderRegistry
 from prismal.security.prompt_builder import SecurePromptBuilder
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from prismal.core.config import Settings
 
 logger = get_logger("prismal.agents.patterns.mixture_of_agents")
@@ -103,7 +105,12 @@ class MixtureOfAgents:
         self._n_aggregator_layers = n_aggregator_layers
         self._settings = settings if settings is not None else get_settings()
 
-    async def generate(self, query: str, state: Any) -> MoAResult:
+    async def generate(
+        self,
+        query: str,
+        state: Any,
+        budget_guard_fn: Callable[[dict[str, object]], Awaitable[bool]] | None = None,
+    ) -> MoAResult:
         """Run proposers in parallel, then ``n_aggregator_layers`` refinements."""
         del state  # reserved for future hooks
         otel = OTelManager()
@@ -121,6 +128,13 @@ class MixtureOfAgents:
             aggregator_llm = registry.get_llm(self._aggregator_model)
             current = list(proposer_outputs)
             for layer_idx in range(self._n_aggregator_layers):
+                # Budget pre-check before each aggregator refinement layer; a soft
+                # cap stops further layers and returns the current best synthesis.
+                if budget_guard_fn is not None and not await budget_guard_fn(
+                    {"pattern": "moa", "layer": layer_idx + 1}
+                ):
+                    logger.debug("moa_budget_stop", layer=layer_idx + 1)
+                    break
                 synth = await self._aggregate(aggregator_llm, query, current)
                 layer_outputs.append([synth])
                 current = [synth]

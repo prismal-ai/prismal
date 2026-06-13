@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from langchain_core.messages import SystemMessage
 
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
+from prismal.budget.resolve import get_budget_guard
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
 
@@ -176,6 +177,7 @@ async def coder_node(state: AgentState) -> dict[str, object]:
         messages,
         agent_name="coder",
         session_id=str(session_id) if session_id else None,
+        budget_guard=get_budget_guard(state),
     )
 
     logger.info("coder_complete", session_id=session_id)

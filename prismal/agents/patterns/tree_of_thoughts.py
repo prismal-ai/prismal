@@ -96,6 +96,9 @@ GenerateThoughtsFn = Callable[[str, Any, list[Thought]], Awaitable[list[str]]]
 EvaluateThoughtFn = Callable[[str, Any], Awaitable[float]]
 """``(content, state) -> score in [0, 1]``."""
 
+BudgetGuardFn = Callable[[dict[str, object]], Awaitable[bool]]
+"""Budget pre-check: ``await fn(ctx) -> bool`` (False = stop deepening)."""
+
 
 async def tree_of_thoughts(
     problem: str,
@@ -107,6 +110,7 @@ async def tree_of_thoughts(
     beam_size: int = 2,
     threshold: float = 0.9,
     search_strategy: Literal["bfs", "dfs", "beam"] = "beam",
+    budget_guard_fn: BudgetGuardFn | None = None,
 ) -> ToTResult:
     """Explore a reasoning tree rooted at *problem*.
 
@@ -168,6 +172,7 @@ async def tree_of_thoughts(
                 threshold=threshold,
                 all_thoughts=all_thoughts,
                 parent_map=parent_map,
+                budget_guard_fn=budget_guard_fn,
             )
         elif search_strategy == "bfs":
             terminal = await _bfs_search(
@@ -181,6 +186,7 @@ async def tree_of_thoughts(
                 threshold=threshold,
                 all_thoughts=all_thoughts,
                 parent_map=parent_map,
+                budget_guard_fn=budget_guard_fn,
             )
         elif search_strategy == "dfs":
             terminal = await _dfs_search(
@@ -194,6 +200,7 @@ async def tree_of_thoughts(
                 threshold=threshold,
                 all_thoughts=all_thoughts,
                 parent_map=parent_map,
+                budget_guard_fn=budget_guard_fn,
             )
         else:
             raise ValueError(f"Unknown search_strategy: {search_strategy!r}")
@@ -224,6 +231,16 @@ async def tree_of_thoughts(
 
 
 # ── Strategies ────────────────────────────────────────────────────────────────
+
+
+async def _budget_allows(budget_guard_fn: BudgetGuardFn | None, strategy: str, level: int) -> bool:
+    """True when there is no guard or the guard permits deepening one more level."""
+    if budget_guard_fn is None:
+        return True
+    allowed = await budget_guard_fn({"pattern": "tot", "strategy": strategy, "level": level})
+    if not allowed:
+        logger.debug("tot_budget_stop", strategy=strategy, level=level)
+    return allowed
 
 
 async def _expand_node(
@@ -272,11 +289,14 @@ async def _beam_search(
     threshold: float,
     all_thoughts: list[Thought],
     parent_map: dict[str, Thought],
+    budget_guard_fn: BudgetGuardFn | None = None,
 ) -> Thought | None:
     """Expand the top ``beam_size`` nodes each level; bail on threshold."""
     del breadth  # honoured by the generator via the API, not enforced here
     frontier = [root]
     for _d in range(depth):
+        if _d > 0 and not await _budget_allows(budget_guard_fn, "beam", _d):
+            break
         otel = OTelManager()
         level_children: list[Thought] = []
         for node in frontier:
@@ -317,11 +337,14 @@ async def _bfs_search(
     threshold: float,
     all_thoughts: list[Thought],
     parent_map: dict[str, Thought],
+    budget_guard_fn: BudgetGuardFn | None = None,
 ) -> Thought | None:
     """Expand every node at every level — unbounded fanout, use with care."""
     del breadth  # honoured by the generator
     frontier = [root]
     for _d in range(depth):
+        if _d > 0 and not await _budget_allows(budget_guard_fn, "bfs", _d):
+            break
         next_frontier: list[Thought] = []
         for node in frontier:
             children = await _expand_node(
@@ -355,12 +378,18 @@ async def _dfs_search(
     threshold: float,
     all_thoughts: list[Thought],
     parent_map: dict[str, Thought],
+    budget_guard_fn: BudgetGuardFn | None = None,
 ) -> Thought | None:
     """Descend the highest-scoring branch first, backtrack only on dead ends."""
     del breadth
 
     async def recurse(node: Thought, remaining: int) -> Thought | None:
         if remaining == 0:
+            return None
+        # Budget pre-check below the first level (root expansion always runs).
+        if remaining < depth and not await _budget_allows(
+            budget_guard_fn, "dfs", depth - remaining
+        ):
             return None
         children = await _expand_node(
             node=node,

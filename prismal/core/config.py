@@ -408,6 +408,53 @@ class Settings(BaseSettings):
         description="0 = unlimited; >0 = soft per-run token budget.",
     )
 
+    # ── Cost & Budget Governance (Phase C — SPEC-CST-CFG-001) ─────────
+    budget_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for the cost/budget governance layer.",
+    )
+    budget_max_tokens: int = Field(
+        default=0,
+        ge=0,
+        description="Per-run token ceiling (0 = unlimited).",
+    )
+    budget_max_cost_usd: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Per-run estimated USD ceiling (0 = unlimited).",
+    )
+    budget_max_calls: int = Field(
+        default=0,
+        ge=0,
+        description="Per-run LLM call ceiling (0 = unlimited).",
+    )
+    budget_max_wall_clock_s: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Per-run wall-clock ceiling in seconds (0 = unlimited).",
+    )
+    budget_scope: str = Field(
+        default="turn",
+        description="Budget accounting scope: turn | session | tenant.",
+    )
+    budget_soft_ratio: float = Field(
+        default=0.8,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of a limit at which a soft cap (degrade) fires.",
+    )
+    budget_hard_cap: bool = Field(
+        default=True,
+        description="True = abort (raise) on a hard cap; False = soft-only (warn).",
+    )
+    budget_pricing: dict[str, dict[str, float]] = Field(
+        default_factory=dict,
+        description=(
+            "Fallback per-model pricing for models LiteLLM cannot price: "
+            '{"model": {"input": usd_per_1k, "output": usd_per_1k}}.'
+        ),
+    )
+
     # ── Sandbox multi-lenguaje ────────────────────────────────────────
     sandbox_path: str = Field(
         default="sandbox",
@@ -1635,6 +1682,22 @@ class Settings(BaseSettings):
                 f"PRISMAL_SKYNET_SWARM_SIZE={self.skynet_swarm_size} exceeds the "
                 f"effective swarm cap min(skynet_max_swarm, parallel_max_workers)"
                 f"={self.skynet_max_swarm}. Lower the fixed size or raise the cap."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_budget(self) -> "Settings":
+        """Validate the cost/budget governance settings (C1-04 / SPEC-CST-CFG-001).
+
+        ``budget_soft_ratio`` is range-bound by its Field (``[0, 1]``); here we
+        reject an unknown ``budget_scope`` so a typo fails fast at load time
+        rather than silently disabling tenant accounting.
+        """
+        valid_scopes = {"turn", "session", "tenant"}
+        if self.budget_scope not in valid_scopes:
+            raise ValueError(
+                f"PRISMAL_BUDGET_SCOPE={self.budget_scope!r} is invalid; "
+                f"expected one of {sorted(valid_scopes)}."
             )
         return self
 
