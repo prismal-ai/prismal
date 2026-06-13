@@ -36,10 +36,10 @@ class _BudgetOn(_Settings):
 def test_graph_snapshot_unchanged_when_budget_toggled(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(graph_module, "get_settings", lambda: _Settings())
+    monkeypatch.setattr(graph_module, "get_settings", _Settings)
     baseline = build_supervisor_graph(checkpoint_path=tmp_path / "off.db").get_graph()
 
-    monkeypatch.setattr(graph_module, "get_settings", lambda: _BudgetOn())
+    monkeypatch.setattr(graph_module, "get_settings", _BudgetOn)
     candidate = build_supervisor_graph(checkpoint_path=tmp_path / "on.db").get_graph()
 
     assert set(baseline.nodes) == set(candidate.nodes)
