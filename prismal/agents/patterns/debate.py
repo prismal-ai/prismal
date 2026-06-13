@@ -45,6 +45,8 @@ from prismal.providers.registry import ProviderRegistry
 from prismal.security.prompt_builder import SecurePromptBuilder
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from prismal.core.config import Settings
 
 logger = get_logger("prismal.agents.patterns.debate")
@@ -140,6 +142,7 @@ async def debate_round(
     roles: list[str] | None = None,
     synthesis_strategy: Literal["moderator", "majority_vote", "weighted"] = "moderator",
     settings: Settings | None = None,
+    budget_guard_fn: Callable[[dict[str, object]], Awaitable[bool]] | None = None,
 ) -> DebateResult:
     """Run a multi-agent debate and synthesise consensus.
 
@@ -193,6 +196,14 @@ async def debate_round(
         had_any_success = False
 
         for round_idx in range(1, n_rounds + 1):
+            # Budget pre-check before each additional round (round 1 always runs).
+            if (
+                round_idx > 1
+                and budget_guard_fn is not None
+                and not await budget_guard_fn({"pattern": "debate", "round": round_idx})
+            ):
+                logger.debug("debate_budget_stop", round=round_idx)
+                break
             round_positions: list[DebatePosition] = []
             for agent_idx, role in enumerate(resolved_roles):
                 agent_id = f"agent_{agent_idx}"

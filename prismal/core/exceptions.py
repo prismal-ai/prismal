@@ -33,6 +33,27 @@ class PrismalError(Exception):
     """Base class for all Prismal-specific errors."""
 
 
+class BudgetExceeded(PrismalError):  # noqa: N818 — SPEC-CST-ERR-001 name
+    """A run exceeded one dimension of its :class:`~prismal.budget.types.Budget`.
+
+    Args:
+        dimension: The breached dimension (``"tokens"``, ``"cost"``, ``"calls"``
+            or ``"wall_clock"``).
+        used: The accumulated value on that dimension at the time of the breach.
+        limit: The configured ceiling for that dimension.
+        scope: The budget scope (``"turn"``, ``"session"``, ``"tenant"`` or, for
+            the unified Skynet budget, ``"skynet"``).
+    """
+
+    def __init__(self, dimension: str, used: float, limit: float, scope: str = "turn") -> None:
+        """Initialize BudgetExceeded."""
+        self.dimension = dimension
+        self.used = used
+        self.limit = limit
+        self.scope = scope
+        super().__init__(f"Budget exceeded on {dimension} ({scope}): {used} >= {limit}")
+
+
 # ── Security ──────────────────────────────────────────────────────────────────
 
 
@@ -726,8 +747,17 @@ class SkynetConfigError(SkynetError):
     """
 
 
-class SkynetBudgetExceeded(SkynetError):  # noqa: N818 — SPEC-SKY-ERR-001 name
-    """Raised when a Skynet run exceeds its ``skynet_token_budget``."""
+class SkynetBudgetExceeded(BudgetExceeded, SkynetError):  # noqa: N818 — SPEC-SKY-ERR-001 name
+    """Raised when a Skynet run exceeds its ``skynet_token_budget``.
+
+    Unified with the general budget engine (Phase C): now also a
+    :class:`BudgetExceeded`, so general budget handlers catch it while existing
+    ``except SkynetError`` handlers keep working.
+    """
+
+    def __init__(self, used: float, limit: float) -> None:
+        """Initialize SkynetBudgetExceeded on the token dimension."""
+        super().__init__("tokens", used, limit, scope="skynet")
 
 
 class MissingDependencyError(PrismalError):
@@ -750,6 +780,7 @@ __all__ = [
     "AdapterError",
     "AdaptiveRAGError",
     "AudioAgentError",
+    "BudgetExceeded",
     "CanaryLeakError",
     "CodeReviewError",
     "CompilerError",

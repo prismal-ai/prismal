@@ -1,11 +1,11 @@
 # Prismal — Cost & Budget Governance
 
-## Strategic Plan / Product Requirements Document (PLAN) — *seed PRD*
+## Strategic Plan / Product Requirements Document (PLAN)
 
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` (seed PRD; ARCHITECTURE/SPEC/TASKS missing) |
+| **Status** | `IMPLEMENTED` (full SDD: SPEC + ARCHITECTURE + TASKS; shipped Phase C) |
 | **Version** | 0.1 |
 | **Date** | 2026-06-06 |
 | **Reviewers** | Tech Lead, AI Architect, FinOps |

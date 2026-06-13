@@ -44,6 +44,7 @@ from prismal.monitoring.otel import OTelManager
 from prismal.security.prompt_builder import SecurePromptBuilder
 
 if TYPE_CHECKING:
+    from prismal.budget.meter import CostMeter
     from prismal.core.config import Settings
     from prismal.security.audit import AuditLogger
 
@@ -116,6 +117,11 @@ class SkynetSupervisor:
         self._prompt_builder = (
             prompt_builder if prompt_builder is not None else SecurePromptBuilder()
         )
+        # Cost & budget governance unification (Phase C): one CostMeter for the
+        # swarm; the dormant ``skynet_token_budget`` is now enforced via it.
+        from prismal.budget.meter import CostMeter
+
+        self._meter = CostMeter(settings=settings)
 
     async def plan(
         self,
@@ -196,6 +202,23 @@ class SkynetSupervisor:
                 deferred=deferred,
             )
 
+    @property
+    def meter(self) -> CostMeter:
+        """The shared swarm :class:`CostMeter` (planner/evaluator/worker usage)."""
+        return self._meter
+
+    def enforce_token_budget(self) -> None:
+        """Raise :class:`SkynetBudgetExceeded` when the metered tokens exceed
+        ``skynet_token_budget`` (``0`` = unlimited → never raises)."""
+        limit = self._settings.skynet_token_budget
+        if limit <= 0:
+            return
+        used = self._meter.usage.total_tokens
+        if used >= limit:
+            from prismal.core.exceptions import SkynetBudgetExceeded
+
+            raise SkynetBudgetExceeded(used=used, limit=limit)
+
     async def evaluate(self, goal: str, results: list[WorkerResult]) -> tuple[bool, str]:
         """Decide whether the goal is met and synthesize the best answer.
 
@@ -212,6 +235,10 @@ class SkynetSupervisor:
         Raises:
             SkynetError: when the evaluator backend fails.
         """
+        # Enforce the swarm token budget at the round boundary (before another
+        # evaluator call) — finally activating the dormant skynet_token_budget.
+        self.enforce_token_budget()
+
         otel = OTelManager()
         with otel.start_span("skynet.evaluate") as span:
             user = self._compose_evaluation_content(goal, results)
@@ -323,6 +350,12 @@ class SkynetSupervisor:
                 HumanMessage(content=messages[1]["content"]),
             ]
         )
+        from contextlib import suppress
+
+        with suppress(Exception):
+            self._meter.record_response(
+                response, model_override or self._settings.default_model, pattern="skynet"
+            )
         return str(response.content)
 
     def _audit_logger(self) -> AuditLogger:

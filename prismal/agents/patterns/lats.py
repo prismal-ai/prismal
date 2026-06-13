@@ -193,6 +193,7 @@ class LATSAgent:
         self,
         initial_state: Any,
         goal: str,
+        budget_guard_fn: Callable[[dict[str, object]], Awaitable[bool]] | None = None,
     ) -> LATSResult:
         """Run MCTS from *initial_state* and return the best action path.
 
@@ -223,6 +224,17 @@ class LATSAgent:
             total_simulations = 0
             for _ in range(self._max_simulations):
                 if deadline is not None and time.monotonic() >= deadline:
+                    break
+                # Budget pre-check; let one simulation run first so the search is
+                # never vacuous, then a soft cap stops further simulations.
+                if (
+                    total_simulations >= 1
+                    and budget_guard_fn is not None
+                    and not await budget_guard_fn(
+                        {"pattern": "lats", "simulations": total_simulations}
+                    )
+                ):
+                    logger.debug("lats_budget_stop", simulations=total_simulations)
                     break
                 await self._one_simulation(root)
                 total_simulations += 1

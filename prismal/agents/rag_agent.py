@@ -15,6 +15,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from prismal.agents.patterns.reflection import reflection_loop
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
+from prismal.budget.resolve import get_budget_guard
 from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
@@ -272,6 +273,7 @@ async def rag_agent_node(state: AgentState) -> dict[str, object]:
                 list(messages),
                 agent_name="rag_agent",
                 session_id=str(session_id) if session_id else None,
+                budget_guard=get_budget_guard(state),
             ),
         )
         last_response = response

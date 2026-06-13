@@ -12,6 +12,69 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [3.1.5] — 2026-06-13
+
+Cost & Budget Governance (**Phase C** — `specs/cost-budget-governance/`).
+The **enforcement** layer atop `prismal/monitoring/` (observation): meter real
+per-run usage, compare it to a `Budget`, and cut off (soft = degrade, hard =
+abort) when exceeded. **Additive and opt-in**: gated by `settings.budget_enabled`
+(default `False`); with the flag off there is zero extra state and the compiled
+supervisor graph is byte-for-byte unchanged (snapshot-tested). Docs:
+`docs/budget.md`; example: `examples/budget_governance.py`.
+
+### Added — cost & budget governance (Phase C)
+
+- **`prismal.budget`** package — `types.py` (`Budget`, `BudgetScope`
+  `turn|session|tenant`, `TokenCounts`, `Usage` summable with `+`,
+  `BudgetStatus`, `Degradation`; `0` on any dimension = unlimited, mirroring the
+  `skynet_token_budget` convention), `usage.py::extract_token_usage()` (LangChain
+  `usage_metadata` → OpenAI-style `response_metadata['token_usage']` → zeros;
+  never raises), `meter.py::CostMeter` (in-memory O(1) `Usage` accumulator, OTel
+  counters tagged `agent`/`pattern`/`model`/`tenant`, optional `CostTracker`
+  FinOps bridge), `guard.py::BudgetGuard` (`check()` pure verdict, `enforce()`
+  hash-first audit + `BudgetExceeded` on hard cap, `degradation()` advice,
+  `make_budget_guard_fn()` adapter), `resolve.py` (`resolve_budget()` +
+  `seed_budget_run`/`maybe_seed_budget_run`/`get_budget_guard`/`clear_budget_run`
+  with a session-keyed in-process registry — live engines never reach the
+  checkpoint serializer; only a serializable marker lands in
+  `state["metadata"]["budget"]`).
+- **`prismal.providers.cost`** — `CostEstimate` + `compute_cost_usd()`: prices a
+  call from LiteLLM's native model map first, then the `settings.budget_pricing`
+  fallback table, else a zero-cost `"none"` estimate. The only new module
+  importing `litellm` (Critical Rule #4); never raises.
+- **Settings** (`core/config.py`) — `budget_enabled`, `budget_max_tokens`,
+  `budget_max_cost_usd`, `budget_max_calls`, `budget_max_wall_clock_s`,
+  `budget_scope`, `budget_soft_ratio`, `budget_hard_cap`, `budget_pricing`,
+  `budget_alert_usd`; `_validate_budget` rejects an unknown `budget_scope` at
+  load time.
+- **Exceptions** (`core/exceptions.py`) — `BudgetExceeded`; re-parented
+  `SkynetBudgetExceeded(BudgetExceeded, SkynetError)`.
+- **Observability** (`monitoring/otel.py`) — counters
+  `prismal.budget_tokens_total`, `prismal.budget_cost_usd_total`,
+  `prismal.budget_cutoffs_total` + histogram `prismal.cost_per_call_usd`.
+- **Docs & example** — `docs/budget.md` user guide; runnable
+  `examples/budget_governance.py`.
+
+### Changed — cost & budget governance (Phase C)
+
+- `react_loop(..., budget_guard=None)` now meters usage after each LLM call and
+  checks the budget before the next (hard cap → graceful partial answer + break);
+  the per-run guard is wired from `state["metadata"]["budget"]` at the node seam.
+- The five expensive patterns honour an injected `budget_guard_fn`:
+  `debate_round`, `tree_of_thoughts`, `LATSAgent.search`,
+  `MixtureOfAgents.generate`, `reflection_loop`.
+- Skynet's supervisor/worker build `Budget(max_tokens=skynet_token_budget)` over a
+  shared `CostMeter` and raise `SkynetBudgetExceeded` on breach — **unifying the
+  previously dormant `skynet_token_budget`** with this engine.
+
+### Fixed
+
+- `prismal/budget/resolve.py` — moved `collections.abc.Mapping` into the
+  `TYPE_CHECKING` block (ruff `TC003`), keeping the lint gate green under the
+  pinned pre-commit / CI ruff.
+
+---
+
 ## [3.1.4] — 2026-06-12
 
 Config source injection (**Fase W** — `specs/config-source-injection/`).

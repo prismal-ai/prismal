@@ -34,6 +34,7 @@ This package is the **agent framework layer** extracted from the larger monorepo
 - **Tool provider injection (implemented)** — `ToolProviderPort` hexagonal port: the host composes MCP/Skills/stub providers and injects them (`set_tool_provider` or per-session via graph config); the agent core no longer imports `prismal.mcp`/`prismal.skills` — see [`docs/tool-providers.md`](./docs/tool-providers.md) and [`specs/tool-provider-injection/`](./specs/tool-provider-injection/)
 - **Runtime composition root (implemented)** — `build_runtime(settings, *, org_id=None)` composes every core port (tool provider, vector store, embeddings, checkpointer, audit) into a `RuntimeContext` in a single call, with `global`/`context` modes (`settings.runtime_mode`), per-`org_id` collection isolation, coordinated `aclose()`, and `build_test_runtime` fakes — the one composition contract `prismal-server`/`prismal-dashboard` build on; see [`docs/composition-root.md`](./docs/composition-root.md) and [`specs/composition-root/`](./specs/composition-root/)
 - **Config source injection (implemented)** — `ConfigSourcePort` hexagonal port: the core stops reading `.env`/`os.environ` and consumes an injected source (`EnvConfigSource` default keeps byte-for-byte parity; `MappingConfigSource`/`ChainedConfigSource` compose secrets managers; per-tenant via `build_settings(source)`); `set_config_source` invalidates the `get_settings` cache, an AST guard forbids new config `os.getenv` in the core — see [`docs/configuration.md`](./docs/configuration.md) and [`specs/config-source-injection/`](./specs/config-source-injection/)
+- **Cost & Budget Governance (implemented, opt-in)** — per-run/session/tenant token / cost(USD) / call / wall-clock budgets with **soft (degrade) / hard (abort)** circuit-breakers: a `CostMeter` accumulates real usage (priced via LiteLLM + a `budget_pricing` fallback table) and a `BudgetGuard` enforces it in `react_loop`, the expensive patterns (debate, ToT, LATS, MoA, reflection) and Skynet (unifying `skynet_token_budget`) — gated by `settings.budget_enabled` (default `False`); see [`docs/budget.md`](./docs/budget.md) and [`specs/cost-budget-governance/`](./specs/cost-budget-governance/)
 - **120-tool global cap** enforced by the official `CompositeToolProvider` (legacy constants kept in `tool_registry.py`)
 - **Graph visualization** — `to_mermaid()` / `visualize()` / `save_graph_image()` (from `prismal.langgraph`) render any compiled graph or `SubgraphDefinition`; `SubgraphDefinition.to_mermaid()` and `visualize_supervisor_graph()` are one-line shortcuts (see `examples/visualize_graphs.py`)
 
@@ -305,16 +306,40 @@ Runnable examples: [`examples/config_source_env.py`](./examples/config_source_en
 
 ---
 
+### Cost & Budget Governance (Phase C — implemented, opt-in)
+
+The **enforcement** layer atop the monitoring stack (user guide: [`docs/budget.md`](./docs/budget.md); contracts: [`specs/cost-budget-governance/`](./specs/cost-budget-governance/)): meter real per-run usage, compare it to a `Budget`, and cut off when exceeded. **Additive and opt-in** — gated by `settings.budget_enabled` (default `False`); with the flag off there is zero extra state and the compiled supervisor graph is byte-for-byte unchanged (snapshot-tested).
+
+```python
+# settings (env: PRISMAL_BUDGET_*)
+budget_enabled       = True
+budget_scope         = "turn"     # turn | session | tenant
+budget_max_tokens    = 200_000    # 0 = unlimited on that dimension
+budget_max_cost_usd  = 5.0
+budget_soft_ratio    = 0.8        # warn/degrade at 80% of any cap
+budget_hard_cap      = True       # raise BudgetExceeded on a hard breach
+```
+
+- **Value objects** (`prismal/budget/types.py`): `Budget` (per-dimension ceiling; `0` = unlimited), `BudgetScope` (`turn|session|tenant`), `Usage` (cumulative, summable), `BudgetStatus`, `Degradation`.
+- **Meter** (`prismal/budget/meter.py`): `CostMeter` accumulates `Usage` per run (O(1), no hot-path I/O), prices each call via `providers/cost.py` (LiteLLM native map → `budget_pricing` table → zero-cost `none`), emits OTel counters tagged `agent`/`pattern`/`model`/`tenant`, and optionally persists to a `CostTracker` (FinOps history).
+- **Guard** (`prismal/budget/guard.py`): `BudgetGuard.check()` is a pure within/soft/hard verdict; `enforce()` audits (hash-first) and raises `BudgetExceeded` on a hard cap; `make_budget_guard_fn()` adapts it to the `budget_guard_fn` the patterns consume.
+- **Per-run wiring** (`prismal/budget/resolve.py`): `seed_budget_run` installs the `{meter, guard}` in an in-process registry keyed by `session_id` (never checkpointed — only a serializable marker lands in `state["metadata"]["budget"]`), idempotent per user-turn so usage resets between turns.
+- **Enforcement sites**: `react_loop` (record after, check before, hard → partial answer + break) and the expensive patterns `debate` / `tree_of_thoughts` / `lats` / `mixture_of_agents` / `reflection_loop`; Skynet builds `Budget(max_tokens=skynet_token_budget)` over a shared meter and raises `SkynetBudgetExceeded(BudgetExceeded, SkynetError)`.
+
+Runnable example: [`examples/budget_governance.py`](./examples/budget_governance.py).
+
+---
+
 ## Roadmap — features to build
 
-Already implemented: extension surface (Phase X), tool provider injection (Phase Y), advanced architectures (Phase A/B/C), multimodal (Phase F), Kokoro (Phase K), Skynet (Phase S), the **vector store port (Phase Z)**, the **runtime composition root (Phase R)**, the **config source injection (Phase W)**, and the dependency remediation (18/18 alerts in a terminal state).
+Already implemented: extension surface (Phase X), tool provider injection (Phase Y), advanced architectures (Phase A/B/C), multimodal (Phase F), Kokoro (Phase K), Skynet (Phase S), the **vector store port (Phase Z)**, the **runtime composition root (Phase R)**, the **config source injection (Phase W)**, the **cost & budget governance (Phase C)**, and the dependency remediation (18/18 alerts in a terminal state).
 
 What remains, **ordered from fast-and-necessary → complex-and-less-necessary**. Each feature has its SDD contract in [`specs/`](./specs/). Status: `spec ready` = ready to build (PLAN/ARCHITECTURE/SPEC/TASKS); `PRD seed` = PRD only, needs expansion before building.
 
 1. **Finish Tool Provider Injection (Phase Y)** — *fast · necessary · in progress* — [`specs/tool-provider-injection/`](./specs/tool-provider-injection/). The Y1–Y5 code has already landed; what's left is closing Y6–Y8 (settings/observability, docs/examples, parity tests) and marking the spec `IMPLEMENTED`.
 2. **Vector Store Port (Phase Z)** — *moderate · necessary · ✅ implemented* — [`specs/vector-store-port/`](./specs/vector-store-port/). Removes the ChromaDB lock-in behind a `VectorStorePort` with adapters (Chroma default + LanceDB, sqlite-vec, Qdrant, pgvector), selectable via `settings.vector_store_backend`. Reduces the security surface and opens up embedded backends. See [`docs/vector-stores.md`](./docs/vector-stores.md).
 3. **Runtime Composition Root (Phase R)** — *moderate · necessary · ✅ implemented* — [`specs/composition-root/`](./specs/composition-root/). `build_runtime()` composes and injects every port (tools, vector store, embeddings, checkpoint, audit) into a `RuntimeContext` in a single call, with `global`/`context` modes and per-`org_id` collection isolation; **unblocks `prismal-server` / `prismal-dashboard`**. See [`docs/composition-root.md`](./docs/composition-root.md).
-4. **Cost & Budget Governance** — *fast-to-moderate · useful · PRD seed* — [`specs/cost-budget-governance/`](./specs/cost-budget-governance/). Per-run/session/tenant budgets + cost/token/call circuit-breakers in `react_loop` and the expensive patterns (debate, ToT, LATS, MoA). A cheap insurance policy against runaway spend.
+4. **Cost & Budget Governance (Phase C)** — *fast-to-moderate · useful · ✅ implemented* — [`specs/cost-budget-governance/`](./specs/cost-budget-governance/). Per-run/session/tenant budgets + cost/token/call/wall-clock circuit-breakers (soft = degrade, hard = abort) in `react_loop`, the expensive patterns (debate, ToT, LATS, MoA, reflection) and Skynet. A cheap insurance policy against runaway spend. See [`docs/budget.md`](./docs/budget.md).
 5. **A2A / Agent Cards interop (Phase I)** — *complex · necessary (ecosystem) · spec ready* — [`specs/a2a-interop/`](./specs/a2a-interop/). Bidirectional agent-to-agent interop: expose prismal as an A2A agent (Agent Card at `/.well-known/agent-card.json`, JSON-RPC + SSE) and consume remote agents as nodes/tools. Complements MCP; closes the gap with MS Agent Framework / Google ADK.
 6. **Agent Identity & Access Governance** — *complex · necessary (enterprise) · PRD seed* — [`specs/agent-identity-governance/`](./specs/agent-identity-governance/). Per-agent identity (W3C DID), scoped credentials, OAuth-on-behalf, and a `PolicyEngine`. The trust foundation that A2A consumes; an enterprise production blocker.
 7. **Agent Evaluation & Reliability Harness** — *moderate-to-complex · useful (reliability) · PRD seed* — [`specs/agent-eval-harness/`](./specs/agent-eval-harness/). System-level evaluation of the graph (trajectories, tool usage, RAG groundedness), regression with a CI gate, and an adversarial suite. Closes the "scaffold gap".
@@ -330,7 +355,7 @@ Rule: **contract/logic → framework (`prismal/`); serving HTTP, authenticating,
 | 2 | Vector Store Port (Phase Z) | ✅ `rag/stores/` + `VectorStorePort` | picks the backend via config |
 | 3 | Composition Root (Phase R) | ✅ `prismal/composition/` · `build_runtime()` / `RuntimeContext` | calls it in the lifespan |
 | 3b | Config Source Injection (Phase W) | ✅ `core/config_source.py` · `ConfigSourcePort` / `build_settings(source)` | owns secrets/`.env`, injects per-tenant sources |
-| 4 | Cost & Budget Governance | ✅ guard in `react_loop` + patterns | per-tenant quotas |
+| 4 | Cost & Budget Governance (Phase C) | ✅ `prismal/budget/` · meter + guard in `react_loop`/patterns/Skynet | per-tenant quotas |
 | 5 | A2A / Agent Cards (Phase I) | ✅ types · card · client · `A2AToolProvider` · handler | **HTTP endpoint (`/a2a`, `/.well-known/agent-card.json`) + auth** |
 | 6 | Agent Identity & Governance | ✅ `PolicyEngine` + identity port (`security/`) | **IdP/OAuth + credential vault + DID issuance/rotation** |
 | 7 | Agent Eval Harness | eval engine (module) | runs as a dev/CI tool (or a separate package) |
@@ -424,8 +449,15 @@ prismal/                ← PEP 420 namespace package (NO __init__.py at root)
 │       ├── engineering_orchestrator/
 │       └── research_orchestrator/
 ├── core/                  ← Pydantic Settings, logging, exceptions, DB, user model
+├── budget/                ← (Phase C) Cost & Budget Governance — opt-in (settings.budget_enabled)
+│   ├── types.py           ← Budget / BudgetScope / Usage / BudgetStatus / Degradation
+│   ├── usage.py           ← extract_token_usage() from LangChain message metadata
+│   ├── meter.py           ← CostMeter (accumulate Usage + OTel + optional CostTracker bridge)
+│   ├── guard.py           ← BudgetGuard (check/enforce/degradation) + make_budget_guard_fn()
+│   └── resolve.py         ← resolve_budget() + per-run seeding (session-keyed registry)
 ├── providers/             ← LiteLLM wrapper (ONLY location for provider-specific imports;
-│                             Phase F adds stt/tts/vision/multimodal/cross_modal_embeddings)
+│                             Phase F adds stt/tts/vision/multimodal/cross_modal_embeddings;
+│                             Phase C adds cost.py — per-call USD pricing)
 ├── memory/                ← Short-term history + long-term PII-sanitized store
 ├── mcp/                   ← MCP client, adapter, connection manager, capability routing
 ├── security/              ← 5-layer defense-in-depth (see below) + (Phase F) media_validator.py
@@ -493,7 +525,7 @@ This package follows [Semantic Versioning](https://semver.org/).
 Tag format for releases: `prismal/vMAJOR.MINOR.PATCH`
 
 ```bash
-git tag prismal/v3.1.4
+git tag prismal/v3.1.5
 git push --tags
 ```
 
@@ -521,7 +553,7 @@ twine upload --repository testpypi dist/*          # validate on TestPyPI first
 # 3) Push history and publish prismal-ai
 git push origin main
 twine upload dist/*                                 # publish to PyPI
-git tag prismal/v3.1.4 && git push --tags         # tag format: prismal/vMAJOR.MINOR.PATCH
+git tag prismal/v3.1.5 && git push --tags         # tag format: prismal/vMAJOR.MINOR.PATCH
 
 # 4) Publish the deprecated compatibility bridge (lightagent-agents -> prismal-ai)
 cd compat/lightagent-agents
