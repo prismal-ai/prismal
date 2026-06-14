@@ -111,6 +111,12 @@ class DocumentProcessorFactory:
         docs = self._load_by_extension(path, extension)
         docs = self._ensure_source_metadata(docs, path)
 
+        # Phase H — retrieved document bodies are untrusted external content.
+        from prismal.security.taint import Provenance, mark_untrusted_active
+
+        for doc in docs:
+            mark_untrusted_active(doc.page_content, Provenance.RAG)
+
         logger.info(
             "document_loaded",
             path=str(path),

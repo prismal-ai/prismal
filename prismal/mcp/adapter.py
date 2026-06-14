@@ -307,6 +307,12 @@ class MCPToolAdapter(BaseTool):
         if self._interceptor is not None:
             await self._interceptor.on_tool_end(output=output, run_id=run_id)
 
+        # Phase H — tool results are untrusted external content; tag so the
+        # indirect-injection detector scores them before re-injection.
+        from prismal.security.taint import Provenance, mark_untrusted_active
+
+        mark_untrusted_active(output, Provenance.TOOL)
+
         logger.debug(
             "mcp_adapter_call_success",
             tool=self.name,

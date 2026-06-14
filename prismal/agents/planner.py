@@ -20,6 +20,7 @@ from prismal.budget.resolve import get_budget_guard
 from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
+from prismal.security.hardening_run import hardening_react_kwargs
 
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
@@ -299,6 +300,7 @@ async def planner_node(state: AgentState) -> dict[str, object]:
                 agent_name="planner",
                 session_id=str(session_id) if session_id else None,
                 budget_guard=get_budget_guard(state),
+                **hardening_react_kwargs(state),
             ),
         )
         last_response = response

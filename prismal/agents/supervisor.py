@@ -798,6 +798,13 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
 
     maybe_seed_budget_run(state, get_settings())
 
+    # Runtime hardening (Phase H): seed the per-run injection detector / runaway
+    # guard / tool-policy / taint registry once per turn. No-op unless
+    # settings.hardening_enabled — disabled path is byte-for-byte unchanged.
+    from prismal.security.hardening_run import maybe_seed_hardening_run
+
+    maybe_seed_hardening_run(state, get_settings())
+
     otel = OTelManager()
     with otel.start_span(
         "agent.supervisor",
