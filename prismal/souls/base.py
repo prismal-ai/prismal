@@ -211,6 +211,12 @@ def load_soul(
     if len(body) > max_chars:
         raise SoulValidationError(soul_id, f"body too large: {len(body)} chars (max {max_chars})")
 
+    # Phase H — the SOUL.md body is user-controlled content; tag it untrusted so
+    # the indirect-injection detector scores it before it reaches a model.
+    from prismal.security.taint import Provenance, mark_untrusted_active
+
+    mark_untrusted_active(body, Provenance.SOUL)
+
     return Soul(metadata=metadata, body=body, source_dir=resolved_dir)
 
 

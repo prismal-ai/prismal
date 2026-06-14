@@ -1,0 +1,68 @@
+# Prismal — Tool Policy (example)
+# Artifact for specs/runtime-hardening (Phase H, SPEC-HRD-POL-001).
+# Ship a copy as config/tool_policies.yaml. Loaded by load_tool_policies().
+#
+# Evaluation: first-match, most-specific-wins over (agent, tool, args).
+# Effects: allow | deny | require_hitl
+# Modes are global (settings.hardening_mode): off | warn | enforce.
+# 'agent' and 'tool' support globs ("*" = any). arg_constraints map an argument
+# name to a regex the value must satisfy. rate_limit_per_run: 0 = unlimited.
+
+version: 1
+# Default effect applied when no rule matches (settings.hardening_tool_policy_default).
+default: allow
+
+policies:
+  # --- High-risk, destructive operations require a human ---
+  - agent: "*"
+    tool: "delete_file"
+    effect: require_hitl
+    reason: "Destructive filesystem operation"
+
+  - agent: "*"
+    tool: "shell_exec"
+    effect: require_hitl
+    reason: "Arbitrary command execution"
+
+  # --- coder may write only inside the workspace, bounded per run ---
+  - agent: "coder"
+    tool: "write_file"
+    effect: allow
+    arg_constraints:
+      path: "^(/sessions/[^/]+/mnt/|workspace/|\\./).*"   # confine to workspace
+    rate_limit_per_run: 25
+
+  # --- network egress: deny by default for non-research agents ---
+  - agent: "*"
+    tool: "http_request"
+    effect: deny
+    reason: "No outbound HTTP unless explicitly permitted"
+
+  - agent: "researcher"
+    tool: "http_request"
+    effect: allow
+    rate_limit_per_run: 40
+
+  - agent: "parallel_researcher"
+    tool: "http_request"
+    effect: allow
+    rate_limit_per_run: 40
+
+  # --- data_analyst: read-only DB tools allowed, writes blocked ---
+  - agent: "data_analyst"
+    tool: "sql_query"
+    effect: allow
+    arg_constraints:
+      statement: "^(?i)\\s*select\\b.*"   # SELECT-only
+    rate_limit_per_run: 100
+
+  - agent: "data_analyst"
+    tool: "sql_exec"
+    effect: deny
+    reason: "data_analyst is read-only"
+
+  # --- secrets / credentials never exposed via tools ---
+  - agent: "*"
+    tool: "read_secret"
+    effect: deny
+    reason: "Secrets are injected via ConfigSourcePort, never read by agents"

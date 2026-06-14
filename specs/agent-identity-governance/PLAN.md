@@ -1,16 +1,18 @@
 # Prismal — Agent Identity & Access Governance
 
-## Strategic Plan / Product Requirements Document (PLAN) — *seed PRD*
+## Strategic Plan / Product Requirements Document (PLAN)
 
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` (seed PRD; ARCHITECTURE/SPEC/TASKS missing) |
-| **Version** | 0.1 |
-| **Date** | 2026-06-06 |
+| **Status** | `READY` (full SDD: PLAN + SPEC + ARCHITECTURE + TASKS) |
+| **Version** | 1.0 |
+| **Phase** | IDN (Identity) |
+| **Target package version** | `3.4.0` (SemVer **minor** — new functionality; ships after Phase V `3.3.0`) |
+| **Date** | 2026-06-13 |
 | **Reviewers** | Tech Lead, Security Lead, AI Architect |
 | **Priority** | P1 (enterprise production blocker) |
-| **Related** | `specs/a2a-interop/` (consumes DID), `prismal/security/permissions.py`, `audit.py` |
+| **Related** | `specs/a2a-interop/` (consumes DID), `specs/runtime-hardening/` (Phase H `ToolPolicyEngine` delegate), `specs/composition-root/` (per-`org_id`), `prismal/security/permissions.py`, `audit.py` |
 
 ---
 
@@ -116,3 +118,4 @@ Expand this PRD to the full SDD set (ARCHITECTURE/SPEC/TASKS) with: the `AgentId
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | 0.1 | 2026-06-06 | Ernesto Crespo | Seed PRD — agent identity and access governance |
+| 1.0 | 2026-06-13 | Ernesto Crespo | Promoted SEED → READY: added ARCHITECTURE/SPEC/TASKS + `identity_policies.example.yaml` + `agent-card-did.example.json`; assigned Phase IDN; `PolicyEngine` delegates to Phase H `ToolPolicyEngine` |

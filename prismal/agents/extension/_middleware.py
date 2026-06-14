@@ -16,6 +16,7 @@ import hashlib
 import json
 import time
 from collections.abc import Awaitable, Callable
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any, cast
 
 import structlog
@@ -256,6 +257,66 @@ def _error_update(node_name: str, cause: BaseException, *, timeout: bool) -> dic
     }
 
 
+# ── Runtime hardening (Phase H — H5-03) ───────────────────────────────────────
+
+
+def get_settings() -> Any:
+    """Return current settings (module-level seam so tests can patch it)."""
+    from prismal.core.config import get_settings as _get_settings
+
+    return _get_settings()
+
+
+def get_taint_registry(state: AgentState) -> Any:
+    """Return the per-run taint registry (module-level seam for patching)."""
+    from prismal.security.hardening_run import get_taint_registry as _get
+
+    return _get(state)
+
+
+def _redact_update_messages(update: dict[str, Any], settings: Any) -> dict[str, Any]:
+    """Redact PII from any message contents in *update* (Phase H — PII-on-output)."""
+    messages = update.get("messages")
+    if not isinstance(messages, list):
+        return update
+    from prismal.security.pii_sanitizer import redact_output
+
+    for msg in messages:
+        content = getattr(msg, "content", None)
+        if isinstance(content, str) and content:
+            with suppress(Exception):
+                msg.content = redact_output(content, settings=settings)
+    return update
+
+
+async def hardening_middleware(
+    next_fn: NodeFn,
+    state: AgentState,
+    metadata: NodeMetadata,  # noqa: ARG001 — Middleware signature requires it
+) -> dict[str, Any]:
+    """Innermost stage: taint-in around the node + PII redaction on output.
+
+    A complete passthrough when ``hardening_enabled`` is False, so the disabled
+    path is byte-for-byte unchanged.
+    """
+    settings = get_settings()
+    if not getattr(settings, "hardening_enabled", False):
+        return await next_fn(state)
+
+    registry = get_taint_registry(state)
+    if registry is not None:
+        from prismal.security.taint import use_taint_registry
+
+        with use_taint_registry(registry):
+            update = await next_fn(state)
+    else:
+        update = await next_fn(state)
+
+    if getattr(settings, "hardening_pii_output", False):
+        update = _redact_update_messages(update, settings)
+    return update
+
+
 # ── Composition ───────────────────────────────────────────────────────────────
 
 # Outermost → innermost. Order rationale documented in ``decorators.prismal_node``.
@@ -267,6 +328,7 @@ DEFAULT_MIDDLEWARE_STACK: list[Middleware] = [
     audit_middleware,
     retry_middleware,
     timeout_middleware,
+    hardening_middleware,
 ]
 
 
@@ -296,6 +358,7 @@ __all__ = [
     "audit_middleware",
     "build_pipeline",
     "error_mapping_middleware",
+    "hardening_middleware",
     "logger_middleware",
     "otel_middleware",
     "retry_middleware",

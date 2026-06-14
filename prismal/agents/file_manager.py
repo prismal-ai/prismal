@@ -15,6 +15,7 @@ from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
+from prismal.security.hardening_run import hardening_react_kwargs
 
 if TYPE_CHECKING:
     from prismal.agents.state import AgentState
@@ -148,6 +149,7 @@ async def file_manager_node(state: AgentState) -> dict[str, object]:
         agent_name="file_manager",
         session_id=str(session_id) if session_id else None,
         budget_guard=get_budget_guard(state),
+        **hardening_react_kwargs(state),
     )
 
     logger.info("file_manager_complete", session_id=session_id)

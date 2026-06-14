@@ -40,6 +40,13 @@ class ImageLoader:
         if result.ocr_text:
             metadata["ocr_text"] = result.ocr_text
         logger.info("image_loaded", source=str(path), caption_chars=len(caption))
+
+        # Phase H — VLM captions and OCR text are untrusted media-derived content.
+        from prismal.security.taint import Provenance, mark_untrusted_active
+
+        mark_untrusted_active(caption, Provenance.MEDIA)
+        if result.ocr_text:
+            mark_untrusted_active(result.ocr_text, Provenance.MEDIA)
         return [Document(page_content=caption, metadata=metadata)]
 
     def _resolve_agent(self) -> VisionAgent:

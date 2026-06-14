@@ -38,7 +38,7 @@ class AudioLoader:
         client = self._resolve_client()
         result = await client.transcribe(path)
         if not result.segments:
-            return [
+            docs = [
                 Document(
                     page_content=result.text,
                     metadata={
@@ -49,8 +49,15 @@ class AudioLoader:
                     },
                 )
             ]
-        docs = self._chunk_segments(result.segments, path, result.language)
-        logger.info("audio_loaded", source=str(path), chunks=len(docs))
+        else:
+            docs = self._chunk_segments(result.segments, path, result.language)
+            logger.info("audio_loaded", source=str(path), chunks=len(docs))
+
+        # Phase H — STT transcripts are untrusted media-derived content.
+        from prismal.security.taint import Provenance, mark_untrusted_active
+
+        for doc in docs:
+            mark_untrusted_active(doc.page_content, Provenance.MEDIA)
         return docs
 
     def _chunk_segments(
