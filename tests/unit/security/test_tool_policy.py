@@ -61,12 +61,14 @@ def test_most_specific_rule_wins() -> None:
         ]
     )
     # researcher gets the specific allow; everyone else gets the glob deny.
-    assert eng.evaluate(
-        agent="researcher", tool="http_request", args={}, call_count=0
-    ).effect is PolicyEffect.ALLOW
-    assert eng.evaluate(
-        agent="coder", tool="http_request", args={}, call_count=0
-    ).effect is PolicyEffect.DENY
+    assert (
+        eng.evaluate(agent="researcher", tool="http_request", args={}, call_count=0).effect
+        is PolicyEffect.ALLOW
+    )
+    assert (
+        eng.evaluate(agent="coder", tool="http_request", args={}, call_count=0).effect
+        is PolicyEffect.DENY
+    )
 
 
 # ── arg constraints ──────────────────────────────────────────────────────────
@@ -87,9 +89,7 @@ def test_arg_constraint_violation_denies() -> None:
         agent="coder", tool="write_file", args={"path": "workspace/a.txt"}, call_count=0
     )
     assert ok.effect is PolicyEffect.ALLOW
-    bad = eng.evaluate(
-        agent="coder", tool="write_file", args={"path": "/etc/passwd"}, call_count=0
-    )
+    bad = eng.evaluate(agent="coder", tool="write_file", args={"path": "/etc/passwd"}, call_count=0)
     assert bad.effect is PolicyEffect.DENY
 
 
@@ -98,12 +98,17 @@ def test_arg_constraint_violation_denies() -> None:
 
 def test_rate_limit_denies_after_n_calls() -> None:
     eng = _engine(
-        [ToolPolicy(agent="coder", tool="write_file", effect=PolicyEffect.ALLOW, rate_limit_per_run=20)]
+        [
+            ToolPolicy(
+                agent="coder", tool="write_file", effect=PolicyEffect.ALLOW, rate_limit_per_run=20
+            )
+        ]
     )
     # 20th call (call_count=19) allowed; 21st (call_count=20) denied.
-    assert eng.evaluate(
-        agent="coder", tool="write_file", args={}, call_count=19
-    ).effect is PolicyEffect.ALLOW
+    assert (
+        eng.evaluate(agent="coder", tool="write_file", args={}, call_count=19).effect
+        is PolicyEffect.ALLOW
+    )
     denied = eng.evaluate(agent="coder", tool="write_file", args={}, call_count=20)
     assert denied.effect is PolicyEffect.DENY
     assert "rate" in denied.reason.lower()
@@ -111,11 +116,16 @@ def test_rate_limit_denies_after_n_calls() -> None:
 
 def test_rate_limit_zero_is_unlimited() -> None:
     eng = _engine(
-        [ToolPolicy(agent="coder", tool="write_file", effect=PolicyEffect.ALLOW, rate_limit_per_run=0)]
+        [
+            ToolPolicy(
+                agent="coder", tool="write_file", effect=PolicyEffect.ALLOW, rate_limit_per_run=0
+            )
+        ]
     )
-    assert eng.evaluate(
-        agent="coder", tool="write_file", args={}, call_count=9999
-    ).effect is PolicyEffect.ALLOW
+    assert (
+        eng.evaluate(agent="coder", tool="write_file", args={}, call_count=9999).effect
+        is PolicyEffect.ALLOW
+    )
 
 
 # ── load_tool_policies ───────────────────────────────────────────────────────

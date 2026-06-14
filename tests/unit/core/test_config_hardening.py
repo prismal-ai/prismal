@@ -93,4 +93,6 @@ def test_invalid_tool_policy_default_rejected() -> None:
 
 def test_valid_tool_policy_defaults_accepted() -> None:
     for default in ("allow", "deny"):
-        assert Settings(hardening_tool_policy_default=default).hardening_tool_policy_default == default
+        assert (
+            Settings(hardening_tool_policy_default=default).hardening_tool_policy_default == default
+        )

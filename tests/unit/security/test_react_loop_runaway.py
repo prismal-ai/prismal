@@ -78,8 +78,6 @@ async def test_step_cap_stops_loop() -> None:
 
 async def test_no_runaway_guard_is_unchanged() -> None:
     llm = _LoopingLLM()
-    await react_loop(
-        llm, [_Tool()], [HumanMessage(content="go")], max_iterations=5
-    )
+    await react_loop(llm, [_Tool()], [HumanMessage(content="go")], max_iterations=5)
     # Without a guard, the loop runs to max_iterations (+1 final synthesis call).
     assert llm.calls == 6

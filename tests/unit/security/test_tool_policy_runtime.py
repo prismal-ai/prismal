@@ -31,7 +31,11 @@ def _engine(policies: list[ToolPolicy], default: str = "allow") -> ToolPolicyEng
 
 def test_run_policy_counts_allowed_calls_for_rate_limit() -> None:
     eng = _engine(
-        [ToolPolicy(agent="coder", tool="write_file", effect=PolicyEffect.ALLOW, rate_limit_per_run=2)]
+        [
+            ToolPolicy(
+                agent="coder", tool="write_file", effect=PolicyEffect.ALLOW, rate_limit_per_run=2
+            )
+        ]
     )
     run = RunToolPolicy(eng)
     assert run.check(agent="coder", tool="write_file", args={}).effect is PolicyEffect.ALLOW
@@ -101,9 +105,7 @@ async def test_react_loop_denies_tool_and_skips_dispatch() -> None:
     tool = _Tool("http_request")
     llm = _ToolThenFinalLLM("http_request")
 
-    await react_loop(
-        llm, [tool], [HumanMessage(content="go")], agent_name="coder", tool_policy=run
-    )
+    await react_loop(llm, [tool], [HumanMessage(content="go")], agent_name="coder", tool_policy=run)
 
     assert tool.invoked is False  # dispatch was skipped
     content = str(_tool_message(llm.second_call_messages).content).lower()
@@ -116,9 +118,7 @@ async def test_react_loop_require_hitl_skips_until_approved() -> None:
     tool = _Tool("delete_file")
     llm = _ToolThenFinalLLM("delete_file")
 
-    await react_loop(
-        llm, [tool], [HumanMessage(content="rm")], agent_name="coder", tool_policy=run
-    )
+    await react_loop(llm, [tool], [HumanMessage(content="rm")], agent_name="coder", tool_policy=run)
 
     assert tool.invoked is False
     content = str(_tool_message(llm.second_call_messages).content).lower()
