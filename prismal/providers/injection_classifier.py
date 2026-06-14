@@ -15,14 +15,11 @@ import re
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
-from prismal.core.logging import get_logger
 from prismal.security.prompt_builder import SecurePromptBuilder
 
 if TYPE_CHECKING:
     from prismal.core.config import Settings
     from prismal.security.indirect_injection import ClassifierFn
-
-logger = get_logger("prismal.providers.injection_classifier")
 
 _FLOAT_RE = re.compile(r"-?\d+(?:\.\d+)?")
 
