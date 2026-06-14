@@ -10,7 +10,144 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Planned, **spec-complete** phases (full SDD under `specs/`, not yet implemented).
+Each is additive and **opt-in** (graph byte-for-byte unchanged when its flag is
+off, snapshot-tested), so each is a **SemVer minor** bump. They ship in order
+**H → V → IDN → I**. When a phase lands, promote its block below to a top-level
+`## [X.Y.Z] — <date>` heading and set its spec docs to `IMPLEMENTED`.
+
+### [3.3.0] — Phase V · Agent Evaluation & Reliability Harness — *planned*
+
+> Spec: [`specs/agent-eval-harness/`](./specs/agent-eval-harness/). System-level
+> evaluation (the "scaffold gap"); the red-team suite is the executable proof for
+> Phase H controls. Additive; **no agent-runtime change**. Fakes by default,
+> `live_api` opt-in.
+
+#### Added — evaluation harness (Phase V)
+
+- **`prismal.eval`** package (sibling of the runtime; imports only the public
+  graph entry + ports): `types.py` (`EvalCase`/`EvalSet`/`Assertion`/`Trajectory`/
+  `CaseResult`/`Scorecard`), `runner.py` (`EvalRunner` over
+  `get_async_compiled_graph().astream` with `build_test_runtime` fakes + seeds),
+  `trajectory.py` (capture from the event stream), `assertions.py`
+  (exact/semantic/tool-usage/llm-judge/groundedness/security), `judges.py`
+  (LLM-as-judge via `providers/`, Budget-metered), `regression.py` (baseline diff
+  + tolerance gate), `redteam/` (adversarial corpus loader + `assert_security`),
+  `report.py` (JSON/Markdown/Langfuse), `__main__.py` CLI.
+- **Adversarial corpus** — `redteam-corpus.example.yaml` (direct + indirect
+  injection, tool-abuse, exfiltration, jailbreak, system-prompt leak); each case
+  asserts containment against L1–L5 (+ Phase H controls when present).
+- **Settings** (`core/config.py`) — `eval_default_mode`, `eval_judge_model`,
+  `eval_regression_tolerance`, `eval_seed`, `eval_langfuse_export`.
+- **Exceptions** — `EvalError`, `EvalSetError`, `RegressionGateFailed`.
+- **CI** — `eval` + `redteam` pytest markers; a gate that fails on regression or a
+  passed attack. Docs: `docs/eval.md`; example: `examples/agent_eval.py`.
+
+### [3.4.0] — Phase IDN · Agent Identity & Access Governance — *planned*
+
+> Spec: [`specs/agent-identity-governance/`](./specs/agent-identity-governance/).
+> Per-agent identity + access policy; foundation for A2A (I) and multi-tenant (R).
+> Opt-in: `identity_enabled` (default `False`).
+
+#### Added — identity & access governance (Phase IDN)
+
+- **`prismal.identity`** hexagonal package: `types.py` (`AgentIdentity`, `DID`,
+  `Scope`, `Credential`, `OnBehalfToken`, `PolicyDecision`), `did.py` (`did:key`
+  local + `did:web` for A2A; issue/resolve/verify/`did_document`), `provider.py`
+  (`IdentityPort` + `LocalIdentityProvider`/`OidcIdentityProvider`/`FakeIdentityProvider`),
+  `vault.py` (`CredentialVaultPort` + `EnvVault` via `ConfigSourcePort`/`FileVault`/
+  `FakeVault`; secrets resolved at the boundary, never in state/logs),
+  `delegation.py` (OAuth on-behalf-of: `mint`/`propagate` narrow-only/`revoke`),
+  `policy.py` (identity-aware `PolicyEngine.allow(identity, action, resource)` that
+  **delegates** `(agent, tool, args)` to the Phase H `ToolPolicyEngine`).
+- **Ports** (`agents/extension/ports.py`) — `IdentityPort`, `CredentialVaultPort`,
+  `PolicyPort` Protocols.
+- **Settings** (`core/config.py`) — `identity_enabled`, `identity_mode`,
+  `identity_provider`, `identity_did_method`, `identity_did_web_domain`,
+  `identity_vault`, `identity_policy_path`, `identity_on_behalf_enabled`,
+  `identity_on_behalf_ttl_s`, `oidc_issuer`/`oidc_client_id`.
+- **Exceptions** — `IdentityError` hierarchy (`DidVerificationError`, `ScopeError`,
+  `PolicyDenied`, `CredentialResolutionError`, `IdentityConfigError`,
+  `DelegationError`).
+- **Observability** — counters `prismal.identity_issued_total`,
+  `prismal.policy_decisions_total`, `prismal.credential_resolved_total`,
+  `prismal.did_verify_total`.
+- **Artifacts/docs** — `identity_policies.example.yaml`,
+  `agent-card-did.example.json`; `docs/identity.md`; `examples/agent_identity.py`.
+
+#### Changed — identity & access governance (Phase IDN)
+
+- `ActionInterceptor.check()` consults `PolicyEngine` (least-privilege scopes +
+  identity rules) when `identity_enabled`; `PermissionManager` grants and
+  `AuditLogger` records gain an `identity` (DID) field (secrets redacted).
+- `composition/runtime.py` composes the identity provider + vault + policy per
+  `org_id` on the `RuntimeContext` (released by `aclose()`).
+
+### [3.5.0] — Phase I · A2A / Agent Cards Interoperability — *planned*
+
+> Spec: [`specs/a2a-interop/`](./specs/a2a-interop/). Bidirectional Agent2Agent
+> interop. **Consumes** the Phase IDN DID (Agent Card issue + remote-DID verify +
+> delegation authorization), so it ships after `3.4.0`.
+
+#### Added — A2A interoperability (Phase I)
+
+- JSON-RPC over HTTP(S)+SSE transport; Agent Card served at
+  `/.well-known/agent-card.json` (embeds the agent's DID Document); discovery +
+  delegation with external agents (Google ADK, MS Agent Framework, …); inbound
+  remote-DID verification and `a2a_delegate` policy authorization via Phase IDN.
+
 ---
+
+## [3.2.0] — 2026-06-14
+
+> Spec: [`specs/runtime-hardening/`](./specs/runtime-hardening/) ·
+> Research: `docs/security/hardening-and-harness-engineering.md`. Closes residual
+> OWASP **LLM01/05/06/10** gaps. Opt-in: `hardening_enabled` (default `False`).
+
+#### Added — runtime hardening (Phase H)
+
+- **`prismal.security.taint`** — `Provenance`, `TaintTag`, `TaintRegistry`
+  (`mark_untrusted`/`is_untrusted`); content from tools/RAG/web/STT/OCR/captions/
+  souls is tagged at its loader (hashes only — serializable, no secrets).
+- **`prismal.security.indirect_injection`** — `IndirectInjectionDetector`: scores
+  untrusted content through the existing `GuardrailsEngine` + an indirect-injection
+  heuristic pack before re-injection; optional LLM classifier wired via
+  `providers/` (metered by Budget). Closes **indirect prompt injection**.
+- **`prismal.security.output_validator`** — `OutputValidator`
+  (`validate_tool_args` schema check + `validate_freeform` path/command/html
+  escaping; paths delegate to `filesystem_guard`). Closes **Improper Output
+  Handling**.
+- **`prismal.security.tool_policy`** — identity-agnostic `ToolPolicyEngine`
+  (`(agent, tool, args)` → allow/deny/require-HITL + per-run rate limits), YAML
+  loader (`config/tool_policies.yaml`; example shipped). Closes **Excessive
+  Agency** at the tool boundary.
+- **`prismal.security.runaway`** — `RunawayGuard` (explicit step cap + stagnation
+  detection); shares the per-run registry with the Budget guard. Closes
+  **Unbounded Consumption** within budget.
+- **Settings** (`core/config.py`) — `hardening_enabled`, `hardening_mode`
+  (`off|warn|enforce`), `taint_tracking_enabled`, `hardening_injection_threshold`,
+  `hardening_injection_classifier`, `output_validation_enabled`,
+  `tool_policy_path`, `hardening_tool_policy_default`, `hardening_runaway_max_steps`,
+  `hardening_runaway_stagnation_window`, `hardening_pii_output`.
+- **Exceptions** (`core/exceptions.py`) — `HardeningError` hierarchy
+  (`IndirectInjectionBlocked`, `OutputValidationError`, `ToolPolicyDenied`,
+  `RunawayStopped`, `HardeningConfigError`).
+- **Observability** (`monitoring/otel.py`) — counters
+  `prismal.guardrail_blocks_total`, `prismal.injection_detected_total`,
+  `prismal.output_rejected_total`, `prismal.tool_policy_denied_total`,
+  `prismal.runaway_stops_total`.
+- **Docs & example** — `docs/security/runtime-hardening.md`;
+  `examples/runtime_hardening.py`.
+
+#### Changed — runtime hardening (Phase H)
+
+- `react_loop` checks untrusted tool/RAG results before re-injection and ticks
+  the `RunawayGuard` next to the Budget check (stop → graceful partial).
+- `ActionInterceptor.check()` consults `ToolPolicyEngine` via its
+  `_tool_call_checker` seam; `REQUIRE_HITL` routes through `hitl_gate()`.
+- `pii_sanitizer` gains `redact_output` so PII redaction also covers agent output.
+- `@prismal_node` middleware chain extends with taint-in / output-validator / pii
+  stages, all gated on `hardening_enabled`.
 
 ## [3.1.5] — 2026-06-13
 

@@ -15,8 +15,12 @@ from __future__ import annotations
 
 import re
 from re import Pattern
+from typing import TYPE_CHECKING
 
 from prismal.core.logging import get_logger
+
+if TYPE_CHECKING:
+    from prismal.core.config import Settings
 
 logger = get_logger("prismal.security.pii_sanitizer")
 
@@ -87,4 +91,23 @@ class PIISanitizer:
         return sanitized
 
 
-__all__ = ["PIISanitizer"]
+def redact_output(text: str, *, settings: Settings | None = None) -> str:
+    """Redact PII from an agent OUTPUT, not just long-term memory (Phase H).
+
+    Reuses :meth:`PIISanitizer.sanitize`. No-op unless
+    ``settings.hardening_pii_output`` is True (resolved from ``get_settings()``
+    when *settings* is None). Never raises.
+    """
+    if not text:
+        return text
+    resolved = settings
+    if resolved is None:
+        from prismal.core.config import get_settings
+
+        resolved = get_settings()
+    if not getattr(resolved, "hardening_pii_output", False):
+        return text
+    return PIISanitizer.sanitize(text)
+
+
+__all__ = ["PIISanitizer", "redact_output"]

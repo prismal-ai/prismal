@@ -279,6 +279,27 @@ class OTelManager:
             description="Estimated USD cost per individual LLM call",
             unit="USD",
         )
+        # Runtime Hardening (Phase H — SPEC-HRD-OTEL-001)
+        self._counters["guardrail_blocks"] = self._meter.create_counter(
+            "prismal.guardrail_blocks_total",
+            description="Content blocked by a guardrail layer (labelled by layer)",
+        )
+        self._counters["injection_detected"] = self._meter.create_counter(
+            "prismal.injection_detected_total",
+            description="Indirect-injection detections by vector (direct|tool|rag|media)",
+        )
+        self._counters["output_rejected"] = self._meter.create_counter(
+            "prismal.output_rejected_total",
+            description="Model outputs rejected by the output validator (by reason)",
+        )
+        self._counters["tool_policy_denied"] = self._meter.create_counter(
+            "prismal.tool_policy_denied_total",
+            description="Tool calls denied by the tool-policy engine (by agent, tool)",
+        )
+        self._counters["runaway_stops"] = self._meter.create_counter(
+            "prismal.runaway_stops_total",
+            description="Runaway-guard stops by reason (step_cap|stagnation)",
+        )
         self._histograms["agent_latency"] = self._meter.create_histogram(
             "prismal.agent_latency_seconds",
             description="Agent execution latency in seconds",

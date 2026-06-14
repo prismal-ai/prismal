@@ -141,6 +141,44 @@ class ActionInterceptor(BaseCallbackHandler):
             duration_ms=duration_ms,
         )
 
+    def check_tool_policy(
+        self,
+        *,
+        agent: str,
+        tool: str,
+        args: dict[str, Any],
+        call_count: int,
+        policy_engine: Any,
+    ) -> Any:
+        """Consult the declarative :class:`ToolPolicyEngine` (Phase H — H4-03).
+
+        Returns the :class:`PolicyDecision`. A ``DENY`` is audited and raised as
+        :class:`ToolPolicyDenied`; ``ALLOW`` / ``REQUIRE_HITL`` are returned for
+        the caller to honour (REQUIRE_HITL routes through ``hitl_gate`` at the
+        graph-node level).
+        """
+        from prismal.core.exceptions import ToolPolicyDenied
+        from prismal.security.tool_policy import PolicyEffect
+
+        decision = policy_engine.evaluate(agent=agent, tool=tool, args=args, call_count=call_count)
+        if decision.effect is PolicyEffect.DENY:
+            self._audit.log_event(
+                "tool_policy_denied",
+                {"agent": agent, "tool": tool, "rule": decision.rule, "reason": decision.reason},
+            )
+            logger.warning(
+                "tool_policy_denied",
+                agent=agent,
+                tool=tool,
+                rule=decision.rule,
+                reason=decision.reason,
+            )
+            raise ToolPolicyDenied(
+                f"tool '{tool}' denied for agent '{agent}' by rule "
+                f"{decision.rule}: {decision.reason}"
+            )
+        return decision
+
     @staticmethod
     def check_shell(cmd: list[str]) -> bool:
         """Return True if shell execution is permitted by current settings.

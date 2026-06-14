@@ -455,6 +455,56 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Runtime Hardening (Phase H — SPEC-HRD-CFG-001) ────────────────
+    hardening_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for the runtime-hardening layer.",
+    )
+    hardening_mode: str = Field(
+        default="warn",
+        description="Global default control mode: off | warn | enforce.",
+    )
+    taint_tracking_enabled: bool = Field(
+        default=True,
+        description="Mark untrusted content (only effective if hardening_enabled).",
+    )
+    hardening_injection_threshold: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Risk threshold (0-1) to flag/block indirect injection.",
+    )
+    hardening_injection_classifier: bool = Field(
+        default=False,
+        description="Use the optional LLM injection classifier (metered via Budget).",
+    )
+    output_validation_enabled: bool = Field(
+        default=True,
+        description="Validate/escape model outputs before use (if hardening_enabled).",
+    )
+    tool_policy_path: str = Field(
+        default="config/tool_policies.yaml",
+        description="Path to the declarative tool-policy YAML file.",
+    )
+    hardening_tool_policy_default: str = Field(
+        default="allow",
+        description="Default effect when no policy rule matches: allow | deny.",
+    )
+    hardening_runaway_max_steps: int = Field(
+        default=40,
+        ge=0,
+        description="Hard step cap per run (0 = unlimited).",
+    )
+    hardening_runaway_stagnation_window: int = Field(
+        default=4,
+        ge=0,
+        description="Identical-signature window that triggers a runaway stop.",
+    )
+    hardening_pii_output: bool = Field(
+        default=False,
+        description="Redact PII from agent outputs.",
+    )
+
     # ── Sandbox multi-lenguaje ────────────────────────────────────────
     sandbox_path: str = Field(
         default="sandbox",
@@ -1698,6 +1748,29 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"PRISMAL_BUDGET_SCOPE={self.budget_scope!r} is invalid; "
                 f"expected one of {sorted(valid_scopes)}."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_hardening(self) -> "Settings":
+        """Validate the runtime-hardening settings (H1-01 / SPEC-HRD-CFG-001).
+
+        Numeric ranges are enforced by their Fields; here we reject an unknown
+        ``hardening_mode`` or ``hardening_tool_policy_default`` so a typo fails
+        fast at load time rather than silently disabling a control.
+        """
+        valid_modes = {"off", "warn", "enforce"}
+        if self.hardening_mode not in valid_modes:
+            raise ValueError(
+                f"PRISMAL_HARDENING_MODE={self.hardening_mode!r} is invalid; "
+                f"expected one of {sorted(valid_modes)}."
+            )
+        valid_defaults = {"allow", "deny"}
+        if self.hardening_tool_policy_default not in valid_defaults:
+            raise ValueError(
+                f"PRISMAL_HARDENING_TOOL_POLICY_DEFAULT="
+                f"{self.hardening_tool_policy_default!r} is invalid; "
+                f"expected one of {sorted(valid_defaults)}."
             )
         return self
 

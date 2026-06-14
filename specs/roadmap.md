@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| **Last updated** | 2026-06-13 |
-| **Package version** | 3.1.5 |
+| **Last updated** | 2026-06-14 |
+| **Package version** | 3.2.0 |
 | **Author** | Ernesto Crespo |
-| **Latest spec** | `cost-budget-governance/` (Phase C) — 2026-06-12 |
-| **Latest shipped** | `cost-budget-governance/` (Phase C) — 2026-06-12 |
+| **Latest spec** | `agent-identity-governance/` (Phase IDN) — 2026-06-13 |
+| **Latest shipped** | `runtime-hardening/` (Phase H) — 2026-06-14 |
 
 Living index of every SDD under `specs/`: what has shipped, what is pending,
 and in which order the pending work fits together. Statuses are verified
@@ -33,6 +33,7 @@ Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented) ·
 | [`composition-root/`](./composition-root/) | R | ✅ | `build_runtime(settings, *, org_id=None)` composition facade in `prismal/composition/` — assembles all ports (tool provider Y, vector store Z, embeddings, checkpointer, audit) into a `RuntimeContext` with coordinated `aclose()`; `global`/`context` modes (`settings.runtime_mode`); per-`org_id` collection isolation (`collection_for`); `VectorStoreProvider`/`VectorStoreProviderPort`; `build_test_runtime` fakes; pure config loaders. Additive/opt-in. Docs: `docs/composition-root.md` · **v3.1.3** |
 | [`config-source-injection/`](./config-source-injection/) | W | ✅ | `ConfigSourcePort` hexagonal inversion of configuration: the core stops reading `.env`/`os.environ` and consumes an injected source. `EnvConfigSource` (default, byte-for-byte parity) + `MappingConfigSource`/`ChainedConfigSource`/`FakeConfigSource`; `set_config_source`/`build_settings`/`reload_settings`; `env_file` dropped from `Settings`; import-time `env_compat` mutation removed (legacy `LIGHTAGENT_` mirror folded into `EnvConfigSource`); `tavily_api_key`/`config_source_strict` fields + `ConfigSourceError`; raw `os.getenv` reads relocated (tavily, mcp `resolve_secret`); composition-root `apply_org_overrides(*, source=)`; AST guard. Additive/opt-in. Docs: `docs/configuration.md` · **v3.1.4** |
 | [`cost-budget-governance/`](./cost-budget-governance/) | C | ✅ | `prismal/budget/` enforcement layer (opt-in `budget_enabled`): `Budget`/`Usage`/`BudgetStatus` value objects (`0`=unlimited), `CostMeter` (auto token+cost extraction; `providers/cost.py` litellm-native + pricing-table fallback; OTel + `CostTracker` bridge), `BudgetGuard` (soft-cap degrade / hard-cap abort) + `make_budget_guard_fn`; `react_loop` metering + graceful partial; `budget_guard_fn` in the 5 expensive patterns (debate/ToT/LATS/MoA/reflection); per-turn seeding via an in-process registry (no live objects in checkpointed state); **unifies the dormant `skynet_token_budget`** under `BudgetExceeded`. Docs: `docs/budget.md` · **v3.1.5** |
+| [`runtime-hardening/`](./runtime-hardening/) | H | ✅ | `prismal/security/` hardening layer (opt-in `hardening_enabled`, `off\|warn\|enforce`): taint tracking (`taint.py` + per-run registry), `IndirectInjectionDetector` (reuses `GuardrailsEngine` + heuristic pack; optional LLM classifier in `providers/`), `OutputValidator` (tool-arg schema + path/command/html), identity-agnostic `ToolPolicyEngine` (allow/deny/HITL/rate-limit, `config/tool_policies.yaml`), `RunawayGuard` (step cap + stagnation), PII-on-output; wired into `react_loop` + the `@prismal_node` middleware + supervisor seeding; 5 security OTel counters; graph byte-for-byte unchanged when off. Docs: `docs/security/runtime-hardening.md` · **v3.2.0** |
 
 Deferred to follow-up phases (noted in their specs): Skynet S+ (heterogeneous
 specialist swarms; metering *worker* token usage into the shared swarm budget —
@@ -43,14 +44,32 @@ evaluator boundary via the unified budget engine; remote workers via A2A).
 
 | Spec | Phase | What it adds | Depends on |
 |---|---|---|---|
-| [`a2a-interop/`](./a2a-interop/) | I | Bidirectional A2A (Agent2Agent) interoperability: JSON-RPC over HTTP(S)+SSE, Agent Card at `/.well-known/agent-card.json`, discovery/delegation with external agents (Google ADK, MS Agent Framework, …) | Benefits from agent-identity (DID) |
+| [`agent-eval-harness/`](./agent-eval-harness/) | V | System-level evaluation (the "scaffold gap"): `prismal/eval/` runs eval-sets against the real graph, captures trajectories, scores (exact/semantic/llm-judge/tool-usage/groundedness), regression gate, and an adversarial red-team suite proving containment. Artifact: `redteam-corpus.example.yaml` | Public graph entry + ports; proves `runtime-hardening` controls |
+| [`agent-identity-governance/`](./agent-identity-governance/) | IDN | Per-agent identity (W3C DID), scoped per-agent credentials (vault via `ConfigSourcePort`), OAuth-on-behalf delegation, identity-aware `PolicyEngine` (delegates to the Phase H `ToolPolicyEngine`) wired into `ActionInterceptor`. Opt-in: `identity_enabled`. Artifacts: `identity_policies.example.yaml`, `agent-card-did.example.json` | Foundation for A2A (I) + multi-tenant (R); recommends Phase H |
+| [`a2a-interop/`](./a2a-interop/) | I | Bidirectional A2A (Agent2Agent) interoperability: JSON-RPC over HTTP(S)+SSE, Agent Card at `/.well-known/agent-card.json`, discovery/delegation with external agents (Google ADK, MS Agent Framework, …) | Consumes agent-identity (DID) |
+
+### Target package versions (strict SemVer — minor per phase)
+
+Current: **`3.2.0`**. Each pending phase is new, additive, opt-in functionality → a **SemVer minor** bump, shipped in order **V → IDN → I** (H shipped in `3.2.0`):
+
+| Order | Phase | Spec | Target version |
+|---|---|---|---|
+| ✅ | H | [`runtime-hardening/`](./runtime-hardening/) | **`3.2.0`** (shipped) |
+| 1 | V | [`agent-eval-harness/`](./agent-eval-harness/) | **`3.3.0`** |
+| 2 | IDN | [`agent-identity-governance/`](./agent-identity-governance/) | **`3.4.0`** |
+| 3 | I | [`a2a-interop/`](./a2a-interop/) | **`3.5.0`** |
+
+> Versioning note: the earlier additive phases Z/R/W/C were released as **patches**
+> (`3.1.2`–`3.1.5`) to avoid bumping the minor too quickly. Going forward, feature
+> phases follow **strict SemVer**: new functionality ⇒ a **minor** bump (a breaking
+> change would be a major, but all pending phases are opt-in and snapshot-safe, so
+> none is expected). Each spec's metadata table records its `Target package version`.
 
 ## 🌱 Seed PRDs (PLAN only — ARCHITECTURE/SPEC/TASKS must be written first)
 
 | Spec | What it adds | Depends on |
 |---|---|---|
-| [`agent-eval-harness/`](./agent-eval-harness/) | System-level evaluation (the "scaffold gap"): trajectories, tool usage, RAG fidelity, adversarial robustness, cross-version regression | — |
-| [`agent-identity-governance/`](./agent-identity-governance/) | Per-agent identity (W3C DID), scoped per-agent credentials, OAuth-on-behalf delegation, auditable access policies | Foundation for A2A (I) and multi-tenant (R) |
+| _(none — all specs now have a full SDD set)_ | | |
 
 ## Suggested order
 
@@ -71,11 +90,19 @@ evaluator boundary via the unified budget engine; remote workers via A2A).
    meters real usage per run and enforces soft/hard caps in `react_loop` and the
    expensive patterns; unifies the dormant `skynet_token_budget`. Opt-in via
    `budget_enabled`.
-4. **`agent-identity-governance`** → **`a2a-interop` (I)** — identity first,
+4. ~~**`runtime-hardening` (H)**~~ — ✅ **shipped** (v3.2.0): security hardening
+   derived from the 2026 OWASP LLM/Agentic Top 10 research
+   (`docs/security/hardening-and-harness-engineering.md`): indirect-injection
+   containment, output validation, tool policy, runaway guard, taint tracking,
+   PII-on-output. Additive/opt-in (`hardening_enabled`); extends `security/` and
+   reuses the budget per-run registry. Docs: `docs/security/runtime-hardening.md`.
+5. **`agent-eval-harness` (V)** — system-level evaluation + red-team. Valuable at
+   any point and the **executable proof** for Phase H controls; most leverage once
+   the surface stabilizes. Run with fakes in CI; `live_api` opt-in.
+6. **`agent-identity-governance`** → **`a2a-interop` (I)** — identity first,
    then the interop layer that consumes it (and enables Skynet S+ remote
-   workers).
-5. **`agent-eval-harness`** — valuable at any point; most leverage once the
-   surface above stabilizes.
+   workers). The identity-aware `PolicyEngine` supersedes Phase H's
+   identity-agnostic `ToolPolicyEngine`.
 
 ## Maintenance notes
 

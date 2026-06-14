@@ -111,6 +111,40 @@ class CanaryLeakError(SecurityError):
         super().__init__(f"Canary token leaked in LLM output: '{token}'")
 
 
+# ── Runtime hardening (Phase H — SPEC-HRD-ERR-001) ──────────────────────────────
+
+
+class HardeningError(PrismalError):
+    """Base class for the opt-in runtime-hardening layer (Phase H)."""
+
+
+class IndirectInjectionBlocked(HardeningError):  # noqa: N818 — SPEC-HRD-ERR-001 name
+    """Untrusted content was blocked by the indirect-injection detector.
+
+    Raised only in ``enforce`` mode and caught at the ``react_loop`` seam, where
+    it is converted into a neutralised/blocked tool result.
+    """
+
+
+class OutputValidationError(HardeningError):
+    """Model output failed schema/escape validation before use."""
+
+
+class ToolPolicyDenied(HardeningError):  # noqa: N818 — SPEC-HRD-ERR-001 name
+    """A tool call was denied by the declarative ``ToolPolicyEngine``."""
+
+
+class RunawayStopped(HardeningError):  # noqa: N818 — SPEC-HRD-ERR-001 name
+    """A run hit the explicit step cap or stagnated.
+
+    Maps to the same graceful-partial path used for a hard budget cap.
+    """
+
+
+class HardeningConfigError(HardeningError):
+    """The tool-policy YAML or a hardening setting failed to load/validate."""
+
+
 # ── Provider ──────────────────────────────────────────────────────────────────
 
 
