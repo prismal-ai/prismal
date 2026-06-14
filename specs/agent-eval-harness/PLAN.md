@@ -1,16 +1,18 @@
 # Prismal — Agent Evaluation & Reliability Harness
 
-## Strategic Plan / Product Requirements Document (PLAN) — *seed PRD*
+## Strategic Plan / Product Requirements Document (PLAN)
 
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` (seed PRD; ARCHITECTURE/SPEC/TASKS missing) |
-| **Version** | 0.1 |
-| **Date** | 2026-06-06 |
+| **Status** | `READY` (full SDD: PLAN + SPEC + ARCHITECTURE + TASKS) |
+| **Version** | 1.0 |
+| **Phase** | V (Verification / Evaluation) |
+| **Target package version** | `3.3.0` (SemVer **minor** — new functionality; ships after Phase H `3.2.0`) |
+| **Date** | 2026-06-13 |
 | **Reviewers** | Tech Lead, AI Architect, QA Lead |
 | **Priority** | P2 (reliability) |
-| **Related** | `skill-creator` (skill evals), `monitoring/`, `agents/graph.py` |
+| **Related** | `skill-creator` (skill evals), `monitoring/`, `agents/graph.py`, `specs/runtime-hardening/` (red-team proves its controls) |
 
 ---
 
@@ -111,3 +113,4 @@ Expand to the full SDD set: design of `EvalRunner` and trajectory capture from t
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | 0.1 | 2026-06-06 | Ernesto Crespo | Seed PRD — system evaluation harness |
+| 1.0 | 2026-06-13 | Ernesto Crespo | Promoted SEED → READY: added ARCHITECTURE/SPEC/TASKS + `redteam-corpus.example.yaml`; assigned Phase V; linked to `runtime-hardening` |

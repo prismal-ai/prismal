@@ -11,6 +11,7 @@
 | **Reviewers** | Tech Lead, AI Architect, Security Lead |
 | **Related documents** | `ARCHITECTURE.md`, `SPEC.md`, `TASKS.md` |
 | **Phase** | I — Interop (A2A / Agent Cards) |
+| **Target package version** | `3.5.0` (SemVer **minor** — new functionality; ships after Phase IDN `3.4.0`, whose DID it consumes) |
 | **Related to** | Phase X (Extension Surface), Phase Y (Tool Provider Injection), `specs/agent-identity-governance/` |
 
 ---
