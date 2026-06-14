@@ -15,8 +15,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from prismal.core.logging import get_logger
-
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -27,8 +25,6 @@ if TYPE_CHECKING:
     from prismal.security.runaway import RunawayGuard
     from prismal.security.taint import TaintRegistry
     from prismal.security.tool_policy import RunToolPolicy
-
-logger = get_logger("prismal.security.hardening_run")
 
 # session_id -> {detector, runaway, tool_policy, taint, turn}. In-process only.
 _RUN_ENGINES: dict[str, dict[str, Any]] = {}
