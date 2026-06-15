@@ -80,6 +80,10 @@ class Trajectory:
     tokens: int
     latency_ms: float
     terminated: bool
+    # Security signals observed in the public stream (guardrail/injection/policy
+    # markers in state metadata, blocked tool results). Populated for red-team
+    # cases; empty otherwise. Defaulted so existing constructors are unaffected.
+    security_signals: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

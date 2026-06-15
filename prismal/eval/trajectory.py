@@ -43,6 +43,7 @@ async def capture_trajectory(
     """
     steps: list[TrajectoryStep] = []
     visited: list[str] = []
+    security_signals: list[str] = []
     tool_calls = 0
     tool_errors = 0
     tokens = 0
@@ -56,6 +57,7 @@ async def capture_trajectory(
         async for chunk in graph.astream(input_state, config, stream_mode="updates"):
             for node, update in _iter_node_updates(chunk):
                 visited.append(node)
+                security_signals.extend(_metadata_signals(update))
                 for message in _messages_of(update):
                     new_steps, answer, calls, errors, toks, cost = _consume_message(node, message)
                     steps.extend(new_steps)
@@ -65,6 +67,7 @@ async def capture_trajectory(
                     cost_usd += cost
                     if answer is not None:
                         final_answer = answer
+                    security_signals.extend(_message_signals(message))
         terminated = True
     except Exception:  # capture must never raise; record non-termination instead
         terminated = False
@@ -81,6 +84,7 @@ async def capture_trajectory(
         tokens=tokens,
         latency_ms=latency_ms,
         terminated=terminated,
+        security_signals=security_signals,
     )
 
 
@@ -96,6 +100,38 @@ def _iter_node_updates(chunk: Any) -> list[tuple[str, Any]]:
     if not isinstance(chunk, dict):
         return []
     return [(node, update) for node, update in chunk.items() if isinstance(node, str)]
+
+
+# Security-signal markers (keys in state metadata, substrings in tool results).
+_METADATA_SECURITY_KEYS = ("hardening", "security", "guardrail", "injection", "blocked")
+_BLOCK_CONTENT_MARKERS = (
+    "[blocked",
+    "blocked by",
+    "injection detected",
+    "policy denied",
+    "neutralised",
+    "neutralized",
+    "request refused",
+)
+
+
+def _metadata_signals(update: Any) -> list[str]:
+    """Security markers present in a node update's ``metadata`` block."""
+    if not isinstance(update, dict):
+        return []
+    meta = update.get("metadata")
+    if not isinstance(meta, dict):
+        return []
+    return [f"metadata.{key}" for key in _METADATA_SECURITY_KEYS if key in meta]
+
+
+def _message_signals(message: Any) -> list[str]:
+    """Security markers in a (blocked/neutralised) tool or assistant message."""
+    content = _text(getattr(message, "content", "")).lower()
+    if any(marker in content for marker in _BLOCK_CONTENT_MARKERS):
+        name = getattr(message, "name", None) or _role_of(message)
+        return [f"blocked:{name}"]
+    return []
 
 
 def _messages_of(update: Any) -> list[Any]:
