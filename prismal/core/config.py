@@ -455,6 +455,31 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Evaluation harness (Phase V — SPEC-EVL-CFG-001) ───────────────
+    eval_default_mode: str = Field(
+        default="fakes",
+        description="Default eval execution mode: fakes | live_api.",
+    )
+    eval_judge_model: str = Field(
+        default="",
+        description="Optional LLM-judge model override ('' = provider default).",
+    )
+    eval_regression_tolerance: float = Field(
+        default=0.02,
+        ge=0.0,
+        le=1.0,
+        description="Per-metric regression tolerance for the gate.",
+    )
+    eval_seed: int = Field(
+        default=0,
+        ge=0,
+        description="Global seed for reproducible eval runs.",
+    )
+    eval_langfuse_export: bool = Field(
+        default=False,
+        description="Export scorecards to Langfuse evals.",
+    )
+
     # ── Runtime Hardening (Phase H — SPEC-HRD-CFG-001) ────────────────
     hardening_enabled: bool = Field(
         default=False,
@@ -1748,6 +1773,22 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"PRISMAL_BUDGET_SCOPE={self.budget_scope!r} is invalid; "
                 f"expected one of {sorted(valid_scopes)}."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_eval(self) -> "Settings":
+        """Validate the eval-harness settings (V1-03 / SPEC-EVL-CFG-001).
+
+        ``eval_regression_tolerance``/``eval_seed`` are range-bound by their
+        Fields; here we reject an unknown ``eval_default_mode`` so a typo fails
+        fast at load time rather than silently running the wrong mode.
+        """
+        valid_modes = {"fakes", "live_api"}
+        if self.eval_default_mode not in valid_modes:
+            raise ValueError(
+                f"PRISMAL_EVAL_DEFAULT_MODE={self.eval_default_mode!r} is invalid; "
+                f"expected one of {sorted(valid_modes)}."
             )
         return self
 

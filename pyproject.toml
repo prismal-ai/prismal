@@ -416,6 +416,8 @@ markers = [
   "e2e: End-to-end tests through the compiled graph (deterministic, mocked LLM)",
   "slow: Tests that take > 5 seconds",
   "live_api: Tests that call real LLM APIs (require API keys)",
+  "eval: Agent evaluation-harness suites (Phase V; deterministic with fakes)",
+  "redteam: Adversarial / red-team containment suites (Phase V)",
 ]
 filterwarnings = [
   "error",
