@@ -30,20 +30,10 @@ from prismal.eval.types import (
 if TYPE_CHECKING:
     from prismal.core.config import Settings
 
-# ``Judge`` (V3) is typed as ``Any`` until the judges module lands.
 GraphFactory = Callable[..., Awaitable[Any]]
 RuntimeFactory = Callable[..., Any]
-Evaluator = Callable[[Trajectory, EvalCase, Any], Awaitable[list[AssertionResult]]]
-
-
-async def _no_assertions(_traj: Trajectory, _case: EvalCase, _judge: Any) -> list[AssertionResult]:
-    """Default evaluator until V3 wires the real assertion dispatch.
-
-    Returns ``[]`` so cases with no assertions pass trivially; cases that *do*
-    carry assertions are only exercised once V3 swaps in the real dispatcher
-    (driven by its own failing tests).
-    """
-    return []
+# An override evaluator receives (trajectory, case, judge, embeddings).
+Evaluator = Callable[..., Awaitable[list[AssertionResult]]]
 
 
 class EvalRunner:
@@ -65,13 +55,14 @@ class EvalRunner:
                 :func:`prismal.agents.graph.get_async_compiled_graph`.
             runtime_factory: Factory returning a ``RuntimeContext``. Defaults to
                 :func:`prismal.composition.build_test_runtime` (deterministic fakes).
-            evaluator: Async assertion dispatcher. Defaults to the no-op until V3.
+            evaluator: Optional override for assertion dispatch; defaults to
+                :func:`prismal.eval.assertions.dispatch_assertions`.
             judge: Optional LLM-as-judge for ``llm_judge``/``groundedness``.
             settings: Optional settings (seed, mode).
         """
         self._graph_factory = graph_factory
         self._runtime_factory = runtime_factory
-        self._evaluator = evaluator or _no_assertions
+        self._evaluator = evaluator
         self._judge = judge
         self._settings = settings
 
@@ -83,7 +74,7 @@ class EvalRunner:
             graph = await self._make_graph(runtime)
             config = {"configurable": {"thread_id": f"eval-{case.id}"}}
             trajectory = await capture_trajectory(graph, case, config=config)
-            assertion_results = await self._evaluator(trajectory, case, self._judge)
+            assertion_results = await self._evaluate(trajectory, case, runtime)
         except Exception as exc:  # a runner failure is a failed case, never a raise
             return CaseResult(
                 case_id=case.id,
@@ -110,6 +101,27 @@ class EvalRunner:
         return _aggregate(eval_set.suite, results, version=self._version())
 
     # ── internals ────────────────────────────────────────────────────────────
+
+    async def _evaluate(
+        self, trajectory: Trajectory, case: EvalCase, runtime: Any
+    ) -> list[AssertionResult]:
+        """Evaluate the case's assertions against the captured trajectory."""
+        embeddings = getattr(runtime, "embeddings", None)
+        judge = self._judge_for()
+        if self._evaluator is not None:
+            return await self._evaluator(trajectory, case, judge=judge, embeddings=embeddings)
+        from prismal.eval.assertions import dispatch_assertions
+
+        return await dispatch_assertions(trajectory, case, judge=judge, embeddings=embeddings)
+
+    def _judge_for(self) -> Any:
+        """Return the judge, lazily building a default when assertions need one."""
+        if self._judge is not None:
+            return self._judge
+        from prismal.eval.judges import Judge
+
+        self._judge = Judge(settings=self._settings)
+        return self._judge
 
     def _seed_for(self, case: EvalCase) -> None:
         """Seed the RNG for reproducibility from the case setup or settings."""
