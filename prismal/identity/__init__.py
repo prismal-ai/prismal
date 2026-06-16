@@ -19,6 +19,11 @@ from prismal.identity.did import (
     resolve_did,
     verify_did,
 )
+from prismal.identity.policy import (
+    IdentityPolicy,
+    PolicyEngine,
+    load_identity_policies,
+)
 from prismal.identity.provider import (
     FakeIdentityProvider,
     LocalIdentityProvider,
@@ -43,15 +48,18 @@ __all__ = [
     "FakeIdentityProvider",
     "FakeVault",
     "FileVault",
+    "IdentityPolicy",
     "LocalIdentityProvider",
     "OidcIdentityProvider",
     "OnBehalfToken",
     "PolicyDecision",
     "PolicyEffect",
+    "PolicyEngine",
     "Scope",
     "did_document",
     "issue_did_key",
     "issue_did_web",
+    "load_identity_policies",
     "resolve_did",
     "verify_did",
 ]
