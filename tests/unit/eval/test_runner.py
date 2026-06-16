@@ -123,3 +123,13 @@ def test_assertion_type_for_future_dispatch_is_typed() -> None:
     """Sanity: an EvalCase can carry assertions the runner will later dispatch."""
     case = _answer_case([Assertion(type=AssertionType.EXACT, expected="ok")])
     assert case.assertions[0].type is AssertionType.EXACT
+
+
+async def test_scorecard_stamps_prismal_version() -> None:
+    """The scorecard version is the prismal package version, not a dependency's."""
+    from importlib.metadata import version
+
+    chunks = [{"supervisor": {"messages": [AIMessage(content="ok")]}}]
+    runner, _ = _runner(_FakeGraph(chunks))
+    card = await runner.run_set(EvalSet(suite="s", cases=[_answer_case()]))
+    assert card.version == version("prismal-ai")

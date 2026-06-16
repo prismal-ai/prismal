@@ -151,9 +151,20 @@ class EvalRunner:
         return await factory(tool_provider=tool_provider)
 
     def _version(self) -> str:
-        from prismal.langgraph import VERSION  # harness version proxy
+        """Resolve the prismal package version stamped on the scorecard."""
+        return _package_version()
 
-        return str(VERSION)
+
+def _package_version() -> str:
+    """Best-effort prismal distribution version (``"0.0.0"`` if undiscoverable)."""
+    from importlib.metadata import PackageNotFoundError, version
+
+    for dist in ("prismal-ai", "prismal"):
+        try:
+            return version(dist)
+        except PackageNotFoundError:
+            continue
+    return "0.0.0"
 
 
 def _runtime_kwargs(setup: dict[str, Any]) -> dict[str, Any]:

@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` (full SDD: PLAN + SPEC + ARCHITECTURE + TASKS) |
+| **Status** | `IMPLEMENTED` (v3.3.0, 2026-06-15) |
 | **Version** | 1.0 |
 | **Phase** | V (Verification / Evaluation) |
 | **Target package version** | `3.3.0` (SemVer **minor** — new functionality; ships after Phase H `3.2.0`) |
