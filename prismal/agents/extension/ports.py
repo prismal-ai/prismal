@@ -11,10 +11,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Mapping, Sequence
 
     from langchain_core.documents import Document
     from langchain_core.tools import BaseTool
+    from pydantic import SecretStr
+
+    from prismal.identity.types import (
+        DID,
+        AgentIdentity,
+        Credential,
+        PolicyDecision,
+        Scope,
+    )
 
 
 @runtime_checkable
@@ -189,6 +198,77 @@ class VectorStoreProviderPort(Protocol):
         ...
 
 
+@runtime_checkable
+class IdentityPort(Protocol):
+    """Per-agent identity issuer/resolver/verifier (SPEC-IDN-PRV-001).
+
+    Conforming implementations: ``LocalIdentityProvider`` (did:key, offline),
+    ``OidcIdentityProvider`` (Entra/Okta adapter), ``FakeIdentityProvider``
+    (tests). The core only calls these methods; ``build_runtime`` composes and
+    injects the concrete provider per ``org_id``.
+    """
+
+    def issue(
+        self, *, agent_name: str, org_id: str | None = None, scopes: Sequence[Scope] = ()
+    ) -> AgentIdentity:
+        """Mint a verifiable identity for ``agent_name`` within ``org_id``."""
+        ...
+
+    def resolve(self, did: DID) -> AgentIdentity | None:
+        """Return the identity for ``did`` or ``None`` if unknown."""
+        ...
+
+    def verify(self, did: DID) -> bool:
+        """Return ``True`` if ``did`` is currently valid (not revoked/expired)."""
+        ...
+
+    def revoke(self, did: DID) -> None:
+        """Invalidate ``did`` so subsequent :meth:`verify` calls fail."""
+        ...
+
+
+@runtime_checkable
+class CredentialVaultPort(Protocol):
+    """Scoped secret resolver (SPEC-IDN-VLT-001).
+
+    Conforming implementations: ``EnvVault`` (via the injected ``ConfigSourcePort``;
+    never reads ``os.environ`` directly), ``FileVault`` (encrypted), ``FakeVault``
+    (tests). The resolved :class:`~prismal.identity.types.Credential` value is used
+    only at the action boundary and redacted from audit; only the opaque
+    ``credential_ref`` travels in identity metadata.
+    """
+
+    def resolve(self, credential_ref: str, *, scopes: Sequence[Scope] = ()) -> Credential:
+        """Resolve ``credential_ref`` to a :class:`Credential`; out-of-scope → ``ScopeError``."""
+        ...
+
+    def store(self, ref: str, value: SecretStr, *, scopes: Sequence[Scope] = ()) -> None:
+        """Persist a secret under ``ref`` with the given scopes."""
+        ...
+
+
+@runtime_checkable
+class PolicyPort(Protocol):
+    """Identity-aware authorization decision (SPEC-IDN-POL-001).
+
+    Conforming implementation: :class:`prismal.identity.policy.PolicyEngine`,
+    which delegates ``(agent, tool, args)`` rules to the Phase H
+    ``ToolPolicyEngine`` and layers identity scopes + resource matching on top.
+    Evaluation is sync, O(1), and must not raise on the hot path.
+    """
+
+    def allow(
+        self,
+        *,
+        identity: AgentIdentity,
+        action: str,
+        resource: str,
+        context: Mapping[str, Any] | None = None,
+    ) -> PolicyDecision:
+        """Decide whether ``identity`` may perform ``action`` on ``resource``."""
+        ...
+
+
 def conforms_to(obj: Any, port: type) -> bool:
     """Return ``True`` if ``obj`` structurally satisfies ``port``.
 
@@ -204,7 +284,10 @@ def conforms_to(obj: Any, port: type) -> bool:
 __all__ = [
     "AuditPort",
     "CheckpointPort",
+    "CredentialVaultPort",
     "EmbeddingsPort",
+    "IdentityPort",
+    "PolicyPort",
     "ToolPort",
     "ToolProviderPort",
     "VectorStorePort",
