@@ -8,6 +8,9 @@ resolution raises ``ScopeError``; ``EnvVault`` reads through the injected
 
 from __future__ import annotations
 
+import os
+import stat
+
 import pytest
 from pydantic import SecretStr
 
@@ -139,3 +142,15 @@ def test_file_vault_out_of_scope_raises(tmp_path) -> None:
 def test_file_vault_unknown_ref_raises(tmp_path) -> None:
     with pytest.raises(CredentialResolutionError):
         FileVault(path=tmp_path / "vault.enc").resolve("missing")
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file permissions")
+def test_file_vault_writes_are_owner_only(tmp_path) -> None:
+    """The key file and the encrypted vault must be 0600 (no world/group read)."""
+    path = tmp_path / "sub" / "vault.enc"
+    FileVault(path=path).store("api-key", SecretStr("s3cr3t"))
+    key_path = path.with_suffix(path.suffix + ".key")
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(key_path.stat().st_mode) == 0o600
+    # the parent directory the vault created is owner-only too
+    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700

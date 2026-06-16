@@ -20,6 +20,7 @@ check is skipped (the common boundary case).
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -121,12 +122,25 @@ class FileVault:
     def _key_path(self) -> Path:
         return self._path.with_suffix(self._path.suffix + ".key")
 
+    @staticmethod
+    def _write_owner_only(path: Path, data: bytes) -> None:
+        """Write ``data`` to ``path`` with owner-only (0600) permissions, atomically.
+
+        Uses ``os.open`` with the mode set at creation so there is no window where
+        the secret file is world/group-readable (unlike write-then-chmod).
+        """
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.write(fd, data)
+        finally:
+            os.close(fd)
+
     def _load_or_create_key(self) -> bytes:
         if self._key_path.exists():
             return self._key_path.read_bytes()
         key = Fernet.generate_key()
-        self._key_path.parent.mkdir(parents=True, exist_ok=True)
-        self._key_path.write_bytes(key)
+        self._write_owner_only(self._key_path, key)
         return key
 
     def _read(self) -> dict[str, dict[str, object]]:
@@ -137,8 +151,7 @@ class FileVault:
         return data
 
     def _write(self, data: dict[str, dict[str, object]]) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_bytes(self._fernet.encrypt(json.dumps(data).encode()))
+        self._write_owner_only(self._path, self._fernet.encrypt(json.dumps(data).encode()))
 
     def store(self, ref: str, value: SecretStr, *, scopes: Sequence[Scope] = ()) -> None:
         data = self._read()
