@@ -288,6 +288,22 @@ jobs:
           path: report-e2e.xml
           retention-days: 7
 
+  test-eval:
+    runs-on: ubuntu-latest
+    needs: [complexity-lizard, complexity-cognitive]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: ./.github/actions/setup-python-env
+      # Phase V agent-eval-harness: run the eval + red-team suites with fakes
+      # (no live_api). Fails on a regressed scorecard or a passed attack.
+      - run: uv run pytest tests/unit/eval -m "not live_api" --junitxml=report-eval.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: report-eval
+          path: report-eval.xml
+          retention-days: 7
+
   test-integration:
     runs-on: ubuntu-latest
     needs: [complexity-lizard, complexity-cognitive]
