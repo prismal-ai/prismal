@@ -96,9 +96,7 @@ def test_tool_usage_must_call_fails_when_absent() -> None:
 
 
 def test_tool_usage_never_call_fails_when_forbidden_tool_used() -> None:
-    traj = _traj(
-        steps=[TrajectoryStep(node="coder", role="assistant", tool_name="delete_file")]
-    )
+    traj = _traj(steps=[TrajectoryStep(node="coder", role="assistant", tool_name="delete_file")])
     a = Assertion(type=AssertionType.TOOL_USAGE, never_call=["delete_file"])
     assert assert_tool_usage(traj, a).passed is False
 

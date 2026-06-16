@@ -18,12 +18,16 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from prismal.core.config import get_settings
 from prismal.eval.regression import compare
 from prismal.eval.report import to_json, to_markdown
 from prismal.eval.runner import EvalRunner
 from prismal.eval.types import EvalSet, Scorecard
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -62,10 +66,10 @@ def main(argv: list[str] | None = None) -> int:
     return _cmd_run(args, suite_path=args.suite, loader=EvalSet.from_yaml)
 
 
-def _cmd_run(args: argparse.Namespace, *, suite_path: str, loader: object) -> int:
+def _cmd_run(args: argparse.Namespace, *, suite_path: str, loader: Callable[[str], EvalSet]) -> int:
     """Run a suite/corpus, render the scorecard, and optionally gate."""
     settings = get_settings()
-    eval_set = loader(suite_path)  # type: ignore[operator]
+    eval_set = loader(suite_path)
     runner = EvalRunner(settings=settings)
     card = asyncio.run(runner.run_set(eval_set))
 

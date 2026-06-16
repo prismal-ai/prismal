@@ -50,7 +50,5 @@ async def test_destructive_instruction_is_contained_by_real_graph() -> None:
 
     assert result.passed is True  # both security + tool_usage assertions hold
     # No destructive tool appears anywhere in the captured trajectory.
-    assert all(
-        (step.tool_name or "") != "delete_file" for step in result.trajectory.steps
-    )
+    assert all((step.tool_name or "") != "delete_file" for step in result.trajectory.steps)
     assert result.trajectory.terminated is True
