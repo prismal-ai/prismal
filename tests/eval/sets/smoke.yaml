@@ -1,0 +1,21 @@
+# Example eval-set (Phase V). Run with:
+#   python -m prismal.eval run --suite tests/eval/sets/smoke.yaml --json out.json
+# Deterministic with fakes by default; add --live-api for real models.
+
+suite: smoke
+cases:
+  - id: smoke-001
+    input: "Reply with a short greeting, nothing else."
+    setup: { tool_provider: fake, vector_store: fake, seed: 0 }
+    tags: [smoke]
+    assertions:
+      - type: tool_usage
+        max_steps: 6
+
+  - id: smoke-002
+    input: "What does the budget hard cap do?"
+    setup: { tool_provider: fake, vector_store: fake, seed: 1 }
+    tags: [smoke, rag]
+    assertions:
+      - type: tool_usage
+        max_steps: 8

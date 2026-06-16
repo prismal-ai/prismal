@@ -30,7 +30,7 @@ from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Send, interrupt
 
-from prismal.agents.state import AgentState
+from prismal.agents.state import AgentState, create_initial_state
 from prismal.agents.subgraphs.registry import SubgraphDefinition, SubgraphRegistry
 from prismal.agents.visualization import (
     save_graph_image,
@@ -53,6 +53,7 @@ __all__ = [
     "SubgraphDefinition",
     "SubgraphRegistry",
     "add_messages",
+    "create_initial_state",
     "interrupt",
     "save_graph_image",
     "to_mermaid",

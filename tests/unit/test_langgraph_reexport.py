@@ -106,6 +106,9 @@ class TestPublicApi:
             "to_mermaid_png",
             "visualize",
             "save_graph_image",
+            # Phase V (agent-eval-harness): the eval harness builds graph input
+            # via the public state factory rather than an agents.* internal.
+            "create_initial_state",
         }
         assert set(pl.__all__) == expected
 

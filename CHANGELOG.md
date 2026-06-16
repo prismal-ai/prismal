@@ -13,35 +13,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Planned, **spec-complete** phases (full SDD under `specs/`, not yet implemented).
 Each is additive and **opt-in** (graph byte-for-byte unchanged when its flag is
 off, snapshot-tested), so each is a **SemVer minor** bump. They ship in order
-**H → V → IDN → I**. When a phase lands, promote its block below to a top-level
+**IDN → I**. When a phase lands, promote its block below to a top-level
 `## [X.Y.Z] — <date>` heading and set its spec docs to `IMPLEMENTED`.
-
-### [3.3.0] — Phase V · Agent Evaluation & Reliability Harness — *planned*
-
-> Spec: [`specs/agent-eval-harness/`](./specs/agent-eval-harness/). System-level
-> evaluation (the "scaffold gap"); the red-team suite is the executable proof for
-> Phase H controls. Additive; **no agent-runtime change**. Fakes by default,
-> `live_api` opt-in.
-
-#### Added — evaluation harness (Phase V)
-
-- **`prismal.eval`** package (sibling of the runtime; imports only the public
-  graph entry + ports): `types.py` (`EvalCase`/`EvalSet`/`Assertion`/`Trajectory`/
-  `CaseResult`/`Scorecard`), `runner.py` (`EvalRunner` over
-  `get_async_compiled_graph().astream` with `build_test_runtime` fakes + seeds),
-  `trajectory.py` (capture from the event stream), `assertions.py`
-  (exact/semantic/tool-usage/llm-judge/groundedness/security), `judges.py`
-  (LLM-as-judge via `providers/`, Budget-metered), `regression.py` (baseline diff
-  + tolerance gate), `redteam/` (adversarial corpus loader + `assert_security`),
-  `report.py` (JSON/Markdown/Langfuse), `__main__.py` CLI.
-- **Adversarial corpus** — `redteam-corpus.example.yaml` (direct + indirect
-  injection, tool-abuse, exfiltration, jailbreak, system-prompt leak); each case
-  asserts containment against L1–L5 (+ Phase H controls when present).
-- **Settings** (`core/config.py`) — `eval_default_mode`, `eval_judge_model`,
-  `eval_regression_tolerance`, `eval_seed`, `eval_langfuse_export`.
-- **Exceptions** — `EvalError`, `EvalSetError`, `RegressionGateFailed`.
-- **CI** — `eval` + `redteam` pytest markers; a gate that fails on regression or a
-  passed attack. Docs: `docs/eval.md`; example: `examples/agent_eval.py`.
 
 ### [3.4.0] — Phase IDN · Agent Identity & Access Governance — *planned*
 
@@ -95,6 +68,40 @@ off, snapshot-tested), so each is a **SemVer minor** bump. They ship in order
   `/.well-known/agent-card.json` (embeds the agent's DID Document); discovery +
   delegation with external agents (Google ADK, MS Agent Framework, …); inbound
   remote-DID verification and `a2a_delegate` policy authorization via Phase IDN.
+
+---
+
+## [3.3.0] — 2026-06-15
+
+> Spec: [`specs/agent-eval-harness/`](./specs/agent-eval-harness/). System-level
+> evaluation (the "scaffold gap"); the red-team suite is the executable proof for
+> Phase H controls. Additive; **no agent-runtime change**. Fakes by default,
+> `live_api` opt-in.
+
+### Added — evaluation harness (Phase V)
+
+- **`prismal.eval`** package (sibling of the runtime; imports only the public
+  graph entry + ports, AST-guarded): `types.py` (`EvalCase`/`EvalSet`/`Assertion`/
+  `Trajectory`/`CaseResult`/`Scorecard` + `EvalSet.from_yaml`), `runner.py`
+  (`EvalRunner` over `get_async_compiled_graph().astream` with `build_test_runtime`
+  fakes + per-case seed; never raises), `trajectory.py` (capture from the public
+  event stream + cost/tokens/security-signals), `assertions.py`
+  (exact/semantic/tool-usage/llm-judge/groundedness/security + `dispatch_assertions`),
+  `judges.py` (LLM-as-judge via `providers/`, `SecurePromptBuilder`-isolated),
+  `regression.py` (baseline diff + tolerance gate), `redteam/` (adversarial corpus
+  loader + `assert_security` containment), `report.py` (JSON/Markdown/Langfuse),
+  `__main__.py` CLI (`run`/`redteam`/`gate`).
+- **Adversarial corpus** — `tests/eval/redteam/corpus.yaml` (direct + indirect
+  injection, tool-abuse, exfiltration, jailbreak, system-prompt leak); each case
+  asserts containment against L1–L5 (+ Phase H controls when present).
+- **Public surface** — `prismal.langgraph` re-exports `create_initial_state` so the
+  harness builds graph input via the public state factory, not an `agents.*` internal.
+- **Settings** (`core/config.py`) — `eval_default_mode`, `eval_judge_model`,
+  `eval_regression_tolerance`, `eval_seed`, `eval_langfuse_export` (+ `_validate_eval`).
+- **Exceptions** — `EvalError`, `EvalSetError`, `RegressionGateFailed`.
+- **CI** — `eval` + `redteam` pytest markers; AST guard
+  (`tests/unit/eval/test_no_internal_imports.py`). Docs: `docs/eval.md`; example:
+  `examples/agent_eval.py`.
 
 ---
 

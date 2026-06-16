@@ -63,7 +63,7 @@ No new LangGraph capability is required; identity is metadata + a pre-action gat
 AgentIdentity
  ├─ did            did:key:z6Mk… (local) | did:web:org.example:agents:coder (A2A)
  ├─ agent_name     "coder"            (links to the runtime agent)
- ├─ org_id         tenant scope (Phase R)            
+ ├─ org_id         tenant scope (Phase R)
  ├─ scopes         ["tools:write_file", "rag:read", …]   (least privilege)
  └─ credential_ref opaque handle resolved by the vault (never the secret itself)
 ```

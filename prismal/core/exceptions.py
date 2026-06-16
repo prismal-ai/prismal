@@ -400,6 +400,21 @@ class ConfigSourceError(PrismalError):
         super().__init__(f"{msg}: {cause}" if cause else msg + ".")
 
 
+# ── Evaluation harness (Phase V — SPEC-EVL-ERR-001) ────────────────────────────
+
+
+class EvalError(PrismalError):
+    """Base class for evaluation-harness failures."""
+
+
+class EvalSetError(EvalError):
+    """A malformed eval-set or red-team corpus (SPEC-EVL-ERR-001)."""
+
+
+class RegressionGateFailed(EvalError):  # noqa: N818 — SPEC-EVL-ERR-001 name
+    """The CI regression gate rejected a scorecard vs its baseline."""
+
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 
@@ -828,6 +843,8 @@ __all__ = [
     "DeliberationError",
     "DocumentGenerationError",
     "DocumentLoadError",
+    "EvalError",
+    "EvalSetError",
     "ExtensionError",
     "FusionError",
     "HierarchicalRAGError",
@@ -864,6 +881,7 @@ __all__ = [
     "ProviderTimeoutError",
     "RAGError",
     "RAGIndexError",
+    "RegressionGateFailed",
     "RuntimeCompositionError",
     "STTError",
     "SchedulerError",

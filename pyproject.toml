@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ============================================================
 [project]
 name = "prismal-ai"
-version = "3.2.0"
+version = "3.3.0"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -99,7 +99,7 @@ dependencies = [
   # ── HTTP & Networking ─────────────────────────────────────
   "httpx>=0.28.1",                  # Async HTTP client
   "httpx-sse>=0.4.0",               # SSE support for httpx
-  "aiohttp>=3.14.0",                # Async HTTP for MCP SSE transport (CVE-2026-34993/47265)
+  "aiohttp>=3.14.1",                # Async HTTP for MCP SSE transport (CVE-2026-5427x fixed in 3.14.1)
   # ── Observability ─────────────────────────────────────────
   "structlog>=24.4.0",              # Structured logging
   "loguru>=0.7.0",                  # Log sink: file rotation, retention, compression
@@ -114,7 +114,7 @@ dependencies = [
   # ── Security Primitives ───────────────────────────────────
   "python-jose[cryptography]>=3.3.0", # JWT tokens for auth
   "passlib[bcrypt]>=1.7.4",         # Password hashing
-  "cryptography>=43.0.3",           # Crypto primitives (canary tokens)
+  "cryptography>=48.0.1",           # Crypto primitives (canary tokens; GHSA-537c-gmf6-5ccf fixed in 48.0.1)
   "xxhash>=3.5.0",                  # Fast hashing for audit log chain
 ]
 
@@ -416,6 +416,8 @@ markers = [
   "e2e: End-to-end tests through the compiled graph (deterministic, mocked LLM)",
   "slow: Tests that take > 5 seconds",
   "live_api: Tests that call real LLM APIs (require API keys)",
+  "eval: Agent evaluation-harness suites (Phase V; deterministic with fakes)",
+  "redteam: Adversarial / red-team containment suites (Phase V)",
 ]
 filterwarnings = [
   "error",
