@@ -12,6 +12,18 @@ See ``docs/identity.md`` and ``specs/agent-identity-governance/``.
 
 from __future__ import annotations
 
+from prismal.identity.did import (
+    did_document,
+    issue_did_key,
+    issue_did_web,
+    resolve_did,
+    verify_did,
+)
+from prismal.identity.provider import (
+    FakeIdentityProvider,
+    LocalIdentityProvider,
+    OidcIdentityProvider,
+)
 from prismal.identity.types import (
     DID,
     AgentIdentity,
@@ -26,8 +38,16 @@ __all__ = [
     "DID",
     "AgentIdentity",
     "Credential",
+    "FakeIdentityProvider",
+    "LocalIdentityProvider",
+    "OidcIdentityProvider",
     "OnBehalfToken",
     "PolicyDecision",
     "PolicyEffect",
     "Scope",
+    "did_document",
+    "issue_did_key",
+    "issue_did_web",
+    "resolve_did",
+    "verify_did",
 ]
