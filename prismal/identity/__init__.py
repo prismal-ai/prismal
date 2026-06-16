@@ -33,12 +33,16 @@ from prismal.identity.types import (
     PolicyEffect,
     Scope,
 )
+from prismal.identity.vault import EnvVault, FakeVault, FileVault
 
 __all__ = [
     "DID",
     "AgentIdentity",
     "Credential",
+    "EnvVault",
     "FakeIdentityProvider",
+    "FakeVault",
+    "FileVault",
     "LocalIdentityProvider",
     "OidcIdentityProvider",
     "OnBehalfToken",
