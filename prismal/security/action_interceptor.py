@@ -179,6 +179,61 @@ class ActionInterceptor(BaseCallbackHandler):
             )
         return decision
 
+    def check_identity_policy(
+        self,
+        *,
+        identity: Any,
+        action: str,
+        resource: str,
+        policy_engine: Any,
+        context: dict[str, Any] | None = None,
+    ) -> Any:
+        """Consult the identity-aware :class:`PolicyEngine` (Phase IDN — ID6-01).
+
+        Returns the :class:`PolicyDecision`. A ``DENY`` is audited with the
+        identity DID (never a secret) and raised as :class:`PolicyDenied`;
+        ``ALLOW`` / ``REQUIRE_HITL`` are returned for the caller to honour
+        (``REQUIRE_HITL`` routes through ``hitl_gate`` at the graph-node level).
+        Only invoked when ``settings.identity_enabled`` — with the flag off the
+        caller never calls this, so behaviour is unchanged.
+        """
+        from contextlib import suppress
+
+        from prismal.core.exceptions import PolicyDenied
+        from prismal.identity.types import PolicyEffect
+        from prismal.monitoring.otel import OTelManager
+
+        decision = policy_engine.allow(
+            identity=identity, action=action, resource=resource, context=context
+        )
+        with suppress(Exception):
+            OTelManager().increment_counter(
+                "policy_decisions", attributes={"effect": decision.effect.value}
+            )
+        if decision.effect is PolicyEffect.DENY:
+            self._audit.log_event(
+                "identity_policy_denied",
+                {
+                    "identity": identity.did,
+                    "action": action,
+                    "resource": resource,
+                    "rule": decision.rule,
+                    "reason": decision.reason,
+                },
+            )
+            logger.warning(
+                "identity_policy_denied",
+                identity=identity.did,
+                action=action,
+                resource=resource,
+                rule=decision.rule,
+            )
+            raise PolicyDenied(
+                f"action '{action}' on '{resource}' denied for {identity.did} "
+                f"by rule {decision.rule}: {decision.reason}"
+            )
+        return decision
+
     @staticmethod
     def check_shell(cmd: list[str]) -> bool:
         """Return True if shell execution is permitted by current settings.

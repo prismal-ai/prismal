@@ -530,6 +530,53 @@ class Settings(BaseSettings):
         description="Redact PII from agent outputs.",
     )
 
+    # ── Agent identity & access governance (Phase IDN — SPEC-IDN-CFG-001) ──
+    identity_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for the identity & access governance layer.",
+    )
+    identity_mode: str = Field(
+        default="warn",
+        description="Policy default control mode: off | warn | enforce.",
+    )
+    identity_provider: str = Field(
+        default="local",
+        description="Identity backend: local (did:key) | oidc (Entra/Okta).",
+    )
+    identity_did_method: str = Field(
+        default="key",
+        description="DID method: key (internal, offline) | web (A2A-exposed).",
+    )
+    identity_did_web_domain: str = Field(
+        default="",
+        description="Domain used to issue did:web identifiers (A2A).",
+    )
+    identity_vault: str = Field(
+        default="env",
+        description="Credential vault backend: env (ConfigSourcePort) | file.",
+    )
+    identity_policy_path: str = Field(
+        default="config/identity_policies.yaml",
+        description="Path to the declarative identity-policy YAML file.",
+    )
+    identity_on_behalf_enabled: bool = Field(
+        default=False,
+        description="Enable OAuth on-behalf-of delegation tokens.",
+    )
+    identity_on_behalf_ttl_s: int = Field(
+        default=900,
+        ge=1,
+        description="On-behalf token time-to-live in seconds.",
+    )
+    oidc_issuer: str = Field(
+        default="",
+        description="OIDC issuer URL (required when identity_provider=oidc).",
+    )
+    oidc_client_id: str = Field(
+        default="",
+        description="OIDC client id for the on-behalf adapter (host-supplied).",
+    )
+
     # ── Sandbox multi-lenguaje ────────────────────────────────────────
     sandbox_path: str = Field(
         default="sandbox",
@@ -1812,6 +1859,36 @@ class Settings(BaseSettings):
                 f"PRISMAL_HARDENING_TOOL_POLICY_DEFAULT="
                 f"{self.hardening_tool_policy_default!r} is invalid; "
                 f"expected one of {sorted(valid_defaults)}."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_identity(self) -> "Settings":
+        """Validate the identity & access governance settings (ID1-02 / SPEC-IDN-CFG-001).
+
+        Numeric ranges are enforced by their Fields; here we reject an unknown
+        ``identity_mode``/``identity_provider``/``identity_did_method``/
+        ``identity_vault`` (and an ``oidc`` provider without an ``oidc_issuer``)
+        so a misconfiguration fails fast at load time rather than silently
+        disabling a control. Raises :class:`IdentityConfigError`.
+        """
+        from prismal.core.exceptions import IdentityConfigError
+
+        checks = {
+            "PRISMAL_IDENTITY_MODE": (self.identity_mode, {"off", "warn", "enforce"}),
+            "PRISMAL_IDENTITY_PROVIDER": (self.identity_provider, {"local", "oidc"}),
+            "PRISMAL_IDENTITY_DID_METHOD": (self.identity_did_method, {"key", "web"}),
+            "PRISMAL_IDENTITY_VAULT": (self.identity_vault, {"env", "file"}),
+        }
+        for env_name, (value, valid) in checks.items():
+            if value not in valid:
+                raise IdentityConfigError(
+                    f"{env_name}={value!r} is invalid; expected one of {sorted(valid)}."
+                )
+
+        if self.identity_provider == "oidc" and not self.oidc_issuer:
+            raise IdentityConfigError(
+                "PRISMAL_IDENTITY_PROVIDER='oidc' requires PRISMAL_OIDC_ISSUER to be set."
             )
         return self
 

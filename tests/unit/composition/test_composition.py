@@ -295,3 +295,26 @@ def test_backward_compat_vector_store_factory_standalone() -> None:
 
     store = FakeVectorStore()
     assert store.collection_name == "fake"
+
+
+# ── Identity composition (Phase IDN — ID6-04) ────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_identity_ports_none_when_disabled(patched_builders: dict[str, Any]) -> None:
+    ctx = await build_runtime(Settings(), mode="context")
+    assert ctx.identity_provider is None
+    assert ctx.credential_vault is None
+    assert ctx.policy_engine is None
+    await ctx.aclose()
+
+
+@pytest.mark.asyncio
+async def test_identity_ports_composed_when_enabled(patched_builders: dict[str, Any]) -> None:
+    from prismal.agents.extension.ports import CredentialVaultPort, IdentityPort, PolicyPort
+
+    ctx = await build_runtime(Settings(identity_enabled=True), mode="context")
+    assert isinstance(ctx.identity_provider, IdentityPort)
+    assert isinstance(ctx.credential_vault, CredentialVaultPort)
+    assert isinstance(ctx.policy_engine, PolicyPort)
+    await ctx.aclose()

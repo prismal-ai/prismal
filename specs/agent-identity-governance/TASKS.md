@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-06-13 |
 | **Target package version** | `3.4.0` (SemVer minor) |
@@ -19,7 +19,11 @@
 
 Identity & Access Governance lands in seven phases (ID1–ID7) as a **new hexagonal package** `prismal/identity/` (ports composed by `build_runtime`), gated behind `settings.identity_enabled` (default `False`) so `main` stays green and the 26 agents are unaffected until the final wiring phase. It reuses existing seams (`ActionInterceptor`, `PermissionManager`, `AuditLogger`, `ConfigSourcePort` vault, `composition-root` `org_id`) and **delegates** tool-level decisions to the Phase H `ToolPolicyEngine` (no rule duplication). Every gate honours `mode ∈ {off, warn, enforce}`.
 
-Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. (All rows `TODO` — spec is `READY`, not implemented.)
+Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. Phases ID1–ID7 are `DONE`
+(implemented test-first in v3.4.0, 100% coverage on `prismal/identity`). The
+single exception is **ID6-02** (PermissionManager grants keyed by DID), which is
+`DEFERRED`: it needs an Alembic migration for the existing `permissions` table
+and the `PolicyEngine` + scopes already provide identity-aware authorization.
 
 ## 2. Prerequisites
 
