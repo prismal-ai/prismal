@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ============================================================
 [project]
 name = "prismal-ai"
-version = "3.4.0"
+version = "3.5.0"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -211,6 +211,14 @@ pgvector = [
   "psycopg[binary]>=3.2.0",
 ]
 
+# A2A (Agent2Agent) interoperability (Phase I — opt-in)
+# httpx / httpx-sse are already base dependencies; this extra documents the A2A
+# client/server surface and pins the SSE transport for outbound streaming.
+a2a = [
+  "httpx>=0.28.1",
+  "httpx-sse>=0.4.0",
+]
+
 # Multimodal layer — base media handling (Fase F)
 multimodal = [
   "Pillow>=11.0.0",
@@ -236,7 +244,7 @@ multimodal-embed = [
 
 # All optional extras combined
 all = [
-  "prismal-ai[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance,lancedb,sqlite-vec,qdrant,pgvector,multimodal,multimodal-local,multimodal-premium,multimodal-embed]",
+  "prismal-ai[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance,lancedb,sqlite-vec,qdrant,pgvector,a2a,multimodal,multimodal-local,multimodal-premium,multimodal-embed]",
 ]
 
 # Development tools

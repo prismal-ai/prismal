@@ -10,24 +10,59 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Planned, **spec-complete** phases (full SDD under `specs/`, not yet implemented).
-Each is additive and **opt-in** (graph byte-for-byte unchanged when its flag is
-off, snapshot-tested), so each is a **SemVer minor** bump. Phase IDN shipped in
-`3.4.0`; **Phase I** remains. When a phase lands, promote its block below to a
-top-level `## [X.Y.Z] — <date>` heading and set its spec docs to `IMPLEMENTED`.
+All spec-complete phases under `specs/` are now implemented. New work starts
+here.
 
-### [3.5.0] — Phase I · A2A / Agent Cards Interoperability — *planned*
+## [3.5.0] — 2026-06-17
 
 > Spec: [`specs/a2a-interop/`](./specs/a2a-interop/). Bidirectional Agent2Agent
-> interop. **Consumes** the Phase IDN DID (Agent Card issue + remote-DID verify +
-> delegation authorization), so it ships after `3.4.0`.
+> (A2A) interoperability — the last pending roadmap phase. Additive and
+> **opt-in**: `a2a_enabled` (default `False`) ⇒ compiled graph byte-for-byte
+> unchanged (the supervisor graph is untouched). Implemented test-first (TDD);
+> 94% branch coverage on `prismal/a2a`.
 
-#### Added — A2A interoperability (Phase I)
+### Added — A2A interoperability (Phase I)
 
-- JSON-RPC over HTTP(S)+SSE transport; Agent Card served at
-  `/.well-known/agent-card.json` (embeds the agent's DID Document); discovery +
-  delegation with external agents (Google ADK, MS Agent Framework, …); inbound
-  remote-DID verification and `a2a_delegate` policy authorization via Phase IDN.
+- **`prismal.a2a`** subpackage (`[a2a]` extra; HTTP/SSE imports deferred):
+  - `types.py` — A2A v0.3.x Pydantic models (`AgentCard`, `AgentSkill`,
+    `A2ATask`, `A2AMessage`, `A2AArtifact`, `A2APart`, `A2AAuth`); camelCase wire
+    aliases, snake_case attributes; `A2AAuth` secrets are `SecretStr`.
+  - `card.py` — `build_agent_card(settings, registry, *, org_id, did)` derives the
+    Agent Card from the capability registry + `a2a_published_skills` allowlist;
+    tenant-scopes the URL; embeds the identity DID (`did:web` from the Phase IDN
+    settings or an explicit override); adds media output modes when
+    `multimodal_enabled`; cached per (settings fingerprint, org). Served at
+    `/.well-known/agent-card.json` by the host.
+  - `server.py` — `A2AServerHandler` (inbound): JSON-RPC `message/send` /
+    `tasks/get` / `tasks/cancel` (`handle_rpc`) + SSE streaming (`stream_rpc`);
+    maps a task → sanitized graph invocation (`thread_id = task_id`) → A2A
+    artifacts; `AuthContext` gate (strict mode requires auth); audits
+    `a2a.inbound`.
+  - `client.py` — `A2AClient` (discover card, `send_task` over JSON-RPC+SSE,
+    `cancel`, bearer/OAuth2-client-credentials auth with token caching),
+    `A2AConnectionManager` (fnmatch allowlist + deny-all-in-strict + client pool;
+    mirror of `mcp/connection.py`), and `A2AAgentNode.as_node()` — wraps a remote
+    agent as a `@prismal_node` graph node (the A2A analogue of
+    `LangChainRunnableAdapter`); a remote failure yields a graceful
+    `metadata.a2a.error` update instead of aborting the graph.
+  - `provider.py` — `A2AToolProvider` conforms to the Phase Y `ToolProviderPort`:
+    surfaces remote skills as `a2a__{agent}__{skill}` tools, composable in a
+    `CompositeToolProvider`; sync `get_tools` never raises; async `prepare()`
+    discovers URL-only agents.
+- **Security** — every remote artifact/message passes `InputSanitizer` before it
+  touches `AgentState`; outbound delegation honours the allowlist (deny-all in
+  strict); inbound text is sanitized before the graph; all in/out tasks audited
+  without content.
+- **Settings** (`core/config.py`) — `a2a_enabled`, `a2a_inbound_enabled`,
+  `a2a_outbound_enabled`, `a2a_base_url`, `a2a_published_skills`,
+  `a2a_outbound_allowlist`, `a2a_strict` (all default off/empty/strict).
+- **Exceptions** — `A2AError`, `A2AAgentUnavailable`.
+- **Composition root** (`composition/runtime.py`) — `build_runtime(..., graph=,
+  a2a_agents=)` composes `A2AToolProvider` into the tool provider (outbound) and
+  exposes an `A2AServerHandler` on `RuntimeContext.a2a_handler` (inbound) when
+  `a2a_enabled`; per-`org_id` Agent Card.
+- **Artifacts** — `docs/a2a.md`; `examples/a2a_server.py`,
+  `examples/a2a_remote_node.py`; `[a2a]` extra in `pyproject.toml`.
 
 ---
 

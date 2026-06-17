@@ -5117,7 +5117,7 @@ wheels = [
 
 [[package]]
 name = "prismal-ai"
-version = "3.4.0"
+version = "3.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -5179,6 +5179,10 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+a2a = [
+    { name = "httpx" },
+    { name = "httpx-sse" },
+]
 all = [
     { name = "accelerate" },
     { name = "asyncpg" },
@@ -5187,6 +5191,8 @@ all = [
     { name = "faster-whisper" },
     { name = "ffmpeg-python" },
     { name = "flaml" },
+    { name = "httpx" },
+    { name = "httpx-sse" },
     { name = "imagehash" },
     { name = "imbalanced-learn" },
     { name = "lancedb" },
@@ -5376,8 +5382,10 @@ requires-dist = [
     { name = "flaml", marker = "extra == 'ml'", specifier = ">=2.3.0" },
     { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.25.0" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "httpx", marker = "extra == 'a2a'", specifier = ">=0.28.1" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.1" },
     { name = "httpx-sse", specifier = ">=0.4.0" },
+    { name = "httpx-sse", marker = "extra == 'a2a'", specifier = ">=0.4.0" },
     { name = "icalendar", specifier = ">=6.0.0" },
     { name = "imagehash", marker = "extra == 'multimodal'", specifier = ">=4.3.1" },
     { name = "imbalanced-learn", marker = "extra == 'ml'", specifier = ">=0.12.0" },
@@ -5431,7 +5439,7 @@ requires-dist = [
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.1" },
     { name = "prefect", specifier = ">=3.6.28" },
     { name = "prismal-ai", extras = ["ml"], marker = "extra == 'ml-dl'" },
-    { name = "prismal-ai", extras = ["postgres", "mongodb", "local-embeddings", "ollama", "analytics", "ml", "finance", "datetime", "maintenance", "lancedb", "sqlite-vec", "qdrant", "pgvector", "multimodal", "multimodal-local", "multimodal-premium", "multimodal-embed"], marker = "extra == 'all'" },
+    { name = "prismal-ai", extras = ["postgres", "mongodb", "local-embeddings", "ollama", "analytics", "ml", "finance", "datetime", "maintenance", "lancedb", "sqlite-vec", "qdrant", "pgvector", "a2a", "multimodal", "multimodal-local", "multimodal-premium", "multimodal-embed"], marker = "extra == 'all'" },
     { name = "psutil", specifier = ">=6.1.1" },
     { name = "psycopg", extras = ["binary"], marker = "extra == 'pgvector'", specifier = ">=3.2.0" },
     { name = "psycopg2-binary", marker = "extra == 'postgres'", specifier = ">=2.9.10" },
@@ -5481,7 +5489,7 @@ requires-dist = [
     { name = "xxhash", specifier = ">=3.5.0" },
     { name = "yfinance", marker = "extra == 'finance'", specifier = ">=0.2.50" },
 ]
-provides-extras = ["postgres", "mongodb", "local-embeddings", "ollama", "analytics", "ml", "ml-dl", "finance", "datetime", "maintenance", "lancedb", "sqlite-vec", "qdrant", "pgvector", "multimodal", "multimodal-local", "multimodal-premium", "multimodal-embed", "all", "dev"]
+provides-extras = ["postgres", "mongodb", "local-embeddings", "ollama", "analytics", "ml", "ml-dl", "finance", "datetime", "maintenance", "lancedb", "sqlite-vec", "qdrant", "pgvector", "a2a", "multimodal", "multimodal-local", "multimodal-premium", "multimodal-embed", "all", "dev"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pre-commit", specifier = ">=4.5.1" }]

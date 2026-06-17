@@ -856,7 +856,31 @@ class MissingDependencyError(PrismalError):
         super().__init__(f'{message} (install with: pip install "prismal[{extra_to_install}]")')
 
 
+# ── A2A interop (Phase I) ──────────────────────────────────────────────────────
+
+
+class A2AError(PrismalError):
+    """Base for errors raised by the A2A agent-to-agent interop layer (Phase I)."""
+
+
+class A2AAgentUnavailable(A2AError):  # noqa: N818 — SPEC-A2A-008 name
+    """A remote A2A agent is unreachable, denied by the allowlist, or timed out.
+
+    Args:
+        agent: The remote agent identifier (Agent Card URL or name).
+        reason: Human-readable reason for the failure.
+    """
+
+    def __init__(self, agent: str, reason: str) -> None:
+        """Initialize A2AAgentUnavailable."""
+        self.agent = agent
+        self.reason = reason
+        super().__init__(f"A2A agent {agent!r} unavailable: {reason}")
+
+
 __all__ = [
+    "A2AAgentUnavailable",
+    "A2AError",
     "AdapterError",
     "AdaptiveRAGError",
     "AudioAgentError",
