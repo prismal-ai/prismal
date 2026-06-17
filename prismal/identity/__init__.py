@@ -12,6 +12,14 @@ See ``docs/identity.md`` and ``specs/agent-identity-governance/``.
 
 from __future__ import annotations
 
+from prismal.identity.delegation import (
+    get_on_behalf,
+    mint_on_behalf,
+    propagate,
+    put_on_behalf,
+    revoke,
+    validate,
+)
 from prismal.identity.did import (
     did_document,
     issue_did_key,
@@ -57,9 +65,15 @@ __all__ = [
     "PolicyEngine",
     "Scope",
     "did_document",
+    "get_on_behalf",
     "issue_did_key",
     "issue_did_web",
     "load_identity_policies",
+    "mint_on_behalf",
+    "propagate",
+    "put_on_behalf",
     "resolve_did",
+    "revoke",
+    "validate",
     "verify_did",
 ]
