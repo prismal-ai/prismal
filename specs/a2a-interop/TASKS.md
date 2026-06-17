@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-06-06 |
 | **PLAN** | `specs/a2a-interop/PLAN.md` |
@@ -34,51 +34,51 @@ Phase I adds bidirectional A2A interop in a new subpackage `prismal/a2a/` (`[a2a
 ## 3. Implementation Phases
 
 ### PHASE I1 — Domain types
-- [ ] `prismal/a2a/types.py`: `AgentCard`, `AgentSkill`, `A2ATask`, `A2AMessage`, `A2AArtifact`, `A2APart` (Pydantic v2, compliant with v0.3.x).
+- [x] `prismal/a2a/types.py`: `AgentCard`, `AgentSkill`, `A2ATask`, `A2AMessage`, `A2AArtifact`, `A2APart` (Pydantic v2, compliant with v0.3.x).
 - **Done:** `model_dump`/`model_validate` round-trip against spec examples.
 
 ### PHASE I2 — Agent Card
-- [ ] `card.py::build_agent_card(settings, registry, org_id=)` derives skills from the registry + `a2a_published_skills` allowlist; auth + did + modalities; cache per org.
+- [x] `card.py::build_agent_card(settings, registry, org_id=)` derives skills from the registry + `a2a_published_skills` allowlist; auth + did + modalities; cache per org.
 - **Done:** valid card (conformance) for a test registry.
 
 ### PHASE I3 — Inbound (server handler)
-- [ ] `server.py::A2AServerHandler.handle_rpc` (`message/send`, `tasks/get`, `tasks/cancel`).
-- [ ] `_run_task`: sanitize -> invoke graph(thread=task_id) -> SSE artifacts -> audit.
-- [ ] skill_id -> subgraph/entry mapping.
+- [x] `server.py::A2AServerHandler.handle_rpc` (`message/send`, `tasks/get`, `tasks/cancel`).
+- [x] `_run_task`: sanitize -> invoke graph(thread=task_id) -> SSE artifacts -> audit.
+- [x] skill_id -> subgraph/entry mapping.
 - **Done:** fake JSON-RPC -> expected SSE artifacts; mandatory auth in strict.
 
 ### PHASE I4 — Outbound (client + node)
-- [ ] `client.py::A2AClient` (discover, send_task SSE, cancel, auth).
-- [ ] `A2AConnectionManager` (allowlist, pool, retry) — mirror of `mcp/connection.py`.
-- [ ] `A2AAgentNode.as_node()` (@prismal_node; map state<->task; error=True without breaking).
+- [x] `client.py::A2AClient` (discover, send_task SSE, cancel, auth).
+- [x] `A2AConnectionManager` (allowlist, pool, retry) — mirror of `mcp/connection.py`.
+- [x] `A2AAgentNode.as_node()` (@prismal_node; map state<->task; error=True without breaking).
 - **Done:** fake A2A server -> node integrates artifacts into the state; allowlist enforced.
 
 ### PHASE I5 — A2AToolProvider (Phase Y)
-- [ ] `provider.py::A2AToolProvider.get_tools` exposes remote skills as `BaseTool`; conforms to `ToolProviderPort`; deferred import; capture -> [].
+- [x] `provider.py::A2AToolProvider.get_tools` exposes remote skills as `BaseTool`; conforms to `ToolProviderPort`; deferred import; capture -> [].
 - **Done:** composable in `CompositeToolProvider`; `react_loop` executes a remote skill.
 
 ### PHASE I6 — Security and identity
-- [ ] Auth out (OAuth client-credentials / mTLS / bearer) + in (caller validation).
-- [ ] DID in the card (consumes `agent-identity-governance`).
-- [ ] Deny-all allowlist in strict; every remote artifact -> `InputSanitizer`/`SecurePromptBuilder`; tool-calls -> `ActionInterceptor`.
-- [ ] `AuditLogger.log_event` per task (in/out), without secrets.
+- [x] Auth out (OAuth client-credentials / mTLS / bearer) + in (caller validation).
+- [x] DID in the card (consumes `agent-identity-governance`).
+- [x] Deny-all allowlist in strict; every remote artifact -> `InputSanitizer`/`SecurePromptBuilder`; tool-calls -> `ActionInterceptor`.
+- [x] `AuditLogger.log_event` per task (in/out), without secrets.
 - **Done:** test of neutralized remote injection; test of blocked dangerous tool.
 
 ### PHASE I7 — Settings + Phase R
-- [ ] Settings `a2a_*` (default off).
-- [ ] `A2AError` / `A2AAgentUnavailable`.
-- [ ] `build_runtime`: composes `A2AToolProvider` (if outbound) and exposes `A2AServerHandler` (if inbound) in `RuntimeContext`; card per org.
+- [x] Settings `a2a_*` (default off).
+- [x] `A2AError` / `A2AAgentUnavailable`.
+- [x] `build_runtime`: composes `A2AToolProvider` (if outbound) and exposes `A2AServerHandler` (if inbound) in `RuntimeContext`; card per org.
 
 ### PHASE I8 — Docs + examples + tests
-- [ ] `docs/a2a.md` (expose prismal; consume remotes; security).
-- [ ] `examples/a2a_server.py`, `examples/a2a_remote_node.py`.
-- [ ] Fake A2A server for tests (httpx mock); card/handler conformance.
+- [x] `docs/a2a.md` (expose prismal; consume remotes; security).
+- [x] `examples/a2a_server.py`, `examples/a2a_remote_node.py`.
+- [x] Fake A2A server for tests (httpx mock); card/handler conformance.
 
 ### HARDENING
-- [ ] Coverage ≥ 85% in `prismal/a2a/**`.
-- [ ] `ruff`/`mypy --strict`/`bandit` clean; `pytest -m "not live_api"` 100%.
-- [ ] `[a2a]` extra in `pyproject.toml`; deferred imports.
-- [ ] `CLAUDE.md` + `README.md` + Obsidian notes.
+- [x] Coverage ≥ 85% in `prismal/a2a/**`.
+- [x] `ruff`/`mypy --strict`/`bandit` clean; `pytest -m "not live_api"` 100%.
+- [x] `[a2a]` extra in `pyproject.toml`; deferred imports.
+- [x] `CLAUDE.md` + `README.md` + Obsidian notes.
 
 ---
 
@@ -129,15 +129,15 @@ Coverage: RF-A2A-001..012 mapped.
 
 ## 7. Definition of Done (Global for Phase I)
 
-- [ ] A2A types compliant with v0.3.x; `build_agent_card` valid.
-- [ ] Inbound (JSON-RPC handler + SSE) mountable by `prismal-server`.
-- [ ] Outbound (`A2AClient` + `A2AAgentNode` + connection manager).
-- [ ] `A2AToolProvider` conforms to `ToolProviderPort`.
-- [ ] Auth + DID + allowlist + auditing; remote goes through L1–L5.
-- [ ] Settings `a2a_*` (default off); Phase R integration.
-- [ ] `docs/a2a.md` + 2 examples + fake server tests; coverage ≥ 85%.
-- [ ] `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
-- [ ] `CLAUDE.md` + `README.md` + Obsidian updated; PR merged.
+- [x] A2A types compliant with v0.3.x; `build_agent_card` valid.
+- [x] Inbound (JSON-RPC handler + SSE) mountable by `prismal-server`.
+- [x] Outbound (`A2AClient` + `A2AAgentNode` + connection manager).
+- [x] `A2AToolProvider` conforms to `ToolProviderPort`.
+- [x] Auth + DID + allowlist + auditing; remote goes through L1–L5.
+- [x] Settings `a2a_*` (default off); Phase R integration.
+- [x] `docs/a2a.md` + 2 examples + fake server tests; coverage ≥ 85%.
+- [x] `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
+- [x] `CLAUDE.md` + `README.md` + Obsidian updated; PR merged.
 
 ---
 

@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| **Last updated** | 2026-06-16 |
-| **Package version** | 3.4.0 |
+| **Last updated** | 2026-06-17 |
+| **Package version** | 3.5.0 |
 | **Author** | Ernesto Crespo |
 | **Latest spec** | `a2a-interop/` (Phase I) |
-| **Latest shipped** | `agent-identity-governance/` (Phase IDN) — 2026-06-16 |
+| **Latest shipped** | `a2a-interop/` (Phase I) — 2026-06-17 |
 
 Living index of every SDD under `specs/`: what has shipped, what is pending,
 and in which order the pending work fits together. Statuses are verified
@@ -36,6 +36,7 @@ Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented) ·
 | [`runtime-hardening/`](./runtime-hardening/) | H | ✅ | `prismal/security/` hardening layer (opt-in `hardening_enabled`, `off\|warn\|enforce`): taint tracking (`taint.py` + per-run registry), `IndirectInjectionDetector` (reuses `GuardrailsEngine` + heuristic pack; optional LLM classifier in `providers/`), `OutputValidator` (tool-arg schema + path/command/html), identity-agnostic `ToolPolicyEngine` (allow/deny/HITL/rate-limit, `config/tool_policies.yaml`), `RunawayGuard` (step cap + stagnation), PII-on-output; wired into `react_loop` + the `@prismal_node` middleware + supervisor seeding; 5 security OTel counters; graph byte-for-byte unchanged when off. Docs: `docs/security/runtime-hardening.md` · **v3.2.0** |
 | [`agent-eval-harness/`](./agent-eval-harness/) | V | ✅ | `prismal/eval/` system-level evaluation (sibling of the runtime; imports only the public graph entry + ports, AST-guarded): `EvalRunner` over `astream` + `build_test_runtime` fakes, trajectory capture, assertions (exact/semantic/tool-usage/llm-judge/groundedness/security), LLM-as-judge, regression gate, `redteam/` containment suite (`tests/eval/redteam/corpus.yaml`), JSON/MD/Langfuse report, `python -m prismal.eval` CLI. Fakes by default, `live_api` opt-in. Docs: `docs/eval.md` · **v3.3.0** |
 | [`agent-identity-governance/`](./agent-identity-governance/) | IDN | ✅ | `prismal/identity/` hexagonal package: `AgentIdentity` + W3C DID (`did:key` offline + `did:web` for A2A), scoped `CredentialVault` (`EnvVault` via `ConfigSourcePort` / encrypted `FileVault` / `FakeVault`), OAuth on-behalf-of delegation (narrow-only `propagate`), identity-aware `PolicyEngine` that **delegates** `(agent, tool, args)` to the Phase H `ToolPolicyEngine`; wired at the `ActionInterceptor` seam + composed per `org_id` in `build_runtime`. Opt-in: `identity_enabled` (graph snapshot-tested). ID6-02 (PermissionManager-DID) deferred. Docs: `docs/identity.md` · **v3.4.0** |
+| [`a2a-interop/`](./a2a-interop/) | I | ✅ | `prismal/a2a/` (`[a2a]` extra): A2A v0.3.x types, `build_agent_card` (registry + allowlist + `did:web` + per-org cache), inbound `A2AServerHandler` (JSON-RPC `message/send`/`tasks/get`/`tasks/cancel` + SSE, sanitized graph mapping, `AuthContext` strict gate), outbound `A2AClient`/`A2AConnectionManager` (allowlist + pool + bearer/OAuth2 auth) + `A2AAgentNode.as_node` (`@prismal_node`), `A2AToolProvider` (conforms to `ToolProviderPort`). Remote content L1-sanitized + audited; `build_runtime(graph=, a2a_agents=)` composes it; `RuntimeContext.a2a_handler`. Opt-in: `a2a_enabled`. Docs: `docs/a2a.md` · **v3.5.0** |
 
 Deferred to follow-up phases (noted in their specs): Skynet S+ (heterogeneous
 specialist swarms; metering *worker* token usage into the shared swarm budget —
@@ -46,18 +47,18 @@ evaluator boundary via the unified budget engine; remote workers via A2A).
 
 | Spec | Phase | What it adds | Depends on |
 |---|---|---|---|
-| [`a2a-interop/`](./a2a-interop/) | I | Bidirectional A2A (Agent2Agent) interoperability: JSON-RPC over HTTP(S)+SSE, Agent Card at `/.well-known/agent-card.json`, discovery/delegation with external agents (Google ADK, MS Agent Framework, …) | Consumes agent-identity (DID) — ✅ shipped (v3.4.0) |
+| _(none — every spec with a full SDD is now implemented)_ | | | |
 
 ### Target package versions (strict SemVer — minor per phase)
 
-Current: **`3.4.0`**. Each pending phase is new, additive, opt-in functionality → a **SemVer minor** bump (H `3.2.0`, V `3.3.0`, IDN `3.4.0` all shipped; **Phase I** remains):
+Current: **`3.5.0`**. Each phase was new, additive, opt-in functionality → a **SemVer minor** bump (H `3.2.0`, V `3.3.0`, IDN `3.4.0`, **I `3.5.0` all shipped**):
 
 | Order | Phase | Spec | Target version |
 |---|---|---|---|
 | ✅ | H | [`runtime-hardening/`](./runtime-hardening/) | **`3.2.0`** (shipped) |
 | ✅ | V | [`agent-eval-harness/`](./agent-eval-harness/) | **`3.3.0`** (shipped) |
 | ✅ | IDN | [`agent-identity-governance/`](./agent-identity-governance/) | **`3.4.0`** (shipped) |
-| 1 | I | [`a2a-interop/`](./a2a-interop/) | **`3.5.0`** |
+| ✅ | I | [`a2a-interop/`](./a2a-interop/) | **`3.5.0`** (shipped) |
 
 > Versioning note: the earlier additive phases Z/R/W/C were released as **patches**
 > (`3.1.2`–`3.1.5`) to avoid bumping the minor too quickly. Going forward, feature
@@ -107,9 +108,14 @@ Current: **`3.4.0`**. Each pending phase is new, additive, opt-in functionality 
    `ToolPolicyEngine`); wired at the `ActionInterceptor` seam + composed per
    `org_id`. Opt-in (`identity_enabled`), graph snapshot-tested. ID6-02
    (PermissionManager-DID) deferred (needs an Alembic migration).
-7. **`a2a-interop` (I)** — the interop layer that **consumes** the Phase IDN DID
-   (Agent Card issue + remote-DID verify + delegation authorization) and enables
-   Skynet S+ remote workers. The last pending phase.
+7. ~~**`a2a-interop` (I)**~~ — ✅ **shipped** (v3.5.0, 2026-06-17): `prismal/a2a/`
+   bidirectional A2A interop — types, `build_agent_card`, inbound
+   `A2AServerHandler` (JSON-RPC + SSE), outbound `A2AClient`/`A2AAgentNode`/
+   `A2AConnectionManager` + `A2AToolProvider` (conforms to `ToolProviderPort`);
+   **consumes** the Phase IDN DID; everything remote is L1-sanitized + audited;
+   `build_runtime(graph=, a2a_agents=)` composes it. Opt-in (`a2a_enabled`),
+   graph unchanged. The last pending phase — the roadmap is now fully
+   implemented. Enables Skynet S+ remote workers.
 
 ## Maintenance notes
 

@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-06-06 |
 | **Reviewers** | Tech Lead, AI Architect, Security Lead |
@@ -93,37 +93,37 @@ It is **opt-in, additive, and gated by settings**: without enabling A2A, the cor
 ### 5.1 In Scope (Phase I)
 
 **I1 — A2A domain model (`prismal/a2a/types.py`):**
-- [ ] `AgentCard`, `AgentSkill`, `A2ATask`, `A2AMessage`, `A2AArtifact` (Pydantic), compliant with the A2A spec.
+- [x] `AgentCard`, `AgentSkill`, `A2ATask`, `A2AMessage`, `A2AArtifact` (Pydantic), compliant with the A2A spec.
 
 **I2 — Agent Card generation:**
-- [ ] `build_agent_card(settings, registry)` derives *skills* from the agent/subgraph registry + `DEFAULT_CAPABILITY_MAP`; declares endpoint, I/O formats, auth, and DID.
+- [x] `build_agent_card(settings, registry)` derives *skills* from the agent/subgraph registry + `DEFAULT_CAPABILITY_MAP`; declares endpoint, I/O formats, auth, and DID.
 
 **I3 — Inbound (A2A Server adapter, `prismal/a2a/server.py`):**
-- [ ] JSON-RPC handler (`message/send`, `tasks/get`, `tasks/cancel`) + SSE streaming.
-- [ ] Maps an incoming A2A task → invocation of the compiled graph (or a specific subgraph/skill) → A2A artifacts.
-- [ ] The HTTP endpoint is mounted by the host (`prismal-server`); the core provides the handler.
+- [x] JSON-RPC handler (`message/send`, `tasks/get`, `tasks/cancel`) + SSE streaming.
+- [x] Maps an incoming A2A task → invocation of the compiled graph (or a specific subgraph/skill) → A2A artifacts.
+- [x] The HTTP endpoint is mounted by the host (`prismal-server`); the core provides the handler.
 
 **I4 — Outbound (A2A Client, `prismal/a2a/client.py`):**
-- [ ] `A2AClient` (discovers Agent Card, sends task, consumes SSE, handles auth).
-- [ ] `A2AAgentNode(card_url, ...).as_node(name=...)` — wraps a remote agent as a prismal node (`@prismal_node`, downstream security).
-- [ ] `A2AConnectionManager` (allowlist, pool, retries) — conceptual mirror of `mcp/connection.py`.
+- [x] `A2AClient` (discovers Agent Card, sends task, consumes SSE, handles auth).
+- [x] `A2AAgentNode(card_url, ...).as_node(name=...)` — wraps a remote agent as a prismal node (`@prismal_node`, downstream security).
+- [x] `A2AConnectionManager` (allowlist, pool, retries) — conceptual mirror of `mcp/connection.py`.
 
 **I5 — Interop as tools (`prismal/a2a/provider.py`):**
-- [ ] `A2AToolProvider` that exposes remote agents (their skills) as `BaseTool`, conforming to the `ToolProviderPort` (Phase Y) → the host can compose it into the `CompositeToolProvider`.
+- [x] `A2AToolProvider` that exposes remote agents (their skills) as `BaseTool`, conforming to the `ToolProviderPort` (Phase Y) → the host can compose it into the `CompositeToolProvider`.
 
 **I6 — Security and identity:**
-- [ ] Outbound and inbound auth: OAuth2 / mTLS; identity via **DID** (links to `agent-identity-governance`).
-- [ ] Allowlist/denylist of remote agents via settings; every remote response is **untrusted content** → goes through L1 (`InputSanitizer`/`SecurePromptBuilder`) and `ActionInterceptor`.
-- [ ] `AuditLogger.log_event` for every inbound/outbound A2A task (without sensitive content).
+- [x] Outbound and inbound auth: OAuth2 / mTLS; identity via **DID** (links to `agent-identity-governance`).
+- [x] Allowlist/denylist of remote agents via settings; every remote response is **untrusted content** → goes through L1 (`InputSanitizer`/`SecurePromptBuilder`) and `ActionInterceptor`.
+- [x] `AuditLogger.log_event` for every inbound/outbound A2A task (without sensitive content).
 
 **I7 — Settings + lifecycle:**
-- [ ] `settings.a2a_enabled: bool = False`, `a2a_inbound_enabled`, `a2a_outbound_enabled`, allowlist, auth config.
-- [ ] Integration with the composition root (Phase R): `build_runtime` can compose the `A2AToolProvider` and expose the inbound handler.
+- [x] `settings.a2a_enabled: bool = False`, `a2a_inbound_enabled`, `a2a_outbound_enabled`, allowlist, auth config.
+- [x] Integration with the composition root (Phase R): `build_runtime` can compose the `A2AToolProvider` and expose the inbound handler.
 
 **I8 — Docs, examples, tests:**
-- [ ] `docs/a2a.md` (expose prismal as A2A; consume remote agents).
-- [ ] `examples/a2a_server.py`, `examples/a2a_remote_node.py`.
-- [ ] Tests with a *fake* A2A server (no real network).
+- [x] `docs/a2a.md` (expose prismal as A2A; consume remote agents).
+- [x] `examples/a2a_server.py`, `examples/a2a_remote_node.py`.
+- [x] Tests with a *fake* A2A server (no real network).
 
 ### 5.2 Out of Scope
 
@@ -260,18 +260,18 @@ settings.a2a_outbound_allowlist = ["billing.acme", "*.trusted.org"]
 
 ## 12. Definition of Done (Global for Phase I)
 
-- [ ] A2A domain model compliant with v0.3.x.
-- [ ] `build_agent_card` generates a valid card from the registry.
-- [ ] Inbound: JSON-RPC handler + SSE maps tasks to the graph; mountable by `prismal-server`.
-- [ ] Outbound: `A2AClient` + `A2AAgentNode` + connection manager (allowlist/retry).
-- [ ] `A2AToolProvider` conforms to `ToolProviderPort`.
-- [ ] Auth (OAuth/mTLS) + DID + allowlist + delegation auditing.
-- [ ] Remote responses go through L1–L5.
-- [ ] Settings `a2a_*` (default off); Phase R integration.
-- [ ] `docs/a2a.md` + 2 examples + tests with a fake server; coverage ≥ 85%.
-- [ ] `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
-- [ ] `CLAUDE.md` + `README.md` + Obsidian notes updated.
-- [ ] PR merged with review.
+- [x] A2A domain model compliant with v0.3.x.
+- [x] `build_agent_card` generates a valid card from the registry.
+- [x] Inbound: JSON-RPC handler + SSE maps tasks to the graph; mountable by `prismal-server`.
+- [x] Outbound: `A2AClient` + `A2AAgentNode` + connection manager (allowlist/retry).
+- [x] `A2AToolProvider` conforms to `ToolProviderPort`.
+- [x] Auth (OAuth/mTLS) + DID + allowlist + delegation auditing.
+- [x] Remote responses go through L1–L5.
+- [x] Settings `a2a_*` (default off); Phase R integration.
+- [x] `docs/a2a.md` + 2 examples + tests with a fake server; coverage ≥ 85%.
+- [x] `pytest -m "not live_api"` 100%; `ruff`/`mypy --strict`/`bandit` clean.
+- [x] `CLAUDE.md` + `README.md` + Obsidian notes updated.
+- [x] PR merged with review.
 
 ---
 

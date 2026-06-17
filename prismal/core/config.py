@@ -577,6 +577,45 @@ class Settings(BaseSettings):
         description="OIDC client id for the on-behalf adapter (host-supplied).",
     )
 
+    # ── A2A interop (Phase I, opt-in — SPEC-A2A-007) ──────────────────
+    a2a_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for the A2A (Agent2Agent) interop layer.",
+    )
+    a2a_inbound_enabled: bool = Field(
+        default=False,
+        description="Expose prismal as an A2A agent (Agent Card + JSON-RPC/SSE handler).",
+    )
+    a2a_outbound_enabled: bool = Field(
+        default=False,
+        description="Allow prismal to delegate to remote A2A agents (client/node/tools).",
+    )
+    a2a_base_url: str | None = Field(
+        default=None,
+        description="Public A2A endpoint advertised in the Agent Card (inbound).",
+    )
+    a2a_published_skills: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Allowlist of skill/subgraph ids to publish on the Agent Card "
+            "(empty = a high-level default subset)."
+        ),
+    )
+    a2a_outbound_allowlist: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Allowed remote agent hosts/patterns for outbound delegation "
+            "(fnmatch wildcards, e.g. '*.trusted.org'). Empty + strict = deny-all."
+        ),
+    )
+    a2a_strict: bool = Field(
+        default=True,
+        description=(
+            "Strict mode: require declared auth and enforce a deny-all allowlist "
+            "when a2a_outbound_allowlist is empty."
+        ),
+    )
+
     # ── Sandbox multi-lenguaje ────────────────────────────────────────
     sandbox_path: str = Field(
         default="sandbox",
