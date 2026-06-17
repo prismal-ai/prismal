@@ -176,6 +176,9 @@ class RuntimeContext:
     identity_provider: IdentityPort | None = None
     credential_vault: CredentialVaultPort | None = None
     policy_engine: PolicyPort | None = None
+    # A2A interop (Phase I) — the inbound handler the host mounts; None unless
+    # a2a_enabled + a2a_inbound_enabled and a graph was supplied to build_runtime.
+    a2a_handler: Any | None = None
     _closers: list[Closer] = field(default_factory=list, repr=False)
     _closed: bool = field(default=False, repr=False)
 
@@ -303,6 +306,48 @@ def build_identity_ports(
     return provider, vault, policy
 
 
+async def _compose_a2a(
+    settings: Settings,
+    tool_provider: ToolProviderPort,
+    *,
+    graph: Any | None,
+    a2a_agents: list[Any] | None,
+    closers: list[Closer],
+) -> tuple[ToolProviderPort, Any | None]:
+    """Wire A2A into the runtime (SPEC-A2A-009): outbound tools + inbound handler.
+
+    Returns the (possibly wrapped) tool provider and the inbound handler (or
+    ``None``). Deferred imports keep ``prismal.a2a`` (``[a2a]`` extra) out of the
+    base path when A2A is disabled.
+    """
+    handler: Any | None = None
+
+    if settings.a2a_outbound_enabled and a2a_agents:
+        from prismal.a2a.client import A2AConnectionManager
+        from prismal.a2a.provider import A2AToolProvider
+        from prismal.agents.extension.providers import CompositeToolProvider
+
+        manager = A2AConnectionManager(
+            allowlist=list(settings.a2a_outbound_allowlist), strict=settings.a2a_strict
+        )
+        a2a_provider = A2AToolProvider(a2a_agents, manager=manager)
+        await a2a_provider.prepare()
+        closers.append(manager.aclose)
+        if isinstance(tool_provider, CompositeToolProvider):
+            tool_provider = CompositeToolProvider([a2a_provider, *tool_provider.providers])
+        else:
+            tool_provider = CompositeToolProvider([a2a_provider, tool_provider])
+
+    if settings.a2a_inbound_enabled and graph is not None:
+        from prismal.a2a.server import A2AServerHandler
+
+        handler = A2AServerHandler(graph, settings=settings)
+    elif settings.a2a_inbound_enabled:
+        logger.warning("composition.a2a_inbound_no_graph")
+
+    return tool_provider, handler
+
+
 async def build_runtime(
     settings: Settings | None = None,
     *,
@@ -311,6 +356,8 @@ async def build_runtime(
     mode: Literal["global", "context"] | None = None,
     collection_base: str = DEFAULT_COLLECTION_BASE,
     mcp_config_path: Path | None = None,
+    graph: Any | None = None,
+    a2a_agents: list[Any] | None = None,
 ) -> RuntimeContext:
     """Compose every core port in one call (SPEC-CR-003).
 
@@ -326,6 +373,11 @@ async def build_runtime(
             returned context. ``None`` uses ``settings.runtime_mode``.
         collection_base: Default logical collection for the vector store provider.
         mcp_config_path: Override for the MCP server catalogue.
+        graph: Optional compiled graph; when A2A inbound is enabled it is wrapped
+            in an :class:`~prismal.a2a.server.A2AServerHandler` exposed on the
+            returned context as ``a2a_handler`` (the host mounts its routes).
+        a2a_agents: Optional remote A2A agents (Agent Card URLs or ``AgentCard``
+            objects) to expose as tools when A2A outbound is enabled.
 
     Returns:
         A :class:`RuntimeContext` with five non-null ports; usable as
@@ -353,7 +405,11 @@ async def build_runtime(
         try:
             from prismal.agents.extension.providers import build_default_tool_provider
 
-            tool_provider = await build_default_tool_provider(eff, mcp_config_path=mcp_config_path)
+            # Widen to the port: _compose_a2a (Phase I) may wrap it in a new
+            # CompositeToolProvider, so the variable must hold any ToolProviderPort.
+            tool_provider: ToolProviderPort = await build_default_tool_provider(
+                eff, mcp_config_path=mcp_config_path
+            )
         except Exception as exc:
             raise RuntimeCompositionError("tool_provider", str(exc)) from exc
         mcp_closer = _mcp_closer(tool_provider)
@@ -404,6 +460,17 @@ async def build_runtime(
             except Exception as exc:
                 raise RuntimeCompositionError("identity", str(exc)) from exc
 
+        # 6b. A2A interop (Phase I) — opt-in, additive. Outbound A2A skills join
+        #     the tool provider; the inbound handler wraps the supplied graph.
+        a2a_handler: Any | None = None
+        if eff.a2a_enabled:
+            try:
+                tool_provider, a2a_handler = await _compose_a2a(
+                    eff, tool_provider, graph=graph, a2a_agents=a2a_agents, closers=closers
+                )
+            except Exception as exc:
+                raise RuntimeCompositionError("a2a", str(exc)) from exc
+
         # 7. Mode: global injects the singleton; context leaves globals untouched.
         if resolved_mode == "global":
             from prismal.agents.tool_registry import set_tool_provider
@@ -424,6 +491,7 @@ async def build_runtime(
         identity_provider=identity_provider,
         credential_vault=credential_vault,
         policy_engine=policy_engine,
+        a2a_handler=a2a_handler,
     )
     ctx._closers = closers
     logger.info(
