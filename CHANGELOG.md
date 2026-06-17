@@ -12,49 +12,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Planned, **spec-complete** phases (full SDD under `specs/`, not yet implemented).
 Each is additive and **opt-in** (graph byte-for-byte unchanged when its flag is
-off, snapshot-tested), so each is a **SemVer minor** bump. They ship in order
-**IDN → I**. When a phase lands, promote its block below to a top-level
-`## [X.Y.Z] — <date>` heading and set its spec docs to `IMPLEMENTED`.
-
-### [3.4.0] — Phase IDN · Agent Identity & Access Governance — *planned*
-
-> Spec: [`specs/agent-identity-governance/`](./specs/agent-identity-governance/).
-> Per-agent identity + access policy; foundation for A2A (I) and multi-tenant (R).
-> Opt-in: `identity_enabled` (default `False`).
-
-#### Added — identity & access governance (Phase IDN)
-
-- **`prismal.identity`** hexagonal package: `types.py` (`AgentIdentity`, `DID`,
-  `Scope`, `Credential`, `OnBehalfToken`, `PolicyDecision`), `did.py` (`did:key`
-  local + `did:web` for A2A; issue/resolve/verify/`did_document`), `provider.py`
-  (`IdentityPort` + `LocalIdentityProvider`/`OidcIdentityProvider`/`FakeIdentityProvider`),
-  `vault.py` (`CredentialVaultPort` + `EnvVault` via `ConfigSourcePort`/`FileVault`/
-  `FakeVault`; secrets resolved at the boundary, never in state/logs),
-  `delegation.py` (OAuth on-behalf-of: `mint`/`propagate` narrow-only/`revoke`),
-  `policy.py` (identity-aware `PolicyEngine.allow(identity, action, resource)` that
-  **delegates** `(agent, tool, args)` to the Phase H `ToolPolicyEngine`).
-- **Ports** (`agents/extension/ports.py`) — `IdentityPort`, `CredentialVaultPort`,
-  `PolicyPort` Protocols.
-- **Settings** (`core/config.py`) — `identity_enabled`, `identity_mode`,
-  `identity_provider`, `identity_did_method`, `identity_did_web_domain`,
-  `identity_vault`, `identity_policy_path`, `identity_on_behalf_enabled`,
-  `identity_on_behalf_ttl_s`, `oidc_issuer`/`oidc_client_id`.
-- **Exceptions** — `IdentityError` hierarchy (`DidVerificationError`, `ScopeError`,
-  `PolicyDenied`, `CredentialResolutionError`, `IdentityConfigError`,
-  `DelegationError`).
-- **Observability** — counters `prismal.identity_issued_total`,
-  `prismal.policy_decisions_total`, `prismal.credential_resolved_total`,
-  `prismal.did_verify_total`.
-- **Artifacts/docs** — `identity_policies.example.yaml`,
-  `agent-card-did.example.json`; `docs/identity.md`; `examples/agent_identity.py`.
-
-#### Changed — identity & access governance (Phase IDN)
-
-- `ActionInterceptor.check()` consults `PolicyEngine` (least-privilege scopes +
-  identity rules) when `identity_enabled`; `PermissionManager` grants and
-  `AuditLogger` records gain an `identity` (DID) field (secrets redacted).
-- `composition/runtime.py` composes the identity provider + vault + policy per
-  `org_id` on the `RuntimeContext` (released by `aclose()`).
+off, snapshot-tested), so each is a **SemVer minor** bump. Phase IDN shipped in
+`3.4.0`; **Phase I** remains. When a phase lands, promote its block below to a
+top-level `## [X.Y.Z] — <date>` heading and set its spec docs to `IMPLEMENTED`.
 
 ### [3.5.0] — Phase I · A2A / Agent Cards Interoperability — *planned*
 
@@ -70,6 +30,59 @@ off, snapshot-tested), so each is a **SemVer minor** bump. They ship in order
   remote-DID verification and `a2a_delegate` policy authorization via Phase IDN.
 
 ---
+
+## [3.4.0] — 2026-06-16
+
+> Spec: [`specs/agent-identity-governance/`](./specs/agent-identity-governance/).
+> Per-agent identity + access policy; foundation for A2A (I) and multi-tenant (R).
+> Additive and **opt-in**: `identity_enabled` (default `False`) ⇒ compiled graph
+> byte-for-byte unchanged (snapshot-tested). Implemented test-first (TDD); 100%
+> coverage on `prismal/identity`.
+
+### Added — identity & access governance (Phase IDN)
+
+- **`prismal.identity`** hexagonal package: `types.py` (`AgentIdentity`, `DID`,
+  `Scope`, `Credential`, `OnBehalfToken`, `PolicyDecision`), `did.py` (`did:key`
+  local + `did:web` for A2A; issue/resolve/verify/`did_document`; base58btc +
+  Ed25519 inline, only `cryptography`/`httpx`), `provider.py` (`LocalIdentityProvider`/
+  `OidcIdentityProvider`/`FakeIdentityProvider`), `vault.py` (`EnvVault` via
+  `ConfigSourcePort`/`FileVault` encrypted-at-rest/`FakeVault`; secrets resolved at
+  the boundary, never in state/logs), `delegation.py` (OAuth on-behalf-of:
+  `mint`/`propagate` narrow-only/`revoke`/`validate`), `policy.py` (identity-aware
+  `PolicyEngine.allow(identity, action, resource)` that **delegates** `(agent, tool,
+  args)` to the Phase H `ToolPolicyEngine`).
+- **Ports** (`agents/extension/ports.py`) — `IdentityPort`, `CredentialVaultPort`,
+  `PolicyPort` Protocols, re-exported from `agents/extension`.
+- **Settings** (`core/config.py`) — `identity_enabled`, `identity_mode`,
+  `identity_provider`, `identity_did_method`, `identity_did_web_domain`,
+  `identity_vault`, `identity_policy_path`, `identity_on_behalf_enabled`,
+  `identity_on_behalf_ttl_s`, `oidc_issuer`/`oidc_client_id`; `_validate_identity`.
+- **Exceptions** — `IdentityError` hierarchy (`DidVerificationError`, `ScopeError`,
+  `PolicyDenied`, `CredentialResolutionError`, `IdentityConfigError`,
+  `DelegationError`).
+- **Observability** — counters `prismal.identity_issued_total`,
+  `prismal.policy_decisions_total`, `prismal.credential_resolved_total`,
+  `prismal.did_verify_total`.
+- **Artifacts/docs** — `config/identity_policies.yaml`,
+  `agent-card-did.example.json`; `docs/identity.md`; `examples/agent_identity.py`.
+
+### Changed — identity & access governance (Phase IDN)
+
+- `ActionInterceptor` gains `check_identity_policy(...)` — consults `PolicyEngine`
+  (least-privilege scopes + identity rules) when `identity_enabled`; a `DENY` is
+  audited with the identity DID (never a secret) and raised as `PolicyDenied`;
+  `REQUIRE_HITL` routes through `hitl_gate()`. Additive — the existing `check()`
+  path is unchanged.
+- `composition/runtime.py` — `build_identity_ports(settings)` + `build_runtime`
+  composes the identity provider + vault + policy per `org_id` onto the
+  `RuntimeContext` (`identity_provider`/`credential_vault`/`policy_engine`, `None`
+  when disabled); `FileVault` made lazy (no key-file I/O on construction).
+
+### Deferred — identity & access governance (Phase IDN)
+
+- `PermissionManager` grants keyed by DID (ID6-02) — needs an Alembic migration
+  for the existing `permissions` table; the `PolicyEngine` + scopes already
+  provide identity-aware authorization. Tracked as a follow-up.
 
 ## [3.3.0] — 2026-06-15
 
