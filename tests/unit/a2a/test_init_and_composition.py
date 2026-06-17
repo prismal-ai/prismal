@@ -23,7 +23,8 @@ class _FakeEmbeddings:
 
 
 class _FakeAudit:
-    def log_event(self, event_type: str, payload: dict[str, Any]) -> None: ...
+    def log_event(self, event_type: str, payload: dict[str, Any]) -> None:
+        pass
 
     def log_node(
         self, *, node_name: str, session_id: str, status: str, state_hash: str, duration_ms: float
