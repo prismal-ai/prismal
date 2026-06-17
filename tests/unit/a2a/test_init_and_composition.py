@@ -28,11 +28,13 @@ class _FakeAudit:
 
     def log_node(
         self, *, node_name: str, session_id: str, status: str, state_hash: str, duration_ms: float
-    ) -> None: ...
+    ) -> None:
+        pass
 
     def log_media(
         self, event: str, sha256: str, modality: str, size_bytes: int, duration_s: float | None
-    ) -> None: ...
+    ) -> None:
+        pass
 
 
 @pytest.fixture
