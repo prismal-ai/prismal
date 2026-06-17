@@ -405,7 +405,11 @@ async def build_runtime(
         try:
             from prismal.agents.extension.providers import build_default_tool_provider
 
-            tool_provider = await build_default_tool_provider(eff, mcp_config_path=mcp_config_path)
+            # Widen to the port: _compose_a2a (Phase I) may wrap it in a new
+            # CompositeToolProvider, so the variable must hold any ToolProviderPort.
+            tool_provider: ToolProviderPort = await build_default_tool_provider(
+                eff, mcp_config_path=mcp_config_path
+            )
         except Exception as exc:
             raise RuntimeCompositionError("tool_provider", str(exc)) from exc
         mcp_closer = _mcp_closer(tool_provider)
