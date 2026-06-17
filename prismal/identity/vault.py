@@ -116,7 +116,14 @@ class FileVault:
     ) -> None:
         self._settings = settings
         self._path = Path(path) if path is not None else Path("identity_vault.enc")
-        self._fernet = Fernet(key or self._load_or_create_key())
+        self._key = key
+        self._fernet_cached: Fernet | None = None
+
+    def _fernet(self) -> Fernet:
+        """Lazily build the Fernet cipher so construction has no I/O side effect."""
+        if self._fernet_cached is None:
+            self._fernet_cached = Fernet(self._key or self._load_or_create_key())
+        return self._fernet_cached
 
     @property
     def _key_path(self) -> Path:
@@ -146,12 +153,12 @@ class FileVault:
     def _read(self) -> dict[str, dict[str, object]]:
         if not self._path.exists():
             return {}
-        decrypted = self._fernet.decrypt(self._path.read_bytes())
+        decrypted = self._fernet().decrypt(self._path.read_bytes())
         data: dict[str, dict[str, object]] = json.loads(decrypted)
         return data
 
     def _write(self, data: dict[str, dict[str, object]]) -> None:
-        self._write_owner_only(self._path, self._fernet.encrypt(json.dumps(data).encode()))
+        self._write_owner_only(self._path, self._fernet().encrypt(json.dumps(data).encode()))
 
     def store(self, ref: str, value: SecretStr, *, scopes: Sequence[Scope] = ()) -> None:
         data = self._read()

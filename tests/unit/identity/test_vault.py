@@ -144,6 +144,22 @@ def test_file_vault_unknown_ref_raises(tmp_path) -> None:
         FileVault(path=tmp_path / "vault.enc").resolve("missing")
 
 
+def test_file_vault_same_instance_store_then_resolve(tmp_path) -> None:
+    """A single instance reuses its cached cipher across store + resolve."""
+    vault = FileVault(path=tmp_path / "vault.enc")
+    vault.store("api-key", SecretStr("s3cr3t"), scopes=(Scope("rag:read"),))
+    cred = vault.resolve("api-key", scopes=(Scope("rag:read"),))
+    assert cred.value.get_secret_value() == "s3cr3t"
+
+
+def test_file_vault_construction_is_side_effect_free(tmp_path) -> None:
+    """Constructing a FileVault writes nothing — key material is created lazily."""
+    path = tmp_path / "vault.enc"
+    FileVault(path=path)
+    assert not path.exists()
+    assert not path.with_suffix(path.suffix + ".key").exists()
+
+
 @pytest.mark.skipif(os.name != "posix", reason="POSIX file permissions")
 def test_file_vault_writes_are_owner_only(tmp_path) -> None:
     """The key file and the encrypted vault must be 0600 (no world/group read)."""

@@ -51,7 +51,10 @@ if TYPE_CHECKING:
     from prismal.agents.extension.ports import (
         AuditPort,
         CheckpointPort,
+        CredentialVaultPort,
         EmbeddingsPort,
+        IdentityPort,
+        PolicyPort,
         ToolProviderPort,
         VectorStorePort,
     )
@@ -169,6 +172,10 @@ class RuntimeContext:
     checkpointer: CheckpointPort
     audit: AuditPort
     org_id: str | None = None
+    # Agent identity & access governance (Phase IDN) — None unless identity_enabled.
+    identity_provider: IdentityPort | None = None
+    credential_vault: CredentialVaultPort | None = None
+    policy_engine: PolicyPort | None = None
     _closers: list[Closer] = field(default_factory=list, repr=False)
     _closed: bool = field(default=False, repr=False)
 
@@ -255,6 +262,45 @@ async def _run_closers(closers: list[Closer]) -> None:
                 await result
         except Exception as exc:  # pragma: no cover - defensive teardown
             logger.warning("composition.partial_teardown_error", error=str(exc))
+
+
+def build_identity_ports(
+    settings: Settings,
+) -> tuple[IdentityPort, CredentialVaultPort, PolicyPort]:
+    """Compose the identity ports from settings (Phase IDN — SPEC-IDN-CMP-001).
+
+    Maps ``identity_provider`` → Local/Oidc provider, ``identity_vault`` →
+    Env/File vault, and builds a :class:`PolicyEngine` from the identity policy
+    file. When ``hardening_enabled`` the Phase H ``ToolPolicyEngine`` is wired as
+    the delegate (tool-call rules flow through it; no duplication). Pure
+    in-memory composition — no I/O, no global state.
+    """
+    from prismal.identity.policy import PolicyEngine, load_identity_policies
+    from prismal.identity.provider import LocalIdentityProvider, OidcIdentityProvider
+    from prismal.identity.vault import EnvVault, FileVault
+
+    provider: IdentityPort = (
+        OidcIdentityProvider(settings)
+        if settings.identity_provider == "oidc"
+        else LocalIdentityProvider(settings)
+    )
+    vault: CredentialVaultPort = (
+        FileVault(settings) if settings.identity_vault == "file" else EnvVault(settings)
+    )
+
+    tool_policy = None
+    if settings.hardening_enabled:
+        from prismal.security.tool_policy import ToolPolicyEngine, load_tool_policies
+
+        tool_policy = ToolPolicyEngine(
+            load_tool_policies(settings.tool_policy_path), settings=settings
+        )
+    policy: PolicyPort = PolicyEngine(
+        load_identity_policies(settings.identity_policy_path),
+        tool_policy=tool_policy,
+        settings=settings,
+    )
+    return provider, vault, policy
 
 
 async def build_runtime(
@@ -348,7 +394,17 @@ async def build_runtime(
         except Exception as exc:
             raise RuntimeCompositionError("audit", str(exc)) from exc
 
-        # 6. Mode: global injects the singleton; context leaves globals untouched.
+        # 6. Identity & access governance (Phase IDN) — opt-in, in-memory ports.
+        identity_provider: IdentityPort | None = None
+        credential_vault: CredentialVaultPort | None = None
+        policy_engine: PolicyPort | None = None
+        if eff.identity_enabled:
+            try:
+                identity_provider, credential_vault, policy_engine = build_identity_ports(eff)
+            except Exception as exc:
+                raise RuntimeCompositionError("identity", str(exc)) from exc
+
+        # 7. Mode: global injects the singleton; context leaves globals untouched.
         if resolved_mode == "global":
             from prismal.agents.tool_registry import set_tool_provider
 
@@ -365,6 +421,9 @@ async def build_runtime(
         checkpointer=checkpointer,
         audit=audit,
         org_id=org_id,
+        identity_provider=identity_provider,
+        credential_vault=credential_vault,
+        policy_engine=policy_engine,
     )
     ctx._closers = closers
     logger.info(
@@ -479,6 +538,7 @@ __all__ = [
     "RuntimeConfig",
     "RuntimeContext",
     "VectorStoreProvider",
+    "build_identity_ports",
     "build_runtime",
     "build_test_runtime",
 ]
