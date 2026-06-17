@@ -300,6 +300,23 @@ class OTelManager:
             "prismal.runaway_stops_total",
             description="Runaway-guard stops by reason (step_cap|stagnation)",
         )
+        # Agent identity & access governance (Phase IDN — SPEC-IDN-OTEL-001)
+        self._counters["identity_issued"] = self._meter.create_counter(
+            "prismal.identity_issued_total",
+            description="Agent identities issued (by org)",
+        )
+        self._counters["policy_decisions"] = self._meter.create_counter(
+            "prismal.policy_decisions_total",
+            description="Identity policy decisions (by effect: allow|deny|require_hitl)",
+        )
+        self._counters["credential_resolved"] = self._meter.create_counter(
+            "prismal.credential_resolved_total",
+            description="Credentials resolved from a vault (by vault)",
+        )
+        self._counters["did_verify"] = self._meter.create_counter(
+            "prismal.did_verify_total",
+            description="DID verifications (by result: ok|fail)",
+        )
         self._histograms["agent_latency"] = self._meter.create_histogram(
             "prismal.agent_latency_seconds",
             description="Agent execution latency in seconds",

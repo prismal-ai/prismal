@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` (full SDD: PLAN + SPEC + ARCHITECTURE + TASKS) |
+| **Status** | `IMPLEMENTED` (v3.4.0; ID6-02 PermissionManager-DID deferred) |
 | **Version** | 1.0 |
 | **Phase** | IDN (Identity) |
 | **Target package version** | `3.4.0` (SemVer **minor** — new functionality; ships after Phase V `3.3.0`) |

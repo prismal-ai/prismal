@@ -1,0 +1,73 @@
+# Prismal — Identity & Access Policy (example)
+# Artifact for specs/agent-identity-governance (Phase IDN, SPEC-IDN-POL-001).
+# Ship a copy as config/identity_policies.yaml. Loaded by load_identity_policies().
+#
+# Evaluation order in PolicyEngine.allow(identity, action, resource, context):
+#   1) delegate (agent, tool, args) to the Phase H ToolPolicyEngine (if wired)
+#   2) enforce least-privilege scopes (identity.scopes must cover `resource`)
+#   3) apply these identity policies (most-specific-wins)
+# Effects: allow | deny | require_hitl
+# Modes are global (settings.identity_mode): off | warn | enforce.
+# `identity` globs over the DID or the agent_name; `resource` globs over the
+# resource string (e.g. tools:write_file, rag:*, https://api.example/*).
+
+version: 1
+default: deny            # least privilege: deny unless explicitly allowed
+
+policies:
+  # --- Every agent may read RAG within its tenant ---
+  - identity: "*"
+    action: "tool_call"
+    resource: "rag:read"
+    effect: allow
+    require_scope: "rag:read"
+
+  # --- coder: scoped filesystem writes, destructive ops need a human ---
+  - identity: "coder"
+    action: "tool_call"
+    resource: "tools:write_file"
+    effect: allow
+    require_scope: "tools:write_file"
+
+  - identity: "coder"
+    action: "tool_call"
+    resource: "tools:delete_file"
+    effect: require_hitl
+
+  # --- researcher: outbound HTTP only to allowlisted hosts ---
+  - identity: "researcher"
+    action: "tool_call"
+    resource: "https://api.search.example/*"
+    effect: allow
+    require_scope: "net:egress"
+
+  - identity: "*"
+    action: "tool_call"
+    resource: "https://*"
+    effect: deny          # any other egress denied unless a more specific rule allows
+
+  # --- data_analyst: read-only data plane ---
+  - identity: "data_analyst"
+    action: "tool_call"
+    resource: "db:select"
+    effect: allow
+    require_scope: "db:read"
+
+  - identity: "data_analyst"
+    action: "tool_call"
+    resource: "db:write"
+    effect: deny
+
+  # --- A2A: only identities holding a2a:delegate may delegate to remote agents,
+  #     and remote DIDs must be verified (handled in code before this rule) ---
+  - identity: "*"
+    action: "a2a_delegate"
+    resource: "did:web:*"
+    effect: require_hitl
+    require_scope: "a2a:delegate"
+
+  # --- Secrets are never reachable as a resource via tools ---
+  - identity: "*"
+    action: "tool_call"
+    resource: "secrets:*"
+    effect: deny

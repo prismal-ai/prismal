@@ -145,6 +145,37 @@ class HardeningConfigError(HardeningError):
     """The tool-policy YAML or a hardening setting failed to load/validate."""
 
 
+# ── Agent identity & access governance (Phase IDN — SPEC-IDN-ERR-001) ──────────
+
+
+class IdentityError(PrismalError):
+    """Base class for the opt-in identity & access governance layer (Phase IDN)."""
+
+
+class DidVerificationError(IdentityError):
+    """A DID could not be resolved/verified (tampered signature, unreachable did:web)."""
+
+
+class ScopeError(IdentityError):
+    """An action's resource falls outside the identity's least-privilege scopes."""
+
+
+class PolicyDenied(IdentityError):  # noqa: N818 — SPEC-IDN-ERR-001 name
+    """A ``PolicyEngine`` denied an action in ``enforce`` mode (caught at the seam)."""
+
+
+class CredentialResolutionError(IdentityError):
+    """The credential vault could not resolve a ``credential_ref`` within scope."""
+
+
+class IdentityConfigError(IdentityError):
+    """An identity setting or the identity-policy YAML failed to load/validate."""
+
+
+class DelegationError(IdentityError):
+    """An on-behalf token widened scopes or was used while expired/revoked."""
+
+
 # ── Provider ──────────────────────────────────────────────────────────────────
 
 
@@ -834,13 +865,16 @@ __all__ = [
     "CodeReviewError",
     "CompilerError",
     "ConstitutionalError",
+    "CredentialResolutionError",
     "CronJobExistsError",
     "CronJobNotFoundError",
     "CustomerServiceError",
     "DataETLError",
     "DebateConsensusError",
     "DebateError",
+    "DelegationError",
     "DeliberationError",
+    "DidVerificationError",
     "DocumentGenerationError",
     "DocumentLoadError",
     "EvalError",
@@ -850,6 +884,8 @@ __all__ = [
     "HierarchicalRAGError",
     "HyDEError",
     "HybridSearchError",
+    "IdentityConfigError",
+    "IdentityError",
     "InjectionDetectedError",
     "JudgeError",
     "KokoroConfigError",
@@ -876,6 +912,7 @@ __all__ = [
     "PermissionDeniedError",
     "PluginConflictError",
     "PluginLoadError",
+    "PolicyDenied",
     "PrismalError",
     "ProviderError",
     "ProviderTimeoutError",
@@ -885,6 +922,7 @@ __all__ = [
     "RuntimeCompositionError",
     "STTError",
     "SchedulerError",
+    "ScopeError",
     "SecurityError",
     "SelfRAGError",
     "SkillError",
