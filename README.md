@@ -10,6 +10,24 @@ This package is the **agent framework layer** extracted from the larger monorepo
 
 ---
 
+## Project architecture (organization)
+
+Prismal is split across **eight repositories** in the [`prismal-ai`](https://github.com/orgs/prismal-ai/repositories) organization. `prismal` (this repo) is the **core engine** and the only one currently developed; everything else is a consumer or host that builds on top of it.
+
+![Prismal — Organization Architecture & Component Communication](./assets/prismal_org_architecture.svg)
+
+The macro architecture is a layered, client–server design where a single engine does the agent work and every other component talks to it through well-defined protocols:
+
+- **`prismal`** — the core agent framework (published to PyPI as `prismal-ai`). It owns the LangGraph SUPERVISOR graph, the 26 specialist agents, the 8 RAG engines + `VectorStorePort`, the reasoning patterns and subgraphs, the 5-layer security stack, the hexagonal ports, and the opt-in layers (Multimodal, Kokoro, Skynet, A2A, Budget). Its full internal architecture is in [Architecture](#architecture) below.
+- **`prismal-server`** — the backend host. It composes the engine via `build_runtime()` / `get_async_compiled_graph()` and exposes it over **REST, WebSocket, and SSE**, plus inbound A2A (the Agent Card at `/.well-known/agent-card.json`) and session/auth handling. This is the one process that turns the library into a service.
+- **`prismal-sdk`** — the client library that wraps the server's REST/WS/SSE endpoints so consumers don't hand-roll HTTP.
+- **`prismal-dashboard`, `prismal-tui`, `prismal-webchat`, `prismal-chatbot`** — the consumer front-ends (web admin, terminal, web chat, and external bots such as Slack/Discord). They all reach the engine through the SDK → server path.
+- **`prisma-notebooks`** — example and demo notebooks that import the `prismal` package directly rather than going through the server.
+
+Communication flows top-to-bottom: front-ends call the **SDK**, the SDK speaks **REST/WebSocket/SSE** to **`prismal-server`**, and the server invokes the **`prismal`** engine in-process. The engine, in turn, reaches **external systems** — LLM providers through LiteLLM, MCP servers for tools, vector stores via `VectorStorePort`, datastores (SQLite/Postgres/Chroma) for checkpoints and memory, observability through OpenTelemetry/Langfuse, and other vendors' agents bidirectionally over A2A (outbound from the engine, inbound served by the server). In the diagram, the solid green block marks the developed core, while dashed outlines mark the planned/early-stage repositories.
+
+---
+
 ## Features
 
 - **26 specialized AI agents** built on [LangGraph](https://langchain-ai.github.io/langgraph/) — coder, researcher, planner, critic, data_analyst, rag_agent, codeact_agent, cua_agent, and more
