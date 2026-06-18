@@ -10,6 +10,24 @@ This package is the **agent framework layer** extracted from the larger monorepo
 
 ---
 
+## Project architecture (organization)
+
+Prismal is split across **eight repositories** in the [`prismal-ai`](https://github.com/orgs/prismal-ai/repositories) organization. `prismal` (this repo) is the **core engine** and the only one currently developed; everything else is a consumer or host that builds on top of it.
+
+![Prismal — Organization Architecture & Component Communication](./assets/prismal_org_architecture.svg)
+
+The macro architecture is a layered, client–server design where a single engine does the agent work and every other component talks to it through well-defined protocols:
+
+- **`prismal`** — the core agent framework (published to PyPI as `prismal-ai`). It owns the LangGraph SUPERVISOR graph, the 26 specialist agents, the 8 RAG engines + `VectorStorePort`, the reasoning patterns and subgraphs, the 5-layer security stack, the hexagonal ports, and the opt-in layers (Multimodal, Kokoro, Skynet, A2A, Budget). Its full internal architecture is in [Architecture](#architecture) below.
+- **`prismal-server`** — the backend host. It composes the engine via `build_runtime()` / `get_async_compiled_graph()` and exposes it over **REST, WebSocket, and SSE**, plus inbound A2A (the Agent Card at `/.well-known/agent-card.json`) and session/auth handling. This is the one process that turns the library into a service.
+- **`prismal-sdk`** — the client library that wraps the server's REST/WS/SSE endpoints so consumers don't hand-roll HTTP.
+- **`prismal-dashboard`, `prismal-tui`, `prismal-webchat`, `prismal-chatbot`** — the consumer front-ends (web admin, terminal, web chat, and external bots such as Slack/Discord). They all reach the engine through the SDK → server path.
+- **`prisma-notebooks`** — example and demo notebooks that import the `prismal` package directly rather than going through the server.
+
+Communication flows top-to-bottom: front-ends call the **SDK**, the SDK speaks **REST/WebSocket/SSE** to **`prismal-server`**, and the server invokes the **`prismal`** engine in-process. The engine, in turn, reaches **external systems** — LLM providers through LiteLLM, MCP servers for tools, vector stores via `VectorStorePort`, datastores (SQLite/Postgres/Chroma) for checkpoints and memory, observability through OpenTelemetry/Langfuse, and other vendors' agents bidirectionally over A2A (outbound from the engine, inbound served by the server). In the diagram, the solid green block marks the developed core, while dashed outlines mark the planned/early-stage repositories.
+
+---
+
 ## Features
 
 - **26 specialized AI agents** built on [LangGraph](https://langchain-ai.github.io/langgraph/) — coder, researcher, planner, critic, data_analyst, rag_agent, codeact_agent, cua_agent, and more
@@ -411,6 +429,30 @@ uv run python -m build
 ## Architecture
 
 The core is a LangGraph `StateGraph[AgentState]` assembled in `prismal/agents/graph.py` following the **SUPERVISOR pattern**: a central `supervisor_node` routes each turn to one of 26 specialist agent nodes, each of which returns control to the supervisor; the supervisor routes to `END` when the task is complete. Checkpointing is handled by `AsyncSqliteSaver` (or PostgreSQL via the `[postgres]` extra).
+
+![Prismal — Agent Framework Architecture](./assets/prismal_architecture.svg)
+
+### Diagram walkthrough
+
+The diagram above reads top-to-bottom as a request flows through the framework, organized into eight layers plus a detail panel for A2A.
+
+**1 — Entry + Security.** Every request enters through `get_async_compiled_graph()` and immediately crosses the five-layer defense-in-depth stack before it can touch any state: `InputSanitizer` (L1) strips control characters and normalizes unicode, `GuardrailsEngine` + NeMo Guardrails (L2/L3) apply regex and risk scoring, `SecurePromptBuilder` isolates user input with canary tokens, `ActionInterceptor` (L4) runs pre-tool permission checks, and `AuditLogger` (L5) writes a hash-chained JSONL trail alongside the `PermissionManager` and filesystem guard. No user text is ever f-stringed into a prompt — it always passes through `SecurePromptBuilder` first.
+
+**2 — Core supervisor.** The heart of the framework is the LangGraph `StateGraph[AgentState]`. A deterministic regex `intent_router.match_intent()` runs ahead of LLM supervision; the `SUPERVISOR` node then routes each turn to the right specialist (or to `END`). All turn state lives in `AgentState`, a `TypedDict` whose `messages` field uses the `add_messages` reducer, and progress is persisted by the checkpointer (SQLite by default, PostgreSQL optional).
+
+**3 — Specialist agents.** The supervisor dispatches to one of 26 specialist nodes — `coder`, `researcher`, `rag_agent`, `data_analyst`, `planner`, `critic`, `codeact_agent`, `cua_agent`, `file_manager`, `skill_manager`, `cron_manager`, `parallel_research`, `meta_learner`, `skill_creator`, `domain_supervisor`, `network_supervisor`, and more. Each node does its work and hands control back to the supervisor, which can also route into the reusable patterns and subgraphs below.
+
+**4 — Agent patterns.** Composable reasoning strategies live in `prismal/agents/patterns/`: Tree-of-Thoughts, N-agent Debate, Constitutional self-revision, LATS (MCTS with UCB1), LLM-Compiler (parallel task DAG), Mixture-of-Agents, Swarm handoff, and the `reflection_loop`.
+
+**5 — Subgraphs / pipelines.** Multi-node pipelines assembled by `SubgraphFactory` and held in `SubgraphRegistry`: `dev_pipeline`, `ml_pipeline`, `financial`, `customer_service`, `document_generation`, `data_etl`, `code_review`, plus the analysis/engineering/research orchestrators.
+
+**6 — RAG + vector store.** Eight retrieval engines (HyDE, RAG-Fusion, Hybrid BM25+semantic, Self-RAG, Hierarchical, Multi-Vector, the Adaptive router, and CRAG) sit on top of the hexagonal `VectorStorePort`. A factory selects the backend — Chroma is the default, with LanceDB, sqlite-vec, Qdrant, and pgvector available via extras — and embeddings plus federated search round out the layer.
+
+**7 — Opt-in layers.** Capabilities gated by settings flags that, when off, leave the compiled graph byte-for-byte identical: Multimodal (vision/audio/video), Kokoro deliberation (Spirit/Mind/Heart souls + a Judge), Skynet swarm map-reduce (dynamic worker fan-out via `Send`), A2A interop, and Cost/Budget governance (`CostMeter` + `BudgetGuard`).
+
+**8 — Hexagonal ports, providers & infrastructure.** Tool resolution is inverted behind `ToolProviderPort` (composing MCP, Skills, and Souls); configuration behind `ConfigSourcePort`; and `build_runtime()` is the single composition root that wires every port together. All LLM calls are isolated behind the LiteLLM-based providers layer (Anthropic, OpenAI, Gemini, Ollama). Supporting infrastructure includes short/long-term memory, the scheduler (APScheduler/Prefect), the sandbox (docker/nsjail/bwrap), monitoring (OpenTelemetry/Langfuse/structlog), and the public Extension API (`@prismal_node`, plugins).
+
+**A2A detail panel.** Expanding layer 7's A2A box: `build_agent_card()` publishes an `AgentCard` (one `AgentSkill` per capability, identified by a `did:web`). Inbound traffic is served by `A2AServerHandler` over JSON-RPC + SSE (`message/send`, `tasks/get`, `tasks/cancel`); outbound, `A2AClient` + `A2AConnectionManager` reach remote agents behind an fnmatch allowlist with bearer/oauth2 auth. `A2AAgentNode.as_node()` turns a remote agent into a graph node, and `A2AToolProvider` (conforming to `ToolProviderPort`) surfaces remote skills as `a2a__agent__skill` tools. A2A complements MCP (tools vs. agents), and the trust boundary holds: every remote response is L1-sanitized and audited by hash, never by content.
 
 ```
 prismal/                ← PEP 420 namespace package (NO __init__.py at root)
