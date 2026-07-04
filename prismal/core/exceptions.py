@@ -878,6 +878,38 @@ class A2AAgentUnavailable(A2AError):  # noqa: N818 — SPEC-A2A-008 name
         super().__init__(f"A2A agent {agent!r} unavailable: {reason}")
 
 
+# ── Guardrails Modernization (Phase GRD) ───────────────────────────────────────
+
+
+class GuardrailsModernizationError(PrismalError):
+    """Base for errors raised by the guardrails-modernization layer (Phase GRD)."""
+
+
+class NemoClassifierError(GuardrailsModernizationError):
+    """Raised for reasoning safety-classifier failures surfaced to a caller.
+
+    The classifier action itself never raises this on the hot path (timeout
+    and provider errors fail open to ``"safe"``, per DD-GRD-003) — reserved
+    for callers that opt out of the graceful verdict path.
+    """
+
+
+class NemoClassifierConfigError(NemoClassifierError):
+    """Raised for a bad ``config/nemo_rails/`` config or a missing action registration."""
+
+
+class StructuredOutputGuardError(GuardrailsModernizationError):
+    """Base for :class:`~prismal.security.structured_output_guard.StructuredOutputGuard` errors."""
+
+
+class StructuredOutputReaskExhausted(StructuredOutputGuardError):  # noqa: N818 — SPEC-GRD-ERR-001 name
+    """Raised only if a caller opts out of the graceful ``StructuredOutputVerdict`` path.
+
+    ``StructuredOutputGuard.validate()`` itself never raises this — it returns
+    ``ok=False, reason="reask_exhausted"`` on the hot path (DD-GRD-005).
+    """
+
+
 __all__ = [
     "A2AAgentUnavailable",
     "A2AError",
@@ -905,6 +937,7 @@ __all__ = [
     "EvalSetError",
     "ExtensionError",
     "FusionError",
+    "GuardrailsModernizationError",
     "HierarchicalRAGError",
     "HyDEError",
     "HybridSearchError",
@@ -930,6 +963,8 @@ __all__ = [
     "MultimodalError",
     "MultimodalFusionError",
     "MultimodalRAGError",
+    "NemoClassifierConfigError",
+    "NemoClassifierError",
     "NodeExecutionError",
     "NodeTimeoutError",
     "NodeValidationError",
@@ -958,6 +993,8 @@ __all__ = [
     "SkynetPlanError",
     "SoulNotFoundError",
     "SoulValidationError",
+    "StructuredOutputGuardError",
+    "StructuredOutputReaskExhausted",
     "SwarmError",
     "SwarmWorkerError",
     "TTSError",

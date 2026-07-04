@@ -332,6 +332,24 @@ class OTelManager:
             description="RAG retrieval latency in seconds",
             unit="s",
         )
+        # Guardrails Modernization (Phase GRD — SPEC-GRD-OTEL-001)
+        self._counters["nemo_classifier_checks"] = self._meter.create_counter(
+            "prismal.nemo_classifier_checks_total",
+            description="Reasoning safety-classifier checks (by category, result)",
+        )
+        self._histograms["nemo_classifier_latency"] = self._meter.create_histogram(
+            "prismal.nemo_classifier_latency_seconds",
+            description="Reasoning safety-classifier judgment-call latency in seconds",
+            unit="s",
+        )
+        self._counters["structured_output_reask"] = self._meter.create_counter(
+            "prismal.structured_output_reask_total",
+            description="StructuredOutputGuard re-ask outcomes (resolved|exhausted|budget_denied)",
+        )
+        self._counters["structured_output_hub_validator_blocks"] = self._meter.create_counter(
+            "prismal.structured_output_hub_validator_blocks_total",
+            description="Guardrails Hub validator findings (by validator)",
+        )
 
     @contextmanager
     def start_span(

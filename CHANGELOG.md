@@ -13,6 +13,60 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 All spec-complete phases under `specs/` are now implemented. New work starts
 here.
 
+## [3.6.0] — 2026-07-04
+
+> Spec: [`specs/guardrails-modernization/`](./specs/guardrails-modernization/).
+> Closes two concrete gaps in the 5-layer security stack: Layer 3 (NeMo
+> Guardrails) shipped no config, and output enforcement had no schema-first,
+> retry-capable framework. Additive and **opt-in**: `nemo_classifier_enabled`
+> and `structured_output_guard_enabled` (both default `False`) ⇒ compiled
+> graph byte-for-byte unchanged (snapshot-tested). Implemented test-first (TDD).
+
+### Added — Guardrails Modernization (Phase GRD)
+
+- **`config/nemo_rails/`** — `config.yml` + `main.co` (dialog/topical Colang
+  flows for the 5(+1) sentinel categories already asserted by
+  `test_nemo_rails.py`) + `safety_classifier.co`. `NemoRailsLayer` no longer a
+  silent no-op: `available=True` once `nemo_guardrails_enabled=True`.
+- **`security/nemo_actions.py`** — `content_safety_reasoning()`, a
+  reasoning-capable safety-classifier NeMo custom action gated by
+  `nemo_classifier_enabled`; fails open (`"safe"`) on timeout/error, audited +
+  counted. Its own `nemo_classifier_timeout_seconds` budget is fully
+  independent of the existing 450ms dialog-rail timeout.
+- **`security/nemo_rails.py`** *(extended)* — resolves NeMo's main LLM via
+  `providers/registry.py::ProviderRegistry` instead of `LLMRails`'s own
+  config-driven (and previously hardcoded-provider) resolution; conditionally
+  registers the classifier action and activates its Colang flows when enabled.
+  Public API unchanged.
+- **`security/structured_output_guard.py`** — `StructuredOutputGuard`,
+  `StructuredOutputVerdict`: schema-first validation via `guardrails-ai`'s
+  `Guard.for_pydantic(schema).validate()`, with a bounded, Budget-metered
+  automatic re-ask loop driven entirely by Prismal (never `guardrails-ai`'s own
+  `llm_api` mechanism — zero provider-isolation compromise). Composes with,
+  never replaces, `OutputValidator`. Opt-in Guardrails Hub validators
+  (`detect_pii`, `provenance_llm`, `toxic_language`) per-call, gated by
+  `structured_output_guard_hub_validators_enabled`; an uninstalled/unknown
+  validator degrades gracefully. New `[guardrails-ai]` extra; absent ⇒
+  `MissingDependencyError` at construction, never mid-call.
+- **Settings** (`core/config.py`) — `nemo_classifier_enabled`,
+  `nemo_classifier_model`, `nemo_classifier_categories`,
+  `nemo_classifier_threshold`, `nemo_classifier_timeout_seconds`,
+  `structured_output_guard_enabled`, `structured_output_guard_max_reasks`,
+  `structured_output_guard_hub_validators_enabled` (all default off/2/False).
+- **Exceptions** — `GuardrailsModernizationError`, `NemoClassifierError`,
+  `NemoClassifierConfigError`, `StructuredOutputGuardError`,
+  `StructuredOutputReaskExhausted`; reuses the existing `MissingDependencyError`
+  for the missing-extra case.
+- **Observability** — `prismal.nemo_classifier_checks_total{category,result}`,
+  `prismal.nemo_classifier_latency_seconds`,
+  `prismal.structured_output_reask_total{outcome}`,
+  `prismal.structured_output_hub_validator_blocks_total{validator}`.
+- **Artifacts** — `docs/security/guardrails-modernization.md`;
+  `examples/guardrails_modernization.py`; `[guardrails-ai]` extra in
+  `pyproject.toml`.
+
+---
+
 ## [3.5.0] — 2026-06-17
 
 > Spec: [`specs/a2a-interop/`](./specs/a2a-interop/). Bidirectional Agent2Agent

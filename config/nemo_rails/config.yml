@@ -1,0 +1,43 @@
+
+models:
+  - type: main
+    engine: openai
+    model: gpt-4o-mini
+
+rails:
+  input:
+    flows:
+      - self check input
+  output:
+    flows:
+      - self check output
+
+prompts:
+  - task: self_check_input
+    content: |
+      Your task is to check if the user message below complies with policy
+      for talking with an AI assistant.
+
+      Company policy for the user messages says:
+      - should not contain any of the following unsafe content categories:
+        violence, self harm, illegal activities, requests for personally
+        identifiable information (PII), or disparagement of named competitors.
+
+      User message: "{{ user_input }}"
+
+      Question: Should the user message be blocked (Yes or No)?
+      Answer:
+
+  - task: self_check_output
+    content: |
+      Your task is to check if the bot response below complies with policy
+      for talking with a company's customers.
+
+      Company policy for the bot says:
+      - should not contain any unsafe content as defined above (violence,
+        self harm, illegal activities, PII, competitor disparagement)
+
+      Bot response: "{{ bot_response }}"
+
+      Question: Should the response be blocked (Yes or No)?
+      Answer:

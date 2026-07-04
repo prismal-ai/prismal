@@ -616,6 +616,53 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Guardrails Modernization (Phase GRD — SPEC-GRD-CFG-001) ───────
+    nemo_classifier_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for the reasoning safety-classifier rail.",
+    )
+    nemo_classifier_model: str | None = Field(
+        default=None,
+        description="Optional model override for the classifier judgment call.",
+    )
+    nemo_classifier_categories: list[str] = Field(
+        default_factory=lambda: [
+            "violence",
+            "self_harm",
+            "illegal_activities",
+            "pii_request",
+            "competitor_disparagement",
+        ],
+        description="Configurable safety-classifier category set.",
+    )
+    nemo_classifier_threshold: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Confidence threshold to treat a classifier verdict as a block.",
+    )
+    nemo_classifier_timeout_seconds: float = Field(
+        default=3.0,
+        ge=0.0,
+        description=(
+            "Independent timeout for the classifier action only (DD-GRD-003) — "
+            "never affects the separate 450ms dialog-rail timeout."
+        ),
+    )
+    structured_output_guard_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for StructuredOutputGuard.",
+    )
+    structured_output_guard_max_reasks: int = Field(
+        default=2,
+        ge=0,
+        description="Bound on automatic re-ask attempts (0 = validate once, no re-ask).",
+    )
+    structured_output_guard_hub_validators_enabled: bool = Field(
+        default=False,
+        description="Master gate for Guardrails Hub validators.",
+    )
+
     # ── Sandbox multi-lenguaje ────────────────────────────────────────
     sandbox_path: str = Field(
         default="sandbox",
@@ -1898,6 +1945,21 @@ class Settings(BaseSettings):
                 f"PRISMAL_HARDENING_TOOL_POLICY_DEFAULT="
                 f"{self.hardening_tool_policy_default!r} is invalid; "
                 f"expected one of {sorted(valid_defaults)}."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_guardrails_modernization(self) -> "Settings":
+        """Validate the guardrails-modernization settings (SPEC-GRD-CFG-001).
+
+        An empty ``nemo_classifier_categories`` is only a configuration error
+        when the classifier is actually enabled — disabled-by-default is the
+        zero-overhead path and an empty list there is harmless.
+        """
+        if self.nemo_classifier_enabled and not self.nemo_classifier_categories:
+            raise ValueError(
+                "PRISMAL_NEMO_CLASSIFIER_CATEGORIES must be non-empty when "
+                "PRISMAL_NEMO_CLASSIFIER_ENABLED=true."
             )
         return self
 

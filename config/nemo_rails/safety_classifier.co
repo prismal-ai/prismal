@@ -1,0 +1,31 @@
+# Reasoning-capable safety-classifier flows (Phase GRD — SPEC-GRD-NEMO-CFG-001).
+#
+# Only reachable when `nemo_classifier_enabled=True` — NemoRailsLayer appends
+# these flow names to `rails.input.flows` / `rails.output.flows` at runtime
+# (see `_activate_classifier_flows` in `prismal/security/nemo_rails.py`); they
+# are never listed in `config.yml` itself, so the classifier stays fully
+# opt-in regardless of what `nemo_guardrails_enabled` alone activates.
+#
+# `content_safety_reasoning` (registered from `prismal/security/nemo_actions.py`)
+# returns a bare category string from the configured `nemo_classifier_categories`,
+# or "safe". A non-"safe" verdict is wrapped in the existing
+# `[NEMO_BLOCKED:<category>]` sentinel so `_parse_block_response()` requires no
+# changes (DD-GRD-002) — indistinguishable downstream from a dialog-rail block.
+
+define flow content safety reasoning input
+  $category = execute content_safety_reasoning(text=$user_message)
+  if $category != "safe"
+    bot respond nemo blocked input
+    stop
+
+define bot respond nemo blocked input
+  "[NEMO_BLOCKED:{$category}]"
+
+define flow content safety reasoning output
+  $category = execute content_safety_reasoning(text=$bot_message)
+  if $category != "safe"
+    bot respond nemo blocked output
+    stop
+
+define bot respond nemo blocked output
+  "[NEMO_BLOCKED:{$category}]"

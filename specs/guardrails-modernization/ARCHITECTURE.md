@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-07-04 |
 | **Phase** | GRD |
@@ -123,12 +123,12 @@ The classifier custom action returns a bare category string (one of the configur
 - Introduces a **separate** `nemo_classifier_timeout_seconds` setting (proposed default: `3.0`) that only applies to the classifier action's own `asyncio.wait_for`, wrapped independently inside `nemo_actions.py`, not inside `NemoRailsLayer.check_input`/`check_output`'s existing timeout. A classifier timeout fails open (verdict = `"safe"`, audited) — `RF-GRD-005`.
 - Emits a **separate** histogram (`prismal.nemo_classifier_latency_seconds`) so the two contracts are never conflated in observability either.
 
-> **Open question:** should the default `nemo_classifier_timeout_seconds` be tuned per-provider (fast local/small classifier models could plausibly hit sub-second P99, remote frontier-model judges will not), or should it stay a single global knob? Flagging for reviewer input before TASKS execution — this spec assumes a single global setting with a conservative default.
+> **Resolved (2026-07-04, reviewer sign-off):** single global `nemo_classifier_timeout_seconds` setting, default `3.0`s, as this spec originally assumed. Per-provider tuning deferred — an operator needing a faster local classifier can lower the single knob themselves.
 
 ### DD-GRD-004: `guardrails-ai` SDK import isolation follows the `nemo_rails.py` precedent, not a new rule
 Rule #4 (no provider SDK imports outside `providers/`) targets *LLM provider* SDKs (`anthropic`, `openai`, `google.generativeai`, `ollama`, etc.). `nemoguardrails` is already a committed exception to a literal reading of that rule — it lives in `prismal/security/nemo_rails.py` because it is a **guardrails orchestration SDK**, not an LLM provider client, even though it internally drives LLM calls. `guardrails-ai` (`import guardrails`, the `Guard` class) is the same shape of dependency, so `structured_output_guard.py` follows the identical precedent: the SDK import is lazy/deferred (mirroring `nemo_rails.py`'s `try: from nemoguardrails import LLMRails, RailsConfig / except ImportError`), lives inside `prismal/security/`, and any *actual* LLM completion the SDK needs (its own re-ask call) is injected as a callable resolved from `providers/` (`ProviderRegistry().get_llm()`), never constructed inside `security/`.
 
-> **Open question:** `guardrails-ai`'s `Guard` object historically expects either a raw provider SDK callable or a LiteLLM-style model string for its own re-ask invocation. Whether we inject a thin `providers/`-resolved callable (preserving isolation strictly) or accept the small isolation compromise of Guard's own environment-variable-driven model resolution needs a concrete implementation-time decision — flagged here rather than resolved unilaterally, since it affects whether `[guardrails-ai]` truly stays provider-agnostic day one.
+> **Resolved (2026-07-04, reviewer sign-off):** `guardrails-ai`'s `Guard.validate(raw_output)` (confirmed against the real `guardrails-ai==0.10.2` API) performs pure schema validation with **no LLM call involved** — distinct from `Guard.__call__(llm_api=..., num_reasks=...)`, which is guardrails-ai's own generate+validate+reask loop. `StructuredOutputGuard` uses only `Guard.validate()` and drives its own bounded re-ask loop via an injected `reask_fn` resolved from `providers/`; `guardrails-ai`'s `llm_api` mechanism is never invoked. This is a strict-isolation resolution with zero compromise — not the fallback option this question flagged.
 
 ### DD-GRD-005: Bounded re-ask, metered exactly like every other expensive pattern
 `StructuredOutputGuard.validate()` accepts `budget_guard_fn: Callable[[dict], Awaitable[bool]] | None = None`, the exact type `make_budget_guard_fn()` returns — the same contract `reflection_loop`, `debate_round`, `tree_of_thoughts`, `LATSAgent.search`, and `MixtureOfAgents.generate` already consume. `None` means zero-overhead always-allow (the disabled/default path). Re-ask attempts stop at `min(structured_output_guard_max_reasks, first budget_guard_fn() == False)`.

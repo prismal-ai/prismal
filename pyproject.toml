@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ============================================================
 [project]
 name = "prismal-ai"
-version = "3.5.0"
+version = "3.6.0"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -242,9 +242,14 @@ multimodal-embed = [
   "torch>=2.6",  # >=2.6 neutralizes CVE-2026-1839 (transformers Trainer torch.load)
 ]
 
+# Guardrails Modernization — structured-output validation via guardrails-ai (Phase GRD)
+guardrails-ai = [
+  "guardrails-ai>=0.10.2",
+]
+
 # All optional extras combined
 all = [
-  "prismal-ai[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance,lancedb,sqlite-vec,qdrant,pgvector,a2a,multimodal,multimodal-local,multimodal-premium,multimodal-embed]",
+  "prismal-ai[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance,lancedb,sqlite-vec,qdrant,pgvector,a2a,multimodal,multimodal-local,multimodal-premium,multimodal-embed,guardrails-ai]",
 ]
 
 # Development tools
@@ -398,6 +403,8 @@ module = [
   "langchain_qdrant", "langchain_qdrant.*", "langchain_postgres", "langchain_postgres.*",
   # Optional notebook dependency for graph visualization.
   "IPython", "IPython.*",
+  # Guardrails Modernization (Phase GRD) — lazy-imported inside structured_output_guard.py.
+  "guardrails", "guardrails.*",
 ]
 ignore_missing_imports = true
 

@@ -5,11 +5,11 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
-| **Version** | 1.0 |
+| **Status** | `IMPLEMENTED` |
+| **Version** | 1.1 |
 | **Date** | 2026-07-04 |
 | **Phase** | GRD |
-| **Target package version** | `3.6.0` (SemVer minor — new opt-in functionality, not yet started) |
+| **Target package version** | `3.6.0` (SemVer minor — shipped) |
 | **PLAN** | `specs/guardrails-modernization/PLAN.md` |
 | **SPEC** | `specs/guardrails-modernization/SPEC.md` |
 | **Architecture** | `specs/guardrails-modernization/ARCHITECTURE.md` |
@@ -20,7 +20,7 @@
 
 Guardrails Modernization lands in three phases (GRD1–GRD3), each independently testable and gated behind its own opt-in flag (`nemo_classifier_enabled`, `structured_output_guard_enabled`, both default `False`) so `main` stays green and the existing L1–L5 stack is unaffected until an operator opts in. GRD1 ships the NeMo config artifact the repo has always assumed but never shipped, plus a reasoning-capable classifier action. GRD2 adds `StructuredOutputGuard` behind a new `[guardrails-ai]` extra. GRD3 wires both into settings/OTel/tests/docs/packaging. No new LangGraph capability; no change to the `runtime-hardening` middleware ordering.
 
-Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **All rows are `TODO` — this spec has not been implemented yet.**
+Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **Implemented 2026-07-04 with TDD** — all 26 tasks `DONE`, both open design questions (DD-GRD-003, DD-GRD-004) resolved (see below), full quality gate green.
 
 ## 2. Prerequisites
 
@@ -35,13 +35,13 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **All rows are `TODO` —
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| GRD1-01 | `config/nemo_rails/config.yml`: model + rails wiring (SPEC-GRD-NEMO-CFG-001) | 0.4 d | — | TODO |
-| GRD1-02 | `config/nemo_rails/main.co`: dialog/topical flows for the 5(+1) existing sentinel categories | 0.6 d | GRD1-01 | TODO |
-| GRD1-03 | `prismal/security/nemo_actions.py`: `content_safety_reasoning()` + `register()` (SPEC-GRD-NEMO-CLS-001) | 0.8 d | GRD1-01 | TODO |
-| GRD1-04 | `config/nemo_rails/safety_classifier.co`: flow invoking the custom action, sentinel-wrapped verdict | 0.5 d | GRD1-03 | TODO |
-| GRD1-05 | `nemo_rails.py`: conditional `nemo_actions.register(rails, settings=...)` call in `NemoRailsLayer.__init__`, gated on `nemo_classifier_enabled` | 0.4 d | GRD1-03 | TODO |
-| GRD1-06 | Independent classifier timeout (SPEC-GRD-NEMO-TIMEOUT-001) — separate `wait_for` inside `content_safety_reasoning`, never touching `_NEMO_TIMEOUT_SECONDS` | 0.3 d | GRD1-03 | TODO |
-| GRD1-07 | Default classifier judgment call wiring via `ProviderRegistry().get_llm()` (Rule #4) | 0.4 d | GRD1-03 | TODO |
+| GRD1-01 | `config/nemo_rails/config.yml`: model + rails wiring (SPEC-GRD-NEMO-CFG-001) | 0.4 d | — | DONE |
+| GRD1-02 | `config/nemo_rails/main.co`: dialog/topical flows for the 5(+1) existing sentinel categories | 0.6 d | GRD1-01 | DONE |
+| GRD1-03 | `prismal/security/nemo_actions.py`: `content_safety_reasoning()` + `register()` (SPEC-GRD-NEMO-CLS-001) | 0.8 d | GRD1-01 | DONE |
+| GRD1-04 | `config/nemo_rails/safety_classifier.co`: flow invoking the custom action, sentinel-wrapped verdict | 0.5 d | GRD1-03 | DONE |
+| GRD1-05 | `nemo_rails.py`: conditional `nemo_actions.register(rails, settings=...)` call in `NemoRailsLayer.__init__`, gated on `nemo_classifier_enabled` | 0.4 d | GRD1-03 | DONE |
+| GRD1-06 | Independent classifier timeout (SPEC-GRD-NEMO-TIMEOUT-001) — separate `wait_for` inside `content_safety_reasoning`, never touching `_NEMO_TIMEOUT_SECONDS` | 0.3 d | GRD1-03 | DONE |
+| GRD1-07 | Default classifier judgment call wiring via `ProviderRegistry().get_llm()` (Rule #4) | 0.4 d | GRD1-03 | DONE |
 
 **Done when:** `config/nemo_rails/` exists with `config.yml` + `main.co` (+ `safety_classifier.co`); `NemoRailsLayer(Path("config/nemo_rails")).available is True`; `tests/integration/security/test_nemo_pipeline.py::test_nemo_rails_config_dir_exists` passes unmodified; a curated corpus of harmful prompts across the 5 default categories is classified correctly when `nemo_classifier_enabled=True`; classifier timeout/error fails open and is audited.
 
@@ -49,12 +49,12 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **All rows are `TODO` —
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| GRD2-01 | `[project.optional-dependencies].guardrails-ai` extra (SPEC-GRD-PKG-001); confirm floor version | 0.2 d | — | TODO |
-| GRD2-02 | `prismal/security/structured_output_guard.py`: `StructuredOutputVerdict`, `StructuredOutputGuard.__init__` (lazy `import guardrails`, `MissingDependencyError` on absence) | 0.6 d | GRD2-01 | TODO |
-| GRD2-03 | `StructuredOutputGuard.validate()`: schema validation via `Guard.for_pydantic(schema)` (or equivalent current API) | 0.7 d | GRD2-02 | TODO |
-| GRD2-04 | Bounded, metered re-ask loop: `reask_fn` default wiring to `ProviderRegistry().get_llm()`; `budget_guard_fn` consulted before each attempt (SPEC-GRD-SOG-001) | 0.8 d | GRD2-03 | TODO |
-| GRD2-05 | Opt-in Guardrails Hub validators (`hub_validators` param + `structured_output_guard_hub_validators_enabled` master gate) | 0.6 d | GRD2-03 | TODO |
-| GRD2-06 | Composition point: `.coerced` value still flows through `OutputValidator.validate_tool_args()` unchanged (DD-GRD-006) | 0.3 d | GRD2-03 | TODO |
+| GRD2-01 | `[project.optional-dependencies].guardrails-ai` extra (SPEC-GRD-PKG-001); confirm floor version | 0.2 d | — | DONE |
+| GRD2-02 | `prismal/security/structured_output_guard.py`: `StructuredOutputVerdict`, `StructuredOutputGuard.__init__` (lazy `import guardrails`, `MissingDependencyError` on absence) | 0.6 d | GRD2-01 | DONE |
+| GRD2-03 | `StructuredOutputGuard.validate()`: schema validation via `Guard.for_pydantic(schema)` (or equivalent current API) | 0.7 d | GRD2-02 | DONE |
+| GRD2-04 | Bounded, metered re-ask loop: `reask_fn` default wiring to `ProviderRegistry().get_llm()`; `budget_guard_fn` consulted before each attempt (SPEC-GRD-SOG-001) | 0.8 d | GRD2-03 | DONE |
+| GRD2-05 | Opt-in Guardrails Hub validators (`hub_validators` param + `structured_output_guard_hub_validators_enabled` master gate) | 0.6 d | GRD2-03 | DONE |
+| GRD2-06 | Composition point: `.coerced` value still flows through `OutputValidator.validate_tool_args()` unchanged (DD-GRD-006) | 0.3 d | GRD2-03 | DONE |
 
 **Done when:** valid output passes with `reask_count=0`; invalid-then-fixed output passes with `reask_count>0`; output that never resolves within the bound returns `ok=False, reason="reask_exhausted"`; a `budget_guard_fn` denial stops re-asking immediately; missing `[guardrails-ai]` raises `MissingDependencyError` at construction, not mid-call; `OutputValidator` still runs on the coerced value.
 
@@ -62,19 +62,19 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **All rows are `TODO` —
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| GRD3-01 | `core/config.py`: `nemo_classifier_*` + `structured_output_guard_*` settings + `_validate_guardrails_modernization` (SPEC-GRD-CFG-001) | 0.4 d | — | TODO |
-| GRD3-02 | `core/exceptions.py`: `GuardrailsModernizationError` hierarchy (SPEC-GRD-ERR-001) | 0.2 d | — | TODO |
-| GRD3-03 | `monitoring/otel.py`: register the 4 new counters/histograms (SPEC-GRD-OTEL-001) | 0.3 d | GRD1,GRD2 | TODO |
-| GRD3-04 | `prismal/security/__init__.py`: re-export `StructuredOutputGuard`, `StructuredOutputVerdict` | 0.1 d | GRD2 | TODO |
-| GRD3-05 | Unit: classifier action over a curated corpus (5 categories + safe); timeout/error fail-open | 0.6 d | GRD1 | TODO |
-| GRD3-06 | Unit: `StructuredOutputGuard` valid/invalid/re-ask/exhausted/budget-denied/missing-extra paths | 0.6 d | GRD2 | TODO |
-| GRD3-07 | Integration: `config/nemo_rails/` loads with a mocked `LLMRails`; classifier-off latency regression test (P99 unaffected) | 0.5 d | GRD1 | TODO |
-| GRD3-08 | Integration: both flags `False` ⇒ compiled-graph snapshot unchanged (mirrors `hardening_enabled=False` precedent) | 0.3 d | GRD1,GRD2 | TODO |
-| GRD3-09 | AST guard: `nemoguardrails`/`guardrails` imports confined to `prismal/security/`; extend existing no-provider-outside-`providers/` and no-`mcp`/`skills`-in-`agents/**` guards to cover the new modules | 0.3 d | GRD1,GRD2 | TODO |
-| GRD3-10 | `pyproject.toml`: `guardrails-ai` extra + `all` aggregate + `[tool.mypy.overrides]` entry (SPEC-GRD-PKG-001) | 0.2 d | GRD2-01 | TODO |
-| GRD3-11 | `docs/security/guardrails-modernization.md` | 0.5 d | GRD1,GRD2 | TODO |
-| GRD3-12 | `examples/guardrails_modernization.py` | 0.4 d | GRD1,GRD2 | TODO |
-| GRD3-13 | `README.md` + `CHANGELOG.md` entries (written as **planned**, target `3.6.0` — not marked shipped) | 0.2 d | GRD3-11 | TODO |
+| GRD3-01 | `core/config.py`: `nemo_classifier_*` + `structured_output_guard_*` settings + `_validate_guardrails_modernization` (SPEC-GRD-CFG-001) | 0.4 d | — | DONE |
+| GRD3-02 | `core/exceptions.py`: `GuardrailsModernizationError` hierarchy (SPEC-GRD-ERR-001) | 0.2 d | — | DONE |
+| GRD3-03 | `monitoring/otel.py`: register the 4 new counters/histograms (SPEC-GRD-OTEL-001) | 0.3 d | GRD1,GRD2 | DONE |
+| GRD3-04 | `prismal/security/__init__.py`: re-export `StructuredOutputGuard`, `StructuredOutputVerdict` | 0.1 d | GRD2 | DONE |
+| GRD3-05 | Unit: classifier action over a curated corpus (5 categories + safe); timeout/error fail-open | 0.6 d | GRD1 | DONE |
+| GRD3-06 | Unit: `StructuredOutputGuard` valid/invalid/re-ask/exhausted/budget-denied/missing-extra paths | 0.6 d | GRD2 | DONE |
+| GRD3-07 | Integration: `config/nemo_rails/` loads with a mocked `LLMRails`; classifier-off latency regression test (P99 unaffected) | 0.5 d | GRD1 | DONE |
+| GRD3-08 | Integration: both flags `False` ⇒ compiled-graph snapshot unchanged (mirrors `hardening_enabled=False` precedent) | 0.3 d | GRD1,GRD2 | DONE |
+| GRD3-09 | AST guard: `nemoguardrails`/`guardrails` imports confined to `prismal/security/`; extend existing no-provider-outside-`providers/` and no-`mcp`/`skills`-in-`agents/**` guards to cover the new modules | 0.3 d | GRD1,GRD2 | DONE |
+| GRD3-10 | `pyproject.toml`: `guardrails-ai` extra + `all` aggregate + `[tool.mypy.overrides]` entry (SPEC-GRD-PKG-001) | 0.2 d | GRD2-01 | DONE |
+| GRD3-11 | `docs/security/guardrails-modernization.md` | 0.5 d | GRD1,GRD2 | DONE |
+| GRD3-12 | `examples/guardrails_modernization.py` | 0.4 d | GRD1,GRD2 | DONE |
+| GRD3-13 | `README.md` + `CHANGELOG.md` entries (written as **planned**, target `3.6.0` — not marked shipped) | 0.2 d | GRD3-11 | DONE |
 
 **Done when:** `uv run pytest -m unit` green; `ruff`, `mypy --strict`, `bandit` clean; coverage ≥ project target (80%) on new modules; both new flags default `False`; snapshot test proves zero behavior change when disabled.
 
@@ -92,15 +92,17 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **All rows are `TODO` —
 
 ## 5. Definition of Done (feature)
 
-- [ ] All MUST requirements (RF-GRD-001…008, 010, 012, 013) implemented and tested.
-- [ ] `config/nemo_rails/` ships and `NemoRailsLayer.available=True` under `nemo_guardrails_enabled=True`.
-- [ ] The existing ≤ 500 ms P99 / fail-open contract for the classifier-off dialog-rail path is proven unchanged by a regression test.
-- [ ] The reasoning safety-classifier scores a curated corpus correctly and fails open on timeout/error.
-- [ ] `StructuredOutputGuard` resolves schema violations via bounded, Budget-metered re-ask, and composes with (never bypasses) `OutputValidator`.
-- [ ] Both `nemo_classifier_enabled=False` and `structured_output_guard_enabled=False` ⇒ zero behavior change (snapshot proven).
-- [ ] No provider SDK import outside `providers/`; `nemoguardrails`/`guardrails` imports confined to `security/`; no `prismal.mcp`/`prismal.skills` import in `agents/**`.
-- [ ] `ruff` + `mypy --strict` + `bandit` clean; unit suite green.
-- [ ] Both open design questions (DD-GRD-003 timeout tuning, DD-GRD-004 re-ask LLM wiring) resolved with an explicit reviewer decision, not a silent default.
+- [x] All MUST requirements (RF-GRD-001…008, 010, 012, 013) implemented and tested.
+- [x] `config/nemo_rails/` ships and `NemoRailsLayer.available=True` under `nemo_guardrails_enabled=True` (verified against the real installed `nemoguardrails==0.21.0`, no API key required — main LLM is injected via `providers/registry.py`).
+- [x] The existing ≤ 500 ms P99 / fail-open contract for the classifier-off dialog-rail path is proven unchanged by a regression test (`test_check_input_timeout_budget_unaffected_when_classifier_enabled`, `test_nemo_timeout_constant_unaffected_by_classifier_flag`).
+- [x] The reasoning safety-classifier scores a curated corpus correctly and fails open on timeout/error.
+- [x] `StructuredOutputGuard` resolves schema violations via bounded, Budget-metered re-ask, and composes with (never bypasses) `OutputValidator` (verified end-to-end with the real `guardrails-ai==0.10.2` package).
+- [x] Both `nemo_classifier_enabled=False` and `structured_output_guard_enabled=False` ⇒ zero behavior change (snapshot proven — `test_graph_snapshot_guardrails_modernization.py`).
+- [x] No provider SDK import outside `providers/`; `nemoguardrails`/`guardrails` imports confined to `security/` (module top-level AST-guarded); no `prismal.mcp`/`prismal.skills` import in `agents/**` (untouched by this phase).
+- [x] `ruff` + `mypy --strict` + `bandit` clean; unit suite green (3688 passed / 9 skipped, tests/unit full tree).
+- [x] Both open design questions resolved (reviewer sign-off obtained 2026-07-04):
+  - **DD-GRD-003**: single global `nemo_classifier_timeout_seconds` setting, default `3.0`s. Per-provider tuning deferred.
+  - **DD-GRD-004**: `StructuredOutputGuard` uses only `Guard.for_pydantic(schema).validate()` (pure schema check, no LLM call inside guardrails-ai). The bounded re-ask loop is driven entirely by Prismal via an injected `reask_fn` resolved from `providers/` — `guardrails-ai`'s own `Guard.__call__(llm_api=...)` re-ask mechanism is never invoked. Zero provider-isolation compromise.
 
 ## 6. Effort Summary
 

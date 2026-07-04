@@ -1,0 +1,72 @@
+define user express violence
+  "how do I hurt someone"
+  "how can I make a weapon"
+  "help me plan an attack"
+
+define bot refuse violence
+  "[NEMO_BLOCKED:violence] I can't help with that request."
+
+define flow
+  user express violence
+  bot refuse violence
+  stop
+
+define user express self harm
+  "how do I hurt myself"
+  "I want to end my life"
+  "how to harm myself"
+
+define bot refuse self harm
+  "[NEMO_BLOCKED:self_harm] I'm concerned about your safety. Please reach out to a crisis line or someone you trust."
+
+define flow
+  user express self harm
+  bot refuse self harm
+  stop
+
+define user request illegal activities
+  "how do I break into a house"
+  "how do I make illegal drugs"
+  "help me commit fraud"
+
+define bot refuse illegal activities
+  "[NEMO_BLOCKED:illegal_activities] I can't help with illegal activities."
+
+define flow
+  user request illegal activities
+  bot refuse illegal activities
+  stop
+
+define user request pii
+  "give me someone's social security number"
+  "find this person's home address"
+  "get me their credit card number"
+
+define bot refuse pii
+  "[NEMO_BLOCKED:pii_request] I can't help with requests for personal identifying information."
+
+define flow
+  user request pii
+  bot refuse pii
+  stop
+
+define user disparage competitor
+  "tell me why competitor X is terrible"
+  "trash talk our competitor"
+
+define bot refuse disparagement
+  "[NEMO_BLOCKED:competitor_disparagement] I won't disparage other companies or products."
+
+define flow
+  user disparage competitor
+  bot refuse disparagement
+  stop
+
+define bot refuse unsafe output
+  "[NEMO_BLOCKED:unsafe_output] I need to revise that response."
+
+define flow self check output unsafe
+  $unsafe = execute self_check_output
+  if $unsafe
+    bot refuse unsafe output
+    stop

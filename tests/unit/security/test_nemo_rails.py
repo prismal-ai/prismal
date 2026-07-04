@@ -309,13 +309,219 @@ def test_nemo_rails_layer_successful_init(tmp_path: Path) -> None:
     mock_nemoguardrails.RailsConfig = mock_rails_cls
     mock_nemoguardrails.LLMRails = mock_llm_rails_cls
 
-    with patch.dict(sys.modules, {"nemoguardrails": mock_nemoguardrails}):
+    with (
+        patch.dict(sys.modules, {"nemoguardrails": mock_nemoguardrails}),
+        patch("prismal.security.nemo_rails._resolve_main_llm", return_value=None),
+    ):
         layer = NemoRailsLayer(config_dir)
 
     assert layer.available is True
     assert layer._rails is mock_llm_rails_instance
     mock_rails_cls.from_path.assert_called_once_with(str(config_dir))
-    mock_llm_rails_cls.assert_called_once_with(mock_rails_config)
+    mock_llm_rails_cls.assert_called_once_with(mock_rails_config, llm=None)
+
+
+def test_nemo_rails_layer_injects_resolved_llm(tmp_path: Path) -> None:
+    """NemoRailsLayer passes a settings-driven llm= to LLMRails (DD-GRD-001).
+
+    ``LLMRails`` eagerly initializes its ``models:`` config entry unless an
+    ``llm`` override is supplied — passing one keeps NeMo settings-driven via
+    ``providers/`` (Rule #4) instead of requiring hardcoded provider
+    credentials in ``config.yml``.
+    """
+    import sys
+    from unittest.mock import MagicMock, patch
+
+    config_dir = tmp_path / "nemo_rails"
+    config_dir.mkdir()
+
+    mock_rails_config = MagicMock()
+    mock_rails_cls = MagicMock()
+    mock_rails_cls.from_path.return_value = mock_rails_config
+
+    mock_llm_rails_cls = MagicMock(return_value=MagicMock())
+
+    mock_nemoguardrails = MagicMock()
+    mock_nemoguardrails.RailsConfig = mock_rails_cls
+    mock_nemoguardrails.LLMRails = mock_llm_rails_cls
+
+    sentinel_llm = MagicMock(name="resolved_chat_model")
+
+    with (
+        patch.dict(sys.modules, {"nemoguardrails": mock_nemoguardrails}),
+        patch("prismal.security.nemo_rails._resolve_main_llm", return_value=sentinel_llm),
+    ):
+        layer = NemoRailsLayer(config_dir)
+
+    assert layer.available is True
+    mock_llm_rails_cls.assert_called_once_with(mock_rails_config, llm=sentinel_llm)
+
+
+def test_resolve_main_llm_uses_provider_registry() -> None:
+    """``_resolve_main_llm`` delegates to ``ProviderRegistry().get_llm()`` (Rule #4)."""
+    from unittest.mock import MagicMock, patch
+
+    from prismal.security.nemo_rails import _resolve_main_llm
+
+    sentinel_llm = MagicMock(name="chat_model")
+    mock_registry_instance = MagicMock()
+    mock_registry_instance.get_llm.return_value = sentinel_llm
+    mock_registry_cls = MagicMock(return_value=mock_registry_instance)
+
+    with patch("prismal.providers.registry.ProviderRegistry", mock_registry_cls):
+        result = _resolve_main_llm()
+
+    assert result is sentinel_llm
+
+
+def test_resolve_main_llm_fails_open_on_error() -> None:
+    """``_resolve_main_llm`` returns None (never raises) if provider resolution fails."""
+    from unittest.mock import patch
+
+    from prismal.security.nemo_rails import _resolve_main_llm
+
+    with patch(
+        "prismal.providers.registry.ProviderRegistry",
+        side_effect=RuntimeError("no provider configured"),
+    ):
+        result = _resolve_main_llm()
+
+    assert result is None
+
+
+def _make_mock_nemoguardrails(rails_config: MagicMock) -> tuple[MagicMock, MagicMock]:
+    """Build a mocked ``nemoguardrails`` module + the LLMRails instance it yields."""
+    mock_rails_cls = MagicMock()
+    mock_rails_cls.from_path.return_value = rails_config
+
+    mock_llm_rails_instance = MagicMock()
+    mock_llm_rails_cls = MagicMock(return_value=mock_llm_rails_instance)
+
+    mock_nemoguardrails = MagicMock()
+    mock_nemoguardrails.RailsConfig = mock_rails_cls
+    mock_nemoguardrails.LLMRails = mock_llm_rails_cls
+    return mock_nemoguardrails, mock_llm_rails_instance
+
+
+def test_nemo_rails_layer_registers_classifier_action_when_enabled(tmp_path: Path) -> None:
+    """NemoRailsLayer registers the classifier custom action when enabled (GRD1-05)."""
+    import sys
+    from unittest.mock import MagicMock, patch
+
+    from prismal.core.config import Settings
+
+    config_dir = tmp_path / "nemo_rails"
+    config_dir.mkdir()
+
+    rails_config = MagicMock()
+    rails_config.rails.input.flows = []
+    rails_config.rails.output.flows = []
+    mock_nemoguardrails, mock_llm_rails_instance = _make_mock_nemoguardrails(rails_config)
+
+    settings = Settings(nemo_classifier_enabled=True, llm_provider="")
+
+    with (
+        patch.dict(sys.modules, {"nemoguardrails": mock_nemoguardrails}),
+        patch("prismal.security.nemo_rails._resolve_main_llm", return_value=None),
+        patch("prismal.core.config.get_settings", return_value=settings),
+    ):
+        layer = NemoRailsLayer(config_dir)
+
+    assert layer.available is True
+    mock_llm_rails_instance.register_action.assert_called_once()
+    args, _ = mock_llm_rails_instance.register_action.call_args
+    assert args[1] == "content_safety_reasoning"
+
+
+def test_nemo_rails_layer_activates_classifier_flows_when_enabled(tmp_path: Path) -> None:
+    """The classifier flow names are appended to rails.input/output.flows when enabled."""
+    import sys
+    from unittest.mock import MagicMock, patch
+
+    from prismal.core.config import Settings
+
+    config_dir = tmp_path / "nemo_rails"
+    config_dir.mkdir()
+
+    rails_config = MagicMock()
+    rails_config.rails.input.flows = []
+    rails_config.rails.output.flows = []
+    mock_nemoguardrails, _ = _make_mock_nemoguardrails(rails_config)
+
+    settings = Settings(nemo_classifier_enabled=True, llm_provider="")
+
+    with (
+        patch.dict(sys.modules, {"nemoguardrails": mock_nemoguardrails}),
+        patch("prismal.security.nemo_rails._resolve_main_llm", return_value=None),
+        patch("prismal.core.config.get_settings", return_value=settings),
+    ):
+        NemoRailsLayer(config_dir)
+
+    assert "content safety reasoning input" in rails_config.rails.input.flows
+    assert "content safety reasoning output" in rails_config.rails.output.flows
+
+
+def test_nemo_rails_layer_does_not_register_classifier_when_disabled(tmp_path: Path) -> None:
+    """NemoRailsLayer does not register the classifier action when disabled (default)."""
+    import sys
+    from unittest.mock import MagicMock, patch
+
+    from prismal.core.config import Settings
+
+    config_dir = tmp_path / "nemo_rails"
+    config_dir.mkdir()
+
+    rails_config = MagicMock()
+    rails_config.rails.input.flows = []
+    rails_config.rails.output.flows = []
+    mock_nemoguardrails, mock_llm_rails_instance = _make_mock_nemoguardrails(rails_config)
+
+    settings = Settings(nemo_classifier_enabled=False, llm_provider="")
+
+    with (
+        patch.dict(sys.modules, {"nemoguardrails": mock_nemoguardrails}),
+        patch("prismal.security.nemo_rails._resolve_main_llm", return_value=None),
+        patch("prismal.core.config.get_settings", return_value=settings),
+    ):
+        NemoRailsLayer(config_dir)
+
+    mock_llm_rails_instance.register_action.assert_not_called()
+    assert rails_config.rails.input.flows == []
+    assert rails_config.rails.output.flows == []
+
+
+def test_nemo_timeout_constant_unaffected_by_classifier_flag() -> None:
+    """RF-GRD-004 regression: the base dialog-rail timeout constant is untouched."""
+    from prismal.security.nemo_rails import _NEMO_TIMEOUT_SECONDS
+
+    assert _NEMO_TIMEOUT_SECONDS == 0.45
+
+
+@pytest.mark.asyncio
+async def test_check_input_timeout_budget_unaffected_when_classifier_enabled() -> None:
+    """RF-GRD-004: check_input's own timeout budget is unaffected by nemo_classifier_enabled.
+
+    check_input/check_output never invoke the classifier action directly — they
+    only run NeMo's own generate_async against the compiled flows, so their
+    timeout contract is independent of the classifier flag by construction.
+    """
+    mock_rails = MagicMock()
+
+    async def slow_generate(*_args: object, **_kwargs: object) -> str:
+        await asyncio.sleep(10)
+        return "response"
+
+    mock_rails.generate_async = slow_generate
+
+    layer = NemoRailsLayer.__new__(NemoRailsLayer)
+    layer._rails = mock_rails  # type: ignore[attr-defined]
+    layer._config_path = Path("config/nemo_rails")  # type: ignore[attr-defined]
+
+    with patch("prismal.security.nemo_rails._NEMO_TIMEOUT_SECONDS", 0.01):
+        blocked, category = await layer.check_input("some text")
+
+    assert blocked is False
+    assert category == ""
 
 
 def test_nemo_rails_layer_init_generic_exception(tmp_path: Path) -> None:
