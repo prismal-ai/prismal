@@ -10,6 +10,8 @@
 
 > Caveat: this analysis is based on the repo structure, the specs, and the notes — not on running the suite or auditing each capability end-to-end. The specs describe the *intended* design; actual maturity may be lower.
 
+> **2026-07-04 update:** every P0–P2 item in §5 below (Tool Provider, Vector Store Port, Composition Root, Dependency Remediation, A2A, Agent Identity, Eval Harness, Cost & Budget Governance) has since shipped — verified against real code, tests, and `CHANGELOG.md`, not just spec metadata. This document is kept for historical framing only; for the current state and the *next* round of gaps (external, versus 2026 Loops/Harness/Guardrails state of the art rather than internal backlog) see [`gap-analysis-loops-harness-guardrails-2026-07.md`](./gap-analysis-loops-harness-guardrails-2026-07.md), whose priority list (§5) is now tracked as SDD artifacts: [`specs/guardrails-modernization/`](../specs/guardrails-modernization/), [`specs/loop-hardening/`](../specs/loop-hardening/), [`specs/node-io-typesafety/`](../specs/node-io-typesafety/), [`specs/observability-integration/`](../specs/observability-integration/), [`specs/reference-host-bootstrap/PLAN.md`](../specs/reference-host-bootstrap/PLAN.md) (PRD seed), [`specs/agent-identity-governance/ADDENDUM-ID8-permission-manager-did.md`](../specs/agent-identity-governance/ADDENDUM-ID8-permission-manager-did.md), and [`specs/dependency-security-remediation/ADDENDUM-refresh-2026-07.md`](../specs/dependency-security-remediation/ADDENDUM-refresh-2026-07.md).
+
 ---
 
 ## 1. What prismal is and what it resembles
