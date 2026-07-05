@@ -663,6 +663,48 @@ class Settings(BaseSettings):
         description="Master gate for Guardrails Hub validators.",
     )
 
+    # ── Loop Hardening (Phase LH — SPEC-LH-CFG-001) ───────────────────
+    context_compaction_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for persisted-context compaction.",
+    )
+    context_compaction_strategy: str = Field(
+        default="truncate",
+        description="Compaction strategy: truncate (no LLM call) | summarize (opt-in).",
+    )
+    context_compaction_max_messages: int = Field(
+        default=60,
+        ge=0,
+        description="Raw message-count trigger threshold.",
+    )
+    context_compaction_token_threshold: int = Field(
+        default=0,
+        ge=0,
+        description="Cumulative-token trigger via Budget's CostMeter (0 = disabled).",
+    )
+    context_compaction_keep_recent: int = Field(
+        default=10,
+        ge=0,
+        description="Number of most-recent messages always kept verbatim.",
+    )
+    context_compaction_summarizer_model: str | None = Field(
+        default=None,
+        description="Model id for the summarize strategy; None uses the provider default.",
+    )
+    context_compaction_min_interval_messages: int = Field(
+        default=20,
+        ge=0,
+        description="Minimum new messages since the last compaction before compacting again.",
+    )
+    tool_gating_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for dynamic tool gating by task phase.",
+    )
+    tool_gating_phase_map_path: str = Field(
+        default="config/tool_gating_phases.yaml",
+        description="Phase -> capability-override table path.",
+    )
+
     # ── Sandbox multi-lenguaje ────────────────────────────────────────
     sandbox_path: str = Field(
         default="sandbox",
@@ -1960,6 +2002,22 @@ class Settings(BaseSettings):
             raise ValueError(
                 "PRISMAL_NEMO_CLASSIFIER_CATEGORIES must be non-empty when "
                 "PRISMAL_NEMO_CLASSIFIER_ENABLED=true."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_loop_hardening(self) -> "Settings":
+        """Validate the loop-hardening settings (SPEC-LH-CFG-001).
+
+        Numeric ranges are enforced by their Fields; here we reject an unknown
+        ``context_compaction_strategy`` so a typo fails fast at load time
+        rather than silently disabling a control.
+        """
+        valid_strategies = {"truncate", "summarize"}
+        if self.context_compaction_strategy not in valid_strategies:
+            raise ValueError(
+                f"PRISMAL_CONTEXT_COMPACTION_STRATEGY={self.context_compaction_strategy!r} "
+                f"is invalid; expected one of {sorted(valid_strategies)}."
             )
         return self
 

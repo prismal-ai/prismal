@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-07-04 |
 | **Phase** | LH |
@@ -20,7 +20,7 @@
 
 Loop Hardening is planned in three phases (LH1–LH3), each independently testable and gated behind its own flag (`context_compaction_enabled`, `tool_gating_enabled`, both default `False`) so `main` stays green and the 26 agents are unaffected until the wiring phase. Reuses existing primitives wherever possible: the `budget/resolve.py` / `security/hardening_run.py` per-run-registry pattern, `BudgetGuard`/`CostMeter` for optional metering, `CompositeToolProvider`'s existing fail-open shape, and `OTelManager` for counters. No new LangGraph capability beyond `RemoveMessage` (already available in the pinned `langgraph`/`langchain-core` versions).
 
-Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **All rows below are `TODO` — this is a proposal, nothing has been implemented yet.**
+Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **Implemented 2026-07-04 with TDD** — all 26 tasks `DONE`, full quality gate green (ruff/mypy --strict/bandit clean, 3756 unit tests passed / 9 skipped).
 
 ## 2. Prerequisites
 
@@ -35,13 +35,13 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **All rows below are `TOD
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| LH1-01 | `core/config.py`: `context_compaction_*` settings (SPEC-LH-CFG-001) + `_validate_loop_hardening` | 0.3 d | — | TODO |
-| LH1-02 | `core/exceptions.py`: `LoopHardeningError` hierarchy (`ContextCompactionError`, `ToolGatingConfigError`) (SPEC-LH-ERR-001) | 0.2 d | — | TODO |
-| LH1-03 | `agents/context_compaction.py`: `CompactionStrategy`, `CompactionResult`, `ContextCompactor.should_compact`/`compact`/`to_state_update` (SPEC-LH-CTX-001/002) | 1.0 d | LH1-01 | TODO |
-| LH1-04 | Per-run seeding trio: `maybe_seed_context_compaction_run`, `get_context_compactor`, `clear_context_compaction_run` + watermark bookkeeping (SPEC-LH-CTX-003) | 0.5 d | LH1-03 | TODO |
-| LH1-05 | Wire into `supervisor_node` next to `maybe_seed_budget_run`/`maybe_seed_hardening_run`; fold the compaction state update into the turn's return value | 0.5 d | LH1-04 | TODO |
-| LH1-06 | *(conditional on the open question)* Optional `react_loop(..., context_compactor=None)` local-loop hook | 0.6 d | LH1-03 | TODO |
-| LH1-07 | Optional `summarize` strategy: default `summarizer_fn` wiring `ProviderRegistry().get_llm()`, metered via `BudgetGuard.meter.record_response` when present | 0.5 d | LH1-03 | TODO |
+| LH1-01 | `core/config.py`: `context_compaction_*` settings (SPEC-LH-CFG-001) + `_validate_loop_hardening` | 0.3 d | — | DONE |
+| LH1-02 | `core/exceptions.py`: `LoopHardeningError` hierarchy (`ContextCompactionError`, `ToolGatingConfigError`) (SPEC-LH-ERR-001) | 0.2 d | — | DONE |
+| LH1-03 | `agents/context_compaction.py`: `CompactionStrategy`, `CompactionResult`, `ContextCompactor.should_compact`/`compact`/`to_state_update` (SPEC-LH-CTX-001/002) | 1.0 d | LH1-01 | DONE |
+| LH1-04 | Per-run seeding trio: `maybe_seed_context_compaction_run`, `get_context_compactor`, `clear_context_compaction_run` + watermark bookkeeping (SPEC-LH-CTX-003) | 0.5 d | LH1-03 | DONE |
+| LH1-05 | Wire into `supervisor_node` next to `maybe_seed_budget_run`/`maybe_seed_hardening_run`; fold the compaction state update into the turn's return value | 0.5 d | LH1-04 | DONE |
+| LH1-06 | *(conditional on the open question)* Optional `react_loop(..., context_compactor=None)` local-loop hook | 0.6 d | LH1-03 | DONE |
+| LH1-07 | Optional `summarize` strategy: default `summarizer_fn` wiring `ProviderRegistry().get_llm()`, metered via `BudgetGuard.meter.record_response` when present | 0.5 d | LH1-03 | DONE |
 
 **Done when:** settings parse from `PRISMAL_*`; a synthetic 200-message history compacts to the expected shape under `truncate`; `add_messages` reducer round-trips a `RemoveMessage`-based state update without error; re-running the same turn does not re-compact the same segment (watermark honoured); `summarize` records exactly one metered call when a guard is present.
 
@@ -49,12 +49,12 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **All rows below are `TOD
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| LH2-01 | `agents/loop_phase.py`: `resolve_phase()` (SPEC-LH-PHS-001) | 0.4 d | — | TODO |
-| LH2-02 | `agents/extension/ports.py`: add optional `phase` keyword to `ToolProviderPort.get_tools()` (SPEC-LH-GAT-001); update the Protocol docstring | 0.2 d | — | TODO |
-| LH2-03 | `agents/extension/providers.py`: `CompositeToolProvider(..., phase_capability_map=...)` narrowing + fail-open `TypeError` shim per sub-provider (SPEC-LH-GAT-002) | 0.7 d | LH2-02 | TODO |
-| LH2-04 | `load_phase_capability_map()` + `config/tool_gating_phases.yaml` default (ship example from this spec dir) | 0.3 d | LH2-03 | TODO |
-| LH2-05 | `agents/tool_registry.py`: thread optional `phase` through `get_tools_for_agent()`, `get_tools_for_agent_ctx()`, `_observed_get_tools()`, with the DD-LH-006 fail-open shim centralized at this choke point (SPEC-LH-GAT-003) | 0.6 d | LH2-02 | TODO |
-| LH2-06 | `core/config.py`: `tool_gating_*` settings (part of SPEC-LH-CFG-001) | 0.2 d | — | TODO |
+| LH2-01 | `agents/loop_phase.py`: `resolve_phase()` (SPEC-LH-PHS-001) | 0.4 d | — | DONE |
+| LH2-02 | `agents/extension/ports.py`: add optional `phase` keyword to `ToolProviderPort.get_tools()` (SPEC-LH-GAT-001); update the Protocol docstring | 0.2 d | — | DONE |
+| LH2-03 | `agents/extension/providers.py`: `CompositeToolProvider(..., phase_capability_map=...)` narrowing + fail-open `TypeError` shim per sub-provider (SPEC-LH-GAT-002) | 0.7 d | LH2-02 | DONE |
+| LH2-04 | `load_phase_capability_map()` + `config/tool_gating_phases.yaml` default (ship example from this spec dir) | 0.3 d | LH2-03 | DONE |
+| LH2-05 | `agents/tool_registry.py`: thread optional `phase` through `get_tools_for_agent()`, `get_tools_for_agent_ctx()`, `_observed_get_tools()`, with the DD-LH-006 fail-open shim centralized at this choke point (SPEC-LH-GAT-003) | 0.6 d | LH2-02 | DONE |
+| LH2-06 | `core/config.py`: `tool_gating_*` settings (part of SPEC-LH-CFG-001) | 0.2 d | — | DONE |
 
 **Done when:** `isinstance(FakeToolProvider(), ToolProviderPort)` still holds; `get_tools_for_agent("coder")` (no `phase`) is byte-for-byte unchanged; a phase-mapped agent's resolved tool list visibly narrows for a configured `(agent, phase)` pair; a fake two-keyword sub-provider does not raise when called with `phase` set.
 
@@ -62,19 +62,19 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **All rows below are `TOD
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| LH3-01 | `monitoring/otel.py`: register the 5 loop-hardening counters (SPEC-LH-OTEL-001) | 0.3 d | LH1,LH2 | TODO |
-| LH3-02 | Unit: `ContextCompactor` threshold logic (message-count + token-count triggers), `to_state_update()` shape, watermark idempotency | 0.6 d | LH1 | TODO |
-| LH3-03 | Unit: `RemoveMessage` state update round-trips through `add_messages` without breaking reducer semantics | 0.4 d | LH1 | TODO |
-| LH3-04 | Unit: `resolve_phase()` — all derivation branches + explicit-hint precedence | 0.4 d | LH2 | TODO |
-| LH3-05 | Unit: `CompositeToolProvider` phase-narrowing intersection + `TypeError` fail-open shim against a deliberately non-conforming fake provider | 0.5 d | LH2 | TODO |
-| LH3-06 | Integration: `context_compaction_enabled=False` **and** `tool_gating_enabled=False` ⇒ compiled supervisor graph snapshot unchanged | 0.4 d | LH1,LH2 | TODO |
-| LH3-07 | Integration: `get_tools_for_agent()` output unchanged (contract test) when `tool_gating_enabled=False` or `phase` omitted | 0.3 d | LH2 | TODO |
-| LH3-08 | Integration: simulated long Skynet/Debate run stays under a configured message ceiling with compaction on (fakes only, no live LLM) | 0.6 d | LH1 | TODO |
-| LH3-09 | Integration: an agent's resolved tool list narrows between a `"planning"`-phase call and an `"executing"`-phase call with a phase map configured (fakes only) | 0.4 d | LH2 | TODO |
-| LH3-10 | AST guards: confirm `test_no_mcp_skills_imports.py` and the provider-import guard still pass unmodified after LH2's edits to `tool_registry.py`/`extension/providers.py` | 0.2 d | LH2 | TODO |
-| LH3-11 | `docs/loop-hardening.md` user guide | 0.4 d | LH1,LH2 | TODO |
-| LH3-12 | `examples/loop_hardening.py` runnable example | 0.3 d | LH1,LH2 | TODO |
-| LH3-13 | `README.md` + `CHANGELOG.md` entries (as **planned**, not shipped — do not mark `IMPLEMENTED`) | 0.2 d | LH3-11 | TODO |
+| LH3-01 | `monitoring/otel.py`: register the 5 loop-hardening counters (SPEC-LH-OTEL-001) | 0.3 d | LH1,LH2 | DONE |
+| LH3-02 | Unit: `ContextCompactor` threshold logic (message-count + token-count triggers), `to_state_update()` shape, watermark idempotency | 0.6 d | LH1 | DONE |
+| LH3-03 | Unit: `RemoveMessage` state update round-trips through `add_messages` without breaking reducer semantics | 0.4 d | LH1 | DONE |
+| LH3-04 | Unit: `resolve_phase()` — all derivation branches + explicit-hint precedence | 0.4 d | LH2 | DONE |
+| LH3-05 | Unit: `CompositeToolProvider` phase-narrowing intersection + `TypeError` fail-open shim against a deliberately non-conforming fake provider | 0.5 d | LH2 | DONE |
+| LH3-06 | Integration: `context_compaction_enabled=False` **and** `tool_gating_enabled=False` ⇒ compiled supervisor graph snapshot unchanged | 0.4 d | LH1,LH2 | DONE |
+| LH3-07 | Integration: `get_tools_for_agent()` output unchanged (contract test) when `tool_gating_enabled=False` or `phase` omitted | 0.3 d | LH2 | DONE |
+| LH3-08 | Integration: simulated long Skynet/Debate run stays under a configured message ceiling with compaction on (fakes only, no live LLM) | 0.6 d | LH1 | DONE |
+| LH3-09 | Integration: an agent's resolved tool list narrows between a `"planning"`-phase call and an `"executing"`-phase call with a phase map configured (fakes only) | 0.4 d | LH2 | DONE |
+| LH3-10 | AST guards: confirm `test_no_mcp_skills_imports.py` and the provider-import guard still pass unmodified after LH2's edits to `tool_registry.py`/`extension/providers.py` | 0.2 d | LH2 | DONE |
+| LH3-11 | `docs/loop-hardening.md` user guide | 0.4 d | LH1,LH2 | DONE |
+| LH3-12 | `examples/loop_hardening.py` runnable example | 0.3 d | LH1,LH2 | DONE |
+| LH3-13 | `README.md` + `CHANGELOG.md` entries (as **planned**, not shipped — do not mark `IMPLEMENTED`) | 0.2 d | LH3-11 | DONE |
 
 **Done when:** `uv run pytest -m unit` green for all new modules; `ruff`, `mypy --strict`, `bandit` clean; coverage ≥ project target (80%) on new modules; both snapshot/contract tests (LH3-06/07) pass with both flags off.
 
@@ -108,13 +108,13 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **All rows below are `TOD
 
 ## 6. Definition of Done (feature)
 
-- [ ] All MUST requirements (RF-LH-001…009, 011) implemented and tested; RF-LH-010 (SHOULD) implemented.
-- [ ] `state["messages"]` compaction is proven reducer-safe (`RemoveMessage`-only deletions) by a dedicated test.
-- [ ] Tool-gating narrowing is proven both to narrow when configured and to no-op when a provider doesn't support `phase`.
-- [ ] With `context_compaction_enabled=False` and `tool_gating_enabled=False`, zero behavior change (snapshot + contract tests proven).
-- [ ] No provider SDK / `prismal.mcp` / `prismal.skills` import in the wrong layer (existing AST guards still pass).
-- [ ] `ruff` + `mypy --strict` + `bandit` clean; unit suite green.
-- [ ] `docs/loop-hardening.md` cross-references the gap-analysis motivation and the `runtime-hardening`/`cost-budget-governance` precedents this phase imitates.
+- [x] All MUST requirements (RF-LH-001…009, 011) implemented and tested; RF-LH-010 (SHOULD) implemented.
+- [x] `state["messages"]` compaction is proven reducer-safe (`RemoveMessage`-only deletions) by a dedicated test.
+- [x] Tool-gating narrowing is proven both to narrow when configured and to no-op when a provider doesn't support `phase`.
+- [x] With `context_compaction_enabled=False` and `tool_gating_enabled=False`, zero behavior change (snapshot + contract tests proven).
+- [x] No provider SDK / `prismal.mcp` / `prismal.skills` import in the wrong layer (existing AST guards still pass).
+- [x] `ruff` + `mypy --strict` + `bandit` clean; unit suite green.
+- [x] `docs/loop-hardening.md` cross-references the gap-analysis motivation and the `runtime-hardening`/`cost-budget-governance` precedents this phase imitates.
 
 ## 7. Effort Summary
 

@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from langchain_core.runnables import RunnableConfig
     from langchain_core.tools import BaseTool
 
+    from prismal.agents.context_compaction import ContextCompactor
     from prismal.agents.extension.ports import ToolProviderPort
     from prismal.agents.extension.providers import StubToolProvider
     from prismal.budget.guard import BudgetGuard
@@ -308,12 +309,15 @@ def _observed_get_tools(
     capabilities: list[str] | None,
     *,
     fallback: bool = False,
+    phase: str | None = None,
 ) -> list[BaseTool]:
     """Resolve tools through *provider* inside the ``prismal.tools.resolve`` span.
 
     Emits the Fase Y counters: ``tool_provider_resolved{provider}``,
     ``tools_injected{agent}`` and — when *fallback* is set —
-    ``tool_provider_fallback``.
+    ``tool_provider_fallback``. ``phase`` (Phase LH) is passed through a
+    fail-open shim (DD-LH-006): a provider whose ``get_tools`` doesn't accept
+    the keyword is called again without it.
     """
     from prismal.monitoring.otel import OTelManager
 
@@ -323,7 +327,18 @@ def _observed_get_tools(
         "prismal.tools.resolve",
         attributes={"prismal.agent": agent_name},
     ) as span:
-        tools = provider.get_tools(agent_name=agent_name, capabilities=capabilities)
+        if phase is None:
+            tools = provider.get_tools(agent_name=agent_name, capabilities=capabilities)
+        else:
+            try:
+                tools = provider.get_tools(
+                    agent_name=agent_name, capabilities=capabilities, phase=phase
+                )
+            except TypeError:
+                tools = provider.get_tools(agent_name=agent_name, capabilities=capabilities)
+            otel.increment_counter(
+                "tool_gate_phase_resolved", attributes={"agent": agent_name, "phase": phase}
+            )
         span.set_attribute("prismal.tool_provider", label)
         span.set_attribute("prismal.n_tools", len(tools))
         span.set_attribute("prismal.fallback", fallback)
@@ -488,6 +503,8 @@ def get_recommended_capabilities(node_name: str) -> list[str] | None:
 def get_tools_for_agent(
     agent_name: str,
     required_capabilities: list[str] | None = None,
+    *,
+    phase: str | None = None,
 ) -> list[BaseTool]:
     """Return the tool list for a named agent (stable facade — SPEC-TPI-008).
 
@@ -521,7 +538,7 @@ def get_tools_for_agent(
             raise ToolProviderNotConfigured(agent_name)
         logger.warning("tool_registry.no_provider", agent=agent_name)
         return _observed_get_tools(_get_default_stub_provider(), agent_name, None, fallback=True)
-    return _observed_get_tools(provider, agent_name, required_capabilities)
+    return _observed_get_tools(provider, agent_name, required_capabilities, phase=phase)
 
 
 # ---------------------------------------------------------------------------
@@ -555,6 +572,8 @@ def get_tools_for_agent_ctx(
     agent_name: str,
     config: RunnableConfig | None = None,
     required_capabilities: list[str] | None = None,
+    *,
+    phase: str | None = None,
 ) -> list[BaseTool]:
     """Context-aware variant of :func:`get_tools_for_agent` (variante B).
 
@@ -575,8 +594,8 @@ def get_tools_for_agent_ctx(
     if config is not None:
         provider = config.get("configurable", {}).get("tool_provider")
     if provider is None:
-        return get_tools_for_agent(agent_name, required_capabilities)
-    return _observed_get_tools(provider, agent_name, required_capabilities)
+        return get_tools_for_agent(agent_name, required_capabilities, phase=phase)
+    return _observed_get_tools(provider, agent_name, required_capabilities, phase=phase)
 
 
 # ---------------------------------------------------------------------------
@@ -919,6 +938,7 @@ async def react_loop(
     injection_detector: IndirectInjectionDetector | None = None,
     tool_policy: RunToolPolicy | None = None,
     runaway_guard: RunawayGuard | None = None,
+    context_compactor: ContextCompactor | None = None,
 ) -> object:
     """Execute a ReAct (Reason + Act) tool loop until the LLM returns a final answer.
 
@@ -976,6 +996,8 @@ async def react_loop(
         )
         if partial is not None:
             return partial
+        if context_compactor is not None:
+            loop_messages = list(await context_compactor.compact_list(loop_messages))  # type: ignore[arg-type]
         try:
             response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
                 llm,
@@ -1154,6 +1176,8 @@ async def react_loop(
                     )
                 )
             )
+            if context_compactor is not None:
+                loop_messages = list(await context_compactor.compact_list(loop_messages))  # type: ignore[arg-type]
             try:
                 response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
                     llm,
@@ -1195,6 +1219,8 @@ async def react_loop(
                 )
             )
         )
+        if context_compactor is not None:
+            loop_messages = list(await context_compactor.compact_list(loop_messages))  # type: ignore[arg-type]
         try:
             response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
                 llm,
@@ -1216,6 +1242,15 @@ async def react_loop(
     return _sanitise_final_response(response)
 
 
+def load_phase_capability_map(path: str | None = None) -> dict[str, dict[str, list[str]]]:
+    """Re-export of :func:`prismal.agents.extension.providers.load_phase_capability_map`."""
+    from prismal.agents.extension.providers import (
+        load_phase_capability_map as _load_phase_capability_map,
+    )
+
+    return _load_phase_capability_map(path)
+
+
 __all__ = [
     "DEFAULT_CAPABILITY_MAP",
     "get_mcp_tools",
@@ -1225,6 +1260,7 @@ __all__ = [
     "get_tools_for_agent",
     "get_tools_for_agent_ctx",
     "init_mcp",
+    "load_phase_capability_map",
     "react_loop",
     "resolve_provider",
     "set_tool_provider",

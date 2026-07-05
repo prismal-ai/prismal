@@ -120,6 +120,12 @@ class ToolProviderPort(Protocol):
     whatever it can (an empty list at minimum). ``agent_name`` lets a provider
     select tools per agent (providers that don't need it ignore it);
     ``capabilities`` is the Fase E filter — ``None`` means no filter.
+    ``phase`` is the Fase LH dynamic tool-gating hint (SPEC-LH-GAT-001) — ``None``
+    (default) means no phase-based narrowing, reproducing pre-LH behavior
+    exactly. Conforming implementations that do not support phase-based
+    narrowing MAY ignore the argument; core call sites never assume a provider
+    honours it and fail open when a provider's ``get_tools`` does not accept
+    the keyword at all (DD-LH-006).
 
     Returned tools are ``langchain_core.tools.BaseTool`` instances (the
     concrete type that conforms to :class:`ToolPort`).
@@ -130,6 +136,7 @@ class ToolProviderPort(Protocol):
         *,
         agent_name: str,
         capabilities: list[str] | None = None,
+        phase: str | None = None,
     ) -> list[BaseTool]:
         pass
 

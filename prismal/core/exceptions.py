@@ -910,6 +910,21 @@ class StructuredOutputReaskExhausted(StructuredOutputGuardError):  # noqa: N818 
     """
 
 
+# ── Loop Hardening (Phase LH) ───────────────────────────────────────────────
+
+
+class LoopHardeningError(PrismalError):
+    """Base for errors raised by the loop-hardening layer (Phase LH)."""
+
+
+class ContextCompactionError(LoopHardeningError):
+    """Internal use / tests — ``ContextCompactor.compact()`` itself never raises this outward."""
+
+
+class ToolGatingConfigError(LoopHardeningError):
+    """Raised for a bad ``tool_gating_phases.yaml`` — at load time, not per-request."""
+
+
 __all__ = [
     "A2AAgentUnavailable",
     "A2AError",
@@ -921,6 +936,7 @@ __all__ = [
     "CodeReviewError",
     "CompilerError",
     "ConstitutionalError",
+    "ContextCompactionError",
     "CredentialResolutionError",
     "CronJobExistsError",
     "CronJobNotFoundError",
@@ -949,6 +965,7 @@ __all__ = [
     "KokoroError",
     "LATSError",
     "LangChainAdapterError",
+    "LoopHardeningError",
     "MCPConnectionError",
     "MCPError",
     "MCPToolError",
@@ -999,6 +1016,7 @@ __all__ = [
     "SwarmWorkerError",
     "TTSError",
     "ToTError",
+    "ToolGatingConfigError",
     "ToolProviderNotConfigured",
     "VectorStoreBackendUnavailable",
     "VectorStoreError",

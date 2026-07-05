@@ -78,8 +78,14 @@ class TestSetGetProvider:
 
 class TestDelegation:
     def test_signature_unchanged(self) -> None:
+        """agent_name/required_capabilities keep their original positions.
+
+        ``phase`` (Phase LH, SPEC-LH-GAT-003) is an additive keyword-only
+        parameter appended after them — existing positional/keyword callers
+        are unaffected.
+        """
         params = list(inspect.signature(tool_registry.get_tools_for_agent).parameters)
-        assert params == ["agent_name", "required_capabilities"]
+        assert params == ["agent_name", "required_capabilities", "phase"]
 
     def test_delegates_agent_name_and_capabilities(self) -> None:
         provider = _RecordingProvider()

@@ -350,6 +350,27 @@ class OTelManager:
             "prismal.structured_output_hub_validator_blocks_total",
             description="Guardrails Hub validator findings (by validator)",
         )
+        # Loop Hardening (Phase LH — SPEC-LH-OTEL-001)
+        self._counters["context_compactions"] = self._meter.create_counter(
+            "prismal.context_compactions_total",
+            description="Context compactions performed (by strategy: truncate|summarize)",
+        )
+        self._counters["context_compaction_messages_dropped"] = self._meter.create_counter(
+            "prismal.context_compaction_messages_dropped_total",
+            description="Messages dropped by context compaction",
+        )
+        self._counters["context_compaction_summarize_errors"] = self._meter.create_counter(
+            "prismal.context_compaction_summarize_errors_total",
+            description="Summarizer LLM failures (fails open to truncate)",
+        )
+        self._counters["tool_gate_narrowed"] = self._meter.create_counter(
+            "prismal.tool_gate_narrowed_total",
+            description="Tool resolutions narrowed by phase-based gating (by agent)",
+        )
+        self._counters["tool_gate_phase_resolved"] = self._meter.create_counter(
+            "prismal.tool_gate_phase_resolved_total",
+            description="Tool resolutions carrying a resolved phase hint (by agent, phase)",
+        )
 
     @contextmanager
     def start_span(

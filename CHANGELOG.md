@@ -13,6 +13,63 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 All spec-complete phases under `specs/` are now implemented. New work starts
 here.
 
+## [3.7.0] — 2026-07-04
+
+> Spec: [`specs/loop-hardening/`](./specs/loop-hardening/). Closes two gaps
+> in the agentic-loop mechanics: no context/message-window compaction, and
+> no dynamic tool provisioning by task phase. Additive and **opt-in**:
+> `context_compaction_enabled` and `tool_gating_enabled` (both default
+> `False`) ⇒ compiled graph and `get_tools_for_agent()` output byte-for-byte
+> unchanged (snapshot + contract tested). Implemented test-first (TDD).
+
+### Added — Loop Hardening (Phase LH)
+
+- **`agents/context_compaction.py`** — `ContextCompactor`: trims/summarizes
+  `state["messages"]` via `RemoveMessage` (never in-place mutation) once a
+  message-count (or Budget-token) threshold is exceeded, keeping the most
+  recent `context_compaction_keep_recent` messages verbatim. `truncate`
+  (default, no LLM call) or `summarize` (opt-in, Budget-metered, falls open
+  to truncate on summarizer failure). Per-run seeding trio
+  (`maybe_seed_context_compaction_run`/`get_context_compactor`/
+  `clear_context_compaction_run`) mirrors `budget/resolve.py`; wired into
+  `supervisor_node` next to `maybe_seed_budget_run`/`maybe_seed_hardening_run`.
+  A second, optional `react_loop(..., context_compactor=...)` hook compacts a
+  single node's local tool-loop accumulator (position-based, via the new
+  `compact_list()`) — `context_compaction_react_kwargs()` mirrors
+  `hardening_react_kwargs` for opting individual nodes in.
+- **`agents/loop_phase.py::resolve_phase`** — deterministic, LLM-free task
+  phase (`planning`/`executing`/`finishing`/`None`) from an explicit
+  `state["metadata"]["loop"]["phase"]` hint or `task_plan`/`pending_tasks`/
+  `completed_tasks`.
+- **`agents/extension/ports.py`** *(extended)* — `ToolProviderPort.get_tools()`
+  gains an optional `phase` keyword (non-breaking Protocol widening).
+- **`agents/extension/providers.py`** *(extended)* —
+  `CompositeToolProvider(phase_capability_map=...)` intersects a phase's
+  capability override with the caller's capabilities before delegating to
+  live sub-providers (never a superset); falls open to a phase-less call on
+  `TypeError` from a non-conforming sub-provider. New
+  `load_phase_capability_map()` + `config/tool_gating_phases.yaml`.
+- **`agents/tool_registry.py`** *(extended)* — `get_tools_for_agent()` /
+  `get_tools_for_agent_ctx()` / `_observed_get_tools()` thread an optional
+  `phase`, with the fail-open shim centralized at the single
+  `_observed_get_tools` choke point.
+- **Settings** (`core/config.py`) — `context_compaction_enabled`,
+  `context_compaction_strategy`, `context_compaction_max_messages`,
+  `context_compaction_token_threshold`, `context_compaction_keep_recent`,
+  `context_compaction_summarizer_model`,
+  `context_compaction_min_interval_messages`, `tool_gating_enabled`,
+  `tool_gating_phase_map_path`.
+- **Exceptions** — `LoopHardeningError`, `ContextCompactionError`,
+  `ToolGatingConfigError`.
+- **Observability** — `prismal.context_compactions_total{strategy}`,
+  `prismal.context_compaction_messages_dropped_total`,
+  `prismal.context_compaction_summarize_errors_total`,
+  `prismal.tool_gate_narrowed_total{agent}`,
+  `prismal.tool_gate_phase_resolved_total{agent,phase}`.
+- **Artifacts** — `docs/loop-hardening.md`; `examples/loop_hardening.py`.
+
+---
+
 ## [3.6.0] — 2026-07-04
 
 > Spec: [`specs/guardrails-modernization/`](./specs/guardrails-modernization/).

@@ -77,8 +77,10 @@ class A2AToolProvider:
         *,
         agent_name: str,
         capabilities: list[str] | None = None,
+        phase: str | None = None,
     ) -> list[BaseTool]:
         """Return remote skills as tools, filtered by *capabilities* (never raises)."""
+        del phase
         del agent_name  # A2A tools are offered to any requesting agent
         try:
             tools: list[BaseTool] = []
