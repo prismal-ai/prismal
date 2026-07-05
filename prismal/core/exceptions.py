@@ -26,6 +26,8 @@ Hierarchy::
 
 from __future__ import annotations
 
+from typing import Literal
+
 # ── Base ─────────────────────────────────────────────────────────────────────
 
 
@@ -632,7 +634,36 @@ class NodeTimeoutError(NodeExecutionError):
 
 
 class NodeValidationError(NodeExecutionError):
-    """Raised when the ``state_update`` returned by a node is not valid."""
+    """Raised when a node's declared ``input_model``/``output_model`` rejects the
+    state (Phase NTS — SPEC-NTS-ERR-001).
+
+    Extends :class:`NodeExecutionError` (so ``error_mapping_middleware`` catches
+    it for free) with the side of the contract that failed and field-level
+    messages. Consistent with the ``state_keys``-not-values convention,
+    ``schema_errors`` carries field names and pydantic's own type/constraint
+    description only — never field values.
+
+    Args:
+        node_name: Name of the node whose contract failed.
+        state_keys: Keys present in the state/state_update at failure time.
+        cause: The underlying pydantic ``ValidationError``, or ``None``.
+        direction: ``"input"`` or ``"output"`` — which side of the contract failed.
+        schema_errors: Field-level messages (never field values).
+    """
+
+    def __init__(
+        self,
+        node_name: str,
+        state_keys: list[str],
+        cause: BaseException | None,
+        *,
+        direction: Literal["input", "output"],
+        schema_errors: list[str],
+    ) -> None:
+        """Initialize NodeValidationError."""
+        self.direction = direction
+        self.schema_errors = schema_errors
+        super().__init__(node_name, state_keys, cause)  # type: ignore[arg-type]
 
 
 class PluginLoadError(ExtensionError):

@@ -19,12 +19,14 @@ import functools
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from prismal.agents.extension import _registry
 from prismal.agents.extension._middleware import build_pipeline
 
 if TYPE_CHECKING:
+    from pydantic import BaseModel
+
     from prismal.agents.state import AgentState
 
 SecurityLevel = Literal["off", "standard", "strict"]
@@ -37,6 +39,11 @@ SecurityLevel = Literal["off", "standard", "strict"]
 
 NodeFn = Callable[["AgentState"], Awaitable[dict[str, Any]]]
 """Signature of a node: ``async (state) -> state_update``."""
+
+_NodeFnT = TypeVar("_NodeFnT", bound=NodeFn)
+"""Type-preserving var so a decorated node keeps its concrete callable type
+(lets a ``@prismal_node``-wrapped node be added to a raw ``StateGraph`` exactly
+like the undecorated function)."""
 
 
 @dataclass(frozen=True)
@@ -63,6 +70,11 @@ class NodeMetadata:
     source_module: str
     extra: dict[str, Any] = field(default_factory=dict)
 
+    # [Phase NTS — SPEC-NTS-TYP-002] Optional per-node I/O contracts. Both
+    # default to None, so every pre-existing construction site is unaffected.
+    input_model: type[BaseModel] | None = None
+    output_model: type[BaseModel] | None = None
+
 
 def prismal_node(
     *,
@@ -73,7 +85,9 @@ def prismal_node(
     retry: RetryPolicy | None = None,
     timeout_s: float | None = None,
     raise_on_error: bool = False,
-) -> Callable[[NodeFn], NodeFn]:
+    input_model: type[BaseModel] | None = None,
+    output_model: type[BaseModel] | None = None,
+) -> Callable[[_NodeFnT], _NodeFnT]:
     """Wrap a LangGraph node with prismal cross-cutting middleware.
 
     The middleware chain, from outermost to innermost, is:
@@ -97,6 +111,13 @@ def prismal_node(
         timeout_s: Per-invocation timeout in seconds. ``None`` disables it.
         raise_on_error: If True, propagate a ``NodeExecutionError`` on failure.
             If False (default), return ``{"metadata": {"error": {...}}}``.
+        input_model: Optional Pydantic model describing the subset of
+            ``AgentState`` this node reads (Phase NTS). ``None`` (default)
+            disables input validation for this node. Only consulted when
+            ``settings.node_typesafety_enabled`` is True.
+        output_model: Optional Pydantic model describing the subset of the
+            returned ``state_update`` this node produces. ``None`` (default)
+            disables output validation.
 
     Returns:
         A decorator that returns the wrapped ``NodeFn`` with two attributes:
@@ -104,7 +125,7 @@ def prismal_node(
         (the original function).
     """
 
-    def decorator(fn: NodeFn) -> NodeFn:
+    def decorator(fn: _NodeFnT) -> _NodeFnT:
         # Idempotent: decorating an already-decorated node returns it unchanged.
         if getattr(fn, "__prismal_node__", None) is not None:
             return fn
@@ -122,6 +143,8 @@ def prismal_node(
             raise_on_error=raise_on_error,
             registered_at=datetime.now(UTC).isoformat(),
             source_module=fn.__module__,
+            input_model=input_model,
+            output_model=output_model,
         )
         pipeline = build_pipeline(fn, metadata)
 
@@ -138,7 +161,9 @@ def prismal_node(
 
             DEFAULT_CAPABILITY_MAP[node_name] = list(metadata.capabilities)
 
-        return wrapper
+        # ``wrapper`` has the ``NodeFn`` shape; cast back to the caller's concrete
+        # type so the decorated node keeps the original's static signature.
+        return cast("_NodeFnT", wrapper)
 
     return decorator
 

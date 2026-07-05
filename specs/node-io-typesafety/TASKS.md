@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-07-04 |
 | **Phase** | NTS |
@@ -20,7 +20,12 @@
 
 Node I/O Type-Safety lands in four phases (NTS1–NTS4), each independently testable and gated behind `settings.node_typesafety_enabled` (default `False`) so `main` stays green and none of the 26+ existing agents are affected until an operator opts a specific node in. Every control honours `mode ∈ {off, warn, enforce}` and reuses existing primitives (`@prismal_node`'s `DEFAULT_MIDDLEWARE_STACK`, `PrismalStateGraphBuilder`, the existing `NodeValidationError` stub, `OTelManager`). No new LangGraph capability and no change to `AgentState` itself.
 
-Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **No work has started — every row below is `TODO`.**
+Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **IMPLEMENTED 2026-07-05 (v3.8.0) — all NTS1–NTS4 rows are `DONE`.** Resolved open questions: `NodeIOValidatorPort` **deferred** (DD-NTS-004), **global-only** mode (no per-node override) for v1, and the **3** mandatory pilots only (`file_manager`, `cron_manager`, `skill_manager`).
+
+**Implementation deviations from the SPEC text (keep in mind when editing):**
+- The pilot nodes were **bare** (added to a raw `StateGraph`, not `@prismal_node`-wrapped). Decorating them uses `security="off", audit=False` and no `capabilities` to keep behaviour as close to the undecorated version as possible (only the opt-in, default-off validation layer is genuinely new). Their real return dicts are `{current_agent, messages}`, so `FileManagerOutput` etc. declare exactly those two keys (the SPEC's illustrative example added a `metadata` key the real nodes never return).
+- `enforce`-mode raises `NodeValidationError` with a **non-`None` cause** (`ValueError` of the joined schema errors), not `cause=None` as the SPEC pseudocode showed: `error_mapping_middleware` maps `type(cause).__name__`/`str(cause)`, so a `None` cause would produce a useless `"NoneType"`/`"None"` payload. The class still *accepts* `None` (SPEC-NTS-ERR-001); the middleware just supplies a useful one. Reconciles the SPEC's internally-inconsistent Flow NTS-B.
+- The graph-snapshot test lives in **`tests/unit/agents/test_graph_snapshot_node_typesafety.py`** (not `tests/integration/`): `tests/integration/conftest.py` stubs `prismal.agents.graph`, so a real-graph snapshot cannot run there — every sibling snapshot test is a unit test. The end-to-end warn/enforce test is `tests/unit/agents/extension/test_node_io_validation_e2e.py` for the same reason (the integration conftest stubs the agents layer).
 
 ## 2. Prerequisites
 

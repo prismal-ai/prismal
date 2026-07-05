@@ -13,6 +13,39 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 All spec-complete phases under `specs/` are now implemented. New work starts
 here.
 
+## [3.8.0] — 2026-07-05
+
+> Spec: [`specs/node-io-typesafety/`](./specs/node-io-typesafety/). Adds an
+> **opt-in, per-node** Pydantic I/O contract layer at the `@prismal_node`
+> boundary. `AgentState` stays a bare `TypedDict`; declared `input_model`/
+> `output_model` are narrow boundary projections validated at node entry/exit.
+> Additive and **opt-in**: with `node_typesafety_enabled=False` (default) the
+> compiled supervisor graph is byte-for-byte unchanged (snapshot-tested).
+
+### Added
+
+- `agents/extension/node_schema.py` — `NodeIOMode`, `NodeIODirection`,
+  `NodeIOValidationResult` (frozen), and pure, never-raising
+  `validate_node_input()` / `validate_node_output()` helpers (narrow-projection
+  semantics; extra keys ignored; field-name-only error messages, never values).
+- `@prismal_node(input_model=, output_model=)` and matching `NodeMetadata`
+  fields (both default `None`, so every existing call site is unaffected);
+  `PrismalStateGraphBuilder.add_node(input_model=, output_model=)` forwarded on
+  auto-wrap only.
+- `node_io_validation_middleware` — new **innermost** entry of
+  `DEFAULT_MIDDLEWARE_STACK` (one layer inside `hardening_middleware`); a pure
+  passthrough when disabled. Modes `off | warn | enforce`: `warn` logs + counts
+  and passes through; `enforce` raises `NodeValidationError`, mapped by the
+  existing `error_mapping_middleware` with zero changes to it.
+- Settings `node_typesafety_enabled` (default `False`) + `node_typesafety_mode`
+  (default `warn`) with a `_validate_node_typesafety` validator rejecting an
+  unknown mode; the `NodeValidationError` stub gains `direction`/`schema_errors`.
+- OTel counters `prismal.node_io_validated_total` and
+  `prismal.node_io_validation_failures_total` (labelled by `node`, `direction`).
+- Pilot annotations on `file_manager`, `cron_manager`, `skill_manager` with an
+  `AgentState`-field-name drift guard; `docs/node-typesafety.md`;
+  `examples/node_typesafety.py`.
+
 ## [3.7.0] — 2026-07-04
 
 > Spec: [`specs/loop-hardening/`](./specs/loop-hardening/). Closes two gaps

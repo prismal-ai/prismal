@@ -530,6 +530,18 @@ class Settings(BaseSettings):
         description="Redact PII from agent outputs.",
     )
 
+    # ── Node I/O Type-Safety (Phase NTS — SPEC-NTS-CFG-001) ────────────
+    node_typesafety_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for per-node I/O schema validation (Phase NTS). "
+        "When False, node_io_validation_middleware is a pure passthrough and the "
+        "compiled supervisor graph is byte-for-byte unchanged.",
+    )
+    node_typesafety_mode: str = Field(
+        default="warn",
+        description="Global default control mode: off | warn | enforce.",
+    )
+
     # ── Agent identity & access governance (Phase IDN — SPEC-IDN-CFG-001) ──
     identity_enabled: bool = Field(
         default=False,
@@ -1987,6 +1999,21 @@ class Settings(BaseSettings):
                 f"PRISMAL_HARDENING_TOOL_POLICY_DEFAULT="
                 f"{self.hardening_tool_policy_default!r} is invalid; "
                 f"expected one of {sorted(valid_defaults)}."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_node_typesafety(self) -> "Settings":
+        """Reject an unknown ``node_typesafety_mode`` at load time (SPEC-NTS-CFG-001).
+
+        Mirrors ``_validate_hardening`` so a typo fails fast at load time rather
+        than silently disabling the control.
+        """
+        valid_modes = {"off", "warn", "enforce"}
+        if self.node_typesafety_mode not in valid_modes:
+            raise ValueError(
+                f"PRISMAL_NODE_TYPESAFETY_MODE={self.node_typesafety_mode!r} is "
+                f"invalid; expected one of {sorted(valid_modes)}."
             )
         return self
 

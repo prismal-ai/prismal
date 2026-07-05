@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from langgraph.graph.state import CompiledStateGraph
+    from pydantic import BaseModel
 
     from prismal.core.config import Settings
 
@@ -91,8 +92,16 @@ class PrismalStateGraphBuilder:
         audit: bool | None = None,
         timeout_s: float | None = None,
         retry: RetryPolicy | None = None,
+        input_model: type[BaseModel] | None = None,
+        output_model: type[BaseModel] | None = None,
     ) -> PrismalStateGraphBuilder:
         """Add a node, auto-wrapping with ``@prismal_node`` when needed.
+
+        ``input_model``/``output_model`` (Phase NTS) follow the same
+        "forwarded only if ``fn`` is not already ``@prismal_node``-decorated"
+        rule as every other kwarg: if ``fn`` already carries
+        ``__prismal_node__``, all kwargs here — including these two — are
+        ignored.
 
         Raises:
             ValueError: If ``name`` is already registered in this builder.
@@ -109,6 +118,8 @@ class PrismalStateGraphBuilder:
             audit=audit if audit is not None else self._defaults.audit,
             timeout_s=timeout_s if timeout_s is not None else self._defaults.timeout_s,
             retry=retry if retry is not None else self._defaults.retry,
+            input_model=input_model,
+            output_model=output_model,
         )(fn)
         self._nodes[name] = wrapped
         return self

@@ -371,6 +371,16 @@ class OTelManager:
             "prismal.tool_gate_phase_resolved_total",
             description="Tool resolutions carrying a resolved phase hint (by agent, phase)",
         )
+        # Node I/O Type-Safety (Phase NTS — SPEC-NTS-OTEL-001)
+        self._counters["node_io_validation_failures"] = self._meter.create_counter(
+            "prismal.node_io_validation_failures_total",
+            description="Node I/O schema validation failures, labelled by node and direction",
+        )
+        self._counters["node_io_validated"] = self._meter.create_counter(
+            "prismal.node_io_validated_total",
+            description="Node I/O schema validations attempted (success or failure), "
+            "labelled by node and direction",
+        )
 
     @contextmanager
     def start_span(
