@@ -620,9 +620,14 @@ class NodeExecutionError(ExtensionError):
         self,
         node_name: str,
         state_keys: list[str],
-        cause: BaseException,
+        cause: BaseException | None,
     ) -> None:
-        """Initialize NodeExecutionError."""
+        """Initialize NodeExecutionError.
+
+        ``cause`` is ``BaseException | None``: most nodes fail with a concrete
+        exception, but :class:`NodeValidationError` may carry ``None`` (a
+        schema rejection with only field-level messages).
+        """
         self.node_name = node_name
         self.state_keys = state_keys
         self.cause = cause
@@ -683,7 +688,7 @@ class NodeValidationError(NodeExecutionError):
         """Initialize NodeValidationError."""
         self.direction = direction
         self.schema_errors = schema_errors
-        super().__init__(node_name, state_keys, cause)  # type: ignore[arg-type]
+        super().__init__(node_name, state_keys, cause)
 
 
 class PluginLoadError(ExtensionError):

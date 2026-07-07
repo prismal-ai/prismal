@@ -253,7 +253,7 @@ async def error_mapping_middleware(
         return _error_update(metadata.name, exc, timeout=False)
 
 
-def _error_update(node_name: str, cause: BaseException, *, timeout: bool) -> dict[str, Any]:
+def _error_update(node_name: str, cause: BaseException | None, *, timeout: bool) -> dict[str, Any]:
     return {
         "metadata": {
             "error": {
