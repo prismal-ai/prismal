@@ -68,7 +68,7 @@ dependencies = [
   # ── Vector Database ───────────────────────────────────────
   "chromadb>=0.6.2",                # Embedding database for RAG
   # ── Document Processing ───────────────────────────────────
-  "pypdf>=6.12.0",                  # PDF loader (>=6.12.0 fixes CVE-2026-48155/48156 DoS)
+  "pypdf>=6.13.3",                  # PDF loader (>=6.13.3 fixes GHSA-jm82-fx9c-mx94; earlier >=6.12.0 fixed CVE-2026-48155/48156 DoS)
   "docx2txt>=0.8",                  # DOCX loader
   "unstructured>=0.16.10",          # Universal document parser
   "python-magic>=0.4.27",           # File type detection
@@ -91,7 +91,7 @@ dependencies = [
   "bandit>=1.8.0",                  # Security linter (used in skill validation)
   # ── Configuration ─────────────────────────────────────────
   "pydantic>=2.10.3",               # Data validation
-  "pydantic-settings>=2.7.0",       # Settings from env vars / .env files
+  "pydantic-settings>=2.14.2",      # Settings from env vars / .env files (>=2.14.2 fixes GHSA-4xgf-cpjx-pc3j)
   "python-dotenv>=1.0.1",           # .env file loading
   "pyyaml>=6.0.2",                  # YAML config files
   "toml>=0.10.2",                   # TOML config support
