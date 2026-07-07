@@ -94,3 +94,71 @@ async def test_list_permissions_excludes_expired(pm: PermissionManager) -> None:
     resources = [p.resource for p in perms]
     assert "x.com" in resources
     assert "y.com" not in resources
+
+
+# --- ID8: identity-scoped grants (DID keying) -----------------------------------
+
+_DID_A = "did:key:zAaa"
+_DID_B = "did:key:zBbb"
+
+
+async def test_identity_scoped_grant_matches_same_identity(pm: PermissionManager) -> None:
+    """A grant issued to a DID is usable when checked with that same DID."""
+    await pm.grant(PermissionType.SHELL, "bash", identity=_DID_A)
+    assert await pm.check(PermissionType.SHELL, "bash", identity=_DID_A)
+
+
+async def test_identity_scoped_grant_not_leaked_to_other_identity(pm: PermissionManager) -> None:
+    """A grant issued to DID A must not be usable by a different DID B."""
+    await pm.grant(PermissionType.SHELL, "bash", identity=_DID_A)
+    assert not await pm.check(PermissionType.SHELL, "bash", identity=_DID_B)
+
+
+async def test_identity_scoped_grant_not_matched_by_global_check(pm: PermissionManager) -> None:
+    """A grant scoped to a DID is not satisfied by an identity-less (global) check."""
+    await pm.grant(PermissionType.SHELL, "bash", identity=_DID_A)
+    assert not await pm.check(PermissionType.SHELL, "bash")
+
+
+async def test_global_grant_satisfies_identity_check(pm: PermissionManager) -> None:
+    """A global (identity=None) grant is usable by any identity — legacy grants apply to all."""
+    await pm.grant(PermissionType.SHELL, "bash")
+    assert await pm.check(PermissionType.SHELL, "bash", identity=_DID_A)
+    assert await pm.check(PermissionType.SHELL, "bash", identity=_DID_B)
+
+
+async def test_revoke_identity_scoped_only_removes_that_identity(pm: PermissionManager) -> None:
+    """Revoking a DID-A grant must leave a DID-B grant for the same resource intact."""
+    await pm.grant(PermissionType.SHELL, "bash", identity=_DID_A)
+    await pm.grant(PermissionType.SHELL, "bash", identity=_DID_B)
+    await pm.revoke(PermissionType.SHELL, "bash", identity=_DID_A)
+    assert not await pm.check(PermissionType.SHELL, "bash", identity=_DID_A)
+    assert await pm.check(PermissionType.SHELL, "bash", identity=_DID_B)
+
+
+async def test_revoke_global_leaves_identity_scoped_intact(pm: PermissionManager) -> None:
+    """Revoking the global grant must not remove a co-existing DID-scoped grant."""
+    await pm.grant(PermissionType.SHELL, "bash")  # global
+    await pm.grant(PermissionType.SHELL, "bash", identity=_DID_A)
+    await pm.revoke(PermissionType.SHELL, "bash")  # revokes global only
+    assert not await pm.check(PermissionType.SHELL, "bash")  # global gone
+    assert await pm.check(PermissionType.SHELL, "bash", identity=_DID_A)  # scoped remains
+
+
+async def test_list_grants_global_view_returns_all(pm: PermissionManager) -> None:
+    """list_grants() with no identity returns every active grant (admin/global view)."""
+    await pm.grant(PermissionType.FILESYSTEM_READ, "/g")  # global
+    await pm.grant(PermissionType.FILESYSTEM_READ, "/a", identity=_DID_A)
+    grants = await pm.list_grants()
+    assert {g.resource for g in grants} == {"/g", "/a"}
+
+
+async def test_list_grants_identity_view_scopes_to_identity_plus_global(
+    pm: PermissionManager,
+) -> None:
+    """list_grants(identity=A) returns global grants + grants scoped to A, never B's."""
+    await pm.grant(PermissionType.FILESYSTEM_READ, "/g")  # global
+    await pm.grant(PermissionType.FILESYSTEM_READ, "/a", identity=_DID_A)
+    await pm.grant(PermissionType.FILESYSTEM_READ, "/b", identity=_DID_B)
+    grants = await pm.list_grants(identity=_DID_A)
+    assert {g.resource for g in grants} == {"/g", "/a"}

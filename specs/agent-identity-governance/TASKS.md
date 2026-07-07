@@ -21,12 +21,12 @@ Identity & Access Governance lands in seven phases (ID1–ID7) as a **new hexago
 
 Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. Phases ID1–ID7 are `DONE`
 (implemented test-first in v3.4.0, 100% coverage on `prismal/identity`). The
-single exception is **ID6-02** (PermissionManager grants keyed by DID), which is
-`DEFERRED`: it needs an Alembic migration for the existing `permissions` table
-and the `PolicyEngine` + scopes already provide identity-aware authorization.
-Re-opened as its own small unit in
+formerly-deferred **ID6-02** (PermissionManager grants keyed by DID) is now
+`DONE` too, implemented test-first in v3.10.0 as
 [`ADDENDUM-ID8-permission-manager-did.md`](./ADDENDUM-ID8-permission-manager-did.md)
-(2026-07-04, from `docs/gap-analysis-loops-harness-guardrails-2026-07.md` item #9).
+(2026-07-07, from `docs/gap-analysis-loops-harness-guardrails-2026-07.md` item #9).
+The addendum landed the identity dimension as a nullable additive column
+(`NULL` = global grant), so no destructive migration was needed after all.
 
 > **2026-07-04 correction:** every other row in this file (ID1-01 … ID7-09) was
 > left at its template default of `TODO` when the feature shipped in v3.4.0,
@@ -100,7 +100,7 @@ Re-opened as its own small unit in
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
 | ID6-01 | `security/action_interceptor.py`: consult `PolicyEngine` when `identity_enabled`; HITL on `REQUIRE_HITL` | 0.5 d | ID4 | DONE |
-| ID6-02 | `security/permissions.py`: grants keyed by identity DID + TTL | 0.4 d | ID2 | `DEFERRED` — see `ADDENDUM-ID8-permission-manager-did.md` |
+| ID6-02 | `security/permissions.py`: grants keyed by identity DID + TTL | 0.4 d | ID2 | `DONE` (v3.10.0) — see `ADDENDUM-ID8-permission-manager-did.md` |
 | ID6-03 | `security/audit.py`: add `identity` (DID) to every record; redact secrets | 0.3 d | ID2 | DONE |
 | ID6-04 | `composition/runtime.py`: compose provider + vault + policy per `org_id`; `aclose()` release | 0.6 d | ID2,ID3,ID4 | DONE |
 | ID6-05 | `monitoring/otel.py`: register identity counters (SPEC-IDN-OTEL-001) | 0.2 d | ID4 | DONE |
