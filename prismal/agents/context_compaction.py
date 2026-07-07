@@ -22,7 +22,7 @@ from __future__ import annotations
 from contextlib import suppress
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from langchain_core.messages import AIMessage, RemoveMessage
 
@@ -266,14 +266,14 @@ _DEFAULT_KEY = "_default"
 
 def _run_key(state: object) -> str:
     if isinstance(state, dict):
-        sid = state.get("session_id")
+        sid = cast("dict[str, Any]", state).get("session_id")
         if sid:
             return str(sid)
     return _DEFAULT_KEY
 
 
 def _turn_signature(state: object) -> int:
-    messages = state.get("messages") if isinstance(state, dict) else None
+    messages = cast("dict[str, Any]", state).get("messages") if isinstance(state, dict) else None
     if not isinstance(messages, list):
         return 0
     return sum(1 for m in messages if getattr(m, "type", None) == "human")

@@ -13,7 +13,7 @@ within a turn and a fresh run starts on the next one.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from prismal.monitoring.observability import run_name_for
 
@@ -53,7 +53,7 @@ def get_observability_provider(session_id: str) -> ObservabilityPort | None:
     if entry is None:
         return None
     # The registry only ever stores ObservabilityPort instances under "provider".
-    return entry.get("provider")  # type: ignore[return-value]
+    return cast("ObservabilityPort", entry["provider"])
 
 
 def clear_observability_run(session_id: str) -> None:

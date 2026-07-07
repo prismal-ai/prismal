@@ -130,9 +130,7 @@ def prismal_node(
         if getattr(fn, "__prismal_node__", None) is not None:
             return fn
 
-        # ty (alpha) doesn't expose ``__name__`` on the Callable alias NodeFn;
-        # mypy resolves it correctly to ``str``.
-        node_name = name or fn.__name__  # ty: ignore[unresolved-attribute]
+        node_name = name or fn.__name__
         metadata = NodeMetadata(
             name=node_name,
             capabilities=tuple(capabilities or []),
