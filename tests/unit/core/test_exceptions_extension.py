@@ -66,6 +66,32 @@ class TestNodeTimeoutError:
         assert err.node_name == "slow_node"
 
 
+class TestNodeValidationError:
+    def test_carries_direction_and_schema_errors(self) -> None:
+        cause = ValueError("bad")
+        err = NodeValidationError(
+            "critic",
+            ["messages", "current_agent"],
+            cause,
+            direction="output",
+            schema_errors=["current_agent: field required"],
+        )
+        assert err.node_name == "critic"
+        assert err.state_keys == ["messages", "current_agent"]
+        assert err.cause is cause
+        assert err.direction == "output"
+        assert err.schema_errors == ["current_agent: field required"]
+
+    def test_accepts_none_cause(self) -> None:
+        err = NodeValidationError("n", ["a"], None, direction="input", schema_errors=[])
+        assert err.cause is None
+        assert err.direction == "input"
+
+    def test_is_node_execution_error(self) -> None:
+        err = NodeValidationError("n", [], None, direction="input", schema_errors=["x: y"])
+        assert isinstance(err, NodeExecutionError)
+
+
 class TestPluginLoadError:
     def test_carries_plugin_name_and_entry_point(self) -> None:
         cause = ImportError("no module")

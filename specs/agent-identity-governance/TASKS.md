@@ -24,6 +24,16 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. Phases ID1–ID7 are `DON
 single exception is **ID6-02** (PermissionManager grants keyed by DID), which is
 `DEFERRED`: it needs an Alembic migration for the existing `permissions` table
 and the `PolicyEngine` + scopes already provide identity-aware authorization.
+Re-opened as its own small unit in
+[`ADDENDUM-ID8-permission-manager-did.md`](./ADDENDUM-ID8-permission-manager-did.md)
+(2026-07-04, from `docs/gap-analysis-loops-harness-guardrails-2026-07.md` item #9).
+
+> **2026-07-04 correction:** every other row in this file (ID1-01 … ID7-09) was
+> left at its template default of `TODO` when the feature shipped in v3.4.0,
+> even though the code, tests, and CHANGELOG confirm all of ID1–ID7 were
+> completed — a bookkeeping gap, not a functional one. Rows have been updated
+> to `DONE` to match reality; `ID6-02` is the sole genuine exception and now
+> carries an explicit `DEFERRED` marker instead of a misleading `TODO`.
 
 ## 2. Prerequisites
 
@@ -38,10 +48,10 @@ and the `PolicyEngine` + scopes already provide identity-aware authorization.
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| ID1-01 | `identity/types.py`: `DID`, `AgentIdentity`, `Scope`, `Credential`, `OnBehalfToken`, `PolicyDecision` (SPEC-IDN-TYP-001) | 0.5 d | — | TODO |
-| ID1-02 | `core/config.py`: `identity_*` settings + `_validate_identity` (SPEC-IDN-CFG-001) | 0.3 d | — | TODO |
-| ID1-03 | `core/exceptions.py`: `IdentityError` hierarchy (SPEC-IDN-ERR-001) | 0.2 d | — | TODO |
-| ID1-04 | `agents/extension/ports.py`: `IdentityPort`, `CredentialVaultPort`, `PolicyPort` Protocols | 0.3 d | ID1-01 | TODO |
+| ID1-01 | `identity/types.py`: `DID`, `AgentIdentity`, `Scope`, `Credential`, `OnBehalfToken`, `PolicyDecision` (SPEC-IDN-TYP-001) | 0.5 d | — | DONE |
+| ID1-02 | `core/config.py`: `identity_*` settings + `_validate_identity` (SPEC-IDN-CFG-001) | 0.3 d | — | DONE |
+| ID1-03 | `core/exceptions.py`: `IdentityError` hierarchy (SPEC-IDN-ERR-001) | 0.2 d | — | DONE |
+| ID1-04 | `agents/extension/ports.py`: `IdentityPort`, `CredentialVaultPort`, `PolicyPort` Protocols | 0.3 d | ID1-01 | DONE |
 
 **Done when:** value objects round-trip; settings parse from `PRISMAL_*`; bad `identity_mode`/`provider` → `IdentityConfigError`; ports importable.
 
@@ -49,10 +59,10 @@ and the `PolicyEngine` + scopes already provide identity-aware authorization.
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| ID2-01 | `identity/did.py`: `issue_did_key` / `issue_did_web` / `resolve_did` / `verify_did` / `did_document` | 0.8 d | ID1 | TODO |
-| ID2-02 | `identity/provider.py`: `LocalIdentityProvider` (did:key, PermissionManager-backed) | 0.6 d | ID2-01 | TODO |
-| ID2-03 | `identity/provider.py`: `OidcIdentityProvider` adapter (Entra/Okta; SDK isolated) | 0.6 d | ID2-02 | TODO |
-| ID2-04 | `FakeIdentityProvider` (deterministic test double) | 0.2 d | ID2-02 | TODO |
+| ID2-01 | `identity/did.py`: `issue_did_key` / `issue_did_web` / `resolve_did` / `verify_did` / `did_document` | 0.8 d | ID1 | DONE |
+| ID2-02 | `identity/provider.py`: `LocalIdentityProvider` (did:key, PermissionManager-backed) | 0.6 d | ID2-01 | DONE |
+| ID2-03 | `identity/provider.py`: `OidcIdentityProvider` adapter (Entra/Okta; SDK isolated) | 0.6 d | ID2-02 | DONE |
+| ID2-04 | `FakeIdentityProvider` (deterministic test double) | 0.2 d | ID2-02 | DONE |
 
 **Done when:** `did:key` round-trips offline; tampered signature fails `verify`; OIDC adapter maps a subject (fake) to an `AgentIdentity`.
 
@@ -60,9 +70,9 @@ and the `PolicyEngine` + scopes already provide identity-aware authorization.
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| ID3-01 | `identity/vault.py`: `EnvVault` via `ConfigSourcePort` (no `os.environ`) | 0.5 d | ID1 | TODO |
-| ID3-02 | `FileVault` (encrypted) + `FakeVault` | 0.4 d | ID3-01 | TODO |
-| ID3-03 | Boundary resolution + redaction (secret never in state/audit) | 0.4 d | ID3-01 | TODO |
+| ID3-01 | `identity/vault.py`: `EnvVault` via `ConfigSourcePort` (no `os.environ`) | 0.5 d | ID1 | DONE |
+| ID3-02 | `FileVault` (encrypted) + `FakeVault` | 0.4 d | ID3-01 | DONE |
+| ID3-03 | Boundary resolution + redaction (secret never in state/audit) | 0.4 d | ID3-01 | DONE |
 
 **Done when:** `resolve()` returns a `SecretStr`; spy proves the secret never reaches state/logs/audit; out-of-scope → `ScopeError`.
 
@@ -70,9 +80,9 @@ and the `PolicyEngine` + scopes already provide identity-aware authorization.
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| ID4-01 | `identity/policy.py`: `IdentityPolicy`, `PolicyEngine.allow` (scopes + identity rules) | 0.7 d | ID1 | TODO |
-| ID4-02 | Delegate `(agent, tool, args)` to Phase H `ToolPolicyEngine` when present | 0.4 d | ID4-01 | TODO |
-| ID4-03 | `load_identity_policies` + `config/identity_policies.yaml` (ship example) | 0.3 d | ID4-01 | TODO |
+| ID4-01 | `identity/policy.py`: `IdentityPolicy`, `PolicyEngine.allow` (scopes + identity rules) | 0.7 d | ID1 | DONE |
+| ID4-02 | Delegate `(agent, tool, args)` to Phase H `ToolPolicyEngine` when present | 0.4 d | ID4-01 | DONE |
+| ID4-03 | `load_identity_policies` + `config/identity_policies.yaml` (ship example) | 0.3 d | ID4-01 | DONE |
 
 **Done when:** out-of-scope action denied; identity rules resolve most-specific-wins; tool rules still flow through the delegated engine; `warn` vs `enforce` honoured.
 
@@ -80,8 +90,8 @@ and the `PolicyEngine` + scopes already provide identity-aware authorization.
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| ID5-01 | `identity/delegation.py`: `mint_on_behalf` / `propagate` (narrow-only) / `revoke` / `validate` | 0.6 d | ID1 | TODO |
-| ID5-02 | Thread the `OnBehalfToken` through `state["metadata"]["identity"]` along the chain | 0.4 d | ID5-01 | TODO |
+| ID5-01 | `identity/delegation.py`: `mint_on_behalf` / `propagate` (narrow-only) / `revoke` / `validate` | 0.6 d | ID1 | DONE |
+| ID5-02 | Thread the `OnBehalfToken` through `state["metadata"]["identity"]` along the chain | 0.4 d | ID5-01 | DONE |
 
 **Done when:** scopes only narrow along `propagate`; expired/revoked token fails `validate`; chain audited.
 
@@ -89,11 +99,11 @@ and the `PolicyEngine` + scopes already provide identity-aware authorization.
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| ID6-01 | `security/action_interceptor.py`: consult `PolicyEngine` when `identity_enabled`; HITL on `REQUIRE_HITL` | 0.5 d | ID4 | TODO |
-| ID6-02 | `security/permissions.py`: grants keyed by identity DID + TTL | 0.4 d | ID2 | TODO |
-| ID6-03 | `security/audit.py`: add `identity` (DID) to every record; redact secrets | 0.3 d | ID2 | TODO |
-| ID6-04 | `composition/runtime.py`: compose provider + vault + policy per `org_id`; `aclose()` release | 0.6 d | ID2,ID3,ID4 | TODO |
-| ID6-05 | `monitoring/otel.py`: register identity counters (SPEC-IDN-OTEL-001) | 0.2 d | ID4 | TODO |
+| ID6-01 | `security/action_interceptor.py`: consult `PolicyEngine` when `identity_enabled`; HITL on `REQUIRE_HITL` | 0.5 d | ID4 | DONE |
+| ID6-02 | `security/permissions.py`: grants keyed by identity DID + TTL | 0.4 d | ID2 | `DEFERRED` — see `ADDENDUM-ID8-permission-manager-did.md` |
+| ID6-03 | `security/audit.py`: add `identity` (DID) to every record; redact secrets | 0.3 d | ID2 | DONE |
+| ID6-04 | `composition/runtime.py`: compose provider + vault + policy per `org_id`; `aclose()` release | 0.6 d | ID2,ID3,ID4 | DONE |
+| ID6-05 | `monitoring/otel.py`: register identity counters (SPEC-IDN-OTEL-001) | 0.2 d | ID4 | DONE |
 
 **Done when:** with `identity_enabled=False` the compiled-graph snapshot is unchanged; with `True`+`enforce` an out-of-scope action is denied and a high-risk action routes to HITL end-to-end.
 
@@ -101,15 +111,15 @@ and the `PolicyEngine` + scopes already provide identity-aware authorization.
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| ID7-01 | Unit: DID issue/resolve/verify (key + web) | 0.5 d | ID2 | TODO |
-| ID7-02 | Unit: vault resolve + redaction (secret never leaks) | 0.4 d | ID3 | TODO |
-| ID7-03 | Unit: policy allow/deny/HITL + scope + Phase-H delegation | 0.6 d | ID4 | TODO |
-| ID7-04 | Unit: delegation (narrow-only, expiry, revoke) | 0.4 d | ID5 | TODO |
-| ID7-05 | Integration: `identity_enabled=False` graph snapshot unchanged | 0.3 d | ID6 | TODO |
-| ID7-06 | Integration: out-of-scope deny + HITL-on-high-risk end-to-end (fakes) | 0.5 d | ID6 | TODO |
-| ID7-07 | Guards: vault uses `ConfigSourcePort` (AST guard); no provider import outside `providers/` | 0.3 d | ID6 | TODO |
-| ID7-08 | `docs/identity.md` + `examples/agent_identity.py` | 0.5 d | ID6 | TODO |
-| ID7-09 | `README.md` + `CHANGELOG.md`; mark PLAN/SPEC/ARCHITECTURE `IMPLEMENTED` | 0.2 d | ID6 | TODO |
+| ID7-01 | Unit: DID issue/resolve/verify (key + web) | 0.5 d | ID2 | DONE |
+| ID7-02 | Unit: vault resolve + redaction (secret never leaks) | 0.4 d | ID3 | DONE |
+| ID7-03 | Unit: policy allow/deny/HITL + scope + Phase-H delegation | 0.6 d | ID4 | DONE |
+| ID7-04 | Unit: delegation (narrow-only, expiry, revoke) | 0.4 d | ID5 | DONE |
+| ID7-05 | Integration: `identity_enabled=False` graph snapshot unchanged | 0.3 d | ID6 | DONE |
+| ID7-06 | Integration: out-of-scope deny + HITL-on-high-risk end-to-end (fakes) | 0.5 d | ID6 | DONE |
+| ID7-07 | Guards: vault uses `ConfigSourcePort` (AST guard); no provider import outside `providers/` | 0.3 d | ID6 | DONE |
+| ID7-08 | `docs/identity.md` + `examples/agent_identity.py` | 0.5 d | ID6 | DONE |
+| ID7-09 | `README.md` + `CHANGELOG.md`; mark PLAN/SPEC/ARCHITECTURE `IMPLEMENTED` | 0.2 d | ID6 | DONE |
 
 **Done when:** `uv run pytest -m unit` green; `ruff` + `mypy --strict` + `bandit` clean; coverage ≥ project target on `prismal/identity/`.
 

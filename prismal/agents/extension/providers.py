@@ -14,12 +14,13 @@ and the fixed-tool-agent exemption (DD-TPI-004).
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from collections.abc import Mapping
 
     from langchain_core.tools import BaseTool
 
@@ -59,9 +60,10 @@ class StubToolProvider:
         *,
         agent_name: str,
         capabilities: list[str] | None = None,
+        phase: str | None = None,
     ) -> list[BaseTool]:
         """Return the static stub set for *agent_name* (unknown agents → ``[]``)."""
-        del capabilities  # parity: stubs are never capability-filtered
+        del capabilities, phase  # parity: stubs are never capability-filtered
         from prismal.agents.subgraphs.ml_pipeline.tools_ml import ML_PIPELINE_TOOLS
         from prismal.agents.tools import (
             CODER_TOOLS,
@@ -120,9 +122,10 @@ class McpToolProvider:
         *,
         agent_name: str,
         capabilities: list[str] | None = None,
+        phase: str | None = None,
     ) -> list[BaseTool]:
         """Return MCP tools filtered by *capabilities* and capped at *max_tools*."""
-        del agent_name  # MCP pool is agent-agnostic
+        del agent_name, phase  # MCP pool is agent-agnostic
         try:
             tools = self._manager.get_all_langchain_tools(capabilities=capabilities)
         except Exception as exc:
@@ -148,9 +151,10 @@ class SkillToolProvider:
         *,
         agent_name: str,
         capabilities: list[str] | None = None,
+        phase: str | None = None,
     ) -> list[BaseTool]:
         """Return tools from active skills (``[]`` on any manager failure)."""
-        del agent_name, capabilities
+        del agent_name, capabilities, phase
         try:
             manager = self._manager
             if manager is None:
@@ -178,10 +182,12 @@ class CompositeToolProvider:
         *,
         max_total: int = _MAX_TOTAL_TOOLS,
         fixed_tool_agents: frozenset[str] = _FIXED_TOOL_AGENTS,
+        phase_capability_map: Mapping[str, Mapping[str, list[str]]] | None = None,
     ) -> None:
         self._providers: tuple[ToolProviderPort, ...] = tuple(providers)
         self._max_total = max_total
         self._fixed_tool_agents = fixed_tool_agents
+        self._phase_capability_map = phase_capability_map or {}
         # Last StubToolProvider wins as the fallback source; earlier stub
         # providers (unusual) are treated as live sources.
         stub: StubToolProvider | None = None
@@ -195,11 +201,45 @@ class CompositeToolProvider:
         """The composed providers, in priority order."""
         return self._providers
 
+    def _effective_capabilities(
+        self, agent_name: str, capabilities: list[str] | None, phase: str | None
+    ) -> list[str] | None:
+        """Narrow *capabilities* per ``phase_capability_map[agent_name][phase]`` (SPEC-LH-GAT-002).
+
+        Never returns a superset of what *capabilities* alone would allow —
+        the override list is intersected with (not added to) the caller's
+        capabilities, or used verbatim when *capabilities* is ``None`` (``all``).
+        """
+        if phase is None:
+            return capabilities
+        override = self._phase_capability_map.get(agent_name, {}).get(phase)
+        if override is None:
+            return capabilities
+        if capabilities is None:
+            return list(override)
+        return [c for c in capabilities if c in override]
+
+    @staticmethod
+    def _call_provider(
+        provider: ToolProviderPort,
+        agent_name: str,
+        capabilities: list[str] | None,
+        phase: str | None,
+    ) -> list[BaseTool]:
+        """Call *provider*, falling open to a phase-less call on ``TypeError`` (DD-LH-006)."""
+        if phase is None:
+            return provider.get_tools(agent_name=agent_name, capabilities=capabilities)
+        try:
+            return provider.get_tools(agent_name=agent_name, capabilities=capabilities, phase=phase)
+        except TypeError:
+            return provider.get_tools(agent_name=agent_name, capabilities=capabilities)
+
     def get_tools(
         self,
         *,
         agent_name: str,
         capabilities: list[str] | None = None,
+        phase: str | None = None,
     ) -> list[BaseTool]:
         """Return the merged, deduplicated, capped tool list for *agent_name*."""
         stubs = (
@@ -220,13 +260,24 @@ class CompositeToolProvider:
             )
             return stubs
 
+        effective_capabilities = self._effective_capabilities(agent_name, capabilities, phase)
+        if phase is not None and effective_capabilities != capabilities:
+            from contextlib import suppress
+
+            from prismal.monitoring.otel import OTelManager
+
+            with suppress(Exception):
+                OTelManager().increment_counter(
+                    "tool_gate_narrowed", attributes={"agent": agent_name}
+                )
+
         live_tools: list[BaseTool] = []
         for provider in self._providers:
             if provider is self._stub_provider:
                 continue
             try:
                 live_tools.extend(
-                    provider.get_tools(agent_name=agent_name, capabilities=capabilities)
+                    self._call_provider(provider, agent_name, effective_capabilities, phase)
                 )
             except Exception as exc:
                 logger.warning(
@@ -288,9 +339,10 @@ class FakeToolProvider:
         *,
         agent_name: str,
         capabilities: list[str] | None = None,
+        phase: str | None = None,
     ) -> list[BaseTool]:
         """Return ``mapping.get(agent_name, default)``."""
-        del capabilities
+        del capabilities, phase
         return self._mapping.get(agent_name, self._default)
 
 
@@ -353,6 +405,33 @@ async def build_default_tool_provider(
     return CompositeToolProvider(providers)
 
 
+def load_phase_capability_map(path: str | None = None) -> dict[str, dict[str, list[str]]]:
+    """Load + validate ``config/tool_gating_phases.yaml`` (SPEC-LH-GAT-002).
+
+    A missing file yields an empty map (no overrides — phase gating is a
+    pure no-op). A malformed file raises :class:`ToolGatingConfigError`
+    (fail loud at startup, not at request time — mirrors ``load_tool_policies``).
+    """
+    import yaml
+
+    from prismal.core.exceptions import ToolGatingConfigError
+
+    resolved = Path(path) if path else Path("config/tool_gating_phases.yaml")
+    if not resolved.exists():
+        logger.info("tool_gating.no_file", path=str(resolved))
+        return {}
+
+    try:
+        with resolved.open(encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except yaml.YAMLError as exc:
+        raise ToolGatingConfigError(f"tool_gating_phases.yaml is malformed: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise ToolGatingConfigError("tool_gating_phases.yaml must be a mapping")
+    return data
+
+
 __all__ = [
     "CompositeToolProvider",
     "FakeToolProvider",
@@ -360,4 +439,5 @@ __all__ = [
     "SkillToolProvider",
     "StubToolProvider",
     "build_default_tool_provider",
+    "load_phase_capability_map",
 ]

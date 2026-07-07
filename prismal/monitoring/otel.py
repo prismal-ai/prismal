@@ -332,6 +332,68 @@ class OTelManager:
             description="RAG retrieval latency in seconds",
             unit="s",
         )
+        # Guardrails Modernization (Phase GRD — SPEC-GRD-OTEL-001)
+        self._counters["nemo_classifier_checks"] = self._meter.create_counter(
+            "prismal.nemo_classifier_checks_total",
+            description="Reasoning safety-classifier checks (by category, result)",
+        )
+        self._histograms["nemo_classifier_latency"] = self._meter.create_histogram(
+            "prismal.nemo_classifier_latency_seconds",
+            description="Reasoning safety-classifier judgment-call latency in seconds",
+            unit="s",
+        )
+        self._counters["structured_output_reask"] = self._meter.create_counter(
+            "prismal.structured_output_reask_total",
+            description="StructuredOutputGuard re-ask outcomes (resolved|exhausted|budget_denied)",
+        )
+        self._counters["structured_output_hub_validator_blocks"] = self._meter.create_counter(
+            "prismal.structured_output_hub_validator_blocks_total",
+            description="Guardrails Hub validator findings (by validator)",
+        )
+        # Loop Hardening (Phase LH — SPEC-LH-OTEL-001)
+        self._counters["context_compactions"] = self._meter.create_counter(
+            "prismal.context_compactions_total",
+            description="Context compactions performed (by strategy: truncate|summarize)",
+        )
+        self._counters["context_compaction_messages_dropped"] = self._meter.create_counter(
+            "prismal.context_compaction_messages_dropped_total",
+            description="Messages dropped by context compaction",
+        )
+        self._counters["context_compaction_summarize_errors"] = self._meter.create_counter(
+            "prismal.context_compaction_summarize_errors_total",
+            description="Summarizer LLM failures (fails open to truncate)",
+        )
+        self._counters["tool_gate_narrowed"] = self._meter.create_counter(
+            "prismal.tool_gate_narrowed_total",
+            description="Tool resolutions narrowed by phase-based gating (by agent)",
+        )
+        self._counters["tool_gate_phase_resolved"] = self._meter.create_counter(
+            "prismal.tool_gate_phase_resolved_total",
+            description="Tool resolutions carrying a resolved phase hint (by agent, phase)",
+        )
+        # Node I/O Type-Safety (Phase NTS — SPEC-NTS-OTEL-001)
+        self._counters["node_io_validation_failures"] = self._meter.create_counter(
+            "prismal.node_io_validation_failures_total",
+            description="Node I/O schema validation failures, labelled by node and direction",
+        )
+        self._counters["node_io_validated"] = self._meter.create_counter(
+            "prismal.node_io_validated_total",
+            description="Node I/O schema validations attempted (success or failure), "
+            "labelled by node and direction",
+        )
+        # Observability integration (Phase OBS — SPEC-OBS-OTEL-001)
+        self._counters["observability_runs"] = self._meter.create_counter(
+            "prismal.observability_runs_total",
+            description="Observability runs by terminal result (completed|evicted)",
+        )
+        self._counters["observability_scores"] = self._meter.create_counter(
+            "prismal.observability_scores_total",
+            description="Score/feedback annotations recorded, labelled by score name",
+        )
+        self._counters["observability_dataset_exports"] = self._meter.create_counter(
+            "prismal.observability_dataset_exports_total",
+            description="Evaluation-dataset exports by format (langsmith|langfuse)",
+        )
 
     @contextmanager
     def start_span(

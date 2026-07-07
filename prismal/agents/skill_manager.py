@@ -36,10 +36,12 @@ from __future__ import annotations
 import re
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import AIMessage
+from pydantic import BaseModel
 
+from prismal.agents.extension.decorators import prismal_node
 from prismal.agents.skill_creator import create_skill
 from prismal.core.logging import get_logger
 from prismal.skills.manager import SkillsManager
@@ -541,6 +543,27 @@ def _install_from_path(
 # ---------------------------------------------------------------------------
 
 
+class SkillManagerInput(BaseModel):
+    """Narrow input contract for ``skill_manager_node`` (Phase NTS pilot)."""
+
+    messages: list[Any]
+    session_id: str
+
+
+class SkillManagerOutput(BaseModel):
+    """Narrow output contract for ``skill_manager_node`` (Phase NTS pilot)."""
+
+    current_agent: str
+    messages: list[Any]
+
+
+@prismal_node(
+    name="skill_manager",
+    security="off",
+    audit=False,
+    input_model=SkillManagerInput,
+    output_model=SkillManagerOutput,
+)
 async def skill_manager_node(state: AgentState) -> dict[str, object]:
     """Execute the skill-manager sub-agent node.
 
@@ -722,4 +745,4 @@ async def skill_manager_node(state: AgentState) -> dict[str, object]:
     }
 
 
-__all__ = ["skill_manager_node"]
+__all__ = ["SkillManagerInput", "SkillManagerOutput", "skill_manager_node"]

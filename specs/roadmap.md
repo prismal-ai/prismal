@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| **Last updated** | 2026-06-17 |
-| **Package version** | 3.5.0 |
+| **Last updated** | 2026-07-04 |
+| **Package version** | 3.6.0 |
 | **Author** | Ernesto Crespo |
-| **Latest spec** | `a2a-interop/` (Phase I) |
-| **Latest shipped** | `a2a-interop/` (Phase I) — 2026-06-17 |
+| **Latest spec** | `guardrails-modernization/` (Phase GRD) |
+| **Latest shipped** | `guardrails-modernization/` (Phase GRD) — 2026-07-04 |
 
 Living index of every SDD under `specs/`: what has shipped, what is pending,
 and in which order the pending work fits together. Statuses are verified
@@ -37,6 +37,7 @@ Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented) ·
 | [`agent-eval-harness/`](./agent-eval-harness/) | V | ✅ | `prismal/eval/` system-level evaluation (sibling of the runtime; imports only the public graph entry + ports, AST-guarded): `EvalRunner` over `astream` + `build_test_runtime` fakes, trajectory capture, assertions (exact/semantic/tool-usage/llm-judge/groundedness/security), LLM-as-judge, regression gate, `redteam/` containment suite (`tests/eval/redteam/corpus.yaml`), JSON/MD/Langfuse report, `python -m prismal.eval` CLI. Fakes by default, `live_api` opt-in. Docs: `docs/eval.md` · **v3.3.0** |
 | [`agent-identity-governance/`](./agent-identity-governance/) | IDN | ✅ | `prismal/identity/` hexagonal package: `AgentIdentity` + W3C DID (`did:key` offline + `did:web` for A2A), scoped `CredentialVault` (`EnvVault` via `ConfigSourcePort` / encrypted `FileVault` / `FakeVault`), OAuth on-behalf-of delegation (narrow-only `propagate`), identity-aware `PolicyEngine` that **delegates** `(agent, tool, args)` to the Phase H `ToolPolicyEngine`; wired at the `ActionInterceptor` seam + composed per `org_id` in `build_runtime`. Opt-in: `identity_enabled` (graph snapshot-tested). ID6-02 (PermissionManager-DID) deferred. Docs: `docs/identity.md` · **v3.4.0** |
 | [`a2a-interop/`](./a2a-interop/) | I | ✅ | `prismal/a2a/` (`[a2a]` extra): A2A v0.3.x types, `build_agent_card` (registry + allowlist + `did:web` + per-org cache), inbound `A2AServerHandler` (JSON-RPC `message/send`/`tasks/get`/`tasks/cancel` + SSE, sanitized graph mapping, `AuthContext` strict gate), outbound `A2AClient`/`A2AConnectionManager` (allowlist + pool + bearer/OAuth2 auth) + `A2AAgentNode.as_node` (`@prismal_node`), `A2AToolProvider` (conforms to `ToolProviderPort`). Remote content L1-sanitized + audited; `build_runtime(graph=, a2a_agents=)` composes it; `RuntimeContext.a2a_handler`. Opt-in: `a2a_enabled`. Docs: `docs/a2a.md` · **v3.5.0** |
+| [`guardrails-modernization/`](./guardrails-modernization/) | GRD | ✅ | `config/nemo_rails/` (finally ships the config `NemoRailsLayer` always expected) + `security/nemo_actions.py::content_safety_reasoning` (reasoning-capable safety-classifier NeMo custom action, settings-driven main-LLM resolution via `providers/`, independent timeout budget, fail-open). `security/structured_output_guard.py::StructuredOutputGuard` (bounded, Budget-metered re-ask over `guardrails-ai`'s `Guard.validate()` — no LLM call inside guardrails-ai itself; opt-in Hub validators; composes with `OutputValidator`). Opt-in: `nemo_classifier_enabled`, `structured_output_guard_enabled`; `[guardrails-ai]` extra. Docs: `docs/security/guardrails-modernization.md` · **v3.6.0** |
 
 Deferred to follow-up phases (noted in their specs): Skynet S+ (heterogeneous
 specialist swarms; metering *worker* token usage into the shared swarm budget —
@@ -45,13 +46,19 @@ evaluator boundary via the unified budget engine; remote workers via A2A).
 
 ## 📋 Ready to implement (full SDD: PLAN + SPEC + ARCHITECTURE + TASKS)
 
+Sourced from the 2026-07-04 gap analysis
+(`docs/gap-analysis-loops-harness-guardrails-2026-07.md`); none started yet.
+
 | Spec | Phase | What it adds | Depends on |
 |---|---|---|---|
-| _(none — every spec with a full SDD is now implemented)_ | | | |
+| [`loop-hardening/`](./loop-hardening/) | LH | Context compaction (`AgentState.messages` grows unbounded today) + dynamic tool gating by task phase | — |
+| [`node-io-typesafety/`](./node-io-typesafety/) | NTS | Pydantic I/O validation contracts per graph node (`AgentState` is still a bare `TypedDict`) | — |
+| [`observability-integration/`](./observability-integration/) | OBS | `ObservabilityPort` + LangSmith/Langfuse parity, dataset export, eval-harness integration | Phase V (eval harness) |
+| [`reference-host-bootstrap/`](./reference-host-bootstrap/) | — | PLAN-only seed for the *external* `prismal-server` host repo (REST/WS/SSE, `/a2a` mount, auth) — out of this repo's scope | Phase Y, I |
 
 ### Target package versions (strict SemVer — minor per phase)
 
-Current: **`3.5.0`**. Each phase was new, additive, opt-in functionality → a **SemVer minor** bump (H `3.2.0`, V `3.3.0`, IDN `3.4.0`, **I `3.5.0` all shipped**):
+Current: **`3.6.0`**. Each phase was new, additive, opt-in functionality → a **SemVer minor** bump (H `3.2.0`, V `3.3.0`, IDN `3.4.0`, I `3.5.0`, **GRD `3.6.0` all shipped**):
 
 | Order | Phase | Spec | Target version |
 |---|---|---|---|
@@ -59,6 +66,10 @@ Current: **`3.5.0`**. Each phase was new, additive, opt-in functionality → a *
 | ✅ | V | [`agent-eval-harness/`](./agent-eval-harness/) | **`3.3.0`** (shipped) |
 | ✅ | IDN | [`agent-identity-governance/`](./agent-identity-governance/) | **`3.4.0`** (shipped) |
 | ✅ | I | [`a2a-interop/`](./a2a-interop/) | **`3.5.0`** (shipped) |
+| ✅ | GRD | [`guardrails-modernization/`](./guardrails-modernization/) | **`3.6.0`** (shipped) |
+| 📋 | LH | [`loop-hardening/`](./loop-hardening/) | `3.7.0` (spec ready) |
+| 📋 | NTS | [`node-io-typesafety/`](./node-io-typesafety/) | `3.8.0` (spec ready) |
+| 📋 | OBS | [`observability-integration/`](./observability-integration/) | `3.9.0` (spec ready) |
 
 > Versioning note: the earlier additive phases Z/R/W/C were released as **patches**
 > (`3.1.2`–`3.1.5`) to avoid bumping the minor too quickly. Going forward, feature
@@ -70,7 +81,7 @@ Current: **`3.5.0`**. Each phase was new, additive, opt-in functionality → a *
 
 | Spec | What it adds | Depends on |
 |---|---|---|
-| _(none — all specs now have a full SDD set)_ | | |
+| [`reference-host-bootstrap/`](./reference-host-bootstrap/) | Scopes the missing `prismal-server` host repo (REST/WS/SSE surface, `/a2a` mount, auth). Out-of-repo — nothing here can be implemented inside `prismal-ai/prismal` itself. | Phase Y, I |
 
 ## Suggested order
 
@@ -114,8 +125,21 @@ Current: **`3.5.0`**. Each phase was new, additive, opt-in functionality → a *
    `A2AConnectionManager` + `A2AToolProvider` (conforms to `ToolProviderPort`);
    **consumes** the Phase IDN DID; everything remote is L1-sanitized + audited;
    `build_runtime(graph=, a2a_agents=)` composes it. Opt-in (`a2a_enabled`),
-   graph unchanged. The last pending phase — the roadmap is now fully
-   implemented. Enables Skynet S+ remote workers.
+   graph unchanged. Enables Skynet S+ remote workers. This was the last
+   pending phase of the *original* roadmap — the 2026-07-04 gap analysis then
+   opened four new ones (below).
+8. ~~**`guardrails-modernization` (GRD)`**~~ — ✅ **shipped** (v3.6.0,
+   2026-07-04): `config/nemo_rails/` finally ships (L3 was a code-complete
+   no-op — no config directory existed); `security/nemo_actions.py` adds a
+   reasoning-capable safety-classifier rail with its own timeout budget and
+   settings-driven main-LLM resolution via `providers/`;
+   `security/structured_output_guard.py::StructuredOutputGuard` adds bounded,
+   Budget-metered re-ask over `guardrails-ai` (schema-check only, no LLM call
+   inside the SDK — zero provider-isolation compromise) plus opt-in Hub
+   validators, composing with `OutputValidator`. Opt-in
+   (`nemo_classifier_enabled`, `structured_output_guard_enabled`), graph
+   unchanged. Next: `loop-hardening` (LH), `node-io-typesafety` (NTS),
+   `observability-integration` (OBS) — all spec-ready, none started.
 
 ## Maintenance notes
 

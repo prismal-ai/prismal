@@ -530,6 +530,45 @@ class Settings(BaseSettings):
         description="Redact PII from agent outputs.",
     )
 
+    # ── Node I/O Type-Safety (Phase NTS — SPEC-NTS-CFG-001) ────────────
+    node_typesafety_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for per-node I/O schema validation (Phase NTS). "
+        "When False, node_io_validation_middleware is a pure passthrough and the "
+        "compiled supervisor graph is byte-for-byte unchanged.",
+    )
+    node_typesafety_mode: str = Field(
+        default="warn",
+        description="Global default control mode: off | warn | enforce.",
+    )
+
+    # ── Observability integration (Phase OBS — SPEC-OBS-CFG-001) ──────
+    observability_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for the observability-integration layer (Phase OBS). "
+        "When False, RuntimeContext.observability is None and every existing "
+        "OTel/Langfuse call site is byte-for-byte unchanged.",
+    )
+    observability_run_buffer_size: int = Field(
+        default=200,
+        gt=0,
+        description="Max spans/tool-calls retained per run in the default adapter's ring buffer.",
+    )
+    observability_max_runs: int = Field(
+        default=500,
+        gt=0,
+        description="Max concurrent run entries retained by the default adapter "
+        "before LRU eviction.",
+    )
+    observability_score_source_default: str = Field(
+        default="system",
+        description="Default source for record_score when omitted: human | llm_judge | system.",
+    )
+    observability_dataset_export_format: str = Field(
+        default="langsmith",
+        description="Default fmt for export_dataset when omitted: langsmith | langfuse.",
+    )
+
     # ── Agent identity & access governance (Phase IDN — SPEC-IDN-CFG-001) ──
     identity_enabled: bool = Field(
         default=False,
@@ -614,6 +653,95 @@ class Settings(BaseSettings):
             "Strict mode: require declared auth and enforce a deny-all allowlist "
             "when a2a_outbound_allowlist is empty."
         ),
+    )
+
+    # ── Guardrails Modernization (Phase GRD — SPEC-GRD-CFG-001) ───────
+    nemo_classifier_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for the reasoning safety-classifier rail.",
+    )
+    nemo_classifier_model: str | None = Field(
+        default=None,
+        description="Optional model override for the classifier judgment call.",
+    )
+    nemo_classifier_categories: list[str] = Field(
+        default_factory=lambda: [
+            "violence",
+            "self_harm",
+            "illegal_activities",
+            "pii_request",
+            "competitor_disparagement",
+        ],
+        description="Configurable safety-classifier category set.",
+    )
+    nemo_classifier_threshold: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Confidence threshold to treat a classifier verdict as a block.",
+    )
+    nemo_classifier_timeout_seconds: float = Field(
+        default=3.0,
+        ge=0.0,
+        description=(
+            "Independent timeout for the classifier action only (DD-GRD-003) — "
+            "never affects the separate 450ms dialog-rail timeout."
+        ),
+    )
+    structured_output_guard_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for StructuredOutputGuard.",
+    )
+    structured_output_guard_max_reasks: int = Field(
+        default=2,
+        ge=0,
+        description="Bound on automatic re-ask attempts (0 = validate once, no re-ask).",
+    )
+    structured_output_guard_hub_validators_enabled: bool = Field(
+        default=False,
+        description="Master gate for Guardrails Hub validators.",
+    )
+
+    # ── Loop Hardening (Phase LH — SPEC-LH-CFG-001) ───────────────────
+    context_compaction_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for persisted-context compaction.",
+    )
+    context_compaction_strategy: str = Field(
+        default="truncate",
+        description="Compaction strategy: truncate (no LLM call) | summarize (opt-in).",
+    )
+    context_compaction_max_messages: int = Field(
+        default=60,
+        ge=0,
+        description="Raw message-count trigger threshold.",
+    )
+    context_compaction_token_threshold: int = Field(
+        default=0,
+        ge=0,
+        description="Cumulative-token trigger via Budget's CostMeter (0 = disabled).",
+    )
+    context_compaction_keep_recent: int = Field(
+        default=10,
+        ge=0,
+        description="Number of most-recent messages always kept verbatim.",
+    )
+    context_compaction_summarizer_model: str | None = Field(
+        default=None,
+        description="Model id for the summarize strategy; None uses the provider default.",
+    )
+    context_compaction_min_interval_messages: int = Field(
+        default=20,
+        ge=0,
+        description="Minimum new messages since the last compaction before compacting again.",
+    )
+    tool_gating_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for dynamic tool gating by task phase.",
+    )
+    tool_gating_phase_map_path: str = Field(
+        default="config/tool_gating_phases.yaml",
+        description="Phase -> capability-override table path.",
     )
 
     # ── Sandbox multi-lenguaje ────────────────────────────────────────
@@ -1898,6 +2026,77 @@ class Settings(BaseSettings):
                 f"PRISMAL_HARDENING_TOOL_POLICY_DEFAULT="
                 f"{self.hardening_tool_policy_default!r} is invalid; "
                 f"expected one of {sorted(valid_defaults)}."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_node_typesafety(self) -> "Settings":
+        """Reject an unknown ``node_typesafety_mode`` at load time (SPEC-NTS-CFG-001).
+
+        Mirrors ``_validate_hardening`` so a typo fails fast at load time rather
+        than silently disabling the control.
+        """
+        valid_modes = {"off", "warn", "enforce"}
+        if self.node_typesafety_mode not in valid_modes:
+            raise ValueError(
+                f"PRISMAL_NODE_TYPESAFETY_MODE={self.node_typesafety_mode!r} is "
+                f"invalid; expected one of {sorted(valid_modes)}."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_observability(self) -> "Settings":
+        """Reject unknown observability enum values at load time (SPEC-OBS-CFG-001).
+
+        Buffer sizes are range-bound by their Fields (``gt=0``); here we reject an
+        unknown ``observability_dataset_export_format`` / ``observability_score_source_default``
+        so a typo fails fast at load time rather than silently misbehaving (mirrors
+        ``_validate_budget`` / ``_validate_hardening``).
+        """
+        valid_formats = {"langsmith", "langfuse"}
+        if self.observability_dataset_export_format not in valid_formats:
+            raise ValueError(
+                f"PRISMAL_OBSERVABILITY_DATASET_EXPORT_FORMAT="
+                f"{self.observability_dataset_export_format!r} is invalid; "
+                f"expected one of {sorted(valid_formats)}."
+            )
+        valid_sources = {"human", "llm_judge", "system"}
+        if self.observability_score_source_default not in valid_sources:
+            raise ValueError(
+                f"PRISMAL_OBSERVABILITY_SCORE_SOURCE_DEFAULT="
+                f"{self.observability_score_source_default!r} is invalid; "
+                f"expected one of {sorted(valid_sources)}."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_guardrails_modernization(self) -> "Settings":
+        """Validate the guardrails-modernization settings (SPEC-GRD-CFG-001).
+
+        An empty ``nemo_classifier_categories`` is only a configuration error
+        when the classifier is actually enabled — disabled-by-default is the
+        zero-overhead path and an empty list there is harmless.
+        """
+        if self.nemo_classifier_enabled and not self.nemo_classifier_categories:
+            raise ValueError(
+                "PRISMAL_NEMO_CLASSIFIER_CATEGORIES must be non-empty when "
+                "PRISMAL_NEMO_CLASSIFIER_ENABLED=true."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_loop_hardening(self) -> "Settings":
+        """Validate the loop-hardening settings (SPEC-LH-CFG-001).
+
+        Numeric ranges are enforced by their Fields; here we reject an unknown
+        ``context_compaction_strategy`` so a typo fails fast at load time
+        rather than silently disabling a control.
+        """
+        valid_strategies = {"truncate", "summarize"}
+        if self.context_compaction_strategy not in valid_strategies:
+            raise ValueError(
+                f"PRISMAL_CONTEXT_COMPACTION_STRATEGY={self.context_compaction_strategy!r} "
+                f"is invalid; expected one of {sorted(valid_strategies)}."
             )
         return self
 

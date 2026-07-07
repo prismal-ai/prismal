@@ -173,4 +173,9 @@ def get_logger(name: str = "prismal") -> structlog.stdlib.BoundLogger:
     cfg = structlog.get_config()
     if not cfg.get("processors"):
         setup_logging()
-    return cast("structlog.stdlib.BoundLogger", structlog.get_logger(name).bind())
+    # Return the lazy proxy (do NOT eagerly ``.bind()``): binding at import time
+    # under ``cache_logger_on_first_use=True`` would freeze a module-level logger
+    # to whatever factory was active then, making it un-interceptable by
+    # ``structlog.testing.capture_logs`` and sensitive to import order. The lazy
+    # proxy defers materialization to first use, re-reading the live config.
+    return cast("structlog.stdlib.BoundLogger", structlog.get_logger(name))

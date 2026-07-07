@@ -7,10 +7,12 @@ strict restrictions against accessing system-level files.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import SystemMessage
+from pydantic import BaseModel
 
+from prismal.agents.extension.decorators import prismal_node
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
 from prismal.core.logging import get_logger
@@ -119,6 +121,32 @@ necesitas compartir una clave pública, copia sólo el contenido de
 """
 
 
+class FileManagerInput(BaseModel):
+    """Narrow input contract for ``file_manager_node`` (Phase NTS pilot).
+
+    A boundary projection of ``AgentState`` — declares only the keys the node
+    reads. ``messages`` is intentionally untyped (``list``); full ``BaseMessage``
+    typing is out of this projection's concern.
+    """
+
+    messages: list[Any]
+    session_id: str
+
+
+class FileManagerOutput(BaseModel):
+    """Narrow output contract for ``file_manager_node`` (Phase NTS pilot)."""
+
+    current_agent: str
+    messages: list[Any]
+
+
+@prismal_node(
+    name="file_manager",
+    security="off",
+    audit=False,
+    input_model=FileManagerInput,
+    output_model=FileManagerOutput,
+)
 async def file_manager_node(state: AgentState) -> dict[str, object]:
     """Execute the file_manager sub-agent node with a ReAct tool loop.
 
@@ -156,4 +184,4 @@ async def file_manager_node(state: AgentState) -> dict[str, object]:
     return {"current_agent": "file_manager", "messages": [response]}
 
 
-__all__ = ["file_manager_node"]
+__all__ = ["FileManagerInput", "FileManagerOutput", "file_manager_node"]

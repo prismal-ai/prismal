@@ -21,7 +21,16 @@ from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 
-from prismal.core.exceptions import NodeExecutionError, NodeTimeoutError
+from prismal.agents.extension.node_schema import (
+    NodeIOValidationResult,
+    validate_node_input,
+    validate_node_output,
+)
+from prismal.core.exceptions import (
+    NodeExecutionError,
+    NodeTimeoutError,
+    NodeValidationError,
+)
 from prismal.monitoring.otel import OTelManager
 
 if TYPE_CHECKING:
@@ -317,6 +326,77 @@ async def hardening_middleware(
     return update
 
 
+# ── Node I/O Type-Safety (Phase NTS — SPEC-NTS-MDW-001) ───────────────────────
+
+
+def _observe(result: NodeIOValidationResult) -> None:
+    """Log (on failure) + increment the appropriate OTel counter. Never raises."""
+    attrs = {"node": result.node_name, "direction": result.direction}
+    otel = OTelManager()
+    otel.increment_counter("node_io_validated", attributes=attrs)
+    if not result.ok:
+        otel.increment_counter("node_io_validation_failures", attributes=attrs)
+        _logger.warning(
+            "node_io_validation_failed",
+            node=result.node_name,
+            direction=result.direction,
+            errors=result.errors,
+        )
+
+
+async def node_io_validation_middleware(
+    next_fn: NodeFn,
+    state: AgentState,
+    metadata: NodeMetadata,
+) -> dict[str, Any]:
+    """Validate a node's declared ``input_model``/``output_model`` (Phase NTS).
+
+    Complete passthrough (no-op) when ``settings.node_typesafety_enabled`` is
+    False — this is the byte-for-byte-unchanged guarantee (RF-NTS-008). When
+    enabled, ``node_typesafety_mode`` governs the failure behaviour: ``warn``
+    logs + counts and passes the (possibly non-conforming) data through; the
+    unraised ``off`` short-circuits validation entirely; ``enforce`` raises
+    :class:`NodeValidationError`, which the outermost ``error_mapping_middleware``
+    catches unchanged (it is-a ``NodeExecutionError``).
+
+    This is the innermost stack entry: it wraps ``user_fn`` directly, so input
+    validation observes exactly the ``state`` the node receives and output
+    validation observes exactly what it returned, before any other middleware.
+    """
+    settings = get_settings()
+    if not getattr(settings, "node_typesafety_enabled", False):
+        return await next_fn(state)
+
+    mode = getattr(settings, "node_typesafety_mode", "warn")
+    if mode != "off" and metadata.input_model is not None:
+        result = validate_node_input(state, metadata.input_model, node_name=metadata.name)
+        _observe(result)
+        if not result.ok and mode == "enforce":
+            raise NodeValidationError(
+                metadata.name,
+                list(state.keys()),
+                ValueError("; ".join(result.errors)),
+                direction="input",
+                schema_errors=result.errors,
+            )
+
+    update = await next_fn(state)
+
+    if mode != "off" and metadata.output_model is not None:
+        result = validate_node_output(update, metadata.output_model, node_name=metadata.name)
+        _observe(result)
+        if not result.ok and mode == "enforce":
+            raise NodeValidationError(
+                metadata.name,
+                list(update.keys()),
+                ValueError("; ".join(result.errors)),
+                direction="output",
+                schema_errors=result.errors,
+            )
+
+    return update
+
+
 # ── Composition ───────────────────────────────────────────────────────────────
 
 # Outermost → innermost. Order rationale documented in ``decorators.prismal_node``.
@@ -329,6 +409,7 @@ DEFAULT_MIDDLEWARE_STACK: list[Middleware] = [
     retry_middleware,
     timeout_middleware,
     hardening_middleware,
+    node_io_validation_middleware,
 ]
 
 
@@ -360,6 +441,7 @@ __all__ = [
     "error_mapping_middleware",
     "hardening_middleware",
     "logger_middleware",
+    "node_io_validation_middleware",
     "otel_middleware",
     "retry_middleware",
     "security_middleware",
