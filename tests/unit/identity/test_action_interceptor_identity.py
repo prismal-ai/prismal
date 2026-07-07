@@ -8,13 +8,15 @@ deny; ``ALLOW``/``REQUIRE_HITL`` are returned for the caller to honour.
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from prismal.core.exceptions import PolicyDenied
 from prismal.identity.policy import IdentityPolicy, PolicyEngine
 from prismal.identity.types import AgentIdentity, PolicyEffect, Scope
 from prismal.security.action_interceptor import ActionInterceptor
-from prismal.security.permissions import PermissionManager
+from prismal.security.permissions import PermissionManager, PermissionType
 
 
 class _SpyAudit:
@@ -79,3 +81,24 @@ def test_require_hitl_is_returned_not_raised() -> None:
         identity=_coder(), action="tool_call", resource="tools:delete_file", policy_engine=engine
     )
     assert decision.effect is PolicyEffect.REQUIRE_HITL
+
+
+# --- ID8-03: TTL PermissionManager.check is identity-scoped when a DID is set ----
+
+
+async def test_on_tool_start_threads_identity_into_permission_check() -> None:
+    """When constructed with a DID, on_tool_start forwards it to PermissionManager.check."""
+    pm = AsyncMock()
+    pm.check = AsyncMock(return_value=True)
+    interceptor = ActionInterceptor(permission_manager=pm, identity="did:key:zCoder")
+    await interceptor.on_tool_start({"name": "bash"}, "ls -la")
+    pm.check.assert_awaited_once_with(PermissionType.SHELL, "*", identity="did:key:zCoder")
+
+
+async def test_on_tool_start_without_identity_keeps_legacy_call() -> None:
+    """With no DID (default), the check call is byte-for-byte the legacy global call (ID8-05)."""
+    pm = AsyncMock()
+    pm.check = AsyncMock(return_value=True)
+    interceptor = ActionInterceptor(permission_manager=pm)
+    await interceptor.on_tool_start({"name": "bash"}, "ls -la")
+    pm.check.assert_awaited_once_with(PermissionType.SHELL, "*")
