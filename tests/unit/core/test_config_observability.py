@@ -58,7 +58,10 @@ def test_invalid_export_format_rejected() -> None:
 
 def test_valid_export_formats_accepted() -> None:
     for fmt in ("langsmith", "langfuse"):
-        assert Settings(observability_dataset_export_format=fmt).observability_dataset_export_format == fmt
+        assert (
+            Settings(observability_dataset_export_format=fmt).observability_dataset_export_format
+            == fmt
+        )
 
 
 def test_invalid_score_source_default_rejected() -> None:
@@ -68,4 +71,7 @@ def test_invalid_score_source_default_rejected() -> None:
 
 def test_valid_score_sources_accepted() -> None:
     for src in ("human", "llm_judge", "system"):
-        assert Settings(observability_score_source_default=src).observability_score_source_default == src
+        assert (
+            Settings(observability_score_source_default=src).observability_score_source_default
+            == src
+        )

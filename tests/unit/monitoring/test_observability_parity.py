@@ -44,9 +44,7 @@ class TestNaming:
 
 
 class TestRecordScore:
-    def test_forwards_to_langfuse_and_stores_local(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_forwards_to_langfuse_and_stores_local(self, monkeypatch: pytest.MonkeyPatch) -> None:
         calls: list[tuple[str, str, float, str | None]] = []
 
         class _FakeLangfuse:
@@ -66,9 +64,7 @@ class TestRecordScore:
             status="ok",
             duration_ms=1.0,
         )
-        provider.record_score(
-            run_id="coder.s.turn0", name="groundedness", value=0.8, comment="ok"
-        )
+        provider.record_score(run_id="coder.s.turn0", name="groundedness", value=0.8, comment="ok")
 
         assert calls == [("coder.s.turn0", "groundedness", 0.8, "ok")]
         summary = provider.get_run_summary("coder.s.turn0")
@@ -163,8 +159,6 @@ class TestExportDataset:
 
     def test_unknown_run_ids_skipped(self) -> None:
         provider = self._seed()
-        records = provider.export_dataset(
-            ["ghost", "coder.s.turn0"], fmt=DatasetFormat.LANGSMITH
-        )
+        records = provider.export_dataset(["ghost", "coder.s.turn0"], fmt=DatasetFormat.LANGSMITH)
         assert len(records) == 1
         assert records[0]["metadata"]["run_id"] == "coder.s.turn0"

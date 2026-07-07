@@ -36,9 +36,7 @@ def test_pilot_model_fields_subset_of_agent_state(model, agent_state_keys) -> No
     declared = set(model.model_fields.keys())
     assert declared, f"{model.__name__} declares no fields"
     orphans = declared - agent_state_keys
-    assert not orphans, (
-        f"{model.__name__} declares fields not in AgentState: {sorted(orphans)}"
-    )
+    assert not orphans, f"{model.__name__} declares fields not in AgentState: {sorted(orphans)}"
 
 
 def test_pilot_models_are_wired_onto_nodes() -> None:

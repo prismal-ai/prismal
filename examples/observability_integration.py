@@ -38,9 +38,7 @@ def main() -> None:
 
     # 2. Seed a per-run provider (live provider stays out of checkpointed state).
     provider = FakeObservabilityProvider()
-    run_id = seed_observability_run(
-        session_id, provider, agent_name="planner", turn=0
-    )
+    run_id = seed_observability_run(session_id, provider, agent_name="planner", turn=0)
     resolved = get_observability_provider(session_id)
     assert resolved is provider
 

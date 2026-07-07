@@ -42,9 +42,7 @@ class _ConformingStub:
     def get_run_summary(self, run_id: str) -> RunSummary | None:
         return None
 
-    def export_dataset(
-        self, run_ids: Sequence[str], *, fmt: DatasetFormat
-    ) -> list[dict[str, Any]]:
+    def export_dataset(self, run_ids: Sequence[str], *, fmt: DatasetFormat) -> list[dict[str, Any]]:
         return []
 
 

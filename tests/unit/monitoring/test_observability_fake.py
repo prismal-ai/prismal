@@ -93,9 +93,7 @@ def test_record_score_on_unknown_run_is_noop() -> None:
 def test_no_io_hot_path_never_raises() -> None:
     provider = FakeObservabilityProvider()
     # Even with an odd status/empty tool calls the sync hot path must not raise.
-    provider.record_node(
-        run_id="r", node_name="n", session_id="s", status="error", duration_ms=0.0
-    )
+    provider.record_node(run_id="r", node_name="n", session_id="s", status="error", duration_ms=0.0)
     summary = provider.get_run_summary("r")
     assert summary is not None
     assert summary.spans[0].status == "error"

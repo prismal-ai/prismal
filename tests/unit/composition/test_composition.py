@@ -348,9 +348,7 @@ async def test_observability_failure_raises_composition_error(
     def _boom(*_a: Any, **_k: Any) -> Any:
         raise RuntimeError("observability down")
 
-    monkeypatch.setattr(
-        "prismal.monitoring.observability.DefaultObservabilityProvider", _boom
-    )
+    monkeypatch.setattr("prismal.monitoring.observability.DefaultObservabilityProvider", _boom)
     with pytest.raises(RuntimeCompositionError) as excinfo:
         await build_runtime(Settings(observability_enabled=True), mode="context")
     assert excinfo.value.port == "observability"

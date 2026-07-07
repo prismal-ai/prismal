@@ -26,9 +26,7 @@ def otel(monkeypatch: pytest.MonkeyPatch) -> _CountingOtel:
     counter = _CountingOtel()
     monkeypatch.setattr("prismal.monitoring.observability.OTelManager", lambda: counter)
     # Silence the Langfuse leg so record_score focuses on the counter.
-    monkeypatch.setattr(
-        "prismal.monitoring.observability.LangfuseManager", lambda: _NoopLangfuse()
-    )
+    monkeypatch.setattr("prismal.monitoring.observability.LangfuseManager", lambda: _NoopLangfuse())
     return counter
 
 
