@@ -86,6 +86,44 @@ def _parse_block_response(response: str) -> tuple[bool, str]:
         return False, ""
 
 
+_CLASSIFIER_INPUT_FLOW = "content safety reasoning input"
+_CLASSIFIER_OUTPUT_FLOW = "content safety reasoning output"
+
+
+def _activate_classifier_flows(rails_config: Any) -> None:
+    """Append the classifier flow names to ``rails_config`` (GRD1, DD-GRD-002).
+
+    ``config/nemo_rails/safety_classifier.co`` defines these flows but they
+    are only reachable once appended to ``rails.input.flows`` /
+    ``rails.output.flows`` — kept out of ``config.yml`` so the classifier
+    stays fully opt-in via ``nemo_classifier_enabled``, never activated by the
+    static config file alone.
+    """
+    if _CLASSIFIER_INPUT_FLOW not in rails_config.rails.input.flows:
+        rails_config.rails.input.flows.append(_CLASSIFIER_INPUT_FLOW)
+    if _CLASSIFIER_OUTPUT_FLOW not in rails_config.rails.output.flows:
+        rails_config.rails.output.flows.append(_CLASSIFIER_OUTPUT_FLOW)
+
+
+def _resolve_main_llm() -> Any | None:
+    """Resolve NeMo's main LLM via ``providers/`` (Rule #4 — GRD1, DD-GRD-001).
+
+    ``LLMRails`` eagerly instantiates its own main LLM from the ``models:``
+    config entry unless one is injected, requiring hardcoded provider
+    credentials. Injecting a ``providers/``-resolved client instead keeps
+    ``config/nemo_rails/config.yml`` settings-driven and provider-agnostic.
+    Never raises: a resolution failure returns ``None`` and NeMo falls back
+    to its own (config-driven) main-LLM resolution.
+    """
+    try:
+        from prismal.providers.registry import ProviderRegistry
+
+        return ProviderRegistry().get_llm()
+    except Exception as exc:
+        logger.warning("nemo_rails_llm_resolution_failed", error=str(exc))
+        return None
+
+
 def _extract_response_text(result: object) -> str:
     """Normalise the return value of ``LLMRails.generate_async``.
 
@@ -135,8 +173,16 @@ class NemoRailsLayer:
         try:
             from nemoguardrails import LLMRails, RailsConfig
 
+            from prismal.core.config import get_settings
+            from prismal.security import nemo_actions
+
+            settings = get_settings()
             rails_config = RailsConfig.from_path(str(config_path))
-            self._rails = LLMRails(rails_config)
+            if settings.nemo_classifier_enabled:
+                _activate_classifier_flows(rails_config)
+
+            self._rails = LLMRails(rails_config, llm=_resolve_main_llm())
+            nemo_actions.register(self._rails, settings=settings)
             logger.info("nemo_rails_loaded", config_path=str(config_path))
         except ImportError:
             logger.warning(

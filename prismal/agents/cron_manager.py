@@ -7,10 +7,12 @@ them into cron expressions + CronManager API calls.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import BaseMessage, SystemMessage
+from pydantic import BaseModel
 
+from prismal.agents.extension.decorators import prismal_node
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
 from prismal.core.logging import get_logger
@@ -133,6 +135,27 @@ cada tarde? ¿A qué hora exacta (por ejemplo 15:00 o 18:30)?
 """
 
 
+class CronManagerInput(BaseModel):
+    """Narrow input contract for ``cron_manager_node`` (Phase NTS pilot)."""
+
+    messages: list[Any]
+    session_id: str
+
+
+class CronManagerOutput(BaseModel):
+    """Narrow output contract for ``cron_manager_node`` (Phase NTS pilot)."""
+
+    current_agent: str
+    messages: list[Any]
+
+
+@prismal_node(
+    name="cron_manager",
+    security="off",
+    audit=False,
+    input_model=CronManagerInput,
+    output_model=CronManagerOutput,
+)
 async def cron_manager_node(state: AgentState) -> dict[str, object]:
     """Execute the cron-manager sub-agent node.
 
@@ -173,4 +196,4 @@ async def cron_manager_node(state: AgentState) -> dict[str, object]:
     return {"current_agent": "cron_manager", "messages": [response]}
 
 
-__all__ = ["cron_manager_node"]
+__all__ = ["CronManagerInput", "CronManagerOutput", "cron_manager_node"]

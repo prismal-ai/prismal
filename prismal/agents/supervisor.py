@@ -569,6 +569,21 @@ async def _extract_and_store_memory(state: AgentState) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _with_compaction(
+    update: dict[str, object], compaction_messages: list[BaseMessage]
+) -> dict[str, object]:
+    """Prepend Phase LH compaction messages to *update*'s ``messages`` list.
+
+    A no-op (``compaction_messages`` empty, the default/disabled path) returns
+    *update* unchanged.
+    """
+    if not compaction_messages:
+        return update
+    existing_raw = update.get("messages")
+    existing = list(existing_raw) if isinstance(existing_raw, list) else []
+    return {**update, "messages": [*compaction_messages, *existing]}
+
+
 def _loop_break_decision(
     state: AgentState,
     trimmed: Sequence[BaseMessage],
@@ -805,6 +820,18 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
 
     maybe_seed_hardening_run(state, get_settings())
 
+    # Loop hardening (Phase LH): seed the per-run ContextCompactor once per
+    # turn and compact state["messages"] when due. No-op unless
+    # settings.context_compaction_enabled — disabled path is unchanged.
+    from prismal.agents.context_compaction import (
+        maybe_compact_context,
+        maybe_seed_context_compaction_run,
+    )
+
+    maybe_seed_context_compaction_run(state, get_settings())
+    compaction_update = await maybe_compact_context(state, get_settings())
+    compaction_messages = compaction_update.get("messages", [])
+
     otel = OTelManager()
     with otel.start_span(
         "agent.supervisor",
@@ -823,14 +850,14 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
         loop_break = _loop_break_decision(state, trimmed, session_id)
         if loop_break is not None:
             span.set_attribute("prismal.routing_decision", "END")
-            return loop_break
+            return _with_compaction(loop_break, compaction_messages)
 
         short_circuit = _intent_short_circuit(trimmed, session_id)
         if short_circuit is not None:
             matched_intent, result = short_circuit
             span.set_attribute("prismal.routing_decision", matched_intent)
             span.set_attribute("prismal.routing_source", "intent_router")
-            return result
+            return _with_compaction(result, compaction_messages)
 
         llm = ProviderRegistry().get_llm_with_fallback()
         memory_context = await _recall_memory_context(state)
@@ -872,11 +899,14 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
             response_messages = await _build_direct_answer(llm, state, trimmed, session_id)
             _spawn_memory_extraction(state)
 
-        return {
-            "current_agent": "supervisor",
-            "next_agent": next_agent,
-            "messages": response_messages,
-        }
+        return _with_compaction(
+            {
+                "current_agent": "supervisor",
+                "next_agent": next_agent,
+                "messages": response_messages,
+            },
+            compaction_messages,
+        )
 
 
 # ---------------------------------------------------------------------------

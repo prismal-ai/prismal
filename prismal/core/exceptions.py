@@ -26,6 +26,8 @@ Hierarchy::
 
 from __future__ import annotations
 
+from typing import Literal
+
 # ── Base ─────────────────────────────────────────────────────────────────────
 
 
@@ -446,6 +448,26 @@ class RegressionGateFailed(EvalError):  # noqa: N818 — SPEC-EVL-ERR-001 name
     """The CI regression gate rejected a scorecard vs its baseline."""
 
 
+# ── Observability integration (Phase OBS — SPEC-OBS-ERR-001) ───────────────────
+
+
+class ObservabilityError(PrismalError):
+    """Base class for the opt-in observability-integration layer (Phase OBS)."""
+
+
+class ObservabilityConfigError(ObservabilityError):
+    """A malformed ``observability_*`` setting value (SPEC-OBS-ERR-001)."""
+
+
+class RunNotFoundError(ObservabilityError):
+    """A run summary was requested for an unknown/evicted ``run_id``.
+
+    Raised only by callers that opt into strict lookup;
+    :meth:`ObservabilityPort.get_run_summary` itself returns ``None``, never
+    raises (SPEC-OBS-PRT-001 / DD-OBS-006).
+    """
+
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 
@@ -598,9 +620,14 @@ class NodeExecutionError(ExtensionError):
         self,
         node_name: str,
         state_keys: list[str],
-        cause: BaseException,
+        cause: BaseException | None,
     ) -> None:
-        """Initialize NodeExecutionError."""
+        """Initialize NodeExecutionError.
+
+        ``cause`` is ``BaseException | None``: most nodes fail with a concrete
+        exception, but :class:`NodeValidationError` may carry ``None`` (a
+        schema rejection with only field-level messages).
+        """
         self.node_name = node_name
         self.state_keys = state_keys
         self.cause = cause
@@ -632,7 +659,36 @@ class NodeTimeoutError(NodeExecutionError):
 
 
 class NodeValidationError(NodeExecutionError):
-    """Raised when the ``state_update`` returned by a node is not valid."""
+    """Raised when a node's declared ``input_model``/``output_model`` rejects the
+    state (Phase NTS — SPEC-NTS-ERR-001).
+
+    Extends :class:`NodeExecutionError` (so ``error_mapping_middleware`` catches
+    it for free) with the side of the contract that failed and field-level
+    messages. Consistent with the ``state_keys``-not-values convention,
+    ``schema_errors`` carries field names and pydantic's own type/constraint
+    description only — never field values.
+
+    Args:
+        node_name: Name of the node whose contract failed.
+        state_keys: Keys present in the state/state_update at failure time.
+        cause: The underlying pydantic ``ValidationError``, or ``None``.
+        direction: ``"input"`` or ``"output"`` — which side of the contract failed.
+        schema_errors: Field-level messages (never field values).
+    """
+
+    def __init__(
+        self,
+        node_name: str,
+        state_keys: list[str],
+        cause: BaseException | None,
+        *,
+        direction: Literal["input", "output"],
+        schema_errors: list[str],
+    ) -> None:
+        """Initialize NodeValidationError."""
+        self.direction = direction
+        self.schema_errors = schema_errors
+        super().__init__(node_name, state_keys, cause)
 
 
 class PluginLoadError(ExtensionError):
@@ -878,6 +934,53 @@ class A2AAgentUnavailable(A2AError):  # noqa: N818 — SPEC-A2A-008 name
         super().__init__(f"A2A agent {agent!r} unavailable: {reason}")
 
 
+# ── Guardrails Modernization (Phase GRD) ───────────────────────────────────────
+
+
+class GuardrailsModernizationError(PrismalError):
+    """Base for errors raised by the guardrails-modernization layer (Phase GRD)."""
+
+
+class NemoClassifierError(GuardrailsModernizationError):
+    """Raised for reasoning safety-classifier failures surfaced to a caller.
+
+    The classifier action itself never raises this on the hot path (timeout
+    and provider errors fail open to ``"safe"``, per DD-GRD-003) — reserved
+    for callers that opt out of the graceful verdict path.
+    """
+
+
+class NemoClassifierConfigError(NemoClassifierError):
+    """Raised for a bad ``config/nemo_rails/`` config or a missing action registration."""
+
+
+class StructuredOutputGuardError(GuardrailsModernizationError):
+    """Base for :class:`~prismal.security.structured_output_guard.StructuredOutputGuard` errors."""
+
+
+class StructuredOutputReaskExhausted(StructuredOutputGuardError):  # noqa: N818 — SPEC-GRD-ERR-001 name
+    """Raised only if a caller opts out of the graceful ``StructuredOutputVerdict`` path.
+
+    ``StructuredOutputGuard.validate()`` itself never raises this — it returns
+    ``ok=False, reason="reask_exhausted"`` on the hot path (DD-GRD-005).
+    """
+
+
+# ── Loop Hardening (Phase LH) ───────────────────────────────────────────────
+
+
+class LoopHardeningError(PrismalError):
+    """Base for errors raised by the loop-hardening layer (Phase LH)."""
+
+
+class ContextCompactionError(LoopHardeningError):
+    """Internal use / tests — ``ContextCompactor.compact()`` itself never raises this outward."""
+
+
+class ToolGatingConfigError(LoopHardeningError):
+    """Raised for a bad ``tool_gating_phases.yaml`` — at load time, not per-request."""
+
+
 __all__ = [
     "A2AAgentUnavailable",
     "A2AError",
@@ -889,6 +992,7 @@ __all__ = [
     "CodeReviewError",
     "CompilerError",
     "ConstitutionalError",
+    "ContextCompactionError",
     "CredentialResolutionError",
     "CronJobExistsError",
     "CronJobNotFoundError",
@@ -905,6 +1009,7 @@ __all__ = [
     "EvalSetError",
     "ExtensionError",
     "FusionError",
+    "GuardrailsModernizationError",
     "HierarchicalRAGError",
     "HyDEError",
     "HybridSearchError",
@@ -916,6 +1021,7 @@ __all__ = [
     "KokoroError",
     "LATSError",
     "LangChainAdapterError",
+    "LoopHardeningError",
     "MCPConnectionError",
     "MCPError",
     "MCPToolError",
@@ -930,6 +1036,8 @@ __all__ = [
     "MultimodalError",
     "MultimodalFusionError",
     "MultimodalRAGError",
+    "NemoClassifierConfigError",
+    "NemoClassifierError",
     "NodeExecutionError",
     "NodeTimeoutError",
     "NodeValidationError",
@@ -958,10 +1066,13 @@ __all__ = [
     "SkynetPlanError",
     "SoulNotFoundError",
     "SoulValidationError",
+    "StructuredOutputGuardError",
+    "StructuredOutputReaskExhausted",
     "SwarmError",
     "SwarmWorkerError",
     "TTSError",
     "ToTError",
+    "ToolGatingConfigError",
     "ToolProviderNotConfigured",
     "VectorStoreBackendUnavailable",
     "VectorStoreError",

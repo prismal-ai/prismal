@@ -13,6 +13,203 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 All spec-complete phases under `specs/` are now implemented. New work starts
 here.
 
+## [3.9.0] — 2026-07-06
+
+> Spec: [`specs/observability-integration/`](./specs/observability-integration/).
+> Adds an **opt-in** `ObservabilityPort` — a stable, backend-agnostic contract
+> over one run's telemetry (spans, cost/latency, tool-call history, node-visit
+> sequence) — plus the concrete LangSmith/Langfuse **parity** closes (consistent
+> run/trace naming, a score/feedback hook, and evaluation-dataset export). The
+> default adapter is a thin wrapper over the *existing* `OTelManager`/
+> `LangfuseManager` emission, so it ships useful before any dashboard exists.
+> Additive and **opt-in**: with `observability_enabled=False` (default)
+> `RuntimeContext.observability` is `None`, the compiled supervisor graph is
+> byte-for-byte unchanged (snapshot-tested), and no existing OTel/Langfuse call
+> site changes. Framework-side only — a literal observability UI belongs to the
+> planned `prismal-dashboard` repo, which consumes this port.
+
+### Added
+
+- `monitoring/observability_types.py` — frozen value objects `RunSummary`,
+  `SpanRecord`, `ToolCallRecord`, `ScoreAnnotation`, and the `DatasetFormat`
+  enum. `RunSummary.usage` reuses `budget.types.Usage` (and its `__add__`) for
+  the cost/latency portion — parallel to, but independent of, `eval.Trajectory`
+  (DD-OBS-001, no import coupling either way).
+- `agents/extension/ports.py` — `ObservabilityPort` `Protocol` (`@runtime_checkable`,
+  10th port in the family): `record_node` / `record_score` (sync, **never raise**
+  on the hot path) + `get_run_summary` / `export_dataset` (best-effort, never
+  raise). Re-exported from `agents/extension/__init__.py`.
+- `monitoring/observability.py` — `DefaultObservabilityProvider` (glue over the
+  OTel/Langfuse singletons with a bounded in-memory ring buffer per run;
+  `run_buffer_size` spans/tool-calls, `max_runs` runs with LRU eviction),
+  `FakeObservabilityProvider` (deterministic, I/O-free), and the naming
+  single-source-of-truth `run_name_for` / `trace_tags_for` (DD-OBS-004).
+- `monitoring/observability_resolve.py` — per-run registry
+  (`seed_observability_run` / `get_observability_provider` /
+  `clear_observability_run`), idempotent per `(session_id, turn)`; the live
+  provider stays **out of checkpointed state** (DD-OBS-002, mirrors
+  `budget/resolve.py`).
+- `record_score` end-to-end: stores a local `ScoreAnnotation` **and** forwards to
+  `LangfuseManager.score_trace` keyed by the canonical `run_id`. `export_dataset`
+  emits LangSmith (snake_case) and Langfuse (camelCase) evaluation-dataset shapes.
+- `composition/runtime.py` — `RuntimeContext.observability: ObservabilityPort | None`
+  plus a `build_runtime()` opt-in composition step gated on `observability_enabled`
+  (mirrors `identity_enabled` / `a2a_enabled`; `RuntimeCompositionError("observability", …)`
+  on failure). `build_test_runtime(observability=…)` fake-injection parameter.
+- Settings `observability_enabled` (default `False`), `observability_run_buffer_size`
+  (`200`), `observability_max_runs` (`500`), `observability_score_source_default`
+  (`"system"`), `observability_dataset_export_format` (`"langsmith"`), validated by
+  `_validate_observability`. Exceptions `ObservabilityError` / `ObservabilityConfigError`
+  / `RunNotFoundError`. OTel counters `prismal.observability_runs_total{result}`,
+  `prismal.observability_scores_total{name}`, `prismal.observability_dataset_exports_total{fmt}`.
+- Docs: [`docs/observability-integration.md`](./docs/observability-integration.md)
+  (explicit framework/host split + eval-harness LLM-judge → `record_score`
+  pattern). Example: [`examples/observability_integration.py`](./examples/observability_integration.py).
+
+## [3.8.0] — 2026-07-05
+
+> Spec: [`specs/node-io-typesafety/`](./specs/node-io-typesafety/). Adds an
+> **opt-in, per-node** Pydantic I/O contract layer at the `@prismal_node`
+> boundary. `AgentState` stays a bare `TypedDict`; declared `input_model`/
+> `output_model` are narrow boundary projections validated at node entry/exit.
+> Additive and **opt-in**: with `node_typesafety_enabled=False` (default) the
+> compiled supervisor graph is byte-for-byte unchanged (snapshot-tested).
+
+### Added
+
+- `agents/extension/node_schema.py` — `NodeIOMode`, `NodeIODirection`,
+  `NodeIOValidationResult` (frozen), and pure, never-raising
+  `validate_node_input()` / `validate_node_output()` helpers (narrow-projection
+  semantics; extra keys ignored; field-name-only error messages, never values).
+- `@prismal_node(input_model=, output_model=)` and matching `NodeMetadata`
+  fields (both default `None`, so every existing call site is unaffected);
+  `PrismalStateGraphBuilder.add_node(input_model=, output_model=)` forwarded on
+  auto-wrap only.
+- `node_io_validation_middleware` — new **innermost** entry of
+  `DEFAULT_MIDDLEWARE_STACK` (one layer inside `hardening_middleware`); a pure
+  passthrough when disabled. Modes `off | warn | enforce`: `warn` logs + counts
+  and passes through; `enforce` raises `NodeValidationError`, mapped by the
+  existing `error_mapping_middleware` with zero changes to it.
+- Settings `node_typesafety_enabled` (default `False`) + `node_typesafety_mode`
+  (default `warn`) with a `_validate_node_typesafety` validator rejecting an
+  unknown mode; the `NodeValidationError` stub gains `direction`/`schema_errors`.
+- OTel counters `prismal.node_io_validated_total` and
+  `prismal.node_io_validation_failures_total` (labelled by `node`, `direction`).
+- Pilot annotations on `file_manager`, `cron_manager`, `skill_manager` with an
+  `AgentState`-field-name drift guard; `docs/node-typesafety.md`;
+  `examples/node_typesafety.py`.
+
+## [3.7.0] — 2026-07-04
+
+> Spec: [`specs/loop-hardening/`](./specs/loop-hardening/). Closes two gaps
+> in the agentic-loop mechanics: no context/message-window compaction, and
+> no dynamic tool provisioning by task phase. Additive and **opt-in**:
+> `context_compaction_enabled` and `tool_gating_enabled` (both default
+> `False`) ⇒ compiled graph and `get_tools_for_agent()` output byte-for-byte
+> unchanged (snapshot + contract tested). Implemented test-first (TDD).
+
+### Added — Loop Hardening (Phase LH)
+
+- **`agents/context_compaction.py`** — `ContextCompactor`: trims/summarizes
+  `state["messages"]` via `RemoveMessage` (never in-place mutation) once a
+  message-count (or Budget-token) threshold is exceeded, keeping the most
+  recent `context_compaction_keep_recent` messages verbatim. `truncate`
+  (default, no LLM call) or `summarize` (opt-in, Budget-metered, falls open
+  to truncate on summarizer failure). Per-run seeding trio
+  (`maybe_seed_context_compaction_run`/`get_context_compactor`/
+  `clear_context_compaction_run`) mirrors `budget/resolve.py`; wired into
+  `supervisor_node` next to `maybe_seed_budget_run`/`maybe_seed_hardening_run`.
+  A second, optional `react_loop(..., context_compactor=...)` hook compacts a
+  single node's local tool-loop accumulator (position-based, via the new
+  `compact_list()`) — `context_compaction_react_kwargs()` mirrors
+  `hardening_react_kwargs` for opting individual nodes in.
+- **`agents/loop_phase.py::resolve_phase`** — deterministic, LLM-free task
+  phase (`planning`/`executing`/`finishing`/`None`) from an explicit
+  `state["metadata"]["loop"]["phase"]` hint or `task_plan`/`pending_tasks`/
+  `completed_tasks`.
+- **`agents/extension/ports.py`** *(extended)* — `ToolProviderPort.get_tools()`
+  gains an optional `phase` keyword (non-breaking Protocol widening).
+- **`agents/extension/providers.py`** *(extended)* —
+  `CompositeToolProvider(phase_capability_map=...)` intersects a phase's
+  capability override with the caller's capabilities before delegating to
+  live sub-providers (never a superset); falls open to a phase-less call on
+  `TypeError` from a non-conforming sub-provider. New
+  `load_phase_capability_map()` + `config/tool_gating_phases.yaml`.
+- **`agents/tool_registry.py`** *(extended)* — `get_tools_for_agent()` /
+  `get_tools_for_agent_ctx()` / `_observed_get_tools()` thread an optional
+  `phase`, with the fail-open shim centralized at the single
+  `_observed_get_tools` choke point.
+- **Settings** (`core/config.py`) — `context_compaction_enabled`,
+  `context_compaction_strategy`, `context_compaction_max_messages`,
+  `context_compaction_token_threshold`, `context_compaction_keep_recent`,
+  `context_compaction_summarizer_model`,
+  `context_compaction_min_interval_messages`, `tool_gating_enabled`,
+  `tool_gating_phase_map_path`.
+- **Exceptions** — `LoopHardeningError`, `ContextCompactionError`,
+  `ToolGatingConfigError`.
+- **Observability** — `prismal.context_compactions_total{strategy}`,
+  `prismal.context_compaction_messages_dropped_total`,
+  `prismal.context_compaction_summarize_errors_total`,
+  `prismal.tool_gate_narrowed_total{agent}`,
+  `prismal.tool_gate_phase_resolved_total{agent,phase}`.
+- **Artifacts** — `docs/loop-hardening.md`; `examples/loop_hardening.py`.
+
+---
+
+## [3.6.0] — 2026-07-04
+
+> Spec: [`specs/guardrails-modernization/`](./specs/guardrails-modernization/).
+> Closes two concrete gaps in the 5-layer security stack: Layer 3 (NeMo
+> Guardrails) shipped no config, and output enforcement had no schema-first,
+> retry-capable framework. Additive and **opt-in**: `nemo_classifier_enabled`
+> and `structured_output_guard_enabled` (both default `False`) ⇒ compiled
+> graph byte-for-byte unchanged (snapshot-tested). Implemented test-first (TDD).
+
+### Added — Guardrails Modernization (Phase GRD)
+
+- **`config/nemo_rails/`** — `config.yml` + `main.co` (dialog/topical Colang
+  flows for the 5(+1) sentinel categories already asserted by
+  `test_nemo_rails.py`) + `safety_classifier.co`. `NemoRailsLayer` no longer a
+  silent no-op: `available=True` once `nemo_guardrails_enabled=True`.
+- **`security/nemo_actions.py`** — `content_safety_reasoning()`, a
+  reasoning-capable safety-classifier NeMo custom action gated by
+  `nemo_classifier_enabled`; fails open (`"safe"`) on timeout/error, audited +
+  counted. Its own `nemo_classifier_timeout_seconds` budget is fully
+  independent of the existing 450ms dialog-rail timeout.
+- **`security/nemo_rails.py`** *(extended)* — resolves NeMo's main LLM via
+  `providers/registry.py::ProviderRegistry` instead of `LLMRails`'s own
+  config-driven (and previously hardcoded-provider) resolution; conditionally
+  registers the classifier action and activates its Colang flows when enabled.
+  Public API unchanged.
+- **`security/structured_output_guard.py`** — `StructuredOutputGuard`,
+  `StructuredOutputVerdict`: schema-first validation via `guardrails-ai`'s
+  `Guard.for_pydantic(schema).validate()`, with a bounded, Budget-metered
+  automatic re-ask loop driven entirely by Prismal (never `guardrails-ai`'s own
+  `llm_api` mechanism — zero provider-isolation compromise). Composes with,
+  never replaces, `OutputValidator`. Opt-in Guardrails Hub validators
+  (`detect_pii`, `provenance_llm`, `toxic_language`) per-call, gated by
+  `structured_output_guard_hub_validators_enabled`; an uninstalled/unknown
+  validator degrades gracefully. New `[guardrails-ai]` extra; absent ⇒
+  `MissingDependencyError` at construction, never mid-call.
+- **Settings** (`core/config.py`) — `nemo_classifier_enabled`,
+  `nemo_classifier_model`, `nemo_classifier_categories`,
+  `nemo_classifier_threshold`, `nemo_classifier_timeout_seconds`,
+  `structured_output_guard_enabled`, `structured_output_guard_max_reasks`,
+  `structured_output_guard_hub_validators_enabled` (all default off/2/False).
+- **Exceptions** — `GuardrailsModernizationError`, `NemoClassifierError`,
+  `NemoClassifierConfigError`, `StructuredOutputGuardError`,
+  `StructuredOutputReaskExhausted`; reuses the existing `MissingDependencyError`
+  for the missing-extra case.
+- **Observability** — `prismal.nemo_classifier_checks_total{category,result}`,
+  `prismal.nemo_classifier_latency_seconds`,
+  `prismal.structured_output_reask_total{outcome}`,
+  `prismal.structured_output_hub_validator_blocks_total{validator}`.
+- **Artifacts** — `docs/security/guardrails-modernization.md`;
+  `examples/guardrails_modernization.py`; `[guardrails-ai]` extra in
+  `pyproject.toml`.
+
+---
+
 ## [3.5.0] — 2026-06-17
 
 > Spec: [`specs/a2a-interop/`](./specs/a2a-interop/). Bidirectional Agent2Agent

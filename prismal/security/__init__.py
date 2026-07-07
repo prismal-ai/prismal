@@ -31,6 +31,10 @@ from prismal.security.permissions import (
 from prismal.security.prompt_builder import SecurePromptBuilder
 from prismal.security.runaway import RunawayGuard, RunawayStatus
 from prismal.security.sanitizer import MAX_INPUT_LENGTH, InputSanitizer
+from prismal.security.structured_output_guard import (
+    StructuredOutputGuard,
+    StructuredOutputVerdict,
+)
 from prismal.security.taint import Provenance, TaintRegistry, TaintTag
 from prismal.security.tool_policy import (
     PolicyDecision,
@@ -65,6 +69,8 @@ __all__ = [
     "RunawayGuard",
     "RunawayStatus",
     "SecurePromptBuilder",
+    "StructuredOutputGuard",
+    "StructuredOutputVerdict",
     "TaintRegistry",
     "TaintTag",
     "ToolPolicy",
