@@ -54,16 +54,23 @@ class ActionInterceptor(BaseCallbackHandler):
         self,
         permission_manager: PermissionManager,
         audit_logger: AuditLogger | None = None,
+        *,
+        identity: str | None = None,
     ) -> None:
         """Initialize the interceptor.
 
         Args:
             permission_manager: Used to check grants before tool execution.
             audit_logger: Optional audit logger. Created with defaults if None.
+            identity: Resolved caller DID (``AgentIdentity.did``). When set, TTL
+                permission checks are scoped to this identity (ID8); ``None``
+                (default) keeps the legacy global check — behavior unchanged when
+                ``identity_enabled`` is off.
         """
         super().__init__()
         self._pm = permission_manager
         self._audit = audit_logger or AuditLogger()
+        self._identity = identity
         # key: run_id str → (tool_name, input_str, start_time)
         self._runs: dict[str, tuple[str, str, float]] = {}
 
@@ -90,7 +97,12 @@ class ActionInterceptor(BaseCallbackHandler):
         if required_perm is None:
             return  # not in map — pass through
 
-        has_permission = await self._pm.check(required_perm, "*")
+        # Scope the TTL check to the resolved identity when one is configured;
+        # otherwise keep the legacy identity-less (global) call byte-for-byte.
+        if self._identity is not None:
+            has_permission = await self._pm.check(required_perm, "*", identity=self._identity)
+        else:
+            has_permission = await self._pm.check(required_perm, "*")
         if not has_permission:
             logger.warning(
                 "tool_blocked",

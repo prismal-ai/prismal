@@ -122,6 +122,38 @@ validate(hop, action="tool_call", resource="rag:read")   # True; rag:write -> Fa
 Scopes may only **narrow** along `propagate` (widening raises `DelegationError`);
 an expired or revoked token fails `validate`.
 
+### Identity-scoped TTL grants (`PermissionManager`)
+
+`PermissionManager` (the TTL grant cache beneath `PolicyEngine`) can key each
+grant to a DID, so two identities sharing a `(permission_type, resource)` pair no
+longer share the same grant.
+
+```python
+from prismal.security.permissions import PermissionManager, PermissionType
+
+pm = PermissionManager()
+await pm.grant(PermissionType.SHELL, "*", identity="did:key:zCoder")   # DID-scoped
+await pm.check(PermissionType.SHELL, "*", identity="did:key:zCoder")   # True
+await pm.check(PermissionType.SHELL, "*", identity="did:key:zOther")   # False — no leak
+
+await pm.grant(PermissionType.NETWORK, "*")                            # global (legacy)
+await pm.check(PermissionType.NETWORK, "*", identity="did:key:zAny")   # True — usable by all
+
+await pm.list_grants(identity="did:key:zCoder")   # global grants + this DID's grants
+await pm.list_grants()                            # global/admin view: every active grant
+```
+
+* `identity` is **keyword-only** and defaults to `None` — a global grant that any
+  identity can use, exactly as before. Existing call sites are unchanged.
+* A DID-scoped grant satisfies a check **only** when the caller's `identity`
+  matches; an identity-less check (`identity=None`) sees only global grants.
+* `revoke` is symmetric with `grant`: `revoke(..., identity=None)` removes just the
+  global grant, `revoke(..., identity=did)` just that DID's grant.
+* `ActionInterceptor(permission_manager=pm, identity=agent_identity.did)` threads
+  the resolved DID into its pre-tool `check`; constructed without `identity` it
+  keeps the legacy global check. `PolicyEngine.allow()` remains the authoritative
+  identity-aware decision — these grants are a narrower TTL allowlist beneath it.
+
 ## Composition (host)
 
 ```python

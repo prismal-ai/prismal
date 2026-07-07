@@ -3,12 +3,12 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` (addendum to an `IMPLEMENTED` spec — see §1) |
-| **Version** | 1.0 |
-| **Date** | 2026-07-04 |
+| **Status** | `IMPLEMENTED` (v3.10.0, test-first 2026-07-07 — see §7) |
+| **Version** | 1.1 |
+| **Date** | 2026-07-04 (impl. 2026-07-07) |
 | **Parent spec** | `specs/agent-identity-governance/` (`SPEC.md`, `ARCHITECTURE.md`, `PLAN.md`, `TASKS.md` — Phase IDN, shipped v3.4.0) |
 | **Origin** | `README.md` Roadmap item 6, parenthetical: *"(ID6-02 PermissionManager-DID deferred.)"*; `docs/gap-analysis-loops-harness-guardrails-2026-07.md`, item #9 |
-| **Target package version** | `3.6.x`/`3.7.x` minor (opt-in, additive — pick the next open minor at implementation time; does not need its own major phase) |
+| **Target package version** | `3.10.0` (opt-in, additive minor — the next open minor at implementation time) |
 
 ---
 
@@ -65,12 +65,14 @@ async def revoke(self, permission_type: PermissionType, resource: str, *, identi
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| ID8-01 | `security/permissions.py`: add `identity` column/param to grant storage + `grant`/`check`/`revoke`, backward-compatible default `None` | 0.4 d | — | `TODO` |
-| ID8-02 | `security/permissions.py`: `list_grants(identity=...)` query | 0.2 d | ID8-01 | `TODO` |
-| ID8-03 | Wire `PermissionManager` calls in `action_interceptor.py`/`tool_policy.py` to pass the resolved `AgentIdentity.did` when `identity_enabled` | 0.3 d | ID8-01 | `TODO` |
-| ID8-04 | Unit: identity-scoped grant does not leak to a different identity; global grant (`identity=None`) keeps legacy behavior | 0.4 d | ID8-01 | `TODO` |
-| ID8-05 | Integration: `identity_enabled=False` ⇒ `PermissionManager` behavior byte-for-byte unchanged (snapshot/regression test) | 0.2 d | ID8-03 | `TODO` |
-| ID8-06 | Update `specs/agent-identity-governance/TASKS.md` row `ID6-02` from `TODO` to `DONE`; update `docs/identity.md` | 0.2 d | ID8-04, ID8-05 | `TODO` |
+| ID8-01 | `security/permissions.py`: add `identity` column/param to grant storage + `grant`/`check`/`revoke`, backward-compatible default `None` | 0.4 d | — | `DONE` |
+| ID8-02 | `security/permissions.py`: `list_grants(identity=...)` query | 0.2 d | ID8-01 | `DONE` |
+| ID8-03 | Wire `PermissionManager` calls in `action_interceptor.py` to pass the resolved `AgentIdentity.did` when set (`tool_policy.py` does not call `PermissionManager`) | 0.3 d | ID8-01 | `DONE` |
+| ID8-04 | Unit: identity-scoped grant does not leak to a different identity; global grant (`identity=None`) keeps legacy behavior | 0.4 d | ID8-01 | `DONE` |
+| ID8-05 | Regression: identity-less interceptor call is byte-for-byte the legacy `check(perm, "*")` (no `identity` kwarg) | 0.2 d | ID8-03 | `DONE` |
+| ID8-06 | Update `specs/agent-identity-governance/TASKS.md` row `ID6-02` to `DONE`; update `docs/identity.md`; CHANGELOG + version bump | 0.2 d | ID8-04, ID8-05 | `DONE` |
+
+**Implementation notes (v3.10.0):** `identity` is a **keyword-only** param appended to `grant`/`check`/`revoke` (positional `ttl_seconds`/`reason` untouched), so all ~existing call sites are source-compatible. `list_grants(identity=None)` returns the global/admin view (all active grants) and `list_permissions()` became a thin alias for it. Semantics: a global grant (column `NULL`) satisfies any check; a DID-scoped grant satisfies only a matching-DID check; `check(identity=None)` matches global grants only. `revoke` is symmetric with `grant` (deletes exactly the targeted scope). `ActionInterceptor` gained a keyword-only `identity` ctor param; it forwards the DID to `check` only when set, keeping the identity-less call unchanged (ID8-05). No Alembic migration — the column is additive & nullable.
 
 **Done when:** an identity-scoped grant is only usable by the identity it was issued to; a global (identity-less) grant behaves exactly as `PermissionManager` does today; `identity_enabled=False` changes nothing; `ID6-02` in the parent `TASKS.md` is updated to `DONE` with a pointer to this addendum.
 

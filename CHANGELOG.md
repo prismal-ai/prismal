@@ -13,6 +13,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 All spec-complete phases under `specs/` are now implemented. New work starts
 here.
 
+## [3.10.0] — 2026-07-07
+
+> Spec:
+> [`specs/agent-identity-governance/ADDENDUM-ID8-permission-manager-did.md`](./specs/agent-identity-governance/ADDENDUM-ID8-permission-manager-did.md).
+> Closes the one deferred task of Phase IDN (**ID6-02**): `PermissionManager`
+> TTL grants can now be keyed to an identity DID. Additive and
+> backward-compatible — omit `identity` and grants stay global, exactly as
+> before.
+
+### Added
+- `PermissionManager.grant/check/revoke` gain a keyword-only
+  `identity: str | None = None` (the caller DID). A global grant (`None`,
+  stored as `NULL`) is usable by any identity; a DID-scoped grant satisfies a
+  check only when the caller's `identity` matches, so two identities no longer
+  share a `(permission_type, resource)` grant.
+- `PermissionManager.list_grants(identity=None)` — global/admin view (every
+  active grant) or an identity view (global + that DID's grants).
+  `list_permissions()` is now a thin alias for `list_grants()`.
+- `ActionInterceptor(..., identity=...)` keyword-only param threads the resolved
+  `AgentIdentity.did` into the pre-tool TTL `check`; constructed without it, the
+  identity-less `check(perm, "*")` call is byte-for-byte unchanged.
+
+### Notes
+- The `permissions.identity` column is additive and nullable (`NULL` = global) —
+  no destructive migration. `PolicyEngine.allow()` remains the authoritative
+  identity-aware decision; these grants are a narrower TTL allowlist beneath it.
+
 ## [3.9.0] — 2026-07-06
 
 > Spec: [`specs/observability-integration/`](./specs/observability-integration/).
