@@ -542,6 +542,33 @@ class Settings(BaseSettings):
         description="Global default control mode: off | warn | enforce.",
     )
 
+    # ── Observability integration (Phase OBS — SPEC-OBS-CFG-001) ──────
+    observability_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for the observability-integration layer (Phase OBS). "
+        "When False, RuntimeContext.observability is None and every existing "
+        "OTel/Langfuse call site is byte-for-byte unchanged.",
+    )
+    observability_run_buffer_size: int = Field(
+        default=200,
+        gt=0,
+        description="Max spans/tool-calls retained per run in the default adapter's ring buffer.",
+    )
+    observability_max_runs: int = Field(
+        default=500,
+        gt=0,
+        description="Max concurrent run entries retained by the default adapter "
+        "before LRU eviction.",
+    )
+    observability_score_source_default: str = Field(
+        default="system",
+        description="Default source for record_score when omitted: human | llm_judge | system.",
+    )
+    observability_dataset_export_format: str = Field(
+        default="langsmith",
+        description="Default fmt for export_dataset when omitted: langsmith | langfuse.",
+    )
+
     # ── Agent identity & access governance (Phase IDN — SPEC-IDN-CFG-001) ──
     identity_enabled: bool = Field(
         default=False,
@@ -2014,6 +2041,31 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"PRISMAL_NODE_TYPESAFETY_MODE={self.node_typesafety_mode!r} is "
                 f"invalid; expected one of {sorted(valid_modes)}."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_observability(self) -> "Settings":
+        """Reject unknown observability enum values at load time (SPEC-OBS-CFG-001).
+
+        Buffer sizes are range-bound by their Fields (``gt=0``); here we reject an
+        unknown ``observability_dataset_export_format`` / ``observability_score_source_default``
+        so a typo fails fast at load time rather than silently misbehaving (mirrors
+        ``_validate_budget`` / ``_validate_hardening``).
+        """
+        valid_formats = {"langsmith", "langfuse"}
+        if self.observability_dataset_export_format not in valid_formats:
+            raise ValueError(
+                f"PRISMAL_OBSERVABILITY_DATASET_EXPORT_FORMAT="
+                f"{self.observability_dataset_export_format!r} is invalid; "
+                f"expected one of {sorted(valid_formats)}."
+            )
+        valid_sources = {"human", "llm_judge", "system"}
+        if self.observability_score_source_default not in valid_sources:
+            raise ValueError(
+                f"PRISMAL_OBSERVABILITY_SCORE_SOURCE_DEFAULT="
+                f"{self.observability_score_source_default!r} is invalid; "
+                f"expected one of {sorted(valid_sources)}."
             )
         return self
 

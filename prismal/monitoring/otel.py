@@ -381,6 +381,19 @@ class OTelManager:
             description="Node I/O schema validations attempted (success or failure), "
             "labelled by node and direction",
         )
+        # Observability integration (Phase OBS — SPEC-OBS-OTEL-001)
+        self._counters["observability_runs"] = self._meter.create_counter(
+            "prismal.observability_runs_total",
+            description="Observability runs by terminal result (completed|evicted)",
+        )
+        self._counters["observability_scores"] = self._meter.create_counter(
+            "prismal.observability_scores_total",
+            description="Score/feedback annotations recorded, labelled by score name",
+        )
+        self._counters["observability_dataset_exports"] = self._meter.create_counter(
+            "prismal.observability_dataset_exports_total",
+            description="Evaluation-dataset exports by format (langsmith|langfuse)",
+        )
 
     @contextmanager
     def start_span(

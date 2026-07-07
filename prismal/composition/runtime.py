@@ -54,6 +54,7 @@ if TYPE_CHECKING:
         CredentialVaultPort,
         EmbeddingsPort,
         IdentityPort,
+        ObservabilityPort,
         PolicyPort,
         ToolProviderPort,
         VectorStorePort,
@@ -179,6 +180,8 @@ class RuntimeContext:
     # A2A interop (Phase I) — the inbound handler the host mounts; None unless
     # a2a_enabled + a2a_inbound_enabled and a graph was supplied to build_runtime.
     a2a_handler: Any | None = None
+    # Observability integration (Phase OBS) — None unless observability_enabled.
+    observability: ObservabilityPort | None = None
     _closers: list[Closer] = field(default_factory=list, repr=False)
     _closed: bool = field(default=False, repr=False)
 
@@ -471,6 +474,17 @@ async def build_runtime(
             except Exception as exc:
                 raise RuntimeCompositionError("a2a", str(exc)) from exc
 
+        # 6c. Observability (Phase OBS) — opt-in, additive. Thin wrapper over the
+        #     existing OTel/Langfuse singletons; None unless observability_enabled.
+        observability: ObservabilityPort | None = None
+        if eff.observability_enabled:
+            try:
+                from prismal.monitoring.observability import DefaultObservabilityProvider
+
+                observability = DefaultObservabilityProvider(settings=eff)
+            except Exception as exc:
+                raise RuntimeCompositionError("observability", str(exc)) from exc
+
         # 7. Mode: global injects the singleton; context leaves globals untouched.
         if resolved_mode == "global":
             from prismal.agents.tool_registry import set_tool_provider
@@ -492,6 +506,7 @@ async def build_runtime(
         credential_vault=credential_vault,
         policy_engine=policy_engine,
         a2a_handler=a2a_handler,
+        observability=observability,
     )
     ctx._closers = closers
     logger.info(
@@ -563,6 +578,7 @@ def build_test_runtime(
     tool_provider: ToolProviderPort | None = None,
     vector_store: VectorStorePort | None = None,
     embeddings: EmbeddingsPort | None = None,
+    observability: ObservabilityPort | None = None,
     org_id: str | None = None,
     collection_base: str = DEFAULT_COLLECTION_BASE,
 ) -> RuntimeContext:
@@ -570,7 +586,9 @@ def build_test_runtime(
 
     No I/O, no connections, no global injection; :meth:`RuntimeContext.aclose`
     is effectively a no-op. Defaults: ``FakeToolProvider`` (Y), ``FakeVectorStore``
-    (Z), and in-module embeddings/checkpointer/audit doubles.
+    (Z), and in-module embeddings/checkpointer/audit doubles. ``observability``
+    defaults to ``None`` (parity with the other opt-in ports); pass a
+    ``FakeObservabilityProvider`` to exercise the observability port in tests.
     """
     from prismal.agents.extension.providers import FakeToolProvider
     from prismal.rag.vector_store_factory import FakeVectorStore
@@ -599,6 +617,7 @@ def build_test_runtime(
         checkpointer=_FakeCheckpointer(),
         audit=_FakeAudit(),
         org_id=org_id,
+        observability=observability,
     )
 
 

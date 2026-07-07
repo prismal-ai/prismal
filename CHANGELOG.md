@@ -13,6 +13,59 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 All spec-complete phases under `specs/` are now implemented. New work starts
 here.
 
+## [3.9.0] — 2026-07-06
+
+> Spec: [`specs/observability-integration/`](./specs/observability-integration/).
+> Adds an **opt-in** `ObservabilityPort` — a stable, backend-agnostic contract
+> over one run's telemetry (spans, cost/latency, tool-call history, node-visit
+> sequence) — plus the concrete LangSmith/Langfuse **parity** closes (consistent
+> run/trace naming, a score/feedback hook, and evaluation-dataset export). The
+> default adapter is a thin wrapper over the *existing* `OTelManager`/
+> `LangfuseManager` emission, so it ships useful before any dashboard exists.
+> Additive and **opt-in**: with `observability_enabled=False` (default)
+> `RuntimeContext.observability` is `None`, the compiled supervisor graph is
+> byte-for-byte unchanged (snapshot-tested), and no existing OTel/Langfuse call
+> site changes. Framework-side only — a literal observability UI belongs to the
+> planned `prismal-dashboard` repo, which consumes this port.
+
+### Added
+
+- `monitoring/observability_types.py` — frozen value objects `RunSummary`,
+  `SpanRecord`, `ToolCallRecord`, `ScoreAnnotation`, and the `DatasetFormat`
+  enum. `RunSummary.usage` reuses `budget.types.Usage` (and its `__add__`) for
+  the cost/latency portion — parallel to, but independent of, `eval.Trajectory`
+  (DD-OBS-001, no import coupling either way).
+- `agents/extension/ports.py` — `ObservabilityPort` `Protocol` (`@runtime_checkable`,
+  10th port in the family): `record_node` / `record_score` (sync, **never raise**
+  on the hot path) + `get_run_summary` / `export_dataset` (best-effort, never
+  raise). Re-exported from `agents/extension/__init__.py`.
+- `monitoring/observability.py` — `DefaultObservabilityProvider` (glue over the
+  OTel/Langfuse singletons with a bounded in-memory ring buffer per run;
+  `run_buffer_size` spans/tool-calls, `max_runs` runs with LRU eviction),
+  `FakeObservabilityProvider` (deterministic, I/O-free), and the naming
+  single-source-of-truth `run_name_for` / `trace_tags_for` (DD-OBS-004).
+- `monitoring/observability_resolve.py` — per-run registry
+  (`seed_observability_run` / `get_observability_provider` /
+  `clear_observability_run`), idempotent per `(session_id, turn)`; the live
+  provider stays **out of checkpointed state** (DD-OBS-002, mirrors
+  `budget/resolve.py`).
+- `record_score` end-to-end: stores a local `ScoreAnnotation` **and** forwards to
+  `LangfuseManager.score_trace` keyed by the canonical `run_id`. `export_dataset`
+  emits LangSmith (snake_case) and Langfuse (camelCase) evaluation-dataset shapes.
+- `composition/runtime.py` — `RuntimeContext.observability: ObservabilityPort | None`
+  plus a `build_runtime()` opt-in composition step gated on `observability_enabled`
+  (mirrors `identity_enabled` / `a2a_enabled`; `RuntimeCompositionError("observability", …)`
+  on failure). `build_test_runtime(observability=…)` fake-injection parameter.
+- Settings `observability_enabled` (default `False`), `observability_run_buffer_size`
+  (`200`), `observability_max_runs` (`500`), `observability_score_source_default`
+  (`"system"`), `observability_dataset_export_format` (`"langsmith"`), validated by
+  `_validate_observability`. Exceptions `ObservabilityError` / `ObservabilityConfigError`
+  / `RunNotFoundError`. OTel counters `prismal.observability_runs_total{result}`,
+  `prismal.observability_scores_total{name}`, `prismal.observability_dataset_exports_total{fmt}`.
+- Docs: [`docs/observability-integration.md`](./docs/observability-integration.md)
+  (explicit framework/host split + eval-harness LLM-judge → `record_score`
+  pattern). Example: [`examples/observability_integration.py`](./examples/observability_integration.py).
+
 ## [3.8.0] — 2026-07-05
 
 > Spec: [`specs/node-io-typesafety/`](./specs/node-io-typesafety/). Adds an

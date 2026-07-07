@@ -448,6 +448,26 @@ class RegressionGateFailed(EvalError):  # noqa: N818 — SPEC-EVL-ERR-001 name
     """The CI regression gate rejected a scorecard vs its baseline."""
 
 
+# ── Observability integration (Phase OBS — SPEC-OBS-ERR-001) ───────────────────
+
+
+class ObservabilityError(PrismalError):
+    """Base class for the opt-in observability-integration layer (Phase OBS)."""
+
+
+class ObservabilityConfigError(ObservabilityError):
+    """A malformed ``observability_*`` setting value (SPEC-OBS-ERR-001)."""
+
+
+class RunNotFoundError(ObservabilityError):
+    """A run summary was requested for an unknown/evicted ``run_id``.
+
+    Raised only by callers that opt into strict lookup;
+    :meth:`ObservabilityPort.get_run_summary` itself returns ``None``, never
+    raises (SPEC-OBS-PRT-001 / DD-OBS-006).
+    """
+
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 

@@ -12,17 +12,24 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Mapping, Sequence
+    from typing import Literal
 
     from langchain_core.documents import Document
     from langchain_core.tools import BaseTool
     from pydantic import SecretStr
 
+    from prismal.budget.types import Usage
     from prismal.identity.types import (
         DID,
         AgentIdentity,
         Credential,
         PolicyDecision,
         Scope,
+    )
+    from prismal.monitoring.observability_types import (
+        DatasetFormat,
+        RunSummary,
+        ToolCallRecord,
     )
 
 
@@ -276,6 +283,74 @@ class PolicyPort(Protocol):
         ...
 
 
+@runtime_checkable
+class ObservabilityPort(Protocol):
+    """Queryable surface over a run's telemetry — backend-agnostic (SPEC-OBS-PRT-001).
+
+    Conforming implementations: ``DefaultObservabilityProvider`` (thin wrapper over
+    the existing ``OTelManager``/``LangfuseManager`` singletons), ``FakeObservabilityProvider``
+    (tests), and any future first-party store or host-supplied adapter (e.g. one
+    ``prismal-dashboard`` implements directly over its own persistence). The core
+    only calls these methods; it never renders them (no web UI belongs here — see
+    PLAN.md's scope boundary).
+
+    ``record_node`` and ``record_score`` are sync and must not raise on the hot
+    path (fail-open: a backend error is logged, never propagated into the graph).
+    """
+
+    def record_node(
+        self,
+        *,
+        run_id: str,
+        node_name: str,
+        session_id: str,
+        status: Literal["ok", "error"],
+        duration_ms: float,
+        tool_calls: Sequence[ToolCallRecord] = (),
+        usage: Usage | None = None,
+    ) -> None:
+        """Record one node's execution (span + its tool calls + LLM usage, if any)."""
+        ...
+
+    def record_score(
+        self,
+        *,
+        run_id: str,
+        name: str,
+        value: float,
+        comment: str = "",
+        source: Literal["human", "llm_judge", "system"] = "system",
+    ) -> None:
+        """Attach a named score/feedback annotation to *run_id* (SPEC-OBS-PAR-002).
+
+        Usable by a human reviewer or the eval-harness's LLM-judge
+        (``prismal.eval.judges``) to close the "feedback/score annotation" gap.
+        Never raises; an unknown ``run_id`` is a no-op (logged at debug level).
+        """
+        ...
+
+    def get_run_summary(self, run_id: str) -> RunSummary | None:
+        """Return the queryable snapshot for *run_id*, or ``None`` if unknown/evicted.
+
+        Best-effort by contract (SPEC-OBS-PRT-001 / ARCHITECTURE.md DD-OBS-006) —
+        implementations are not required to persist beyond process lifetime.
+        """
+        ...
+
+    def export_dataset(
+        self,
+        run_ids: Sequence[str],
+        *,
+        fmt: DatasetFormat,
+    ) -> list[dict[str, Any]]:
+        """Export the given runs as evaluation-dataset records for *fmt*.
+
+        Never raises; runs with no summary are skipped. See SPEC-OBS-PAR-003 for
+        the per-format record shape.
+        """
+        ...
+
+
 def conforms_to(obj: Any, port: type) -> bool:
     """Return ``True`` if ``obj`` structurally satisfies ``port``.
 
@@ -294,6 +369,7 @@ __all__ = [
     "CredentialVaultPort",
     "EmbeddingsPort",
     "IdentityPort",
+    "ObservabilityPort",
     "PolicyPort",
     "ToolPort",
     "ToolProviderPort",

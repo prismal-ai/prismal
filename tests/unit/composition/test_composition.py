@@ -318,3 +318,52 @@ async def test_identity_ports_composed_when_enabled(patched_builders: dict[str, 
     assert isinstance(ctx.credential_vault, CredentialVaultPort)
     assert isinstance(ctx.policy_engine, PolicyPort)
     await ctx.aclose()
+
+
+# ── OBS4: observability port composition (opt-in, mirrors identity/a2a) ───────
+
+
+@pytest.mark.asyncio
+async def test_observability_none_when_disabled(patched_builders: dict[str, Any]) -> None:
+    ctx = await build_runtime(Settings(), mode="context")
+    assert ctx.observability is None
+    await ctx.aclose()
+
+
+@pytest.mark.asyncio
+async def test_observability_composed_when_enabled(patched_builders: dict[str, Any]) -> None:
+    from prismal.agents.extension.ports import ObservabilityPort
+    from prismal.monitoring.observability import DefaultObservabilityProvider
+
+    ctx = await build_runtime(Settings(observability_enabled=True), mode="context")
+    assert isinstance(ctx.observability, ObservabilityPort)
+    assert isinstance(ctx.observability, DefaultObservabilityProvider)
+    await ctx.aclose()
+
+
+@pytest.mark.asyncio
+async def test_observability_failure_raises_composition_error(
+    patched_builders: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _boom(*_a: Any, **_k: Any) -> Any:
+        raise RuntimeError("observability down")
+
+    monkeypatch.setattr(
+        "prismal.monitoring.observability.DefaultObservabilityProvider", _boom
+    )
+    with pytest.raises(RuntimeCompositionError) as excinfo:
+        await build_runtime(Settings(observability_enabled=True), mode="context")
+    assert excinfo.value.port == "observability"
+
+
+def test_test_runtime_observability_defaults_none() -> None:
+    ctx = build_test_runtime()
+    assert ctx.observability is None
+
+
+def test_test_runtime_observability_injected() -> None:
+    from prismal.monitoring.observability import FakeObservabilityProvider
+
+    fake = FakeObservabilityProvider()
+    ctx = build_test_runtime(observability=fake)
+    assert ctx.observability is fake
