@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ============================================================
 [project]
 name = "prismal-ai"
-version = "3.10.0"
+version = "3.10.1"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -70,7 +70,7 @@ dependencies = [
   # ── Document Processing ───────────────────────────────────
   "pypdf>=6.13.3",                  # PDF loader (>=6.13.3 fixes GHSA-jm82-fx9c-mx94; earlier >=6.12.0 fixed CVE-2026-48155/48156 DoS)
   "docx2txt>=0.8",                  # DOCX loader
-  "unstructured>=0.16.10",          # Universal document parser
+  "unstructured>=0.21.5",           # Universal document parser (>=0.21.5: floor lifted so a fresh resolve on py3.13 can't drag ancient numba 0.53.1/llvmlite via the old dep tree — see CHANGELOG 3.10.1)
   "python-magic>=0.4.27",           # File type detection
   "icalendar>=6.0.0",               # iCalendar (.ics) parsing for calendar skill
   # ── Embeddings ────────────────────────────────────────────

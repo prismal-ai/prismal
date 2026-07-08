@@ -13,6 +13,31 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 All spec-complete phases under `specs/` are now implemented. New work starts
 here.
 
+## [3.10.1] — 2026-07-07
+
+> Packaging-only patch: no engine logic changed, and the four public entry
+> points (`build_runtime`, `get_async_compiled_graph`, the A2A
+> `A2AServerHandler` / `build_agent_card`, and identity) are byte-for-byte
+> unchanged.
+
+### Fixed
+- **Fresh-resolve packaging metadata for downstream hosts.** The core
+  dependency floor `unstructured>=0.16.10` was loose enough that a *fresh*
+  resolution of the published `prismal-ai` sdist (a consumer that does not
+  inherit the engine's `uv.lock`) could select an old `unstructured` whose
+  dependency tree drags an ancient `numba` (`0.53.1`, Python <3.10 only) —
+  which has no Python 3.13 wheel and cannot build on 3.13. The floor is raised
+  to `unstructured>=0.21.5` (the version the engine's own `uv.lock` already
+  pins), so a clean py3.13 resolve now selects the working transitive trio
+  (`unstructured 0.21.5`, `numba 0.61.2`, `llvmlite 0.44.0`). `numba` and
+  `llvmlite` are transitive-only (never imported by `prismal`), so they are
+  intentionally not declared as direct dependencies.
+
+### Notes
+- Downstream hosts (e.g. `prismal-server`) that added a temporary
+  `[tool.uv] constraint-dependencies` workaround for `numba` / `llvmlite` /
+  `unstructured` can drop it once they depend on `prismal-ai>=3.10.1`.
+
 ## [3.10.0] — 2026-07-07
 
 > Spec:
