@@ -5219,7 +5219,7 @@ wheels = [
 
 [[package]]
 name = "prismal-ai"
-version = "3.10.0"
+version = "3.10.1"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -5588,7 +5588,7 @@ requires-dist = [
     { name = "types-toml", marker = "extra == 'dev'", specifier = ">=0.10.8.20240310" },
     { name = "tzdata", marker = "extra == 'datetime'", specifier = ">=2024.1" },
     { name = "tzlocal", specifier = ">=5.2" },
-    { name = "unstructured", specifier = ">=0.16.10" },
+    { name = "unstructured", specifier = ">=0.21.5" },
     { name = "watchdog", specifier = ">=6.0.0" },
     { name = "xgboost", marker = "extra == 'ml'", specifier = ">=2.1.0" },
     { name = "xxhash", specifier = ">=3.5.0" },
