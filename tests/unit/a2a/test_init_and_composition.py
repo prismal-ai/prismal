@@ -92,6 +92,23 @@ class TestPublicExports:
         ):
             assert hasattr(a2a, name), name
 
+    def test_reexports_agent_card_build_dependencies(self) -> None:
+        """The two inputs a host needs to call ``build_agent_card`` are public.
+
+        ``build_agent_card(settings, registry, ...)`` requires a ``Settings``
+        instance and a capability registry. Re-exporting ``get_settings`` and
+        ``DEFAULT_CAPABILITY_MAP`` from ``prismal.a2a`` lets a host build the
+        Agent Card without reaching into ``prismal.core`` / ``prismal.agents``.
+        """
+        import prismal.a2a as a2a
+        from prismal.agents.tool_registry import DEFAULT_CAPABILITY_MAP
+        from prismal.core.config import get_settings
+
+        assert "get_settings" in a2a.__all__
+        assert "DEFAULT_CAPABILITY_MAP" in a2a.__all__
+        assert a2a.get_settings is get_settings
+        assert a2a.DEFAULT_CAPABILITY_MAP is DEFAULT_CAPABILITY_MAP
+
 
 class _FakeGraph:
     async def ainvoke(self, state: dict[str, Any], config: Any = None) -> dict[str, Any]:
