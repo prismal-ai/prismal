@@ -30,8 +30,11 @@ from prismal.a2a.types import (
     AgentCard,
     AgentSkill,
 )
+from prismal.agents.tool_registry import DEFAULT_CAPABILITY_MAP
+from prismal.core.config import get_settings
 
 __all__ = [
+    "DEFAULT_CAPABILITY_MAP",
     "PROTOCOL_VERSION",
     "A2AAgentNode",
     "A2AArtifact",
@@ -48,4 +51,5 @@ __all__ = [
     "AuthContext",
     "build_agent_card",
     "clear_agent_card_cache",
+    "get_settings",
 ]

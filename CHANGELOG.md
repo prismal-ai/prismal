@@ -13,6 +13,27 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 All spec-complete phases under `specs/` are now implemented. New work starts
 here.
 
+## [3.10.2] — 2026-07-08
+
+> Public-surface patch: no engine logic changed and `build_agent_card`'s
+> behaviour is unchanged. A host that serves the A2A Agent Card at
+> `/.well-known/agent-card.json` needs the two inputs of
+> `build_agent_card(settings, registry, ...)` — a `Settings` instance and a
+> capability registry. Re-exporting them from `prismal.a2a` lets the host build
+> the card without reaching into `prismal.core` / `prismal.agents` internals.
+
+### Added
+- `prismal.a2a` now re-exports `get_settings` (from `prismal.core.config`) and
+  `DEFAULT_CAPABILITY_MAP` (from `prismal.agents.tool_registry`), so
+  `from prismal.a2a import build_agent_card, get_settings, DEFAULT_CAPABILITY_MAP`
+  is enough to construct the Agent Card. Purely additive — existing exports and
+  behaviour are unchanged.
+
+**Consumer note.** After bumping the pin to `prismal-ai>=3.10.2,<4`,
+`prismal-server` can build the card from these public symbols and
+`GET /.well-known/agent-card.json` stops returning `500` and serves the real
+card.
+
 ## [3.10.1] — 2026-07-07
 
 > Packaging-only patch: no engine logic changed, and the four public entry
