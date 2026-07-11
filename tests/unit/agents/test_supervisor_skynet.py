@@ -94,6 +94,7 @@ class TestIntentShortCircuitGating:
             multimodal_enabled = False
             kokoro_enabled = False
             skynet_enabled = True
+            blind_review_pipeline_enabled = False
 
         monkeypatch.setattr("prismal.agents.supervisor.get_settings", lambda: _S())
         result = _intent_short_circuit(_trimmed, "sess")
@@ -108,6 +109,7 @@ class TestIntentShortCircuitGating:
             multimodal_enabled = False
             kokoro_enabled = False
             skynet_enabled = False
+            blind_review_pipeline_enabled = False
 
         monkeypatch.setattr("prismal.agents.supervisor.get_settings", lambda: _S())
         # Route not in valid set → None → supervisor falls through to the LLM.

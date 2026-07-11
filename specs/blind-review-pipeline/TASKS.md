@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
+| **Status** | `IMPLEMENTED` (v3.11.0, 2026-07-11) |
 | **Version** | 1.0 |
 | **Date** | 2026-07-10 |
 | **Phase** | BRP |
@@ -26,9 +26,9 @@ unit tests run without an LLM backend. BRP composes existing primitives
 (`SubgraphFactory`, `gates.py`, `ProviderRegistry`, `ToolProviderPort`,
 `code_review/types.py`) — no new LangGraph capability.
 
-Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **Nothing implemented
-yet — this document is the TDD implementation plan requested alongside the
-PLAN/ARCHITECTURE/SPEC.**
+Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **All phases (BRP1–BRP6)
+implemented via strict TDD and shipped in v3.11.0 (2026-07-11); every row
+below is `DONE`.**
 
 ## 2. TDD Workflow (applies to every task below)
 
@@ -75,10 +75,10 @@ quality gate (ruff/mypy --strict/bandit) is clean for the files it touches.
 
 | ID | Task | Test(s) first | Estimate | Dependency | Status |
 |---|---|---|---|---|---|
-| BRP1-01 | `core/exceptions.py`: `BlindReviewPipelineError` hierarchy (SPEC-BRP-ERR-001) | `tests/unit/core/test_exceptions.py::test_blind_review_error_hierarchy` | 0.2 d | — | TODO |
-| BRP1-02 | `core/config.py`: `blind_review_*` settings fields (SPEC-BRP-CFG-001) | `tests/unit/core/test_config.py::test_blind_review_settings_defaults` | 0.3 d | BRP1-01 | TODO |
-| BRP1-03 | `_validate_blind_review`: threshold range, iteration floor, same-model `WARNING` | `tests/unit/core/test_config.py::test_blind_review_validation_{threshold,iterations,same_model_warns}` | 0.4 d | BRP1-02 | TODO |
-| BRP1-04 | `blind_review_pipeline/synthesis.py`: `SynthesisResult` dataclass (SPEC-BRP-TYP-001) | `tests/unit/agents/subgraphs/blind_review_pipeline/test_synthesis.py::test_synthesis_result_roundtrip` | 0.2 d | — | TODO |
+| BRP1-01 | `core/exceptions.py`: `BlindReviewPipelineError` hierarchy (SPEC-BRP-ERR-001) | `tests/unit/core/test_exceptions.py::test_blind_review_error_hierarchy` | 0.2 d | — | DONE |
+| BRP1-02 | `core/config.py`: `blind_review_*` settings fields (SPEC-BRP-CFG-001) | `tests/unit/core/test_config.py::test_blind_review_settings_defaults` | 0.3 d | BRP1-01 | DONE |
+| BRP1-03 | `_validate_blind_review`: threshold range, iteration floor, same-model `WARNING` | `tests/unit/core/test_config.py::test_blind_review_validation_{threshold,iterations,same_model_warns}` | 0.4 d | BRP1-02 | DONE |
+| BRP1-04 | `blind_review_pipeline/synthesis.py`: `SynthesisResult` dataclass (SPEC-BRP-TYP-001) | `tests/unit/agents/subgraphs/blind_review_pipeline/test_synthesis.py::test_synthesis_result_roundtrip` | 0.2 d | — | DONE |
 
 **Done when:** settings parse from `PRISMAL_BLIND_REVIEW_*` env vars;
 out-of-range threshold/iterations raise `BlindReviewConfigError`; a
@@ -89,11 +89,11 @@ same-model reviewer pair logs a `WARNING` and does not raise;
 
 | ID | Task | Test(s) first | Estimate | Dependency | Status |
 |---|---|---|---|---|---|
-| BRP2-01 | `make_spec_agent_node()` with injected `spec_fn` (SPEC-BRP-SPEC-001) | `tests/unit/agents/subgraphs/blind_review_pipeline/test_spec_agent.py::test_spec_agent_writes_spec_artifact` | 0.4 d | BRP1 | TODO |
-| BRP2-02 | Default `spec_fn` lazily wires `ProviderRegistry(settings).get_llm(blind_review_spec_model)` + `ToolProviderPort` | `test_spec_agent.py::test_default_spec_fn_resolves_configured_model_and_tools` (fake provider/registry) | 0.4 d | BRP2-01 | TODO |
-| BRP2-03 | `make_implementer_agent_node()` reads only `spec_artifact` (+ prior issues) (SPEC-BRP-IMPL-001) | `tests/unit/agents/subgraphs/blind_review_pipeline/test_implementer_agent.py::test_implementer_reads_spec_only` | 0.5 d | BRP1 | TODO |
-| BRP2-04 | `implementer_agent_node` calls `ActionInterceptor.check()` before file/code actions | `test_implementer_agent.py::test_implementer_calls_action_interceptor` (spy) | 0.3 d | BRP2-03 | TODO |
-| BRP2-05 | Retry path: prior `synthesis.report.issues` passed to `implementer_fn`, not raw reviewer prose | `test_implementer_agent.py::test_implementer_retry_receives_structured_issues` | 0.3 d | BRP2-03 | TODO |
+| BRP2-01 | `make_spec_agent_node()` with injected `spec_fn` (SPEC-BRP-SPEC-001) | `tests/unit/agents/subgraphs/blind_review_pipeline/test_spec_agent.py::test_spec_agent_writes_spec_artifact` | 0.4 d | BRP1 | DONE |
+| BRP2-02 | Default `spec_fn` lazily wires `ProviderRegistry(settings).get_llm(blind_review_spec_model)` + `ToolProviderPort` | `test_spec_agent.py::test_default_spec_fn_resolves_configured_model_and_tools` (fake provider/registry) | 0.4 d | BRP2-01 | DONE |
+| BRP2-03 | `make_implementer_agent_node()` reads only `spec_artifact` (+ prior issues) (SPEC-BRP-IMPL-001) | `tests/unit/agents/subgraphs/blind_review_pipeline/test_implementer_agent.py::test_implementer_reads_spec_only` | 0.5 d | BRP1 | DONE |
+| BRP2-04 | `implementer_agent_node` calls `ActionInterceptor.check()` before file/code actions | `test_implementer_agent.py::test_implementer_calls_action_interceptor` (spy) | 0.3 d | BRP2-03 | DONE |
+| BRP2-05 | Retry path: prior `synthesis.report.issues` passed to `implementer_fn`, not raw reviewer prose | `test_implementer_agent.py::test_implementer_retry_receives_structured_issues` | 0.3 d | BRP2-03 | DONE |
 
 **Done when:** `spec_agent_node` output lands at
 `state["metadata"]["blind_review"]["spec_artifact"]`; a test asserts
@@ -106,12 +106,12 @@ else via a strict-signature spy.
 
 | ID | Task | Test(s) first | Estimate | Dependency | Status |
 |---|---|---|---|---|---|
-| BRP3-01 | `make_reviewer_node(role, model_id, capabilities, reviewer_fn)` (SPEC-BRP-REV-001) | `tests/unit/agents/subgraphs/blind_review_pipeline/test_reviewer_node.py::test_reviewer_node_reads_spec_and_artifact_only` | 0.5 d | BRP1 | TODO |
-| BRP3-02 | `_extract_blind_context(state)` private helper — the only state accessor the node body uses | `test_reviewer_node.py::test_extract_blind_context_ignores_messages_key` (state fixture with populated `messages`) | 0.3 d | BRP3-01 | TODO |
-| BRP3-03 | `BlindnessGuard.assert_no_message_leak()` runtime check | `tests/unit/agents/subgraphs/blind_review_pipeline/test_blindness_guard.py::test_guard_{raises_on_leak,passes_clean_text}` | 0.4 d | BRP3-01 | TODO |
-| BRP3-04 | AST guard test: `reviewer_node.py` never references `state["messages"]` / `state.get("messages"` | `tests/unit/agents/subgraphs/blind_review_pipeline/test_reviewer_blindness_guard.py::test_reviewer_module_never_reads_messages` (write this test FIRST against the not-yet-written module; it must fail with "module not found", then pass once BRP3-01 lands clean) | 0.4 d | BRP3-01 | TODO |
-| BRP3-05 | Default `reviewer_fn` resolves per-role `ProviderRegistry`/`ToolProviderPort` (`agent_name=role`) | `test_reviewer_node.py::test_default_reviewer_fn_uses_role_scoped_provider_and_tools` | 0.4 d | BRP3-01 | TODO |
-| BRP3-06 | `reviewer_a` and `reviewer_b` nodes never read each other's verdict field | `test_reviewer_node.py::test_reviewer_a_does_not_read_reviewer_b_verdict` | 0.3 d | BRP3-01 | TODO |
+| BRP3-01 | `make_reviewer_node(role, model_id, capabilities, reviewer_fn)` (SPEC-BRP-REV-001) | `tests/unit/agents/subgraphs/blind_review_pipeline/test_reviewer_node.py::test_reviewer_node_reads_spec_and_artifact_only` | 0.5 d | BRP1 | DONE |
+| BRP3-02 | `_extract_blind_context(state)` private helper — the only state accessor the node body uses | `test_reviewer_node.py::test_extract_blind_context_ignores_messages_key` (state fixture with populated `messages`) | 0.3 d | BRP3-01 | DONE |
+| BRP3-03 | `BlindnessGuard.assert_no_message_leak()` runtime check | `tests/unit/agents/subgraphs/blind_review_pipeline/test_blindness_guard.py::test_guard_{raises_on_leak,passes_clean_text}` | 0.4 d | BRP3-01 | DONE |
+| BRP3-04 | AST guard test: `reviewer_node.py` never references `state["messages"]` / `state.get("messages"` | `tests/unit/agents/subgraphs/blind_review_pipeline/test_reviewer_blindness_guard.py::test_reviewer_module_never_reads_messages` (write this test FIRST against the not-yet-written module; it must fail with "module not found", then pass once BRP3-01 lands clean) | 0.4 d | BRP3-01 | DONE |
+| BRP3-05 | Default `reviewer_fn` resolves per-role `ProviderRegistry`/`ToolProviderPort` (`agent_name=role`) | `test_reviewer_node.py::test_default_reviewer_fn_uses_role_scoped_provider_and_tools` | 0.4 d | BRP3-01 | DONE |
+| BRP3-06 | `reviewer_a` and `reviewer_b` nodes never read each other's verdict field | `test_reviewer_node.py::test_reviewer_a_does_not_read_reviewer_b_verdict` | 0.3 d | BRP3-01 | DONE |
 
 **Done when:** BRP3-04's AST test is the load-bearing proof of RF-BRP-04 —
 CI fails immediately if a future edit adds `state["messages"]` (or
@@ -125,12 +125,23 @@ prompt string (containing `"HumanMessage("`-shaped content) and asserts
 
 | ID | Task | Test(s) first | Estimate | Dependency | Status |
 |---|---|---|---|---|---|
-| BRP4-01 | `synthesize_verdicts()`: deterministic merge, no LLM call (SPEC-BRP-SYN-001) | `test_synthesis.py::test_synthesize_{min_score,union_issues_deduped,agreement_flag}` | 0.5 d | BRP1-04 | TODO |
-| BRP4-02 | `score_gate(field="blind_review.synthesis.report.score", ...)` wiring (reused, unmodified) | `tests/unit/agents/subgraphs/blind_review_pipeline/test_builder.py::test_score_gate_routes_{pass,fail}` | 0.3 d | BRP4-01 | TODO |
-| BRP4-03 | Static two-way fan-out edges `implementer -> {reviewer_a, reviewer_b}` (DD-BRP-005) | `test_builder.py::test_both_reviewers_run_before_synthesis` | 0.4 d | BRP2, BRP3 | TODO |
-| BRP4-04 | HITL trio reused verbatim (`seed_hitl_metadata`/`human_approval_node`/`hitl_gate`) | `test_builder.py::test_hitl_bypassed_when_disabled` + `test_hitl_interrupt_raised_when_enabled` | 0.4 d | BRP4-02 | TODO |
-| BRP4-05 | `build_blind_review_pipeline_subgraph()` (SPEC-BRP-SUB-001) | `test_builder.py::test_build_subgraph_topology_matches_spec` | 0.5 d | BRP4-01..04 | TODO |
-| BRP4-06 | Idempotent `register_blind_review_pipeline()` | `test_builder.py::test_register_is_idempotent` | 0.3 d | BRP4-05 | TODO |
+| BRP4-01 | `synthesize_verdicts()`: deterministic merge, no LLM call (SPEC-BRP-SYN-001) | `test_synthesis.py::test_synthesize_{min_score,union_issues_deduped,agreement_flag}` | 0.5 d | BRP1-04 | DONE |
+| BRP4-02 | `score_gate(field="blind_review.synthesis.report.score", ...)` wiring (reused, unmodified) | `tests/unit/agents/subgraphs/blind_review_pipeline/test_builder.py::test_score_gate_routes_{pass,fail}` | 0.3 d | BRP4-01 | DONE |
+| BRP4-03 | Sequential reviewers `implementer -> reviewer_a -> reviewer_b -> synthesis` (⚠ deviation from DD-BRP-005 fan-out — see note) | `test_builder.py::test_both_reviewers_run_before_synthesis` | 0.4 d | BRP2, BRP3 | DONE |
+| BRP4-04 | HITL trio reused verbatim (`seed_hitl_metadata`/`human_approval_node`/`hitl_gate`) | `test_builder.py::test_hitl_bypassed_when_disabled` + `test_hitl_interrupt_raised_when_enabled` | 0.4 d | BRP4-02 | DONE |
+| BRP4-05 | `build_blind_review_pipeline_subgraph()` (SPEC-BRP-SUB-001) + bounded correction loop | `test_builder.py::test_build_subgraph_topology_matches_spec` + `test_failing_synthesis_loops_back_and_force_passes` | 0.5 d | BRP4-01..04 | DONE |
+| BRP4-06 | Idempotent `register_blind_review_pipeline()` | `test_builder.py::test_register_is_idempotent` | 0.3 d | BRP4-05 | DONE |
+
+> **BRP4 deviation (DD-BRP-005 / ARCHITECTURE §3.2).** The two-way
+> `implementer → {reviewer_a, reviewer_b}` fan-out is not viable on the shared
+> `AgentState`: both reviewers write the no-reducer `metadata` channel, so a
+> concurrent superstep raises LangGraph `InvalidUpdateError` (verified
+> empirically). Reviewers therefore run **sequentially**
+> (`implementer → reviewer_a → reviewer_b → synthesis`). Blindness/independence
+> is unaffected (guaranteed by the narrow input contract + AST/runtime guards,
+> not by concurrency); only reviewer latency is lost (§7, non-functional). Also
+> fixed a latent infinite-loop: the implementer now increments `iteration_count`
+> so `score_gate`'s `max_iterations` force-pass actually bounds the loop.
 
 **Done when:** the subgraph runs end-to-end with injected fakes (no LLM
 backend); a failing synthesis routes back to `implementer_agent` and
@@ -144,10 +155,10 @@ AST guard's target-module list — see BRP6-04).
 
 | ID | Task | Test(s) first | Estimate | Dependency | Status |
 |---|---|---|---|---|---|
-| BRP5-01 | `intent_router.match_intent()` returns `blind_review_pipeline` for review-panel intents, gated on the flag | `tests/unit/agents/test_intent_router.py::test_blind_review_intent_{matches_when_enabled,ignored_when_disabled}` | 0.3 d | BRP4 | TODO |
-| BRP5-02 | `get_async_compiled_graph()` wires the route when `blind_review_pipeline_enabled` | `tests/unit/agents/test_graph.py::test_blind_review_route_wired_when_enabled` | 0.4 d | BRP4 | TODO |
-| BRP5-03 | `effective_valid_routes` / `build_system_prompt` gate on the flag | `tests/unit/agents/test_graph.py::test_blind_review_absent_from_prompt_when_disabled` | 0.3 d | BRP5-02 | TODO |
-| BRP5-04 | **Snapshot test: graph unchanged when disabled** | `tests/unit/agents/test_graph_snapshot.py::test_graph_snapshot_unchanged_with_blind_review_disabled` — write this FIRST against current `main`'s snapshot, confirm green pre-BRP, then re-run post-BRP5-02 to prove zero drift | 0.4 d | BRP5-02 | TODO |
+| BRP5-01 | `intent_router.match_intent()` returns `blind_review_pipeline` for review-panel intents, gated downstream via `effective_valid_routes` (matcher stays a pure fn per `test_match_intent_is_pure_function`) | `tests/unit/agents/test_intent_router.py::test_blind_review_intent_{matches_when_enabled,ignored_when_disabled}` | 0.3 d | BRP4 | DONE |
+| BRP5-02 | `build_supervisor_graph()`/`get_async_compiled_graph()` wire the route when `blind_review_pipeline_enabled` (`_build_blind_review_nodes` + `_collect_optional_nodes` gate) | `tests/unit/agents/test_graph_blind_review.py::TestGraphWiring::test_node_{added_when_enabled,absent_when_disabled}` + `TestBuildBlindReviewNodes` | 0.4 d | BRP4 | DONE |
+| BRP5-03 | `effective_valid_routes` / `build_system_prompt` gate on the flag | `tests/unit/agents/test_graph_blind_review.py::test_blind_review_absent_from_prompt_when_disabled` | 0.3 d | BRP5-02 | DONE |
+| BRP5-04 | **Snapshot test: graph unchanged when disabled** | `tests/unit/agents/test_graph_snapshot_blind_review.py::test_graph_snapshot_unchanged_with_blind_review_disabled` | 0.4 d | BRP5-02 | DONE |
 
 **Done when:** with `blind_review_pipeline_enabled=False` the compiled-graph
 snapshot is byte-for-byte identical to pre-BRP `main`; with `True`, a
@@ -157,15 +168,15 @@ review-panel intent routes to `blind_review_pipeline` end-to-end.
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| BRP6-01 | Unit tests: settings validation edge cases (threshold bounds, same-model warning) | 0.3 d | BRP1 | TODO |
-| BRP6-02 | Unit tests: spec/implementer input-contract isolation (strict-signature spies) | 0.4 d | BRP2 | TODO |
-| BRP6-03 | Unit tests: reviewer blindness (structural + AST + runtime guard, all three layers) | 0.5 d | BRP3 | TODO |
-| BRP6-04 | Extend `test_no_mcp_skills_imports.py`'s target modules to include `agents/subgraphs/blind_review_pipeline/**` | 0.2 d | BRP4 | TODO |
-| BRP6-05 | Unit tests: synthesis merge (score/dedupe/agreement) | 0.3 d | BRP4 | TODO |
-| BRP6-06 | Unit tests: subgraph end-to-end with fakes (pass path, fail-then-retry path, max-iterations force-pass) | 0.6 d | BRP4 | TODO |
-| BRP6-07 | Integration test: graph snapshot unchanged when disabled (BRP5-04, promoted to the integration tier) | 0.3 d | BRP5 | TODO |
-| BRP6-08 | `docs/blind-review-pipeline.md` + `examples/blind_review_pipeline.py` | 0.5 d | BRP5 | TODO |
-| BRP6-09 | `README.md` + `CHANGELOG.md` entries; `specs/roadmap.md` status flip to `IMPLEMENTED` | 0.2 d | BRP5 | TODO |
+| BRP6-01 | Unit tests: settings validation edge cases (threshold bounds, same-model warning) | 0.3 d | BRP1 | DONE |
+| BRP6-02 | Unit tests: spec/implementer input-contract isolation (strict-signature spies) | 0.4 d | BRP2 | DONE |
+| BRP6-03 | Unit tests: reviewer blindness (structural + AST + runtime guard, all three layers) | 0.5 d | BRP3 | DONE |
+| BRP6-04 | Extend `test_no_mcp_skills_imports.py`'s target modules to include `agents/subgraphs/blind_review_pipeline/**` | 0.2 d | BRP4 | DONE |
+| BRP6-05 | Unit tests: synthesis merge (score/dedupe/agreement) | 0.3 d | BRP4 | DONE |
+| BRP6-06 | Unit tests: subgraph end-to-end with fakes (pass path, fail-then-retry path, max-iterations force-pass) | 0.6 d | BRP4 | DONE |
+| BRP6-07 | Graph snapshot unchanged when disabled — covered by the unit snapshot `test_graph_snapshot_blind_review.py` (BRP5-04) on the **real** sync `build_supervisor_graph`. Not duplicated in the integration tier: `tests/integration/conftest.py` deliberately stubs `prismal.agents.graph` (dropping `build_supervisor_graph`), so a topology test does not belong there. | 0.3 d | BRP5 | DONE |
+| BRP6-08 | `docs/blind-review-pipeline.md` + `examples/blind_review_pipeline.py` | 0.5 d | BRP5 | DONE |
+| BRP6-09 | `README.md` + `CHANGELOG.md` entries; `specs/roadmap.md` status flip to `IMPLEMENTED` | 0.2 d | BRP5 | DONE |
 
 **Done when:** `uv run pytest -m unit` green; `uv run ruff check .` and
 `uv run ruff format --check .` clean; `uv run mypy prismal` (strict) clean;

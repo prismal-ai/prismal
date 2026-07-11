@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` |
+| **Status** | `IMPLEMENTED` (v3.11.0, 2026-07-11) |
 | **Version** | 1.0 |
 | **Date** | 2026-07-10 |
 | **Phase** | BRP (Blind Review Pipeline) |
