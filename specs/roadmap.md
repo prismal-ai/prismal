@@ -55,6 +55,7 @@ Sourced from the 2026-07-04 gap analysis
 | [`node-io-typesafety/`](./node-io-typesafety/) | NTS | Pydantic I/O validation contracts per graph node (`AgentState` is still a bare `TypedDict`) | — |
 | [`observability-integration/`](./observability-integration/) | OBS | `ObservabilityPort` + LangSmith/Langfuse parity, dataset export, eval-harness integration | Phase V (eval harness) |
 | [`reference-host-bootstrap/`](./reference-host-bootstrap/) | — | PLAN-only seed for the *external* `prismal-server` host repo (REST/WS/SSE, `/a2a` mount, auth) — out of this repo's scope | Phase Y, I |
+| [`blind-review-pipeline/`](./blind-review-pipeline/) | BRP | New opt-in subgraph: spec agent → implementer agent → two independent **blind** reviewer agents (no visibility into `state["messages"]`, only spec + artifact) → deterministic synthesis → bounded correction loop / optional HITL. Each of the 4 roles gets its own LLM (`ProviderRegistry`) and tool/skill scope (`ToolProviderPort`). Opt-in: `blind_review_pipeline_enabled`. Full SDD drafted 2026-07-10; nothing implemented yet | Phase Y (shipped) |
 
 ### Target package versions (strict SemVer — minor per phase)
 
@@ -70,6 +71,15 @@ Current: **`3.6.0`**. Each phase was new, additive, opt-in functionality → a *
 | 📋 | LH | [`loop-hardening/`](./loop-hardening/) | `3.7.0` (spec ready) |
 | 📋 | NTS | [`node-io-typesafety/`](./node-io-typesafety/) | `3.8.0` (spec ready) |
 | 📋 | OBS | [`observability-integration/`](./observability-integration/) | `3.9.0` (spec ready) |
+| 📋 | BRP | [`blind-review-pipeline/`](./blind-review-pipeline/) | `3.11.0` (spec ready, not started) |
+
+> **Staleness note (found 2026-07-10 while drafting `blind-review-pipeline`):**
+> `pyproject.toml` on disk is already `3.10.2`, i.e. LH/NTS/OBS (and at least
+> one more phase) have shipped past what this table's "📋 spec ready, not
+> started" markers say. This roadmap file needs a full reconciliation sweep
+> against the codebase (out of scope for this change) — BRP's target
+> `3.11.0` was chosen as "current `3.10.2` + one minor," not by trusting the
+> stale rows above it.
 
 > Versioning note: the earlier additive phases Z/R/W/C were released as **patches**
 > (`3.1.2`–`3.1.5`) to avoid bumping the minor too quickly. Going forward, feature
