@@ -744,6 +744,57 @@ class Settings(BaseSettings):
         description="Phase -> capability-override table path.",
     )
 
+    # ── Blind Review Pipeline (Phase BRP — SPEC-BRP-CFG-001) ──────────
+    # Opt-in; False ⇒ graph byte-for-byte unchanged (mirrors kokoro_enabled /
+    # skynet_enabled / budget_enabled).
+    blind_review_pipeline_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for the blind_review_pipeline subgraph (Phase BRP).",
+    )
+    # Per-role model overrides. None ⇒ ProviderRegistry default model.
+    blind_review_spec_model: str | None = Field(
+        default=None,
+        description="Model id for the spec agent; None uses the provider default.",
+    )
+    blind_review_implementer_model: str | None = Field(
+        default=None,
+        description="Model id for the implementer agent; None uses the provider default.",
+    )
+    blind_review_reviewer_a_model: str | None = Field(
+        default=None,
+        description="Model id for blind reviewer A; None uses the provider default.",
+    )
+    blind_review_reviewer_b_model: str | None = Field(
+        default=None,
+        description="Model id for blind reviewer B; None uses the provider default.",
+    )
+    # Per-role tool capability filters, passed to ToolProviderPort.get_tools().
+    blind_review_spec_capabilities: list[str] = Field(
+        default_factory=lambda: ["docs", "requirements"],
+        description="Capability filter for the spec agent's tools.",
+    )
+    blind_review_implementer_capabilities: list[str] = Field(
+        default_factory=lambda: ["code", "sandbox"],
+        description="Capability filter for the implementer agent's tools.",
+    )
+    blind_review_reviewer_a_capabilities: list[str] = Field(
+        default_factory=lambda: ["code_review", "testing"],
+        description="Capability filter for blind reviewer A's tools.",
+    )
+    blind_review_reviewer_b_capabilities: list[str] = Field(
+        default_factory=lambda: ["security", "style"],
+        description="Capability filter for blind reviewer B's tools.",
+    )
+    # Loop control (mirrors code_review approval_threshold + score_gate max_iterations).
+    blind_review_approval_threshold: float = Field(
+        default=0.8,
+        description="Synthesis score at/above which the artifact is approved.",
+    )
+    blind_review_max_iterations: int = Field(
+        default=3,
+        description="Correction-loop bound before the score gate force-passes.",
+    )
+
     # ── Sandbox multi-lenguaje ────────────────────────────────────────
     sandbox_path: str = Field(
         default="sandbox",
@@ -2003,6 +2054,45 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"PRISMAL_EVAL_DEFAULT_MODE={self.eval_default_mode!r} is invalid; "
                 f"expected one of {sorted(valid_modes)}."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_blind_review(self) -> "Settings":
+        """Validate the Blind Review Pipeline settings (BRP1-03 / SPEC-BRP-CFG-001).
+
+        Mirrors ``_validate_skynet``/``_validate_budget``:
+
+        1. ``blind_review_approval_threshold`` must be in ``[0.0, 1.0]``, else
+           :class:`BlindReviewConfigError`.
+        2. ``blind_review_max_iterations`` must be ``>= 1``, else
+           :class:`BlindReviewConfigError`.
+        3. A same-model reviewer pair is a legal (if weaker) configuration — it
+           logs a ``WARNING`` (``blind_review.reviewers_share_model``) rather
+           than raising.
+        """
+        from prismal.core.exceptions import BlindReviewConfigError
+
+        if not 0.0 <= self.blind_review_approval_threshold <= 1.0:
+            raise BlindReviewConfigError(
+                f"PRISMAL_BLIND_REVIEW_APPROVAL_THRESHOLD="
+                f"{self.blind_review_approval_threshold} is out of range; "
+                f"expected 0.0 <= threshold <= 1.0."
+            )
+        if self.blind_review_max_iterations < 1:
+            raise BlindReviewConfigError(
+                f"PRISMAL_BLIND_REVIEW_MAX_ITERATIONS="
+                f"{self.blind_review_max_iterations} is invalid; expected >= 1."
+            )
+        if (
+            self.blind_review_reviewer_a_model is not None
+            and self.blind_review_reviewer_a_model == self.blind_review_reviewer_b_model
+        ):
+            from prismal.core.logging import get_logger
+
+            get_logger("prismal.core.config").warning(
+                "blind_review.reviewers_share_model",
+                model=self.blind_review_reviewer_a_model,
             )
         return self
 

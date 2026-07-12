@@ -197,3 +197,58 @@ def test_default_model_accepts_prismal_model_alias(
     monkeypatch.setenv("PRISMAL_MODEL", "ollama/codellama")
     s = Settings(_env_file=None)  # type: ignore[call-arg]
     assert s.default_model == "ollama/codellama"
+
+
+def test_blind_review_settings_defaults() -> None:
+    """Blind Review Pipeline settings load with their spec defaults (SPEC-BRP-CFG-001)."""
+    from prismal.core.config import Settings
+
+    s = Settings()
+
+    assert s.blind_review_pipeline_enabled is False
+    assert s.blind_review_spec_model is None
+    assert s.blind_review_implementer_model is None
+    assert s.blind_review_reviewer_a_model is None
+    assert s.blind_review_reviewer_b_model is None
+    assert s.blind_review_spec_capabilities == ["docs", "requirements"]
+    assert s.blind_review_implementer_capabilities == ["code", "sandbox"]
+    assert s.blind_review_reviewer_a_capabilities == ["code_review", "testing"]
+    assert s.blind_review_reviewer_b_capabilities == ["security", "style"]
+    assert s.blind_review_approval_threshold == 0.8
+    assert s.blind_review_max_iterations == 3
+
+
+def test_blind_review_validation_threshold() -> None:
+    """An out-of-range approval threshold raises BlindReviewConfigError (SPEC-BRP-CFG-001)."""
+    from prismal.core.config import Settings
+    from prismal.core.exceptions import BlindReviewConfigError
+
+    with pytest.raises(BlindReviewConfigError):
+        Settings(blind_review_approval_threshold=1.5)
+    with pytest.raises(BlindReviewConfigError):
+        Settings(blind_review_approval_threshold=-0.1)
+
+
+def test_blind_review_validation_iterations() -> None:
+    """A max-iterations floor below 1 raises BlindReviewConfigError (SPEC-BRP-CFG-001)."""
+    from prismal.core.config import Settings
+    from prismal.core.exceptions import BlindReviewConfigError
+
+    with pytest.raises(BlindReviewConfigError):
+        Settings(blind_review_max_iterations=0)
+
+
+def test_blind_review_validation_same_model_warns() -> None:
+    """A same-model reviewer pair logs a WARNING but does not raise (SPEC-BRP-CFG-001)."""
+    from structlog.testing import capture_logs
+
+    from prismal.core.config import Settings
+
+    with capture_logs() as cap_logs:
+        s = Settings(
+            blind_review_reviewer_a_model="claude-sonnet-4-5",
+            blind_review_reviewer_b_model="claude-sonnet-4-5",
+        )
+
+    assert s.blind_review_reviewer_a_model == "claude-sonnet-4-5"
+    assert any(log.get("event") == "blind_review.reviewers_share_model" for log in cap_logs)

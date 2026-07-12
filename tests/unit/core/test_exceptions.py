@@ -168,3 +168,17 @@ def test_catch_as_base_class() -> None:
     for exc in exceptions_to_test:
         with pytest.raises(PrismalError):
             raise exc
+
+
+def test_blind_review_error_hierarchy() -> None:
+    """BlindReviewPipelineError, config, and blindness-violation hierarchy (SPEC-BRP-ERR-001)."""
+    from prismal.core.exceptions import (
+        BlindReviewBlindnessViolationError,
+        BlindReviewConfigError,
+        BlindReviewPipelineError,
+        PrismalError,
+    )
+
+    assert issubclass(BlindReviewPipelineError, PrismalError)
+    assert issubclass(BlindReviewConfigError, BlindReviewPipelineError)
+    assert issubclass(BlindReviewBlindnessViolationError, BlindReviewPipelineError)

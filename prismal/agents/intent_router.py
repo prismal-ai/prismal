@@ -142,6 +142,21 @@ _SKYNET_RE: re.Pattern[str] = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+# Fase BRP (BRP5-01): conservative Blind Review Pipeline intent patterns. Gated
+# downstream — only honoured when ``settings.blind_review_pipeline_enabled`` puts
+# ``blind_review_pipeline`` in ``effective_valid_routes``, otherwise the
+# supervisor falls through to the LLM. Checked AFTER the code_review/skynet
+# patterns so existing routing is unchanged (note ``code review`` needs both
+# words together, so ``blind review`` never collides).
+_BLIND_REVIEW_RE: re.Pattern[str] = re.compile(
+    r"\bblind\s+reviewers?\b|"
+    r"\bblind\s+review\b|"
+    r"\bdual\s+review\b|"
+    r"\brevisi[óo]n\s+ciega\b|"
+    r"\bpanel\s+de\s+revisor\w*\b",
+    re.IGNORECASE,
+)
+
 
 def match_intent(text: str | None) -> str | None:
     """Return a supervisor member name for high-confidence intents.
@@ -195,4 +210,8 @@ def match_intent(text: str | None) -> str | None:
     # is decomposed into sub-orders and fanned out to a worker swarm.
     if _SKYNET_RE.search(normalised):
         return "skynet"
+    # Blind Review Pipeline (opt-in; gated downstream by
+    # ``blind_review_pipeline_enabled``): spec → implement → two blind reviewers.
+    if _BLIND_REVIEW_RE.search(normalised):
+        return "blind_review_pipeline"
     return None

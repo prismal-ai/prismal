@@ -94,3 +94,23 @@ def test_match_intent_is_pure_function() -> None:
     for _ in range(3):
         assert module.match_intent("lista los crons activos") == "cron_manager"
         assert module.match_intent("hola") is None
+
+
+def test_blind_review_intent_matches_when_enabled() -> None:
+    """A review-panel intent matches and is a valid route when the flag is enabled (BRP5-01)."""
+    from prismal.agents.supervisor import effective_valid_routes
+
+    matched = match_intent("run a blind review panel on this implementation")
+    assert matched == "blind_review_pipeline"
+    routes = effective_valid_routes(False, False, False, False, enable_blind_review=True)
+    assert matched in routes
+
+
+def test_blind_review_intent_ignored_when_disabled() -> None:
+    """The pure matcher still fires, but the route is dropped when the flag is off (BRP5-01)."""
+    from prismal.agents.supervisor import effective_valid_routes
+
+    matched = match_intent("dual review of the implementation")
+    assert matched == "blind_review_pipeline"
+    routes = effective_valid_routes(False, False, False, False, enable_blind_review=False)
+    assert matched not in routes

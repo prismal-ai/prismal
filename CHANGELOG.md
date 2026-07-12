@@ -10,8 +10,50 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-All spec-complete phases under `specs/` are now implemented. New work starts
-here.
+New work starts here.
+
+## [3.11.0] — 2026-07-11
+
+> Fase BRP — **Blind Review Pipeline**. A new opt-in subgraph: a spec agent and
+> an implementer produce an artifact that two independent, **blind** reviewers
+> (no visibility into `state["messages"]`, only spec + artifact) assess before a
+> deterministic synthesis and a bounded correction loop, optionally HITL-gated.
+> Each of the four roles gets its own LLM (`ProviderRegistry`) and tool scope
+> (`ToolProviderPort`). Gated by `blind_review_pipeline_enabled` (default
+> `False`) — with the flag off the compiled supervisor graph is byte-for-byte
+> unchanged (snapshot-tested).
+
+### Added
+- `prismal/agents/subgraphs/blind_review_pipeline/` — `make_spec_agent_node`,
+  `make_implementer_agent_node`, `make_reviewer_node` + `BlindnessGuard`,
+  `synthesize_verdicts` / `make_synthesis_node`,
+  `build_blind_review_pipeline_subgraph` / `register_blind_review_pipeline`.
+  Reuses `CodeIssue`/`CodeReviewReport`, `score_gate`, and the `dev_pipeline`
+  HITL trio unmodified.
+- Blindness enforced three ways: the narrow `(spec, artifact)` input contract,
+  a CI-blocking AST guard (`reviewer_node.py` never reads `state["messages"]`),
+  and the runtime `BlindnessGuard`.
+- Settings: `blind_review_pipeline_enabled`, per-role `blind_review_*_model` /
+  `blind_review_*_capabilities`, `blind_review_approval_threshold`,
+  `blind_review_max_iterations` (validated by `_validate_blind_review`).
+- Exceptions: `BlindReviewPipelineError`, `BlindReviewConfigError`,
+  `BlindReviewBlindnessViolationError`.
+- Supervisor/intent integration (gated): `match_intent()` returns
+  `blind_review_pipeline` for review-panel intents; `effective_valid_routes` /
+  `build_system_prompt` / `get_async_compiled_graph` honour the flag.
+- Docs: `docs/blind-review-pipeline.md`; example:
+  `examples/blind_review_pipeline.py`.
+
+### Fixed
+- The implementer node now increments `iteration_count`, so the `score_gate`
+  `max_iterations` force-pass actually bounds the correction loop.
+
+### Notes
+- Reviewers run **sequentially** (not the spec's two-way fan-out): both write
+  the no-reducer `metadata` channel, which raises `InvalidUpdateError` on a
+  concurrent superstep. Independence/blindness is unaffected — it is a property
+  of the input contract, not execution concurrency; only reviewer latency is
+  traded away.
 
 ## [3.10.2] — 2026-07-08
 
