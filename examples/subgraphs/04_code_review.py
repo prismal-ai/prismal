@@ -580,7 +580,7 @@ async def run_code_review(snippet: dict, approval_threshold: float = 0.8) -> dic
     # Modo real con subgraph
     from langchain_core.messages import HumanMessage
 
-    from prismal.agents.state import initial_state
+    from prismal.agents.state import create_initial_state
 
     await register_code_review(approval_threshold=approval_threshold)
     subgraph_def = build_code_review_subgraph(
@@ -591,7 +591,7 @@ async def run_code_review(snippet: dict, approval_threshold: float = 0.8) -> dic
         approval_threshold=approval_threshold,
     )
 
-    state = initial_state()
+    state = create_initial_state(session_id=f"example-code-review-{snippet['id']}")
     state["messages"] = [HumanMessage(content=f"Revisa el código de {filename}:\n\n{code}")]
     state["metadata"] = {
         "code_review": {

@@ -31,7 +31,7 @@ import asyncio
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from prismal.agents.patterns.reflection import reflection_loop
-from prismal.agents.state import AgentState, initial_state
+from prismal.agents.state import AgentState, create_initial_state
 from prismal.core.config import get_settings
 from prismal.providers.registry import ProviderRegistry
 
@@ -206,7 +206,7 @@ async def run_reflection(prompt: dict, threshold: float = 0.85) -> None:
     print(f"  Criterios: {len(prompt['evaluation_criteria'])} criterios")
 
     # Preparar el estado
-    state: AgentState = initial_state()
+    state: AgentState = create_initial_state(session_id="example-reflection-loop")
     state["metadata"]["instruction"] = prompt["instruction"]
     state["metadata"]["criteria"] = prompt["evaluation_criteria"]
     state["metadata"]["topic"] = prompt["topic"]

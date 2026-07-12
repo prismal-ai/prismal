@@ -33,9 +33,9 @@ from __future__ import annotations
 
 import asyncio
 
-from prismal.agents.state import initial_state
+from prismal.agents.state import create_initial_state
 from prismal.agents.subgraphs.ml_pipeline.builder import (
-    build_ml_pipeline_subgraph,
+    get_compiled_ml_pipeline,
     register_ml_pipeline,
 )
 
@@ -71,7 +71,7 @@ async def main() -> None:
     # Registrar e inicializar el subgraph
     print("\n[Inicializando subgraph ML Pipeline]")
     await register_ml_pipeline()
-    subgraph = await build_ml_pipeline_subgraph()
+    subgraph = await get_compiled_ml_pipeline()
     print("  ✓ Subgraph compilado con 6 nodos + quality gate")
 
     # Mostrar arquitectura
@@ -91,8 +91,7 @@ async def main() -> None:
     print("       └── NO → model_trainer (re-entrenamiento, max 3 ciclos)")
 
     # Preparar el estado inicial
-    state = initial_state()
-    state["messages"] = []
+    state = create_initial_state(session_id="example-ml-pipeline")
     state["metadata"] = {
         "task": ML_TASK,
         "pipeline": "ml_pipeline",

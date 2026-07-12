@@ -326,12 +326,12 @@ async def run_debate(topic: dict) -> dict:
     # Modo real con subgraph LangGraph
     from langchain_core.messages import HumanMessage
 
-    from prismal.agents.state import initial_state
+    from prismal.agents.state import create_initial_state
 
     await register_debate_consensus()
     subgraph = build_debate_consensus_subgraph()
 
-    state = initial_state()
+    state = create_initial_state(session_id=f"example-debate-consensus-{topic['id']}")
     state["messages"] = [
         HumanMessage(
             content=(

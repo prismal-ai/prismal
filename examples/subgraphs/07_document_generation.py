@@ -369,12 +369,12 @@ async def run_document_generation(request: dict) -> dict:
     # Modo real con subgraph LangGraph
     from langchain_core.messages import HumanMessage
 
-    from prismal.agents.state import initial_state
+    from prismal.agents.state import create_initial_state
 
     await register_document_generation(format=request["format"])
     subgraph = build_document_generation_subgraph(format=request["format"])
 
-    state = initial_state()
+    state = create_initial_state(session_id=f"example-document-generation-{request['id']}")
     state["messages"] = [
         HumanMessage(
             content=(

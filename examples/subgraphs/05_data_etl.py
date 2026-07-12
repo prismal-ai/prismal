@@ -472,7 +472,7 @@ async def run_etl_pipeline() -> None:
     # Modo real con subgraph LangGraph
     from langchain_core.messages import HumanMessage
 
-    from prismal.agents.state import initial_state
+    from prismal.agents.state import create_initial_state
 
     await register_data_etl()
     subgraph = build_data_etl_subgraph(
@@ -483,7 +483,7 @@ async def run_etl_pipeline() -> None:
         required_columns=REQUIRED_COLUMNS,
     )
 
-    state = initial_state()
+    state = create_initial_state(session_id="example-data-etl-titanic")
     state["messages"] = [HumanMessage(content="Ejecuta el pipeline ETL sobre el dataset Titanic.")]
     state["metadata"] = {
         "data_etl": {

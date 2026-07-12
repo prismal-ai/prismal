@@ -537,15 +537,15 @@ async def demo_real_langgraph() -> None:
     """
     try:
         from langgraph.checkpoint.memory import MemorySaver
-        from langgraph.graph import END, StateGraph
         from langgraph.graph.message import MessagesState
-        from langgraph.types import Command, interrupt
+        from langgraph.types import Command
 
         from prismal.agents.subgraphs.gates import (
             hitl_gate,
             human_approval_node,
             seed_hitl_metadata,
         )
+        from prismal.langgraph import END, StateGraph, interrupt
     except ImportError as e:
         print(f"\n  ⚠  Dependencia no disponible: {e}")
         print("     Instala con: uv pip install -e '.[dev,all]'")

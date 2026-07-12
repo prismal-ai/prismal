@@ -358,14 +358,14 @@ async def run_customer_service(query_data: dict, escalation_threshold: float = 0
     # Modo real con subgraph LangGraph
     from langchain_core.messages import HumanMessage
 
-    from prismal.agents.state import initial_state
+    from prismal.agents.state import create_initial_state
 
     await register_customer_service(escalation_threshold=escalation_threshold)
     subgraph = build_customer_service_subgraph(
         escalation_threshold=escalation_threshold,
     )
 
-    state = initial_state()
+    state = create_initial_state(session_id=f"example-customer-service-{query_data['id']}")
     state["messages"] = [HumanMessage(content=query)]
     state["metadata"] = {
         "customer_service": {
