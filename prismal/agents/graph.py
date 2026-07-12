@@ -206,14 +206,16 @@ def _collect_optional_nodes(
     multimodal_nodes: dict[str, Any] | None = None,
     kokoro_nodes: dict[str, Any] | None = None,
     skynet_nodes: dict[str, Any] | None = None,
+    blind_review_nodes: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Collect the opt-in supervisor routes into a single ``name -> node`` map.
 
     Applies the per-layer gating in one place: the pipeline subgraphs and the
     advanced-architecture map require ``settings.enable_subgraphs``, while the
-    multimodal (Fase F), kokoro (Fase K) and skynet (Fase S) maps are gated by
-    their own toggles. Entries whose graph/map was not supplied by the caller
-    are skipped, so the result contains exactly the nodes to register.
+    multimodal (Fase F), kokoro (Fase K), skynet (Fase S) and blind-review
+    (Fase BRP) maps are gated by their own toggles. Entries whose graph/map was
+    not supplied by the caller are skipped, so the result contains exactly the
+    nodes to register.
 
     Args:
         dev_pipeline_graph: Pre-compiled dev_pipeline subgraph (Phase 24).
@@ -223,6 +225,7 @@ def _collect_optional_nodes(
         multimodal_nodes: Multimodal pipeline node map (Fase F / P3).
         kokoro_nodes: Kokoro deliberation node map (Fase K / K7-02).
         skynet_nodes: Skynet swarm node map (Fase S / S5-02).
+        blind_review_nodes: Blind Review Pipeline node map (Fase BRP / BRP5-02).
 
     Returns:
         Mapping of supervisor route name -> node (callable or compiled
@@ -246,6 +249,8 @@ def _collect_optional_nodes(
         optional.update(kokoro_nodes or {})
     if settings.skynet_enabled:
         optional.update(skynet_nodes or {})
+    if settings.blind_review_pipeline_enabled:
+        optional.update(blind_review_nodes or {})
 
     return optional
 
@@ -260,6 +265,7 @@ def build_supervisor_graph(
     multimodal_nodes: dict[str, Any] | None = None,
     kokoro_nodes: dict[str, Any] | None = None,
     skynet_nodes: dict[str, Any] | None = None,
+    blind_review_nodes: dict[str, Any] | None = None,
 ) -> CompiledStateGraph[AgentState, Any, Any, Any]:
     """
     Build and compile the LangGraph SUPERVISOR state machine.
@@ -361,6 +367,7 @@ def build_supervisor_graph(
         multimodal_nodes=multimodal_nodes,
         kokoro_nodes=kokoro_nodes,
         skynet_nodes=skynet_nodes,
+        blind_review_nodes=blind_review_nodes,
     )
     for _opt_name, _opt_node in optional_nodes.items():
         builder.add_node(_opt_name, _opt_node)
@@ -573,6 +580,32 @@ async def _build_skynet_nodes() -> dict[str, Any]:
     return nodes
 
 
+async def _build_blind_review_nodes() -> dict[str, Any]:
+    """Build the blind_review_pipeline node map (Fase BRP / BRP5-02).
+
+    Returns a single ``{"blind_review_pipeline": <compiled subgraph>}`` entry:
+    the Blind Review Pipeline (spec → implement → two blind reviewers →
+    synthesis → HITL) compiled via
+    :class:`~prismal.agents.subgraphs.factory.SubgraphFactory`. The name matches
+    :data:`~prismal.agents.supervisor.BLIND_REVIEW_MEMBERS`.
+
+    Only invoked when ``settings.blind_review_pipeline_enabled`` is ``True``; the
+    four role backends resolve their providers lazily at call time, so
+    compilation here needs no network.
+    """
+    from prismal.agents.subgraphs.blind_review_pipeline.builder import (
+        build_blind_review_pipeline_subgraph,
+    )
+    from prismal.agents.subgraphs.factory import SubgraphFactory
+
+    factory = SubgraphFactory()
+    nodes: dict[str, Any] = {
+        "blind_review_pipeline": await factory.build(build_blind_review_pipeline_subgraph()),
+    }
+    logger.info("blind_review_nodes_built", count=len(nodes))
+    return nodes
+
+
 def visualize_supervisor_graph(
     graph: CompiledStateGraph[AgentState, Any, Any, Any] | None = None,
 ) -> None:
@@ -699,6 +732,12 @@ async def get_async_compiled_graph(
     if get_settings().skynet_enabled:
         skynet_nodes = await _build_skynet_nodes()
 
+    # Fase BRP (BRP5-02): build the blind_review_pipeline node when the layer is
+    # enabled. Independent of ``enable_subgraphs`` — gated by its own toggle.
+    blind_review_nodes: dict[str, Any] | None = None
+    if get_settings().blind_review_pipeline_enabled:
+        blind_review_nodes = await _build_blind_review_nodes()
+
     _async_graph = build_supervisor_graph(
         checkpointer=checkpointer,
         dev_pipeline_graph=dev_pipeline_graph,
@@ -708,6 +747,7 @@ async def get_async_compiled_graph(
         multimodal_nodes=multimodal_nodes,
         kokoro_nodes=kokoro_nodes,
         skynet_nodes=skynet_nodes,
+        blind_review_nodes=blind_review_nodes,
     )
     logger.debug("async_graph_initialized")
     return _bind_tool_provider(_async_graph, tool_provider)

@@ -13,17 +13,12 @@
 # Dependabot; las resueltas por el lock se retiraron de esta lista).
 # ============================================================
 
-# --- ecdsa 0.19.2 -> CVE-2024-23342 (Minerva timing attack) --
-# Transitiva (python-jose -> ecdsa). El mantenedor de python-ecdsa
-# declaro publicamente que NO habra fix (GHSA-wj6h-64fc-37mp): la
-# mitigacion completa requiere criptografia en C. Recomienda migrar
-# a `cryptography`. Ya usamos python-jose[cryptography] pero python-jose
-# arrastra `ecdsa` como dep regular. Surface: prismal no realiza firmas
-# ECDSA P-256 sensibles en caliente -> riesgo residual aceptado.
-# Spec: specs/dependency-security-remediation/SPEC.md (SEC-A05, alerta #1).
-# TRIGGER de re-evaluacion: migracion python-jose -> PyJWT (deuda
-# registrada en el spec) o fix upstream en python-ecdsa -> quitar ignore.
-CVE-2024-23342
+# --- ecdsa CVE-2024-23342 (Minerva) — RESUELTO 2026-07-11 ----
+# La deuda registrada (python-jose -> PyJWT) fue EJECUTADA: prismal ahora
+# depende de pyjwt[crypto] y `network_supervisor._make_a2a_jwt` usa PyJWT.
+# Al quitar python-jose desaparece su dep transitiva `ecdsa` del uv.lock, de
+# modo que la vulnerabilidad queda ELIMINADA (no aceptada). Ignore retirado
+# de los tres archivos espejados (.trivyignore / ci.yml / .pre-commit-config).
 
 # --- transformers 4.57.6 (marker py>=3.14) -> CVE-2026-1839 --
 # RCE en Trainer._load_rng_state() via torch.load() sin weights_only
@@ -46,18 +41,19 @@ CVE-2026-1839
 # TRIGGER de re-evaluacion: pip publica release con fix -> quitar ignore.
 CVE-2026-3219
 
-# --- chromadb 1.5.8 -> CVE-2026-45829 (sin fix upstream) -----
-# CRITICAL — pre-authentication code injection (GHSA-f4j7-r4q5-qw2c). El rango
-# vulnerable es >=1.0.0,<=1.5.9 con first_patched=None: NO existe version
-# parcheada (1.5.9 sigue afectada) y el stack langchain-chroma no admite
-# downgrade a <1.0.0. ChromaDB se usa aqui como vector store local/embebido
-# (SQLite + Chroma), no como servidor HTTP expuesto, lo que limita la
-# explotabilidad pre-auth (verificado: solo `Chroma(persist_directory=...)`
-# en rag/vector_store.py, sin HttpClient ni `chroma run`). Mismo ignore en
-# pip-audit (.pre-commit-config.yaml + ci.yml).
+# --- chromadb -> CVE-2026-45829 (sin fix upstream) -----------
+# CRITICAL — pre-authentication code injection (GHSA-f4j7-r4q5-qw2c /
+# PYSEC-2026-311). RE-VERIFICADO 2026-07-11 contra OSV: rango vulnerable
+# >=1.0.0, last_affected=1.5.9, sin evento `fixed` -> la ultima version (1.5.9)
+# SIGUE afectada; no existe first_patched_version. ChromaDB se usa aqui como
+# vector store local/embebido (`Chroma(persist_directory=...)`, sin HttpClient
+# ni `chroma run`), por lo que el vector pre-auth del SERVER no esta expuesto;
+# ademas Chroma es ahora backend OPCIONAL (Fase Z vector-store-port), no el
+# unico. Riesgo residual re-afirmado. Mismo ignore en pip-audit
+# (.pre-commit-config.yaml + ci.yml).
 # Spec: specs/dependency-security-remediation/SPEC.md (SEC-A02, alerta #15).
-# TRIGGER de re-evaluacion: chromadb publica first_patched_version ->
-# quitar ignore y subir. Triage: `prismal doctor security-check`.
+# TRIGGER de re-evaluacion: chromadb publica first_patched_version, o proxima
+# revision programada 2026-10. Triage: `prismal doctor security-check`.
 CVE-2026-45829
 
 # --- torch 2.11.0 -> CVE-2025-3000 (sin fix upstream) --------

@@ -981,12 +981,35 @@ class ToolGatingConfigError(LoopHardeningError):
     """Raised for a bad ``tool_gating_phases.yaml`` — at load time, not per-request."""
 
 
+# ── Blind Review Pipeline (Phase BRP) ────────────────────────────────────────
+
+
+class BlindReviewPipelineError(PrismalError):
+    """Base for all Blind Review Pipeline errors (Phase BRP)."""
+
+
+class BlindReviewConfigError(BlindReviewPipelineError):
+    """Invalid ``blind_review_*`` settings (threshold/iterations range)."""
+
+
+class BlindReviewBlindnessViolationError(BlindReviewPipelineError):
+    """Raised by ``BlindnessGuard`` when a reviewer prompt appears to embed
+    ``state["messages"]`` content.
+
+    Defense-in-depth backstop — the primary control is the reviewer node's
+    narrow input contract (SPEC-BRP-REV-001).
+    """
+
+
 __all__ = [
     "A2AAgentUnavailable",
     "A2AError",
     "AdapterError",
     "AdaptiveRAGError",
     "AudioAgentError",
+    "BlindReviewBlindnessViolationError",
+    "BlindReviewConfigError",
+    "BlindReviewPipelineError",
     "BudgetExceeded",
     "CanaryLeakError",
     "CodeReviewError",

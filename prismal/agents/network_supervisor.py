@@ -102,7 +102,7 @@ def _make_a2a_jwt(node_url: str) -> str:
     secret = settings.jwt_secret_key.get_secret_value()
 
     try:
-        from jose import jwt
+        import jwt
 
         payload = {
             "sub": "prismal-node",
@@ -111,9 +111,11 @@ def _make_a2a_jwt(node_url: str) -> str:
             "iat": datetime.now(UTC),
             "exp": datetime.now(UTC) + timedelta(minutes=5),
         }
-        return cast("str", jwt.encode(payload, secret, algorithm="HS256"))
+        # PyJWT (>=2.0) returns a str; the API mirrors the previous python-jose
+        # call (migrated off python-jose → ecdsa CVE-2024-23342, 2026-07).
+        return jwt.encode(payload, secret, algorithm="HS256")
     except ImportError:
-        logger.warning("jose_not_installed_a2a_jwt_empty")
+        logger.warning("pyjwt_not_installed_a2a_jwt_empty")
         return ""
 
 

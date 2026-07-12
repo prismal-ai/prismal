@@ -1,13 +1,13 @@
 alert_id,package,severity,cve_ghsa,current_version,fixed_version,status,surface,action,task,closure_evidence
 4,litellm,Critical,CVE-2026-42208 / GHSA-r75f-5x8p-qvmc,1.86.2,1.83.7,CLOSED-RESOLVED,server,Verified in lock (1.86.2 >= 1.83.7) 2026-06-05,P0-01,uv pip show litellm=1.86.2; pip-audit clean
-15,chromadb,Critical,CVE-2026-45829 / GHSA-f4j7-r4q5-qw2c,1.5.8,no fix,MITIGATED,server,Embedded usage verified (only Chroma(persist_directory) in rag/vector_store.py); ignore + trigger,P0-03,.trivyignore SEC-A02 with trigger
+15,chromadb,Critical,CVE-2026-45829 / GHSA-f4j7-r4q5-qw2c,1.5.8,no fix (last_affected 1.5.9),MITIGATED,server,Re-verified 2026-07-11 vs OSV: still no first_patched_version; embedded-only usage + Chroma now optional (Fase Z); risk re-affirmed (next review 2026-10),P0-03,.trivyignore SEC-A02 with trigger; OSV PYSEC-2026-311
 14,aquasecurity/trivy-action,Critical,GHSA-69fq-xp46-6x23,ci.yml,trivy-action 0.35.0 / trivy 0.69.2-3,CLOSED-SUPPLY-CHAIN,ci,No exposure: workflows exist since 2026-05-22 (post-window Mar 19-20); 0.70.0 binary via curl + sha256 verified; actions pinned to SHA,P0-02+P2-02,commits e08eb49 + d17e355; no rotation needed
 5,litellm,High,proxy cluster 1.83.x (MCP stdio test endpoints),1.86.2,~1.83.x,CLOSED-RESOLVED,server,Verified in lock 2026-06-05,P0-01,litellm 1.86.2 >= patched 1.83.x series
 3,litellm,High,proxy cluster 1.83.x (SSTI /prompts/test),1.86.2,~1.83.x,CLOSED-RESOLVED,server,Verified in lock 2026-06-05,P0-01,litellm 1.86.2 >= patched 1.83.x series
 8,litellm,High,CVE-2026-40217 / GHSA-wxxx-gvqv-xp7p,1.86.2,1.83.10,CLOSED-RESOLVED,server,Verified in lock 2026-06-05 (GHSA confirmed),P0-01,litellm 1.86.2 >= 1.83.10
 7,urllib3,High,CVE-2026-21441 / GHSA-38jv-5279-wg99,2.7.0,2.6.3,CLOSED-RESOLVED,runtime,Verified in lock 2026-06-05,P0-01,urllib3 2.7.0 >= 2.6.3
 6,urllib3,High,GHSA-qccp-gfcp-xxvc,2.7.0,2.7.0,CLOSED-RESOLVED,runtime,Verified in lock 2026-06-05,P0-01,urllib3 2.7.0 >= 2.7.0
-1,ecdsa,High,CVE-2024-23342 / GHSA-wj6h-64fc-37mp,0.19.2,won't-fix,MITIGATED,runtime (transitive),Risk accepted; python-jose -> PyJWT debt registered,P0-03,.trivyignore SEC-A05 with trigger
+1,ecdsa,High,CVE-2024-23342 / GHSA-wj6h-64fc-37mp,(removed),n/a,CLOSED-RESOLVED,runtime (transitive),python-jose -> PyJWT migration EXECUTED 2026-07-11; python-jose+ecdsa dropped from uv.lock (vuln eliminated),P0-03,pip-audit clean without ecdsa ignore; uv.lock has no ecdsa/python-jose
 9,langsmith,High,CVE-2026-45134 / GHSA-3644-q5cj-c5c7,0.8.7,0.8.0,CLOSED-RESOLVED,runtime,Verified in lock 2026-06-05 (GHSA confirmed),P0-01,langsmith 0.8.7 >= 0.8.0
 10,langchain-classic->langsmith,High,CVE-2026-45134 / GHSA-3644-q5cj-c5c7,1.0.7,1.0.7,CLOSED-RESOLVED,runtime,Verified in lock (same CVE as #9),P0-01,langchain-classic 1.0.7 >= 1.0.7
 11,idna,Moderate,CVE-2026-45409 / GHSA-65pc-fj4g-8rjx,3.17,3.15,CLOSED-RESOLVED,runtime (transitive),Verified in lock 2026-06-05 (GHSA confirmed),P0-01,idna 3.17 >= 3.15
@@ -17,3 +17,6 @@ alert_id,package,severity,cve_ghsa,current_version,fixed_version,status,surface,
 2,transformers,Moderate,CVE-2026-1839 / GHSA-69w3-r845-3855,4.57.6 (py>=3.14) / 5.5.4 (py<3.14),5.0.0rc3,MITIGATED,runtime (does not use Trainer),torch>=2.6 in pyproject (lock 2.11.0) neutralizes the vector; py<3.14 already at 5.5.4,P1-02,commit 7369beb; .trivyignore SEC-A10 with trigger
 12,pymdown-extensions,Moderate,CVE-2026-46338 / GHSA-62q4-447f-wv8h,10.21.3,10.21.3,CLOSED-RESOLVED,dev/docs,GHSA confirmed: lock already pins exactly the fix version,P1-04,pymdown-extensions 10.21.3 == fix 10.21.3
 13,prefect,Low,CVE-2026-7724 / GHSA-p3pq-hxmr-vqqr,3.7.4,3.6.28.dev2,REMEDIATED-UPGRADE,runtime (webhooks),pyproject prefect>=3.6.28; lock 3.7.4 (PR #21591 merged 2026-04-20),P1-03,commit 3af5862; scheduler suite 149/149
+19,soupsieve,High,CVE-2026-49476 / GHSA-2wc2-fm75-p42x,2.8.3,2.8.4,REMEDIATED-UPGRADE,runtime (transitive via bs4),Pinned soupsieve>=2.8.4 in pyproject; memory-exhaustion via large selector lists fixed,DSR-R1-05,pip-audit clean; uv.lock soupsieve 2.8.4
+20,soupsieve,High,CVE-2026-49477 / GHSA-836r-79rf-4m37,2.8.3,2.8.4,REMEDIATED-UPGRADE,runtime (transitive via bs4),Pinned soupsieve>=2.8.4 in pyproject; ReDoS in selector parser fixed,DSR-R1-05,pip-audit clean; uv.lock soupsieve 2.8.4
+21,onnx,Medium,GHSA-hwpq-hmq9-wj77,1.21.0,1.22.0,REMEDIATED-UPGRADE,runtime ([ml] extra),Bumped onnx floor >=1.22.0 in pyproject; null-pointer deref in Upsample version converter fixed,DSR-R1-05,uv.lock onnx 1.22.0

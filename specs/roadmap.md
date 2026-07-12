@@ -37,6 +37,7 @@ Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented) ·
 | [`agent-eval-harness/`](./agent-eval-harness/) | V | ✅ | `prismal/eval/` system-level evaluation (sibling of the runtime; imports only the public graph entry + ports, AST-guarded): `EvalRunner` over `astream` + `build_test_runtime` fakes, trajectory capture, assertions (exact/semantic/tool-usage/llm-judge/groundedness/security), LLM-as-judge, regression gate, `redteam/` containment suite (`tests/eval/redteam/corpus.yaml`), JSON/MD/Langfuse report, `python -m prismal.eval` CLI. Fakes by default, `live_api` opt-in. Docs: `docs/eval.md` · **v3.3.0** |
 | [`agent-identity-governance/`](./agent-identity-governance/) | IDN | ✅ | `prismal/identity/` hexagonal package: `AgentIdentity` + W3C DID (`did:key` offline + `did:web` for A2A), scoped `CredentialVault` (`EnvVault` via `ConfigSourcePort` / encrypted `FileVault` / `FakeVault`), OAuth on-behalf-of delegation (narrow-only `propagate`), identity-aware `PolicyEngine` that **delegates** `(agent, tool, args)` to the Phase H `ToolPolicyEngine`; wired at the `ActionInterceptor` seam + composed per `org_id` in `build_runtime`. Opt-in: `identity_enabled` (graph snapshot-tested). ID6-02 (PermissionManager-DID) deferred. Docs: `docs/identity.md` · **v3.4.0** |
 | [`a2a-interop/`](./a2a-interop/) | I | ✅ | `prismal/a2a/` (`[a2a]` extra): A2A v0.3.x types, `build_agent_card` (registry + allowlist + `did:web` + per-org cache), inbound `A2AServerHandler` (JSON-RPC `message/send`/`tasks/get`/`tasks/cancel` + SSE, sanitized graph mapping, `AuthContext` strict gate), outbound `A2AClient`/`A2AConnectionManager` (allowlist + pool + bearer/OAuth2 auth) + `A2AAgentNode.as_node` (`@prismal_node`), `A2AToolProvider` (conforms to `ToolProviderPort`). Remote content L1-sanitized + audited; `build_runtime(graph=, a2a_agents=)` composes it; `RuntimeContext.a2a_handler`. Opt-in: `a2a_enabled`. Docs: `docs/a2a.md` · **v3.5.0** |
+| [`blind-review-pipeline/`](./blind-review-pipeline/) | BRP | ✅ | `prismal/agents/subgraphs/blind_review_pipeline/` opt-in subgraph (`blind_review_pipeline_enabled`): spec → implement → two **blind** reviewers (no `state["messages"]` access — input contract + AST guard + runtime `BlindnessGuard`) → deterministic `synthesize_verdicts` → bounded correction loop + reused HITL trio. Per-role model/tools via `ProviderRegistry`/`ToolProviderPort`; supervisor route + intent gated on the flag (graph snapshot-tested). Docs: `docs/blind-review-pipeline.md` · **v3.11.0** |
 | [`guardrails-modernization/`](./guardrails-modernization/) | GRD | ✅ | `config/nemo_rails/` (finally ships the config `NemoRailsLayer` always expected) + `security/nemo_actions.py::content_safety_reasoning` (reasoning-capable safety-classifier NeMo custom action, settings-driven main-LLM resolution via `providers/`, independent timeout budget, fail-open). `security/structured_output_guard.py::StructuredOutputGuard` (bounded, Budget-metered re-ask over `guardrails-ai`'s `Guard.validate()` — no LLM call inside guardrails-ai itself; opt-in Hub validators; composes with `OutputValidator`). Opt-in: `nemo_classifier_enabled`, `structured_output_guard_enabled`; `[guardrails-ai]` extra. Docs: `docs/security/guardrails-modernization.md` · **v3.6.0** |
 
 Deferred to follow-up phases (noted in their specs): Skynet S+ (heterogeneous
@@ -55,6 +56,7 @@ Sourced from the 2026-07-04 gap analysis
 | [`node-io-typesafety/`](./node-io-typesafety/) | NTS | Pydantic I/O validation contracts per graph node (`AgentState` is still a bare `TypedDict`) | — |
 | [`observability-integration/`](./observability-integration/) | OBS | `ObservabilityPort` + LangSmith/Langfuse parity, dataset export, eval-harness integration | Phase V (eval harness) |
 | [`reference-host-bootstrap/`](./reference-host-bootstrap/) | — | PLAN-only seed for the *external* `prismal-server` host repo (REST/WS/SSE, `/a2a` mount, auth) — out of this repo's scope | Phase Y, I |
+| [`blind-review-pipeline/`](./blind-review-pipeline/) | BRP | New opt-in subgraph: spec agent → implementer agent → two independent **blind** reviewer agents (no visibility into `state["messages"]`, only spec + artifact) → deterministic synthesis → bounded correction loop / optional HITL. Each of the 4 roles gets its own LLM (`ProviderRegistry`) and tool/skill scope (`ToolProviderPort`). Opt-in: `blind_review_pipeline_enabled`. Full SDD drafted 2026-07-10; nothing implemented yet | Phase Y (shipped) |
 
 ### Target package versions (strict SemVer — minor per phase)
 
@@ -70,6 +72,15 @@ Current: **`3.6.0`**. Each phase was new, additive, opt-in functionality → a *
 | 📋 | LH | [`loop-hardening/`](./loop-hardening/) | `3.7.0` (spec ready) |
 | 📋 | NTS | [`node-io-typesafety/`](./node-io-typesafety/) | `3.8.0` (spec ready) |
 | 📋 | OBS | [`observability-integration/`](./observability-integration/) | `3.9.0` (spec ready) |
+| ✅ | BRP | [`blind-review-pipeline/`](./blind-review-pipeline/) | **`3.11.0`** (shipped 2026-07-11) |
+
+> **Staleness note (found 2026-07-10 while drafting `blind-review-pipeline`):**
+> `pyproject.toml` on disk is already `3.10.2`, i.e. LH/NTS/OBS (and at least
+> one more phase) have shipped past what this table's "📋 spec ready, not
+> started" markers say. This roadmap file needs a full reconciliation sweep
+> against the codebase (out of scope for this change) — BRP's target
+> `3.11.0` was chosen as "current `3.10.2` + one minor," not by trusting the
+> stale rows above it.
 
 > Versioning note: the earlier additive phases Z/R/W/C were released as **patches**
 > (`3.1.2`–`3.1.5`) to avoid bumping the minor too quickly. Going forward, feature
