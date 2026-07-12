@@ -181,9 +181,7 @@ def test_make_a2a_jwt_returns_signed_token() -> None:
 
     # The token is a genuine HS256 JWT with the expected claims (proves the
     # PyJWT migration is behaviour-equivalent to the previous python-jose call).
-    decoded = jwt.decode(
-        result, secret, algorithms=["HS256"], audience="http://node:8000"
-    )
+    decoded = jwt.decode(result, secret, algorithms=["HS256"], audience="http://node:8000")
     assert decoded["sub"] == "prismal-node"
     assert decoded["type"] == "a2a"
     assert decoded["aud"] == "http://node:8000"

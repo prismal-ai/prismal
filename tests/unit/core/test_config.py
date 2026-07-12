@@ -251,6 +251,4 @@ def test_blind_review_validation_same_model_warns() -> None:
         )
 
     assert s.blind_review_reviewer_a_model == "claude-sonnet-4-5"
-    assert any(
-        log.get("event") == "blind_review.reviewers_share_model" for log in cap_logs
-    )
+    assert any(log.get("event") == "blind_review.reviewers_share_model" for log in cap_logs)
