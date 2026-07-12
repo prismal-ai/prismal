@@ -883,6 +883,14 @@ class SkynetConfigError(SkynetError):
     """
 
 
+class SkynetRoleError(SkynetError):
+    """Raised only at role-registry LOAD time for a malformed ``skynet_roles.yaml``.
+
+    Never raised at resolve/dispatch time — ``RoleRegistry.resolve`` falls back
+    to ``DEFAULT_ROLE`` for an unknown role (SPEC-SP-ERR-001).
+    """
+
+
 class SkynetBudgetExceeded(BudgetExceeded, SkynetError):  # noqa: N818 — SPEC-SKY-ERR-001 name
     """Raised when a Skynet run exceeds its ``skynet_token_budget``.
 

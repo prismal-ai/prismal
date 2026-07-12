@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from prismal.agents.skynet.reduce import ReduceFn
+    from prismal.budget.meter import CostMeter
     from prismal.core.config import Settings
 
 logger = get_logger("prismal.subgraphs.skynet.reduce")
@@ -34,8 +35,12 @@ def make_reduce_node(
     settings: Settings,
     *,
     reduce_fn: ReduceFn | None = None,
+    meter: CostMeter | None = None,
 ) -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:
-    """Build the reduce node (strategy from ``settings.skynet_reduce_strategy``)."""
+    """Build the reduce node (strategy from ``settings.skynet_reduce_strategy``).
+
+    When *meter* is injected, the default synthesis reducer records into it (S+2).
+    """
 
     async def reduce_node(state: dict[str, Any]) -> dict[str, Any]:
         """Dedupe the tagged worker results and synthesize the round answer."""
@@ -57,6 +62,7 @@ def make_reduce_node(
             results,
             reduce_fn=reduce_fn,
             strategy=settings.skynet_reduce_strategy,
+            meter=meter,
             settings=settings,
         )
         logger.info(

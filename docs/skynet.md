@@ -95,7 +95,65 @@ parallel_max_workers)`; overflow is deferred and surfaced in audit.
 | `skynet_reduce_strategy` | `"synthesis"` | `synthesis` \| `concat` \| `first_success` |
 | `skynet_worker_model` | `""` | Optional worker model override |
 | `skynet_planner_model` | `""` | Optional planner/evaluator/reducer model override |
-| `skynet_token_budget` | `0` | `0` = unlimited; `>0` = soft per-run token budget (S+) |
+| `skynet_token_budget` | `0` | `0` = unlimited; `>0` = soft per-run token budget (whole-swarm under S+) |
+| `skynet_specialists_enabled` | `False` | S+1: assign roles + per-role model/persona/tools |
+| `skynet_roles_path` | `"config/skynet_roles.yaml"` | Specialist `RoleRegistry` YAML file |
+| `skynet_remote_workers_enabled` | `False` | S+3: allow a remote-bound role to run over A2A (also needs `a2a_enabled`) |
+| `skynet_remote_allowlist` | `[]` | fnmatch allowlist of A2A card URLs (empty + strict = deny-all) |
+
+## Skynet S+ — heterogeneous, metered, remote swarms
+
+S+ is additive and opt-in: with every S+ flag off the swarm is byte-for-byte the
+Phase-S swarm above (snapshot-guarded). It layers three capabilities on top.
+
+### Specialist roles (S+1)
+
+A `RoleRegistry` binds each `SwarmOrder.role` to a `SpecialistRole` — a per-role
+model, tool `capabilities`, system `persona`, and optional `remote_agent`. With
+`skynet_specialists_enabled`, the planner tags each sub-order with a role from
+the registry's `known_roles()` (a bad/absent tag falls back to `"worker"`), and
+the worker resolves that role's model + persona + tools at execution time. Roles
+are file-driven (`config/skynet_roles.yaml`; see `skynet_roles.example.yaml`):
+
+```yaml
+roles:
+  researcher:
+    model: "claude-sonnet-4-5"
+    capabilities: ["research", "web"]
+    persona: "You are a meticulous research specialist. Cite sources."
+  legal_review:
+    capabilities: ["legal"]
+    remote_agent: "https://legal.example.com/.well-known/agent-card.json"
+```
+
+`RoleRegistry.resolve()` never raises (unknown role → `DEFAULT_ROLE`); only
+`RoleRegistry.from_yaml()` raises `SkynetRoleError`, once, on a malformed file.
+Role personas are **trusted operator config** (never user-derived).
+
+### Metered workers (S+2)
+
+The builder constructs **one** `CostMeter` and threads it into the supervisor,
+every worker, and the reducer, so `skynet_token_budget` now bounds the *whole*
+swarm (Phase S counted only planner + evaluator). Each worker records its
+response into the shared meter and populates `WorkerResult.usage`;
+`SwarmResult.usage` is the whole-swarm total (planner + evaluator + reducer +
+Σworkers). A hard breach raises `SkynetBudgetExceeded` with a truthful `used`; an
+optional `budget_guard_fn` (Phase C `make_budget_guard_fn`) soft-degrades
+(stops dispatching) or hard-raises.
+
+### Remote workers over A2A (S+3)
+
+A role whose `remote_agent` is set runs its **whole** sub-order on a remote A2A
+agent (not remote *tools* on a local worker). With `skynet_remote_workers_enabled`
+**and** `a2a_enabled`, the worker delegates via `make_remote_send_fn(...)`, which
+reuses the Phase-I `A2AConnectionManager` (allowlist + strict deny-all + pool).
+Remote output crosses a trust boundary → it is **L1-sanitized** before touching
+state and the call is audited hash-first (`a2a.outbound`). A denied / unreachable
+/ timed-out agent is contained as `WorkerResult(success=False, remote=True)` — the
+swarm still reduces the other workers. With the flags off, a remote-bound role
+degrades to a local worker (a `skynet.remote_disabled` warning is logged).
+
+Runnable demo (no LLM, no network): `examples/skynet_specialist_swarm.py`.
 
 ## Security model
 
