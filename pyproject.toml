@@ -68,6 +68,7 @@ dependencies = [
   # ── Vector Database ───────────────────────────────────────
   "chromadb>=0.6.2",                # Embedding database for RAG
   # ── Document Processing ───────────────────────────────────
+  "soupsieve>=2.8.4",               # bs4 CSS selector engine (transitive); >=2.8.4 fixes CVE-2026-49476 (memory exhaustion) + CVE-2026-49477 (ReDoS)
   "pypdf>=6.13.3",                  # PDF loader (>=6.13.3 fixes GHSA-jm82-fx9c-mx94; earlier >=6.12.0 fixed CVE-2026-48155/48156 DoS)
   "docx2txt>=0.8",                  # DOCX loader
   "unstructured>=0.21.5",           # Universal document parser (>=0.21.5: floor lifted so a fresh resolve on py3.13 can't drag ancient numba 0.53.1/llvmlite via the old dep tree — see CHANGELOG 3.10.1)
@@ -112,7 +113,7 @@ dependencies = [
   "tenacity>=9.0.0",                # Retry logic with backoff
   "circuitbreaker>=2.0.0",          # Circuit breaker pattern
   # ── Security Primitives ───────────────────────────────────
-  "python-jose[cryptography]>=3.3.0", # JWT tokens for auth
+  "pyjwt[crypto]>=2.10.0",          # JWT tokens for auth (migrated off python-jose → ecdsa CVE-2024-23342, 2026-07)
   "passlib[bcrypt]>=1.7.4",         # Password hashing
   "cryptography>=48.0.1",           # Crypto primitives (canary tokens; GHSA-537c-gmf6-5ccf fixed in 48.0.1)
   "xxhash>=3.5.0",                  # Fast hashing for audit log chain
@@ -165,7 +166,7 @@ ml = [
   "shap>=0.45.0",
   "imbalanced-learn>=0.12.0",
   "optuna>=3.6.0",
-  "onnx>=1.16.0",
+  "onnx>=1.22.0",                   # >=1.22.0 fixes GHSA-hwpq-hmq9-wj77 (null-pointer deref in Upsample version converter)
   "onnxruntime>=1.18.0",
 ]
 
@@ -394,7 +395,7 @@ module = [
   "shap", "imblearn.*", "flaml", "skl2onnx", "skl2onnx.*",
   "motor", "motor.*", "aiosmtplib", "ntplib",
   "langgraph.checkpoint.postgres.*", "langgraph.store.postgres.*",
-  "psutil", "jose", "joblib",
+  "psutil", "joblib",
   # Multimodal extras (Fase F) — lazy-imported inside functions.
   "ffmpeg", "imagehash", "faster_whisper", "whisper",
   "open_clip", "pyttsx3", "elevenlabs", "elevenlabs.*", "cv2",

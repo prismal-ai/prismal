@@ -134,9 +134,10 @@ jobs:
       # .trivyignore (justification + re-eval trigger per entry there)
       # and .pre-commit-config.yaml (pip-audit hook).
       # Remediation: specs/dependency-security-remediation/ (2026-06).
+      # ecdsa (GHSA-wj6h-64fc-37mp / CVE-2024-23342) removed 2026-07: the
+      # python-jose → PyJWT migration drops python-jose → ecdsa entirely, so
+      # the vuln is eliminated, not accepted (no ignore needed).
       PIP_AUDIT_IGNORES: >-
-        --ignore-vuln=GHSA-wj6h-64fc-37mp
-        --ignore-vuln=CVE-2024-23342
         --ignore-vuln=CVE-2026-1839
         --ignore-vuln=CVE-2026-3219
         --ignore-vuln=CVE-2026-45829

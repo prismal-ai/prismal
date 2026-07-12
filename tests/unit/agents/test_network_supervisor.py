@@ -160,19 +160,33 @@ def test_network_supervisor_loads_nodes_from_config(tmp_path) -> None:
 
 
 def test_make_a2a_jwt_returns_signed_token() -> None:
-    """_make_a2a_jwt returns a non-empty signed JWT string when jose is available."""
+    """_make_a2a_jwt returns a valid HS256 JWT decodable with the shared secret."""
     from unittest.mock import MagicMock
+
+    import jwt
 
     from prismal.agents.network_supervisor import _make_a2a_jwt
 
+    # >= 32 bytes so PyJWT does not emit InsecureKeyLengthWarning (which
+    # filterwarnings=error would turn into a failure).
+    secret = "test-secret-key-that-is-at-least-32-bytes-long"
     mock_settings = MagicMock()
-    mock_settings.jwt_secret_key.get_secret_value.return_value = "test-secret-key-long-enough"
+    mock_settings.jwt_secret_key.get_secret_value.return_value = secret
 
     with patch("prismal.core.config.get_settings", return_value=mock_settings):
         result = _make_a2a_jwt("http://node:8000")
 
     assert isinstance(result, str)
     assert len(result) > 0
+
+    # The token is a genuine HS256 JWT with the expected claims (proves the
+    # PyJWT migration is behaviour-equivalent to the previous python-jose call).
+    decoded = jwt.decode(
+        result, secret, algorithms=["HS256"], audience="http://node:8000"
+    )
+    assert decoded["sub"] == "prismal-node"
+    assert decoded["type"] == "a2a"
+    assert decoded["aud"] == "http://node:8000"
 
 
 @pytest.mark.asyncio

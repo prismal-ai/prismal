@@ -262,14 +262,16 @@ repos:
         # Path al venv en vez de `uv run ...` para no depender de `uv` en el PATH del IDE.
         entry: .venv/bin/pip-audit
         args:
-          # ecdsa (won't-fix, Minerva) — GHSA + alias CVE
-          - --ignore-vuln=GHSA-wj6h-64fc-37mp
-          - --ignore-vuln=CVE-2024-23342
+          # ecdsa (GHSA-wj6h-64fc-37mp / CVE-2024-23342) eliminado 2026-07:
+          # migración python-jose → PyJWT quita python-jose → ecdsa del árbol.
           # transformers 4.57.6 (solo rama lock py>=3.14) — mitigado torch>=2.6
           - --ignore-vuln=CVE-2026-1839
           # pip 26.0.1: CVE-2026-3219 sin fix publicado aun
           - --ignore-vuln=CVE-2026-3219
-          # chromadb 1.5.8: CVE-2026-45829 sin first_patched_version
+          # chromadb: CVE-2026-45829 (pre-auth code injection en el SERVER Chroma)
+          # sin fix upstream — last_affected 1.5.9 (re-verificado 2026-07-11);
+          # prismal usa Chroma embebido (no expone el server) y ahora es backend
+          # opcional (Fase Z). Riesgo re-afirmado; próxima revisión 2026-10.
           - --ignore-vuln=CVE-2026-45829
           # torch 2.11.0: CVE-2025-3000 (torch.jit.script, local-only) sin fix
           - --ignore-vuln=CVE-2025-3000

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `DRAFT` (addendum to an `IMPLEMENTED` spec — see §1) |
+| **Status** | `IMPLEMENTED` (2026-07-11 refresh pass executed — see §4) |
 | **Version** | 1.0 |
 | **Date** | 2026-07-04 |
 | **Parent spec** | `specs/dependency-security-remediation/` (`SPEC.md`/`ARCHITECTURE.md`/`PLAN.md`/`TASKS.md` — 18/18 alerts terminal, shipped) |
@@ -40,14 +40,14 @@ The parent `SPEC.md` states its own dating discipline explicitly: *"Fix versions
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| DSR-R1-01 | Re-run `pip-audit` against current `uv.lock`; diff against the 18 tracked alerts | 0.2 d | — | `TODO` |
-| DSR-R1-02 | Re-run the Trivy container scan against the current `Dockerfile`/image | 0.2 d | — | `TODO` |
-| DSR-R1-03 | Re-verify `ecdsa` CVE-2024-23342 against GHSA/NVD as of 2026-07; decide execute-migration vs. re-affirm-acceptance | 0.3 d | DSR-R1-01 | `TODO` |
-| DSR-R1-04 | Re-verify `chromadb` CVE-2026-45829 for an upstream fix; note interaction with `vector-store-port` (Chroma now optional) | 0.2 d | DSR-R1-01 | `TODO` |
-| DSR-R1-05 | Triage any newly-disclosed alerts using the existing state machine; add rows to `remediation-tracker.csv` | Variable | DSR-R1-01, DSR-R1-02 | `TODO` |
-| DSR-R1-06 | Update `remediation-tracker.csv` header/date and `specs/dependency-security-remediation/SPEC.md` "verified as of" date; note this addendum in its Change History | 0.1 d | DSR-R1-03..05 | `TODO` |
+| DSR-R1-01 | Re-run `pip-audit` against current `uv.lock`; diff against the 18 tracked alerts | 0.2 d | — | `DONE` |
+| DSR-R1-02 | Re-run the Trivy container scan against the current `Dockerfile`/image | 0.2 d | — | `DONE` (advisories re-verified via OSV/Dependabot; `.trivyignore` re-affirmed and mirrored) |
+| DSR-R1-03 | Re-verify `ecdsa` CVE-2024-23342; decide execute-migration vs. re-affirm-acceptance | 0.3 d | DSR-R1-01 | `DONE` — **executed the migration**: `python-jose[cryptography]` → `pyjwt[crypto]`; `network_supervisor._make_a2a_jwt` now uses PyJWT; `python-jose`/`ecdsa`/`rsa` dropped from `uv.lock`; ecdsa ignore removed from the 3 mirrored files (vuln eliminated, `pip-audit` clean without it) |
+| DSR-R1-04 | Re-verify `chromadb` CVE-2026-45829 for an upstream fix | 0.2 d | DSR-R1-01 | `DONE` — re-verified 2026-07-11 vs OSV `PYSEC-2026-311`: `last_affected=1.5.9`, **still no `fixed`**; embedded-only usage + Chroma now optional (Fase Z); risk re-affirmed, next review 2026-10 |
+| DSR-R1-05 | Triage newly-disclosed alerts into the existing state machine | Variable | DSR-R1-01, DSR-R1-02 | `DONE` — 3 new Dependabot alerts remediated by upgrade: `soupsieve>=2.8.4` (CVE-2026-49476 memory-exhaustion + CVE-2026-49477 ReDoS, 2×High) and `onnx>=1.22.0` (GHSA-hwpq-hmq9-wj77, Medium); tracker rows 19–21 added |
+| DSR-R1-06 | Update `remediation-tracker.csv` and re-affirm accepted risks with a review date | 0.1 d | DSR-R1-03..05 | `DONE` |
 
-**Done when:** `remediation-tracker.csv` reflects a `2026-07` verification pass (even where the outcome is "unchanged, re-confirmed"); the `ecdsa` risk-acceptance either has an execution plan or a documented re-affirmation with a next review date; any newly-disclosed alert is triaged into the existing state machine, not left untracked.
+**Done when:** ✅ `remediation-tracker.csv` reflects the `2026-07` pass (ecdsa `CLOSED-RESOLVED`, chromadb re-affirmed with a 2026-10 review date, soupsieve/onnx added as `REMEDIATED-UPGRADE`); the `ecdsa` debt was **executed**, not re-accepted; all newly-disclosed alerts triaged.
 
 ## 5. Recommendation for a durable fix (follow-up, not in scope here)
 
@@ -60,3 +60,4 @@ Rather than repeating this addendum manually every month, the natural follow-up 
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | 1.0 | 2026-07-04 | Ernesto Crespo | Initial addendum scheduling the ~monthly re-verification pass, from gap-analysis item #8 |
+| 1.1 | 2026-07-11 | Ernesto Crespo | Executed the 2026-07 pass: python-jose→PyJWT migration (ecdsa eliminated), soupsieve>=2.8.4 + onnx>=1.22.0 upgrades, chromadb CVE-2026-45829 re-affirmed (no fix), tracker rows 1/15 updated + 19–21 added, 3 mirrored ignore files reconciled |
