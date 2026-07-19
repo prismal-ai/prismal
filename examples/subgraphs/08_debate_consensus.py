@@ -327,9 +327,11 @@ async def run_debate(topic: dict) -> dict:
     from langchain_core.messages import HumanMessage
 
     from prismal.agents.state import create_initial_state
+    from prismal.agents.subgraphs.factory import assemble_state_graph
 
     await register_debate_consensus()
     subgraph = build_debate_consensus_subgraph()
+    graph = assemble_state_graph(subgraph).compile()
 
     state = create_initial_state(session_id=f"example-debate-consensus-{topic['id']}")
     state["messages"] = [
@@ -348,7 +350,7 @@ async def run_debate(topic: dict) -> dict:
     }
 
     config = {"configurable": {"thread_id": f"debate_{topic['id']}_001"}}
-    final_state = await subgraph.graph.ainvoke(state, config=config)
+    final_state = await graph.ainvoke(state, config=config)
 
     debate_meta = final_state.get("metadata", {}).get("debate_consensus", {})
     messages = final_state.get("messages", [])

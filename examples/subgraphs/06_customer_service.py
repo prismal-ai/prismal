@@ -359,11 +359,13 @@ async def run_customer_service(query_data: dict, escalation_threshold: float = 0
     from langchain_core.messages import HumanMessage
 
     from prismal.agents.state import create_initial_state
+    from prismal.agents.subgraphs.factory import assemble_state_graph
 
     await register_customer_service(escalation_threshold=escalation_threshold)
     subgraph = build_customer_service_subgraph(
         escalation_threshold=escalation_threshold,
     )
+    graph = assemble_state_graph(subgraph).compile()
 
     state = create_initial_state(session_id=f"example-customer-service-{query_data['id']}")
     state["messages"] = [HumanMessage(content=query)]
@@ -375,7 +377,7 @@ async def run_customer_service(query_data: dict, escalation_threshold: float = 0
     }
 
     config = {"configurable": {"thread_id": f"cs_{query_data['id']}_001"}}
-    final_state = await subgraph.graph.ainvoke(state, config=config)
+    final_state = await graph.ainvoke(state, config=config)
 
     cs_meta = final_state.get("metadata", {}).get("customer_service", {})
     messages = final_state.get("messages", [])

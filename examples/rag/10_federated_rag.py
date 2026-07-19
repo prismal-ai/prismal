@@ -272,10 +272,7 @@ def print_federated_result(query_info: dict, results: list[RetrievedChunk]) -> N
     for chunk in results[:5]:
         is_expected = chunk.chunk_id == query_info["expected_chunk"]
         mark = "→ " if is_expected else "  "
-        print(
-            f"    {mark}[{chunk.relevance_score:.4f}] "
-            f"{chunk.chunk_id:<22} ← {chunk.source}"
-        )
+        print(f"    {mark}[{chunk.relevance_score:.4f}] {chunk.chunk_id:<22} ← {chunk.source}")
 
     top_ids = [c.chunk_id for c in results[:3]]
     found = query_info["expected_chunk"] in top_ids

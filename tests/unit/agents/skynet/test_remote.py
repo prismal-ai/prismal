@@ -134,9 +134,7 @@ async def test_send_fn_wraps_generic_error_as_unavailable() -> None:
 
     with pytest.raises(A2AAgentUnavailable):
         await send_fn(_ROLE, _ORDER)
-    assert any(
-        e == "a2a.outbound" and p.get("status") == "failed" for e, p in audit.events
-    )
+    assert any(e == "a2a.outbound" and p.get("status") == "failed" for e, p in audit.events)
 
 
 async def test_empty_artifacts_return_empty_string() -> None:
