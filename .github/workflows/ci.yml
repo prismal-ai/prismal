@@ -137,11 +137,16 @@ jobs:
       # ecdsa (GHSA-wj6h-64fc-37mp / CVE-2024-23342) removed 2026-07: the
       # python-jose → PyJWT migration drops python-jose → ecdsa entirely, so
       # the vuln is eliminated, not accepted (no ignore needed).
+      # PYSEC-2026-2132 (click): fix is 8.3.3 but guardrails-ai 0.10.2 caps
+      # click<=8.2.0, so the bump is unresolvable until guardrails lifts the
+      # cap. Low severity (not in trivy HIGH/CRITICAL gate). TRIGGER: guardrails-ai
+      # release allowing click>=8.3.3 → drop this ignore and the cap disappears.
       PIP_AUDIT_IGNORES: >-
         --ignore-vuln=CVE-2026-1839
         --ignore-vuln=CVE-2026-3219
         --ignore-vuln=CVE-2026-45829
         --ignore-vuln=CVE-2025-3000
+        --ignore-vuln=PYSEC-2026-2132
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: ./.github/actions/setup-python-env
