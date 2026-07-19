@@ -10,9 +10,6 @@ resolution-markers = [
     "python_full_version < '3.14' and platform_machine == 's390x'",
 ]
 
-[manifest]
-constraints = [{ name = "setuptools", specifier = ">=83.0.0" }]
-
 [[package]]
 name = "accelerate"
 version = "1.13.0"
@@ -5282,6 +5279,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "rank-bm25" },
     { name = "sentence-transformers" },
+    { name = "setuptools" },
     { name = "soupsieve" },
     { name = "sqlalchemy" },
     { name = "structlog" },
@@ -5584,6 +5582,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.4" },
     { name = "scikit-learn", marker = "extra == 'ml'", specifier = ">=1.5.0" },
     { name = "sentence-transformers", specifier = ">=3.3.1" },
+    { name = "setuptools", specifier = ">=83.0.0" },
     { name = "shap", marker = "extra == 'ml'", specifier = ">=0.45.0" },
     { name = "soupsieve", specifier = ">=2.8.4" },
     { name = "sqlalchemy", specifier = ">=2.0.36" },

@@ -90,6 +90,7 @@ dependencies = [
   # ── Security & Guardrails ─────────────────────────────────
   "nemoguardrails>=0.10.1",         # NVIDIA NeMo Guardrails for LLMs
   "bandit>=1.8.0",                  # Security linter (used in skill validation)
+  "setuptools>=83.0.0",             # Floor transitive setuptools; >=83.0.0 fixes PYSEC-2026-3447
   # ── Configuration ─────────────────────────────────────────
   "pydantic>=2.10.3",               # Data validation
   "pydantic-settings>=2.14.2",      # Settings from env vars / .env files (>=2.14.2 fixes GHSA-4xgf-cpjx-pc3j)
@@ -296,19 +297,6 @@ Documentation = "https://prismal.dev"
 Repository = "https://github.com/prismal-ai/prismal"
 "Bug Tracker" = "https://github.com/prismal-ai/prismal/issues"
 Changelog = "https://github.com/prismal-ai/prismal/blob/main/CHANGELOG.md"
-
-# ============================================================
-# UV RESOLVER CONSTRAINTS — floor transitive deps to patched
-# versions for CVEs whose only fix is upstream (no direct dep).
-# Mirror rationale of .trivyignore / pip-audit ignores.
-# ============================================================
-[tool.uv]
-constraint-dependencies = [
-  # click>=8.3.3 (PYSEC-2026-2132) is NOT applied: guardrails-ai 0.10.2 caps
-  # click<=8.2.0. Low severity (not in trivy HIGH/CRITICAL gate); ignored in
-  # pip-audit until guardrails-ai lifts its cap.
-  "setuptools>=83.0.0", # PYSEC-2026-3447 (transitive build/runtime artifact)
-]
 
 # ============================================================
 # HATCH BUILD CONFIG — namespace package (PEP 420)
