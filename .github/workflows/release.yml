@@ -121,13 +121,39 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "Release exists — updating assets"
-            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
-          else
+          set -uo pipefail
+          # The API and upload endpoints return transient 5xx during GitHub
+          # incidents, and `gh release create` deletes the half-made release
+          # when an asset upload fails — so one blip loses the whole release
+          # while PyPI and GHCR have already published. Retry with backoff.
+          # `gh release view` is only trusted when it says "not found"; any
+          # other failure (5xx) is treated as unknown and retried, so we never
+          # mistake an outage for a missing release.
+          publish() {
+            local view_err
+            view_err="$(gh release view "$GITHUB_REF_NAME" 2>&1 >/dev/null)" && {
+              echo "Release exists — updating assets"
+              gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+              return
+            }
+            case "$view_err" in
+              *"release not found"*|*"Not Found"*|*"HTTP 404"*) ;;
+              *) echo "Cannot determine release state: $view_err"; return 1 ;;
+            esac
             gh release create "$GITHUB_REF_NAME" dist/* \
               --title "prismal v$VERSION" \
               --notes-file RELEASE_NOTES.md \
               --verify-tag
-          fi
+          }
+          for attempt in 1 2 3 4 5; do
+            if publish; then
+              echo "Release published on attempt $attempt"
+              exit 0
+            fi
+            [ "$attempt" -eq 5 ] && break
+            delay=$((attempt * 30))
+            echo "Attempt $attempt failed — retrying in ${delay}s"
+            sleep "$delay"
+          done
+          echo "::error::Release publish failed after 5 attempts"
+          exit 1

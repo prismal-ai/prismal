@@ -10,7 +10,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-New work starts here.
+### Fixed
+- CI (`release.yml`): the `github-release` job now retries with backoff and
+  only trusts a `gh release view` "not found", instead of failing the whole
+  release on a transient GitHub 5xx. During the 2026-07-19 GitHub Actions
+  incident a 503 on the asset upload made `gh release create` roll back the
+  half-made release, so v3.12.0 shipped to PyPI and GHCR without a GitHub
+  Release.
 
 ## [3.12.0] — 2026-07-12
 
