@@ -13,8 +13,7 @@ and in which order the pending work fits together. Statuses are verified
 against the codebase, not just each spec's own `Status` field (spec `Status`
 markers were reconciled with the codebase on 2026-06-07).
 
-Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented) ·
-🌱 `SEED` (PRD only; ARCHITECTURE/SPEC/TASKS missing).
+Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented).
 
 ---
 
@@ -40,10 +39,11 @@ Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented) ·
 | [`blind-review-pipeline/`](./blind-review-pipeline/) | BRP | ✅ | `prismal/agents/subgraphs/blind_review_pipeline/` opt-in subgraph (`blind_review_pipeline_enabled`): spec → implement → two **blind** reviewers (no `state["messages"]` access — input contract + AST guard + runtime `BlindnessGuard`) → deterministic `synthesize_verdicts` → bounded correction loop + reused HITL trio. Per-role model/tools via `ProviderRegistry`/`ToolProviderPort`; supervisor route + intent gated on the flag (graph snapshot-tested). Docs: `docs/blind-review-pipeline.md` · **v3.11.0** |
 | [`guardrails-modernization/`](./guardrails-modernization/) | GRD | ✅ | `config/nemo_rails/` (finally ships the config `NemoRailsLayer` always expected) + `security/nemo_actions.py::content_safety_reasoning` (reasoning-capable safety-classifier NeMo custom action, settings-driven main-LLM resolution via `providers/`, independent timeout budget, fail-open). `security/structured_output_guard.py::StructuredOutputGuard` (bounded, Budget-metered re-ask over `guardrails-ai`'s `Guard.validate()` — no LLM call inside guardrails-ai itself; opt-in Hub validators; composes with `OutputValidator`). Opt-in: `nemo_classifier_enabled`, `structured_output_guard_enabled`; `[guardrails-ai]` extra. Docs: `docs/security/guardrails-modernization.md` · **v3.6.0** |
 
-Deferred to follow-up phases (noted in their specs): Skynet S+ (heterogeneous
-specialist swarms; metering *worker* token usage into the shared swarm budget —
-Phase C already enforces `skynet_token_budget` at the supervisor's planner/
-evaluator boundary via the unified budget engine; remote workers via A2A).
+Deferred follow-up **Skynet S+** now has a full SDD — see
+[`skynet-swarm-plus/`](./skynet-swarm-plus/) in the Ready table below
+(heterogeneous specialist swarms; metering *worker* token usage into the shared
+swarm budget — the Phase-S enforcement only counts planner/evaluator today;
+remote workers via A2A, now unblocked by Phase I).
 
 ## 📋 Ready to implement (full SDD: PLAN + SPEC + ARCHITECTURE + TASKS)
 
@@ -55,8 +55,8 @@ Sourced from the 2026-07-04 gap analysis
 | [`loop-hardening/`](./loop-hardening/) | LH | Context compaction (`AgentState.messages` grows unbounded today) + dynamic tool gating by task phase | — |
 | [`node-io-typesafety/`](./node-io-typesafety/) | NTS | Pydantic I/O validation contracts per graph node (`AgentState` is still a bare `TypedDict`) | — |
 | [`observability-integration/`](./observability-integration/) | OBS | `ObservabilityPort` + LangSmith/Langfuse parity, dataset export, eval-harness integration | Phase V (eval harness) |
-| [`reference-host-bootstrap/`](./reference-host-bootstrap/) | — | PLAN-only seed for the *external* `prismal-server` host repo (REST/WS/SSE, `/a2a` mount, auth) — out of this repo's scope | Phase Y, I |
-| [`blind-review-pipeline/`](./blind-review-pipeline/) | BRP | New opt-in subgraph: spec agent → implementer agent → two independent **blind** reviewer agents (no visibility into `state["messages"]`, only spec + artifact) → deterministic synthesis → bounded correction loop / optional HITL. Each of the 4 roles gets its own LLM (`ProviderRegistry`) and tool/skill scope (`ToolProviderPort`). Opt-in: `blind_review_pipeline_enabled`. Full SDD drafted 2026-07-10; nothing implemented yet | Phase Y (shipped) |
+| [`blind-review-pipeline/`](./blind-review-pipeline/) | BRP | New opt-in subgraph: spec agent → implementer agent → two independent **blind** reviewer agents (no visibility into `state["messages"]`, only spec + artifact) → deterministic synthesis → bounded correction loop / optional HITL. Each of the 4 roles gets its own LLM (`ProviderRegistry`) and tool/skill scope (`ToolProviderPort`). Opt-in: `blind_review_pipeline_enabled`. **Shipped v3.11.0 (2026-07-11).** | Phase Y (shipped) |
+| [`skynet-swarm-plus/`](./skynet-swarm-plus/) | S+ | Follow-up to Phase S: (1) **heterogeneous specialist swarms** — a `RoleRegistry` binds `SwarmOrder.role` → per-role model/persona/tools; (2) **metered workers** — every worker records real token/cost into the shared per-run `CostMeter` so `skynet_token_budget` bounds the *whole* swarm (Phase S counts planner/evaluator only); (3) **remote workers** — a role may bind to a remote A2A agent (`A2AConnectionManager` allowlist). All additive/opt-in; graph byte-for-byte unchanged when off. **Shipped v3.12.0 (2026-07-12), strict TDD.** | Phase C + Phase I (both shipped) |
 
 ### Target package versions (strict SemVer — minor per phase)
 
@@ -88,11 +88,11 @@ Current: **`3.6.0`**. Each phase was new, additive, opt-in functionality → a *
 > change would be a major, but all pending phases are opt-in and snapshot-safe, so
 > none is expected). Each spec's metadata table records its `Target package version`.
 
-## 🌱 Seed PRDs (PLAN only — ARCHITECTURE/SPEC/TASKS must be written first)
-
-| Spec | What it adds | Depends on |
-|---|---|---|
-| [`reference-host-bootstrap/`](./reference-host-bootstrap/) | Scopes the missing `prismal-server` host repo (REST/WS/SSE surface, `/a2a` mount, auth). Out-of-repo — nothing here can be implemented inside `prismal-ai/prismal` itself. | Phase Y, I |
+> **Out-of-repo host (not tracked here):** the `prismal-server` reference host
+> (REST/WS/SSE surface, `/a2a` mount, auth) is a **separate repository** and is
+> deliberately **out of this roadmap's scope** — nothing about it can be
+> implemented inside `prismal-ai/prismal`. Its scoping seed lives with the
+> sibling `prismal-server` repo, not here.
 
 ## Suggested order
 

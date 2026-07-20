@@ -607,8 +607,6 @@ async def demo_real_langgraph() -> None:
 
         from langchain_core.messages import AIMessage, HumanMessage
         from langgraph.checkpoint.memory import MemorySaver
-        from langgraph.graph import END, StateGraph
-        from langgraph.graph.message import add_messages
 
         from prismal.agents.domain_supervisor import make_domain_supervisor
         from prismal.agents.subgraphs.analysis_orchestrator.builder import (
@@ -617,6 +615,7 @@ async def demo_real_langgraph() -> None:
         )
         from prismal.agents.subgraphs.factory import SubgraphFactory
         from prismal.agents.subgraphs.registry import SubgraphDefinition
+        from prismal.langgraph import END, StateGraph, add_messages
     except ImportError as e:
         print(f"\n  ⚠  Dependencia no disponible: {e}")
         print("     Instala con: uv pip install -e '.[dev,all]'")

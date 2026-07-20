@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any
 
 from prismal.agents.skynet.supervisor import _parse_json_object
 from prismal.agents.skynet.types import SwarmOrder, WorkerResult
+from prismal.budget.types import Usage
 from prismal.core.exceptions import PermissionDeniedError
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
@@ -44,11 +45,21 @@ if TYPE_CHECKING:
     from langchain_core.tools import BaseTool
 
     from prismal.agents.extension.ports import ToolProviderPort
+    from prismal.agents.skynet.roles import RoleRegistry, SpecialistRole
+    from prismal.budget.meter import CostMeter
     from prismal.core.config import Settings
     from prismal.security.action_interceptor import ActionInterceptor
 
 #: Worker backend: (secure messages) -> raw output (plain text or JSON protocol).
 WorkerFn = Callable[[list[dict[str, str]]], Awaitable[str]]
+
+#: Pre-call budget check (Phase C ``make_budget_guard_fn``): ``ctx -> proceed?``.
+#: Returns ``False`` to soft-degrade; raises ``BudgetExceeded`` on a hard cap.
+BudgetGuardFn = Callable[[dict[str, Any]], Awaitable[bool]]
+
+#: Remote delegation backend (S+3): ``(role, order) -> remote output text``.
+#: Raises ``A2AAgentUnavailable`` on denial / failure (caught by the worker).
+RemoteSendFn = Callable[["SpecialistRole", SwarmOrder], Awaitable[str]]
 
 logger = get_logger("prismal.agents.skynet.worker")
 
@@ -92,9 +103,32 @@ class SwarmWorker:
         tool_provider: ToolProviderPort | None = None,
         interceptor: ActionInterceptor | None = None,
         prompt_builder: SecurePromptBuilder | None = None,
+        role_registry: RoleRegistry | None = None,
+        meter: CostMeter | None = None,
+        send_fn: RemoteSendFn | None = None,
+        budget_guard_fn: BudgetGuardFn | None = None,
         settings: Settings | None = None,
     ) -> None:
-        """Initialise the worker with its injected collaborators."""
+        """Initialise the worker with its injected collaborators.
+
+        Args:
+            role_registry: S+ specialist registry.  When
+                ``settings.skynet_specialists_enabled`` and a registry is
+                present, ``execute()`` resolves each order's role to a per-role
+                model, persona, and tool capabilities; otherwise the worker
+                behaves byte-for-byte like Phase S.
+            meter: Shared per-run :class:`CostMeter` (S+2).  When present, each
+                worker records its response into it and populates
+                ``WorkerResult.usage``; ``None`` leaves usage empty (Phase S).
+            send_fn: Remote delegation backend (S+3).  A role whose
+                ``remote_agent`` is set is delegated over A2A via this callable
+                when ``skynet_remote_workers_enabled`` **and** ``a2a_enabled``;
+                otherwise the role degrades to a local worker.
+            budget_guard_fn: Optional pre-call budget check (Phase C).  A soft
+                cap (returns ``False``) degrades the order without an LLM call;
+                a hard cap (raises ``BudgetExceeded``) propagates so the fan-out
+                stops dispatching further orders.
+        """
         if settings is None:
             from prismal.core.config import get_settings
 
@@ -103,6 +137,10 @@ class SwarmWorker:
         self._worker_fn = worker_fn
         self._tool_provider = tool_provider
         self._interceptor = interceptor
+        self._role_registry = role_registry
+        self._meter = meter
+        self._send_fn = send_fn
+        self._budget_guard_fn = budget_guard_fn
         self._prompt_builder = (
             prompt_builder if prompt_builder is not None else SecurePromptBuilder()
         )
@@ -128,6 +166,14 @@ class SwarmWorker:
             span.set_attribute("prismal.skynet.order_id", order.order_id)
             span.set_attribute("prismal.skynet.role", order.role)
             span.set_attribute("prismal.skynet.attempt", order.attempt)
+
+            # Pre-call budget gate (S+2). A hard cap raises out of the node
+            # deliberately (fan-out stops); a soft cap degrades this one order.
+            degraded = await self._budget_precheck(order)
+            if degraded is not None:
+                span.set_attribute("prismal.skynet.success", False)
+                return degraded
+
             try:
                 result = await self._run(order)
             except Exception as exc:
@@ -141,6 +187,7 @@ class SwarmWorker:
                     output="",
                     success=False,
                     error=str(exc),
+                    role=order.role,
                 )
             span.set_attribute("prismal.skynet.success", result.success)
             span.set_attribute("prismal.skynet.tool_calls", result.tool_calls)
@@ -150,17 +197,40 @@ class SwarmWorker:
 
     async def _run(self, order: SwarmOrder) -> WorkerResult:
         """Execute the order (exceptions handled by :meth:`execute`)."""
-        tools = self._resolve_tools(order)
+        role = self._resolve_role(order)
 
-        system = _WORKER_SYSTEM
+        # S+3: a remote-bound role runs its whole order on a remote A2A agent
+        # when remote workers are enabled; otherwise it degrades to local.
+        if role.remote_agent:
+            if self._remote_active() and self._send_fn is not None:
+                return await self._run_remote(role, order)
+            logger.warning(
+                "skynet.remote_disabled",
+                order_id=order.order_id,
+                agent=role.remote_agent,
+            )
+
+        capabilities = self._capabilities_for(role, order)
+        tools = self._resolve_tools(capabilities)
+
+        system = f"{role.persona}\n\n{_WORKER_SYSTEM}" if role.persona else _WORKER_SYSTEM
         if tools:
             names = ", ".join(sorted(tools))
             system += _WORKER_SYSTEM_TOOLS.format(names=names)
         user = self._compose_user_content(order)
         messages = self._prompt_builder.build(system=system, user=user)
 
-        worker_fn = self._worker_fn if self._worker_fn is not None else self._default_worker
-        raw = await worker_fn(messages)
+        model = self._model_for(role)
+        usage = Usage()
+        if self._worker_fn is not None:
+            raw = await self._worker_fn(messages)
+        else:
+            response = await self._invoke_default(messages, model=model)
+            raw = str(response.content)
+            # Meter + populate usage only when a shared meter is injected (S+2);
+            # without one, WorkerResult.usage stays empty (Phase-S invariant).
+            if self._meter is not None:
+                usage = self._meter_response(response, model)
 
         output, actions = _parse_worker_response(raw)
         tool_calls = 0
@@ -179,15 +249,125 @@ class SwarmWorker:
             output=output,
             success=True,
             tool_calls=tool_calls,
+            usage=usage,
+            role=order.role,
         )
 
-    def _resolve_tools(self, order: SwarmOrder) -> dict[str, BaseTool]:
-        """Resolve the worker's tools for the order role (Fase Y injection)."""
+    def _remote_active(self) -> bool:
+        """True when remote workers are enabled and A2A is available (S+3)."""
+        return self._settings.skynet_remote_workers_enabled and self._settings.a2a_enabled
+
+    async def _run_remote(self, role: SpecialistRole, order: SwarmOrder) -> WorkerResult:
+        """Delegate *order* to a remote A2A agent via ``send_fn`` (S+3).
+
+        A remote failure (:class:`A2AAgentUnavailable`) is contained as a
+        ``WorkerResult(success=False, remote=True)`` so the swarm still reduces
+        the other workers (Phase-S containment invariant).
+        """
+        from prismal.core.exceptions import A2AAgentUnavailable
+
+        assert self._send_fn is not None  # guarded by the caller
+        try:
+            text = await self._send_fn(role, order)
+        except A2AAgentUnavailable as exc:
+            logger.warning("skynet_remote_failed", order_id=order.order_id, error=str(exc))
+            return WorkerResult(
+                order_id=order.order_id,
+                output="",
+                success=False,
+                error=str(exc),
+                role=order.role,
+                remote=True,
+            )
+        return WorkerResult(
+            order_id=order.order_id,
+            output=text,
+            success=True,
+            role=order.role,
+            remote=True,
+        )
+
+    async def _budget_precheck(self, order: SwarmOrder) -> WorkerResult | None:
+        """Consult ``budget_guard_fn`` before running (S+2).
+
+        Returns a degraded ``WorkerResult`` on a soft cap (guard returns
+        ``False``) or ``None`` to proceed.  A hard cap raises out of the node
+        (the guard raises ``BudgetExceeded``) so the fan-out stops dispatching.
+        """
+        if self._budget_guard_fn is None:
+            return None
+        ctx: dict[str, Any] = {
+            "agent": WORKER_AGENT_NAME,
+            "order_id": order.order_id,
+            "role": order.role,
+        }
+        within = await self._budget_guard_fn(ctx)
+        if within:
+            return None
+        logger.warning("skynet_worker_budget_degraded", order_id=order.order_id)
+        return WorkerResult(
+            order_id=order.order_id,
+            output="",
+            success=False,
+            error="budget soft cap: order skipped",
+            role=order.role,
+        )
+
+    def _meter_response(self, response: object, model: str | None) -> Usage:
+        """Extract + price *response*'s tokens and record them into the meter."""
+        from prismal.budget.usage import extract_token_usage
+        from prismal.providers.cost import compute_cost_usd
+
+        tokens = extract_token_usage(response)
+        priced_model = model or self._settings.default_model
+        estimate = compute_cost_usd(
+            priced_model,
+            tokens.prompt_tokens,
+            tokens.completion_tokens,
+            settings=self._settings,
+        )
+        usage = Usage(
+            prompt_tokens=tokens.prompt_tokens,
+            completion_tokens=tokens.completion_tokens,
+            cost_usd=estimate.cost_usd,
+            calls=1,
+            estimated=estimate.estimated,
+        )
+        if self._meter is not None:
+            self._meter.record(usage, agent=WORKER_AGENT_NAME, pattern="skynet", model=model)
+        return usage
+
+    def _specialists_active(self) -> bool:
+        """True when per-role resolution is on (flag + a registry present)."""
+        return self._settings.skynet_specialists_enabled and self._role_registry is not None
+
+    def _resolve_role(self, order: SwarmOrder) -> SpecialistRole:
+        """Resolve the order's :class:`SpecialistRole` (DEFAULT_ROLE when off)."""
+        from prismal.agents.skynet.roles import DEFAULT_ROLE
+
+        if self._role_registry is not None and self._specialists_active():
+            return self._role_registry.resolve(order.role)
+        return DEFAULT_ROLE
+
+    def _capabilities_for(self, role: SpecialistRole, order: SwarmOrder) -> list[str]:
+        """Tool capabilities for this order — role caps when active, else [role]."""
+        if self._specialists_active():
+            return role.capabilities or [order.role]
+        return [order.role]
+
+    def _model_for(self, role: SpecialistRole) -> str | None:
+        """Per-role model when active, else the Phase-S ``skynet_worker_model``."""
+        if self._specialists_active() and role.model:
+            return role.model
+        return self._settings.skynet_worker_model or None
+
+    def _resolve_tools(self, capabilities: list[str]) -> dict[str, BaseTool]:
+        """Resolve the worker's tools for *capabilities* (Fase Y injection)."""
         if self._tool_provider is None:
             return {}
         tools = self._tool_provider.get_tools(
             agent_name=WORKER_AGENT_NAME,
-            capabilities=[order.role],
+            capabilities=capabilities,
         )
         return {tool.name: tool for tool in tools}
 
@@ -229,21 +409,26 @@ class SwarmWorker:
             return False, f"[tool {tool_name}] failed: {exc}"
         return True, f"[tool {tool_name}] {result}"
 
-    async def _default_worker(self, messages: list[dict[str, str]]) -> str:
-        """Default worker backend — lazily wires ``ProviderRegistry().get_llm()``."""
+    async def _invoke_default(
+        self, messages: list[dict[str, str]], *, model: str | None = None
+    ) -> Any:
+        """Default worker backend — lazily wires ``ProviderRegistry().get_llm()``.
+
+        Returns the raw LLM response (so ``_run`` can meter its ``usage_metadata``).
+        The per-call *model* is passed explicitly (never stored on ``self``) so
+        concurrent orders on the shared worker instance never race on it.
+        """
         from langchain_core.messages import HumanMessage, SystemMessage
 
         from prismal.providers.registry import ProviderRegistry
 
-        model_override = self._settings.skynet_worker_model or None
-        llm = ProviderRegistry(settings=self._settings).get_llm(model=model_override)
-        response = await llm.ainvoke(
+        llm = ProviderRegistry(settings=self._settings).get_llm(model=model)
+        return await llm.ainvoke(
             [
                 SystemMessage(content=messages[0]["content"]),
                 HumanMessage(content=messages[1]["content"]),
             ]
         )
-        return str(response.content)
 
     def _action_interceptor(self) -> ActionInterceptor:
         """Return the injected interceptor, building the default lazily."""

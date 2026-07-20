@@ -103,7 +103,7 @@ Cada fila de la tabla de la Sección 5 quedó registrada como artefacto de Spec-
 
 | # (§5) | Ítem | Spec creado | Tipo de artefacto |
 |---|---|---|---|
-| 1 | Capa host | [`specs/reference-host-bootstrap/PLAN.md`](../specs/reference-host-bootstrap/PLAN.md) | PRD seed (solo PLAN — ARCHITECTURE/SPEC/TASKS quedan para el futuro repo `prismal-server`, ver §9 de ese PLAN) |
+| 1 | Capa host | `prismal-server` (repo externo) | Fuera del alcance de este repo; se movió al repo hermano `prismal-server` (el seed `specs/reference-host-bootstrap/` se retiró de la planificación de este repo el 2026-07-12) |
 | 2 | Clasificador de seguridad NeMo | [`specs/guardrails-modernization/`](../specs/guardrails-modernization/) (Phase `GRD`, fase GRD1) | SDD completo (PLAN/ARCHITECTURE/SPEC/TASKS) |
 | 3 | `guardrails-ai` estructurado | [`specs/guardrails-modernization/`](../specs/guardrails-modernization/) (Phase `GRD`, fase GRD2) | SDD completo — mismo spec que el ítem 2 (agrupados por ser ambos de la capa Guardrails) |
 | 4 | Compactación de contexto | [`specs/loop-hardening/`](../specs/loop-hardening/) (Phase `LH`, fase LH1) | SDD completo |

@@ -68,3 +68,11 @@ CVE-2026-45829
 # TRIGGER de re-evaluacion: PyTorch publica first_patched_version para
 # CVE-2025-3000 -> subir y quitar este ignore.
 CVE-2025-3000
+
+# --- click PYSEC-2026-2132 (NO listado aqui a proposito) ----
+# fix = click 8.3.3, pero guardrails-ai 0.10.2 fija click<=8.2.0, por lo que
+# el bump es irresoluble hasta que guardrails suba el cap. Baja severidad:
+# NO entra en el gate HIGH/CRITICAL de trivy, asi que no requiere ignore aqui;
+# solo se ignora en pip-audit (ci.yml + .pre-commit-config.yaml).
+# TRIGGER de re-evaluacion: guardrails-ai permite click>=8.3.3 -> quitar el
+# ignore de pip-audit (el cap desaparece solo).

@@ -252,3 +252,60 @@ def test_blind_review_validation_same_model_warns() -> None:
 
     assert s.blind_review_reviewer_a_model == "claude-sonnet-4-5"
     assert any(log.get("event") == "blind_review.reviewers_share_model" for log in cap_logs)
+
+
+def test_skynet_plus_settings_defaults() -> None:
+    """Skynet S+ settings parse with safe (off) defaults (SPEC-SP-CFG-001)."""
+    from prismal.core.config import Settings
+
+    s = Settings(_env_file=None)  # type: ignore[call-arg]
+    assert s.skynet_specialists_enabled is False
+    assert s.skynet_roles_path == "config/skynet_roles.yaml"
+    assert s.skynet_remote_workers_enabled is False
+    assert s.skynet_remote_allowlist == []
+
+
+def test_skynet_plus_settings_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PRISMAL_SKYNET_* env vars populate the S+ settings."""
+    from prismal.core.config import Settings
+
+    monkeypatch.setenv("PRISMAL_SKYNET_SPECIALISTS_ENABLED", "true")
+    monkeypatch.setenv("PRISMAL_SKYNET_ROLES_PATH", "/etc/roles.yaml")
+    monkeypatch.setenv("PRISMAL_SKYNET_REMOTE_ALLOWLIST", '["*.example.com"]')
+    s = Settings()
+    assert s.skynet_specialists_enabled is True
+    assert s.skynet_roles_path == "/etc/roles.yaml"
+    assert s.skynet_remote_allowlist == ["*.example.com"]
+
+
+def test_skynet_remote_without_a2a_warns() -> None:
+    """Remote workers enabled without a2a_enabled logs a warning, does not raise."""
+    from structlog.testing import capture_logs
+
+    from prismal.core.config import Settings
+
+    with capture_logs() as cap_logs:
+        s = Settings(
+            _env_file=None,  # type: ignore[call-arg]
+            skynet_remote_workers_enabled=True,
+            a2a_enabled=False,
+        )
+
+    assert s.skynet_remote_workers_enabled is True
+    assert any(log.get("event") == "skynet.remote_needs_a2a" for log in cap_logs)
+
+
+def test_skynet_remote_with_a2a_no_warning() -> None:
+    """Remote workers + a2a_enabled: no remote_needs_a2a warning."""
+    from structlog.testing import capture_logs
+
+    from prismal.core.config import Settings
+
+    with capture_logs() as cap_logs:
+        Settings(
+            _env_file=None,  # type: ignore[call-arg]
+            skynet_remote_workers_enabled=True,
+            a2a_enabled=True,
+        )
+
+    assert not any(log.get("event") == "skynet.remote_needs_a2a" for log in cap_logs)

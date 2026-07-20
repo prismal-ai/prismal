@@ -33,7 +33,7 @@ from prismal.agents.subgraphs.skynet.evaluate_node import (
     make_evaluate_node,
     route_after_evaluate,
 )
-from prismal.agents.subgraphs.skynet.output_node import output_node
+from prismal.agents.subgraphs.skynet.output_node import make_output_node
 from prismal.agents.subgraphs.skynet.plan_node import make_plan_node
 from prismal.agents.subgraphs.skynet.reduce_node import make_reduce_node
 from prismal.agents.subgraphs.skynet.worker_node import make_worker_node
@@ -42,11 +42,14 @@ from prismal.core.logging import get_logger
 if TYPE_CHECKING:
     from prismal.agents.extension.ports import ToolProviderPort
     from prismal.agents.skynet.reduce import ReduceFn
+    from prismal.agents.skynet.roles import RoleRegistry
     from prismal.agents.skynet.supervisor import EvaluateFn, PlanFn
-    from prismal.agents.skynet.worker import WorkerFn
+    from prismal.agents.skynet.worker import BudgetGuardFn, RemoteSendFn, WorkerFn
     from prismal.agents.subgraphs.registry import SubgraphRegistry
+    from prismal.budget.meter import CostMeter
     from prismal.core.config import Settings
     from prismal.security.action_interceptor import ActionInterceptor
+    from prismal.security.audit import AuditLogger
 
 logger = get_logger("prismal.subgraphs.skynet.builder")
 
@@ -68,8 +71,13 @@ def build_skynet_subgraph(
     reduce_fn: ReduceFn | None = None,
     tool_provider: ToolProviderPort | None = None,
     interceptor: ActionInterceptor | None = None,
+    role_registry: RoleRegistry | None = None,
+    send_fn: RemoteSendFn | None = None,
+    budget_guard_fn: BudgetGuardFn | None = None,
+    meter: CostMeter | None = None,
+    audit: AuditLogger | None = None,
 ) -> SubgraphDefinition:
-    """Build the skynet :class:`SubgraphDefinition` (RF-SKY-09).
+    """Build the skynet :class:`SubgraphDefinition` (RF-SKY-09 / SPEC-SP-INT-001).
 
     Args:
         settings: Prismal settings; ``None`` resolves via ``get_settings()``.
@@ -84,6 +92,15 @@ def build_skynet_subgraph(
         reduce_fn: Injected synthesis backend for the reduce node.
         tool_provider: Injected tool source for the worker (Fase Y).
         interceptor: Injected action gate for the worker.
+        role_registry: S+ specialist registry threaded into the supervisor
+            (role-aware planning) and the worker (per-role model/persona/tools).
+        send_fn: S+ remote delegation backend threaded into the worker.
+        budget_guard_fn: S+ pre-call budget check threaded into the worker.
+        meter: Shared per-run :class:`CostMeter` (S+2).  When *supervisor* /
+            *worker* are built here, ONE meter (this or a fresh one) is threaded
+            into the supervisor, worker, reducer, and output node so
+            ``SwarmResult.usage`` is the whole-swarm total (DD-SP-003).
+        audit: Audit logger threaded into the default supervisor.
 
     Returns:
         :class:`SubgraphDefinition` with 5 nodes, the Send fan-out edge, and
@@ -93,10 +110,19 @@ def build_skynet_subgraph(
         from prismal.core.config import get_settings
 
         settings = get_settings()
+    # One shared meter for the whole swarm (DD-SP-003). Built here unless the
+    # caller injected one (e.g. the per-run budget registry).
+    if meter is None:
+        from prismal.budget.meter import CostMeter as _CostMeter
+
+        meter = _CostMeter(settings=settings)
     if supervisor is None:
         supervisor = SkynetSupervisor(
             plan_fn=plan_fn,
             evaluate_fn=evaluate_fn,
+            role_registry=role_registry,
+            meter=meter,
+            audit=audit,
             settings=settings,
         )
     if worker is None:
@@ -104,6 +130,10 @@ def build_skynet_subgraph(
             worker_fn=worker_fn,
             tool_provider=tool_provider,
             interceptor=interceptor,
+            role_registry=role_registry,
+            meter=meter,
+            send_fn=send_fn,
+            budget_guard_fn=budget_guard_fn,
             settings=settings,
         )
 
@@ -124,9 +154,9 @@ def build_skynet_subgraph(
         nodes={
             "skynet_plan": make_plan_node(supervisor),
             "skynet_worker": make_worker_node(worker),
-            "skynet_reduce": make_reduce_node(settings, reduce_fn=reduce_fn),
+            "skynet_reduce": make_reduce_node(settings, reduce_fn=reduce_fn, meter=meter),
             "skynet_evaluate": make_evaluate_node(supervisor, settings),
-            "skynet_output": output_node,
+            "skynet_output": make_output_node(meter=meter),
         },
         edges=[
             ("skynet_worker", "skynet_reduce"),

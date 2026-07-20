@@ -12,6 +12,46 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 New work starts here.
 
+## [3.12.0] — 2026-07-12
+
+> Fase S+ — **Skynet S+ (heterogeneous / metered / remote swarms)**. Follow-up
+> to Phase S that turns each worker into a **specialist** (own model / persona /
+> tools via a file-driven `RoleRegistry`), makes the swarm **truthfully metered**
+> (worker tokens counted into a single shared `CostMeter`, so `skynet_token_budget`
+> bounds the *whole* swarm), and lets a role be a **remote A2A agent** (the whole
+> sub-order runs elsewhere). Composes the shipped Phase C (`budget/`) and Phase I
+> (`a2a/`) primitives — no new LangGraph capability, no change to the Phase-S
+> subgraph topology. All additive and opt-in (`skynet_specialists_enabled`,
+> `skynet_remote_workers_enabled`); with every S+ flag off the compiled graph and
+> the skynet subgraph are byte-for-byte unchanged (snapshot-tested).
+
+### Added
+- `prismal/agents/skynet/roles.py` — `SpecialistRole` + `DEFAULT_ROLE` +
+  `RoleRegistry` (`from_yaml` load mirroring the Phase-H tool-policy loader;
+  `resolve` never raises, falling back to `DEFAULT_ROLE`). Config example:
+  `config/skynet_roles.example.yaml`.
+- `prismal/agents/skynet/remote.py` — `make_remote_send_fn(...)`: delegates one
+  `SwarmOrder` over A2A via the Phase-I `A2AConnectionManager` (allowlist +
+  strict deny-all + pool); remote output is L1-sanitized before it returns and
+  audited hash-first (`a2a.outbound`).
+- `WorkerResult.usage` / `.role` / `.remote` and `SwarmResult.usage` (additive,
+  defaulted — Phase-S round-trips preserved).
+- Role-aware `SkynetSupervisor.plan()` (offers `known_roles()` to the planner,
+  validates tags), injected shared `meter=`; role-aware / metered / remote
+  `SwarmWorker` (`role_registry=`, `meter=`, `send_fn=`, `budget_guard_fn=`);
+  metered default reducer (`reduce_results(meter=)`); builder threads ONE
+  `CostMeter` into supervisor + worker + reducer + output.
+- Settings: `skynet_specialists_enabled`, `skynet_roles_path`,
+  `skynet_remote_workers_enabled`, `skynet_remote_allowlist`; `_validate_skynet`
+  warns `skynet.remote_needs_a2a` when remote is enabled without `a2a_enabled`.
+- Exception `SkynetRoleError` (role-registry load time only).
+- Docs: `docs/skynet.md` S+ sections. Example: `examples/skynet_specialist_swarm.py`.
+
+### Changed
+- `skynet_token_budget` is now **truthful whole-swarm** accounting (worker tokens
+  counted); `enforce_token_budget()` shape is unchanged. `output_node` became a
+  `make_output_node(meter=)` factory (topology unchanged).
+
 ## [3.11.0] — 2026-07-11
 
 > Fase BRP — **Blind Review Pipeline**. A new opt-in subgraph: a spec agent and

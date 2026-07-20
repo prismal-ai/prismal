@@ -36,12 +36,12 @@ import asyncio
 
 from langchain_core.messages import HumanMessage
 
-from prismal.agents.state import initial_state
+from prismal.agents.state import create_initial_state
 
 # Importar con manejo de error por si el subgraph no está registrado
 try:
     from prismal.agents.subgraphs.financial.builder import (
-        build_financial_subgraph,
+        get_compiled_financial_analyst,
         register_financial_analyst,
     )
 
@@ -203,9 +203,9 @@ async def run_financial_analysis(request: dict) -> None:
 
     # Modo real con subgraph
     await register_financial_analyst()
-    subgraph = await build_financial_subgraph()
+    subgraph = await get_compiled_financial_analyst()
 
-    state = initial_state()
+    state = create_initial_state(session_id=f"example-financial-{request['ticker']}")
     state["messages"] = [HumanMessage(content=format_analysis_request(request))]
     state["metadata"] = {
         "ticker": request["ticker"],
