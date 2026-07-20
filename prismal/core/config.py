@@ -408,6 +408,32 @@ class Settings(BaseSettings):
         description="0 = unlimited; >0 = soft per-run token budget.",
     )
 
+    # ── Skynet S+ (Fase S+, opt-in — SPEC-SP-CFG-001) ─────────────────
+    skynet_specialists_enabled: bool = Field(
+        default=False,
+        description=(
+            "S+1: assign roles + per-role model/persona/tools to workers "
+            "(off = homogeneous Phase-S swarm)."
+        ),
+    )
+    skynet_roles_path: str = Field(
+        default="config/skynet_roles.yaml",
+        description="Path to the specialist RoleRegistry YAML file.",
+    )
+    skynet_remote_workers_enabled: bool = Field(
+        default=False,
+        description=(
+            "S+3: allow a role bound to a remote A2A agent to run remotely "
+            "(also requires a2a_enabled)."
+        ),
+    )
+    skynet_remote_allowlist: list[str] = Field(
+        default_factory=list,
+        description=(
+            "fnmatch allowlist of A2A card URLs for remote workers (empty + strict = deny-all)."
+        ),
+    )
+
     # ── Cost & Budget Governance (Phase C — SPEC-CST-CFG-001) ─────────
     budget_enabled: bool = Field(
         default=False,
@@ -2023,6 +2049,13 @@ class Settings(BaseSettings):
                 f"effective swarm cap min(skynet_max_swarm, parallel_max_workers)"
                 f"={self.skynet_max_swarm}. Lower the fixed size or raise the cap."
             )
+
+        # S+3: remote workers need the A2A layer. Missing it is not fatal —
+        # remote-bound roles simply degrade to local — so warn, never raise.
+        if self.skynet_remote_workers_enabled and not self.a2a_enabled:
+            from prismal.core.logging import get_logger
+
+            get_logger("prismal.core.config").warning("skynet.remote_needs_a2a")
         return self
 
     @model_validator(mode="after")

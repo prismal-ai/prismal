@@ -182,3 +182,13 @@ def test_blind_review_error_hierarchy() -> None:
     assert issubclass(BlindReviewPipelineError, PrismalError)
     assert issubclass(BlindReviewConfigError, BlindReviewPipelineError)
     assert issubclass(BlindReviewBlindnessViolationError, BlindReviewPipelineError)
+
+
+def test_skynet_role_error_hierarchy() -> None:
+    """SkynetRoleError is a SkynetError (SPEC-SP-ERR-001, load-time only)."""
+    from prismal.core.exceptions import PrismalError, SkynetError, SkynetRoleError
+
+    assert issubclass(SkynetRoleError, SkynetError)
+    assert issubclass(SkynetRoleError, PrismalError)
+    with pytest.raises(SkynetError):
+        raise SkynetRoleError("malformed skynet_roles.yaml")

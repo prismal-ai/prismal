@@ -23,6 +23,7 @@ from prismal.security.prompt_builder import SecurePromptBuilder
 
 if TYPE_CHECKING:
     from prismal.agents.skynet.types import WorkerResult
+    from prismal.budget.meter import CostMeter
     from prismal.core.config import Settings
 
 #: Reduce backend: (goal, successful results) -> synthesized answer.
@@ -48,6 +49,7 @@ async def reduce_results(
     *,
     reduce_fn: ReduceFn | None = None,
     strategy: Literal["synthesis", "concat", "first_success"] = "synthesis",
+    meter: CostMeter | None = None,
     settings: Settings | None = None,
 ) -> str:
     """Merge worker outputs into a single answer (RF-SKY-06).
@@ -60,6 +62,10 @@ async def reduce_results(
             ``None`` lazily wires ``ProviderRegistry().get_llm()``; any
             synthesis failure falls back to the deterministic ``concat``.
         strategy: ``synthesis`` (default) | ``concat`` | ``first_success``.
+        meter: Shared per-run :class:`CostMeter` (S+2).  Only the **default**
+            synthesis reducer records into it; ``concat``/``first_success`` are
+            LLM-free and an injected ``reduce_fn`` owns its own metering, so
+            neither records here (no double-counting).
         settings: Prismal settings; ``None`` resolves via ``get_settings()``.
 
     Returns:
@@ -92,7 +98,7 @@ async def reduce_results(
 
         if not successes:
             return ""
-        fn = reduce_fn if reduce_fn is not None else _make_default_reducer(settings)
+        fn = reduce_fn if reduce_fn is not None else _make_default_reducer(settings, meter=meter)
         try:
             return await fn(goal, successes)
         except Exception as exc:
@@ -110,10 +116,16 @@ def _concat(successes: list[WorkerResult]) -> str:
     return "\n\n".join(f"[{r.order_id}] {r.output}" for r in successes)
 
 
-def _make_default_reducer(settings: Settings) -> ReduceFn:
-    """Build the default LLM synthesis backend (lazy provider wiring)."""
+def _make_default_reducer(settings: Settings, *, meter: CostMeter | None = None) -> ReduceFn:
+    """Build the default LLM synthesis backend (lazy provider wiring).
+
+    When *meter* is injected, the reducer records its response into it (S+2) so
+    the swarm total includes the reduce step — closing a second Phase-S gap.
+    """
 
     async def _default_reduce(goal: str, successes: list[WorkerResult]) -> str:
+        from contextlib import suppress
+
         from langchain_core.messages import HumanMessage, SystemMessage
 
         from prismal.providers.registry import ProviderRegistry
@@ -130,6 +142,11 @@ def _make_default_reducer(settings: Settings) -> ReduceFn:
                 HumanMessage(content=messages[1]["content"]),
             ]
         )
+        if meter is not None:
+            with suppress(Exception):
+                meter.record_response(
+                    response, model_override or settings.default_model, pattern="skynet"
+                )
         return str(response.content)
 
     return _default_reduce

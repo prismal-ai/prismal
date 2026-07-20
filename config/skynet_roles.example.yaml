@@ -1,0 +1,32 @@
+# Skynet S+ specialist role registry (SPEC-SP-REG-001).
+#
+# Copy to `config/skynet_roles.yaml` (or point `PRISMAL_SKYNET_ROLES_PATH` at
+# this file) and set `PRISMAL_SKYNET_SPECIALISTS_ENABLED=true` to enable
+# heterogeneous specialist swarms. With specialists disabled every worker uses
+# the generic Phase-S profile (model = `skynet_worker_model`, no persona).
+#
+# Each role is keyed by its capability name. The planner tags each sub-order
+# with one of these role keys; an unknown/absent tag falls back to "worker".
+# Fields (all optional except the role key):
+#   model         — per-role model override; omit → `skynet_worker_model`.
+#   capabilities  — tool filter passed to the injected ToolProviderPort.
+#   persona       — role system prompt (TRUSTED operator config; not sanitized).
+#   remote_agent  — A2A Agent Card URL; when set the whole sub-order is
+#                   delegated over A2A (needs PRISMAL_SKYNET_REMOTE_WORKERS_ENABLED
+#                   + PRISMAL_A2A_ENABLED + the URL host on the remote allowlist).
+
+roles:
+  researcher:
+    model: "claude-sonnet-4-5"
+    capabilities: ["research", "web"]
+    persona: "You are a meticulous research specialist. Cite your sources."
+
+  coder:
+    model: "claude-opus-4-8"
+    capabilities: ["code", "sandbox"]
+    persona: "You are a senior engineer. Return runnable, tested code only."
+
+  # A remote specialist: the sub-order runs on another A2A agent entirely.
+  legal_review:
+    capabilities: ["legal"]
+    remote_agent: "https://legal.example.com/.well-known/agent-card.json"

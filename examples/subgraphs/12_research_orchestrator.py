@@ -214,13 +214,12 @@ async def demo_real_langgraph(tasks: list[ResearchTask]) -> None:
 
         from langchain_core.messages import AIMessage, HumanMessage
         from langgraph.checkpoint.memory import MemorySaver
-        from langgraph.graph import StateGraph
-        from langgraph.graph.message import add_messages
 
         from prismal.agents.subgraphs.research_orchestrator.builder import (
             RESEARCH_AGENTS,
             _research_router,
         )
+        from prismal.langgraph import StateGraph, add_messages
     except ImportError as exc:
         print(f"  ⚠  dependencia faltante: {exc}")
         return

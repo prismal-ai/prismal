@@ -46,12 +46,12 @@ import asyncio
 
 from langchain_core.messages import HumanMessage
 
-from prismal.agents.state import initial_state
+from prismal.agents.state import create_initial_state
 
 # Importar el subgraph con manejo de dependencias opcionales
 try:
     from prismal.agents.subgraphs.dev_pipeline.builder import (
-        build_dev_pipeline_subgraph,
+        get_compiled_dev_pipeline,
         register_dev_pipeline,
     )
 
@@ -163,13 +163,9 @@ def format_issue_as_task(issue: dict) -> str:
 async def run_dev_pipeline_real(issue: dict) -> dict:
     """Ejecuta el Dev Pipeline real con el subgraph compilado."""
     await register_dev_pipeline()
-    subgraph_def = build_dev_pipeline_subgraph()
+    compiled = await get_compiled_dev_pipeline()
 
-    from prismal.agents.subgraphs.factory import SubgraphFactory
-
-    compiled = SubgraphFactory.compile(subgraph_def)
-
-    state = initial_state()
+    state = create_initial_state(session_id=f"example-dev-pipeline-{issue['id']}")
     state["messages"] = [HumanMessage(content=format_issue_as_task(issue))]
     state["metadata"] = {
         "issue_id": issue["id"],

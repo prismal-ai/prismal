@@ -44,6 +44,7 @@ from prismal.monitoring.otel import OTelManager
 from prismal.security.prompt_builder import SecurePromptBuilder
 
 if TYPE_CHECKING:
+    from prismal.agents.skynet.roles import RoleRegistry
     from prismal.budget.meter import CostMeter
     from prismal.core.config import Settings
     from prismal.security.audit import AuditLogger
@@ -70,6 +71,10 @@ _PLAN_SYSTEM = (
 )
 _PLAN_SYSTEM_FIXED = (
     " Split the work into exactly {size} load-balanced sub-orders — no more, no fewer."
+)
+_PLAN_SYSTEM_ROLES = (
+    " Tag each sub-order's 'role' with the best-fit specialist from this set: "
+    "{roles}. Use 'worker' for a generic task or when unsure."
 )
 _EVALUATE_SYSTEM = (
     "You are Skynet, a swarm supervisor evaluating your workers' results "
@@ -103,9 +108,22 @@ class SkynetSupervisor:
         evaluate_fn: EvaluateFn | None = None,
         prompt_builder: SecurePromptBuilder | None = None,
         audit: AuditLogger | None = None,
+        role_registry: RoleRegistry | None = None,
+        meter: CostMeter | None = None,
         settings: Settings | None = None,
     ) -> None:
-        """Initialise the supervisor with its injected collaborators."""
+        """Initialise the supervisor with its injected collaborators.
+
+        Args:
+            role_registry: S+ specialist registry consulted by ``plan()`` when
+                ``settings.skynet_specialists_enabled`` — its ``known_roles()``
+                are offered to the planner and used to validate the tags it
+                returns.  ``None`` builds an empty registry (all → ``worker``).
+            meter: Shared per-run :class:`CostMeter` (S+2).  When the builder
+                injects ONE meter into both the supervisor and every worker,
+                ``enforce_token_budget()`` sees the *whole* swarm's tokens.
+                ``None`` builds a private meter (Phase-S behaviour).
+        """
         if settings is None:
             from prismal.core.config import get_settings
 
@@ -114,14 +132,18 @@ class SkynetSupervisor:
         self._plan_fn = plan_fn
         self._evaluate_fn = evaluate_fn
         self._audit = audit
+        self._role_registry = role_registry
         self._prompt_builder = (
             prompt_builder if prompt_builder is not None else SecurePromptBuilder()
         )
         # Cost & budget governance unification (Phase C): one CostMeter for the
         # swarm; the dormant ``skynet_token_budget`` is now enforced via it.
-        from prismal.budget.meter import CostMeter
+        # S+2 lets the builder inject a SHARED meter so worker tokens count too.
+        if meter is None:
+            from prismal.budget.meter import CostMeter
 
-        self._meter = CostMeter(settings=settings)
+            meter = CostMeter(settings=settings)
+        self._meter = meter
 
     async def plan(
         self,
@@ -174,6 +196,7 @@ class SkynetSupervisor:
                     raise SkynetPlanError("Planner decomposed the goal into zero orders")
                 orders, rationale = self._enforce_fixed_size(orders, rationale)
 
+            orders = self._assign_roles(orders)
             requested = len(orders)
             cap = self._effective_cap()
             capped, deferred = orders[:cap], orders[cap:]
@@ -272,12 +295,34 @@ class SkynetSupervisor:
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
+    def _assign_roles(self, orders: list[SwarmOrder]) -> list[SwarmOrder]:
+        """Normalise each order's role (S+1 / DD-SP-002).
+
+        Specialists disabled → every role is coerced to ``"worker"`` (Phase-S
+        behaviour byte-for-byte).  Enabled → a tag outside the registry's
+        ``known_roles()`` falls back to ``"worker"`` so one bad planner tag can
+        never abort the swarm.  Orders already tagged ``"worker"`` are returned
+        untouched (identity), keeping the disabled path allocation-cheap.
+        """
+        if not self._settings.skynet_specialists_enabled:
+            return [o if o.role == "worker" else replace(o, role="worker") for o in orders]
+        known = set(self._known_roles())
+        return [o if o.role in known else replace(o, role="worker") for o in orders]
+
+    def _known_roles(self) -> list[str]:
+        """Return the registry's known role names (empty when no registry)."""
+        return self._role_registry.known_roles() if self._role_registry is not None else []
+
     async def _decompose(self, goal: str) -> tuple[list[SwarmOrder], str]:
         """Run the planner backend over the securely-built goal prompt."""
         system = _PLAN_SYSTEM
         fixed = self._settings.skynet_swarm_size
         if fixed > 0:
             system += _PLAN_SYSTEM_FIXED.format(size=fixed)
+        if self._settings.skynet_specialists_enabled:
+            known = self._known_roles()
+            if known:
+                system += _PLAN_SYSTEM_ROLES.format(roles=", ".join(known))
         messages = self._prompt_builder.build(system=system, user=goal)
 
         plan_fn = self._plan_fn if self._plan_fn is not None else self._default_plan

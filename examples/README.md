@@ -78,6 +78,7 @@ uv run python examples/patterns/09_parallel_dispatcher.py
 | 7 | `07_rag_fusion.py` | RAG-Fusion + RRF | **BEIR** (IR multi-dominio) | N queries en paralelo + Reciprocal Rank Fusion `score = Σ 1/(k+rank)` (Cormack 2009) |
 | 8 | `08_multi_vector_rag.py` | Multi-Vector RAG | **ArXiv Papers** (ML/AI) | Indexa chunk + resumen LLM + N preguntas hipotéticas por documento |
 | 9 | `09_multimodal_rag.py` | Multimodal RAG | **arXiv + MedQuAD + ATIS + ActivityNet** (mezcla) | Indexa text/image/audio/video con `modality`+`source_uri`; `search(modalities=[...])` filtra por modalidad |
+| 10 | `10_federated_rag.py` | Federated RAG | **KB multi-nodo** (sintético) | Búsqueda federada sobre N nodos remotos + KB local; `asyncio.gather`, tolerancia a nodos caídos y `_merge_and_rerank` con dedup por `chunk_id` |
 
 ### Ejecutar RAG
 
@@ -108,6 +109,9 @@ uv run python examples/rag/08_multi_vector_rag.py
 
 # Multimodal RAG (text + image + audio + video)
 uv run python examples/rag/09_multimodal_rag.py
+
+# Federated RAG (multi-nodo, tolerante a fallos)
+uv run python examples/rag/10_federated_rag.py
 ```
 
 ---
@@ -239,6 +243,90 @@ corren offline (sin LLM ni servidores MCP).
 uv run python examples/tool_provider_host.py     # EXAMPLE_USE_MCP=1 para conectar MCP real
 uv run python examples/tool_provider_custom.py
 ```
+
+---
+
+## Supervisor principal y multiagentes
+
+El corazón del framework: el grafo SUPERVISOR de LangGraph y sus modos de
+composición multiagente. Todos corren offline con fakes inyectados.
+
+| Archivo | Descripción |
+|---------|-------------|
+| `supervisor_quickstart.py` | Grafo supervisor completo: `match_intent()` (enrutamiento determinista pre-LLM), `FakeToolProvider` vía `set_tool_provider` (Fase Y), `build_supervisor_graph()` con checkpointer en memoria, listado de nodos y `create_initial_state()` |
+| `hierarchical_supervisor.py` | Modo jerárquico: `make_domain_supervisor()` standalone (3 salidas de enrutamiento) + `NetworkSupervisorAgent`/`NetworkNode` con delegación por capacidades y fallback local |
+| `parallel_research_fanout.py` | Fan-out/fan-in de investigación paralela (Phase 34): `parallel_researcher_node` → dispatcher (`Send`) → workers → `research_aggregator_node`, incluido el camino `on_empty` |
+| `subagent_spawner.py` | `SubAgentSpawner`: spawn dinámico de subagentes con semáforo de concurrencia, timeouts y `cancel_all()`/`cleanup()` |
+
+```bash
+uv run python examples/supervisor_quickstart.py
+uv run python examples/hierarchical_supervisor.py
+uv run python examples/parallel_research_fanout.py
+uv run python examples/subagent_spawner.py
+```
+
+---
+
+## Agentes especializados
+
+| Archivo | Descripción |
+|---------|-------------|
+| `meta_learner.py` | `MetaLearner` + `TraceScore`: puntúa trazas de ejecución por dimensión, detecta agentes bajo umbral y genera propuestas de mejora con revisión humana obligatoria |
+| `skill_creator_agent.py` | `create_skill` + `skill_creator_node`: generación de skills con quality gates (ruff/mypy/bandit), rechazo de código peligroso (AC-017-8) y sentinel de revisión humana |
+| `memory_management.py` | Subsistema de memoria: `ShortTermMemory` (FIFO), `ConversationHistory` (transcript multi-canal) y `LongTermMemory` con redacción de PII/secretos y recall por sesión |
+
+```bash
+uv run python examples/meta_learner.py
+uv run python examples/skill_creator_agent.py
+uv run python examples/memory_management.py
+```
+
+---
+
+## Capas opcionales (Kokoro · Skynet · Budget · A2A · Multimodal)
+
+Ejemplos de las fases opt-in del framework. Todos deterministas y offline.
+
+| Archivo | Fase | Descripción |
+|---------|------|-------------|
+| `kokoro_deliberation.py` | K | Subgraph kokoro completo (load_souls → deliberate → judge → act → output) con personas/juez falsos |
+| `skynet_swarm.py` | S | Swarm map-reduce vía `build_skynet_subgraph` con fakes |
+| `skynet_specialist_swarm.py` | S | Swarm con `RoleRegistry`/`SpecialistRole` (roles especializados) |
+| `skynet_direct_api.py` | S | API directa sin subgraph: `SkynetSupervisor.plan/evaluate`, `SwarmWorker`, `reduce_results` (concat/first_success) y re-plan determinista de órdenes no cumplidas |
+| `budget_governance.py` | C | `CostMeter` + `BudgetGuard` + `make_budget_guard_fn` a bajo nivel |
+| `budget_graph_integration.py` | C | Seeding en el seam del grafo: `resolve_budget` → `seed_budget_run` → `get_budget_guard` → soft/hard → `BudgetExceeded` → `clear_budget_run` |
+| `a2a_server.py` | I | Lado inbound: `AgentCard` + `A2AServerHandler` (JSON-RPC/SSE) |
+| `a2a_remote_node.py` | I | Lado outbound: `A2AAgentNode` como nodo del grafo |
+| `a2a_tool_provider.py` | I | `A2AToolProvider`: skills remotas como tools `a2a__{agent}__{skill}`, composición con `CompositeToolProvider` y wiring vía `build_runtime(a2a_agents=...)` |
+| `multimodal_ingestion.py` | F | `ingest_media()` (descriptor por path bajo `metadata.mm.media`, validación de magic bytes) + `register_multimodal_pipeline()` en un registry propio |
+| `blind_review_pipeline.py` | — | Pipeline de revisión ciega |
+
+```bash
+uv run python examples/kokoro_deliberation.py
+uv run python examples/skynet_direct_api.py
+uv run python examples/budget_graph_integration.py
+uv run python examples/a2a_tool_provider.py
+uv run python examples/multimodal_ingestion.py
+```
+
+---
+
+## Extensión, composición y configuración
+
+| Archivo | Fase | Descripción |
+|---------|------|-------------|
+| `extension/custom_node.py` | X | `@prismal_node` con la cadena de middleware completa |
+| `extension/custom_subgraph.py` | X | `PrismalStateGraphBuilder` fluent API → `SubgraphDefinition` |
+| `extension/discover_plugins_demo.py` | X | Descubrimiento de plugins por entry points |
+| `extension/langchain_migration.py` | X | `LangChainRunnableAdapter`: cualquier `Runnable` como nodo prismal |
+| `plugin_template/` | X | Scaffold completo de plugin instalable (`prismal.subgraphs`) |
+| `composition_root.py` | R | `build_runtime()`/`build_test_runtime()`: los 5 puertos compuestos + multi-tenant (`collection_for`) |
+| `config_source_env.py` / `config_source_custom.py` | W | `ConfigSourcePort`: fuentes env/mapping/encadenadas inyectadas en `Settings` |
+| `vector_store_lancedb.py` | Z | `VectorStoreFactory` con backend alternativo (LanceDB) |
+| `node_typesafety.py` | X | Validación tipada de entrada/salida en nodos |
+| `visualize_graphs.py` | — | `to_mermaid()`/`visualize()` sobre grafos y `SubgraphDefinition` |
+| `agent_eval.py` / `agent_identity.py` | — | Evaluación de agentes / identidad y scopes |
+| `guardrails_modernization.py` / `loop_hardening.py` / `runtime_hardening.py` / `observability_integration.py` | — | Seguridad, endurecimiento de loops y observabilidad |
 
 ---
 

@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ============================================================
 [project]
 name = "prismal-ai"
-version = "3.11.0"
+version = "3.12.0"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -86,10 +86,11 @@ dependencies = [
   "croniter>=2.0",                  # Cron expression parsing
   "tzlocal>=5.2",                   # OS timezone detection for DateTimeService
   # ── MCP (Model Context Protocol) ─────────────────────────
-  "mcp>=1.2.0",                     # MCP client + protocol types
+  "mcp>=1.28.1",                    # MCP client + protocol types; >=1.28.1 fixes CVE-2026-52869/-52870/-59950
   # ── Security & Guardrails ─────────────────────────────────
   "nemoguardrails>=0.10.1",         # NVIDIA NeMo Guardrails for LLMs
   "bandit>=1.8.0",                  # Security linter (used in skill validation)
+  "setuptools>=83.0.0",             # Floor transitive setuptools; >=83.0.0 fixes PYSEC-2026-3447
   # ── Configuration ─────────────────────────────────────────
   "pydantic>=2.10.3",               # Data validation
   "pydantic-settings>=2.14.2",      # Settings from env vars / .env files (>=2.14.2 fixes GHSA-4xgf-cpjx-pc3j)
@@ -222,7 +223,7 @@ a2a = [
 
 # Multimodal layer — base media handling (Fase F)
 multimodal = [
-  "Pillow>=11.0.0",
+  "Pillow>=12.3.0",  # >=12.3.0 fixes PYSEC-2026-2253..2257/-3451..3453
   "ffmpeg-python>=0.2.0",
   "imagehash>=4.3.1",
 ]

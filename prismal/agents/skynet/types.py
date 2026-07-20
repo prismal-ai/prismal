@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from prismal.budget.types import Usage
+
 
 @dataclass(frozen=True)
 class SwarmOrder:
@@ -69,6 +71,9 @@ class WorkerResult:
         success: Whether the order was completed.
         error: Captured failure description (never raised out of the node).
         tool_calls: Number of gated tool calls the worker made.
+        usage: Real per-worker token/cost usage (Phase S+; empty by default).
+        role: The role that executed this order (Phase S+; ``"worker"`` default).
+        remote: ``True`` when the order was delegated over A2A (Phase S+).
     """
 
     order_id: str
@@ -76,6 +81,9 @@ class WorkerResult:
     success: bool
     error: str | None = None
     tool_calls: int = 0
+    usage: Usage = field(default_factory=Usage)
+    role: str = "worker"
+    remote: bool = False
 
 
 @dataclass(frozen=True)
@@ -89,6 +97,8 @@ class SwarmResult:
         rounds_completed: How many plan→dispatch→evaluate rounds ran.
         deferred_orders: Capped overflow carried to the next round (RF-SKY-03).
         complete: Whether the evaluator judged the goal met.
+        usage: Whole-swarm usage total = planner + evaluator + reducer + Σworkers
+            (Phase S+; empty by default so Phase-S round-trips are preserved).
     """
 
     goal: str
@@ -97,3 +107,4 @@ class SwarmResult:
     rounds_completed: int
     deferred_orders: list[SwarmOrder]
     complete: bool
+    usage: Usage = field(default_factory=Usage)
