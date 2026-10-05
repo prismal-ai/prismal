@@ -279,3 +279,10 @@ All LLM calls go through `prismal/providers/` (LiteLLM wrapper + per-provider co
 - `tests/conftest.py` is minimal; most fixtures live in `tests/integration/conftest.py` and per-tier `conftest.py` files.
 - Integration tests under `tests/integration/` expect running services (sandbox backends, databases). They are tagged `@pytest.mark.integration`.
 - Ruff's per-file ignores relax rules for `tests/**` and `prismal/skills/{available,custom}/**` — assume the strict rules everywhere else.
+- **Graph-snapshot baselines (wave 2026-10):** each phase's "flags off ⇒ byte-for-byte unchanged" snapshot / disabled-contract test baselines against **the last released minor at merge time**, not a version number hard-coded in the spec (phases are built on overlapping branches; release order stays TKE → GW → DEC → AMR → PRT+HRS → MEM).
+
+## Wave 2026-10 conventions (`specs/wave-2026-10-implementation-plan.md`)
+
+- **Shared hot files** — every phase adds: one contiguous `# --- <PHASE> ---` settings block plus one `_validate_<phase>` validator in `core/config.py`; one exception subtree in `core/exceptions.py`; one `_register_<phase>_metrics()` helper in `monitoring/otel.py`. Rebase parallel branches on `develop` before each merge.
+- **LLM construction** — `ProviderRegistry.get_llm` signature, wrapper stack (`GatewayChatLiteLLM` innermost, `CacheAwareChatModel` outer, AMR only picks the model string, `with_fallbacks` outermost) and `compute_cost_usd` precedence are fixed by `docs/adr/ADR-WAVE-001-llm-construction-contract.md`. Extend the shared `tests/unit/providers/test_registry_contract.py`; never replace it.
+- **Verify before build** — TKE0, GW0 and PRT0 run up front; DEC0, AMR0 and MEM0 run just-in-time at the start of their milestone (volatile vendor facts). Record outcomes where each spec says (`VERIFY.md`, ADR, or `docs/<feature>.md#verified-facts`).
