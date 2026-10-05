@@ -114,6 +114,8 @@ class ProviderRegistry:
         model: str | None = None,
         streaming: bool = False,
         temperature: float | None = None,
+        *,
+        agent: str | None = None,
     ) -> BaseChatModel:
         """
         Return a LangChain-compatible LLM for the specified model.
@@ -127,9 +129,14 @@ class ProviderRegistry:
             model: LiteLLM model string. None = use ``settings.default_model``.
             streaming: Whether to enable streaming output.
             temperature: Sampling temperature. None = use ``settings.temperature``.
+            agent: Graph node name (Phase TKE). Used for the prompt-cache key and
+                per-agent effort; ``None`` lets the wrapper read the node name
+                from the call's ``langgraph_node`` metadata (ADR-WAVE-001 §2.1).
 
         Returns:
-            A ``ChatLiteLLM`` instance (implements ``BaseChatModel``).
+            A ``ChatLiteLLM`` instance (implements ``BaseChatModel``) — wrapped in
+            a ``CacheAwareChatModel`` when ``token_efficiency_enabled`` and
+            ``prompt_cache_enabled`` / ``llm_effort_enabled`` are on.
         """
         resolved_model = model if model is not None else self._settings.default_model
         temp = temperature if temperature is not None else self._settings.temperature
@@ -176,13 +183,48 @@ class ProviderRegistry:
             handler = langfuse.get_callback_handler()
             if handler is not None:
                 llm.callbacks = [handler]
+            return self._maybe_wrap_token_efficient(llm, resolved_model, agent)
+
+    def _maybe_wrap_token_efficient(
+        self, llm: ChatLiteLLM, model: str, agent: str | None
+    ) -> BaseChatModel:
+        """Pipeline step 6 of ADR-WAVE-001: the outer ``CacheAwareChatModel``.
+
+        Returns *llm* untouched unless the TKE master flag and at least one of
+        ``prompt_cache_enabled`` / ``llm_effort_enabled`` are on.
+        """
+        s = self._settings
+        apply_cache = s.token_efficiency_enabled and s.prompt_cache_enabled
+        apply_effort = s.token_efficiency_enabled and s.llm_effort_enabled
+        if not (apply_cache or apply_effort):
             return llm
+        from prismal.providers.prompt_cache import (
+            CacheAwareChatModel,
+            CachePolicy,
+            load_cache_policy,
+        )
+
+        wrapped = CacheAwareChatModel(
+            inner=llm,
+            policy=load_cache_policy(s) if apply_cache else CachePolicy(),
+            model_name=model,
+            agent=agent,
+            apply_cache=apply_cache,
+            effort_by_agent=dict(s.llm_effort_by_agent) if apply_effort else {},
+            effort_profile=s.llm_effort_profile if apply_effort else "none",
+            max_tokens_by_agent=dict(s.llm_max_tokens_by_agent) if apply_effort else {},
+        )
+        if llm.callbacks:
+            wrapped.callbacks = llm.callbacks
+        return wrapped
 
     def get_llm_with_fallback(
         self,
         model: str | None = None,
         streaming: bool = False,
         temperature: float | None = None,
+        *,
+        agent: str | None = None,
     ) -> BaseChatModel | RunnableWithFallbacks[LanguageModelInput, BaseMessage]:
         """
         Return a primary LLM wrapped with an optional automatic fallback.
@@ -204,7 +246,9 @@ class ProviderRegistry:
             configured) or a ``RunnableWithFallbacks`` wrapping both
             models.
         """
-        primary = self.get_llm(model=model, streaming=streaming, temperature=temperature)
+        primary = self.get_llm(
+            model=model, streaming=streaming, temperature=temperature, agent=agent
+        )
         fallback_model = self._settings.fallback_model
         primary_model = model if model is not None else self._settings.default_model
         if not fallback_model or fallback_model == primary_model:
@@ -218,6 +262,7 @@ class ProviderRegistry:
             model=fallback_model,
             streaming=streaming,
             temperature=temperature,
+            agent=agent,
         )
         return primary.with_fallbacks([fallback])
 

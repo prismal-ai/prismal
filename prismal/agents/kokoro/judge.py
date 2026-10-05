@@ -33,6 +33,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
+from prismal.agents.handoff import envelope_to_message_text
 from prismal.core.exceptions import JudgeError, PermissionDeniedError
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
@@ -271,7 +272,17 @@ class KokoroJudgeAgent:
     def _compose_user_content(self, query: str, deliberation: DeliberationResult) -> str:
         """Assemble the user-controlled deliberation summary for the judge."""
         parts: list[str] = [f"Query: {query}", "", "Final positions:"]
-        parts.extend(f"[{p.agent_id} / {p.role}] {p.content}" for p in deliberation.final_positions)
+        envelopes = deliberation.final_envelopes
+        if len(envelopes) == len(deliberation.final_positions):
+            # Phase TKE: read the souls' envelope summaries, not the raw text.
+            parts.extend(
+                f"[{p.agent_id} / {p.role}] {envelope_to_message_text(env)}"
+                for p, env in zip(deliberation.final_positions, envelopes, strict=True)
+            )
+        else:
+            parts.extend(
+                f"[{p.agent_id} / {p.role}] {p.content}" for p in deliberation.final_positions
+            )
         parts.append("")
         parts.append(
             f"Agreement score: {deliberation.agreement_score:.2f} "

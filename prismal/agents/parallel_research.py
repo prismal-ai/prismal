@@ -34,9 +34,16 @@ from typing import TYPE_CHECKING, Any, cast
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
+from prismal.agents.handoff import (
+    HandoffEnvelope,
+    envelope_to_message_text,
+    handoff_scope,
+    maybe_run_envelope,
+)
 from prismal.agents.patterns.parallel import make_parallel_dispatcher
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
+from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
 from prismal.security.hardening_run import hardening_react_kwargs
@@ -151,15 +158,23 @@ async def parallel_researcher_worker(state: AgentState) -> dict[str, Any]:
         ),
     )
 
-    return {
-        "parallel_results": [
-            {
-                "agent": "parallel_researcher_worker",
-                "task": task,
-                "result": str(response.content),
-            }
-        ]
+    entry: dict[str, Any] = {
+        "agent": "parallel_researcher_worker",
+        "task": task,
+        "result": str(response.content),
     }
+    # Phase TKE (SPEC-TKE-HND-001): additive envelope; absent when disabled.
+    run_id, tenant = handoff_scope(state)
+    env = maybe_run_envelope(
+        entry["result"],
+        settings=get_settings(),
+        run_id=run_id,
+        tenant=tenant,
+        pattern="parallel_research",
+    )
+    if env is not None:
+        entry["envelope"] = env.to_dict()
+    return {"parallel_results": [entry]}
 
 
 async def research_aggregator_node(state: AgentState) -> dict[str, Any]:
@@ -193,7 +208,12 @@ async def research_aggregator_node(state: AgentState) -> dict[str, Any]:
         sections: list[str] = ["## Parallel research summary", ""]
         for idx, item in enumerate(results, start=1):
             task = str(item.get("task", "(unknown task)"))
-            finding = str(item.get("result", "(no result)"))
+            raw_env = item.get("envelope")
+            finding = (
+                envelope_to_message_text(HandoffEnvelope.from_dict(raw_env))
+                if isinstance(raw_env, dict)
+                else str(item.get("result", "(no result)"))
+            )
             sections.append(f"### {idx}. {task}")
             sections.append(finding)
             sections.append("")

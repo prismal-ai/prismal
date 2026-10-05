@@ -10,7 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from prismal.eval.metrics_tokens import TokenReport
 
 
 class AssertionType(StrEnum):
@@ -84,6 +87,12 @@ class Trajectory:
     # markers in state metadata, blocked tool results). Populated for red-team
     # cases; empty otherwise. Defaulted so existing constructors are unaffected.
     security_signals: list[str] = field(default_factory=list)
+    # Token Efficiency (Phase TKE — SPEC-TKE-ACC-005). Defaulted so existing
+    # constructors are unaffected.
+    prompt_tokens: int = 0
+    cache_read_tokens: int = 0
+    llm_calls: int = 0
+    input_cost_usd: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -118,6 +127,7 @@ class Scorecard:
     avg_cost_usd: float
     avg_latency_ms: float
     cases: list[CaseResult]
+    token_report: TokenReport | None = None  # Phase TKE (SPEC-TKE-ACC-005)
 
 
 @dataclass(frozen=True)

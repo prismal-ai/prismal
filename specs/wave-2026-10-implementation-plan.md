@@ -7,7 +7,7 @@
 | **Baseline** | `prismal` v3.12.0 (tag `prismal/v3.12.0`) |
 | **Source** | `docs/gap-analysis-gateways-tokens-decisions-2026-10.md`, `specs/roadmap.md` (wave 9) |
 | **Scope** | The seven `READY` SDDs of the wave: TKE, GW, DEC, AMR, PRT, HRS, MEM |
-| **Status** | `ACTIVE` — M0 done 2026-10-05; next: M1 (TKE). Per-task detail stays in each spec's `TASKS.md` |
+| **Status** | `ACTIVE` — M0 and M1 (TKE, v3.13.0) done 2026-10-05; next: M2 (GW). Per-task detail stays in each spec's `TASKS.md` |
 
 This document does **not** replace the per-spec `TASKS.md`. It sequences them, closes the
 cross-spec gaps found while reading them together, and defines milestones with a done-gate.
@@ -111,7 +111,9 @@ TKE2–TKE9: ≈ 115–120 d of wall-clock work.
 
 ---
 
-### M1 — TKE: Token Efficiency → 3.13.0 (29.5 d; TKE10 deferred)
+### M1 — TKE: Token Efficiency → 3.13.0 (29.5 d; TKE10 deferred) — ✅ IMPLEMENTED 2026-10-05
+
+> Open items carried forward: TKE1-08 baseline capture + TKE9-04 eval A/B (trajectories record 0 tokens for internal LLM calls — needs a live run and/or meter-based capture); not tagged/released yet.
 
 Principle: **measure first** — nothing optimizes until the TKE1 baseline is committed.
 

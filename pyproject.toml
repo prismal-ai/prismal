@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ============================================================
 [project]
 name = "prismal-ai"
-version = "3.12.0"
+version = "3.13.0"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -249,6 +249,14 @@ guardrails-ai = [
   "guardrails-ai>=0.10.2",
 ]
 
+# Token Efficiency (Phase TKE) — RAG cross-encoder rerank + LLMLingua-2 compression
+rerank = [
+  "sentence-transformers>=3.3.1",
+]
+compression = [
+  "llmlingua>=0.2.2",
+]
+
 # All optional extras combined
 all = [
   "prismal-ai[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance,lancedb,sqlite-vec,qdrant,pgvector,a2a,multimodal,multimodal-local,multimodal-premium,multimodal-embed,guardrails-ai]",
@@ -407,6 +415,8 @@ module = [
   "IPython", "IPython.*",
   # Guardrails Modernization (Phase GRD) — lazy-imported inside structured_output_guard.py.
   "guardrails", "guardrails.*",
+  # Token Efficiency (Phase TKE) — lazy-imported inside providers/compression.py.
+  "llmlingua", "llmlingua.*",
 ]
 ignore_missing_imports = true
 

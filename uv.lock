@@ -3308,6 +3308,23 @@ wheels = [
 ]
 
 [[package]]
+name = "llmlingua"
+version = "0.2.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "accelerate" },
+    { name = "nltk" },
+    { name = "numpy" },
+    { name = "tiktoken" },
+    { name = "torch" },
+    { name = "transformers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fd/02/7ed8ad9cec4b2f0a8a45c5b50a2435b559d2c764b5865e896d1c511080b1/llmlingua-0.2.2.tar.gz", hash = "sha256:1a0caedd8d5a65512a85dadb6bfda6f5b3c4b45e5cb9e7b1c6009573f9058572", size = 59753, upload-time = "2024-04-09T08:21:56.88Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6e/3e/221fe46a3338f2babdb2082ee42df88fcaa8ea0e639e832cbb1b93c5923a/llmlingua-0.2.2-py3-none-any.whl", hash = "sha256:da55137efe0db78063b3395396efe8a0dcfe4ae5a09aea0d503c34b7bf1d800c", size = 30536, upload-time = "2024-04-09T08:21:55.428Z" },
+]
+
+[[package]]
 name = "llvmlite"
 version = "0.44.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4237,6 +4254,22 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/51/39/49f737907e6ab2b4ca71855d3bd63dd7958862e9c8b94fb4e5b18ccf6988/nh3-0.3.4-cp38-abi3-win32.whl", hash = "sha256:72e4e9ca1c4bd41b4a28b0190edc2e21e3f71496acd36a0162858e1a28db3d7e", size = 609542, upload-time = "2026-03-25T10:57:27.112Z" },
     { url = "https://files.pythonhosted.org/packages/73/4f/af8e9071d7464575a7316831938237ffc9d92d27f163dbdd964b1309cd9b/nh3-0.3.4-cp38-abi3-win_amd64.whl", hash = "sha256:c10b1f0c741e257a5cb2978d6bac86e7c784ab20572724b20c6402c2e24bce75", size = 624244, upload-time = "2026-03-25T10:57:28.302Z" },
     { url = "https://files.pythonhosted.org/packages/44/0c/37695d6b0168f6714b5c492331636a9e6123d6ec22d25876c68d06eab1b8/nh3-0.3.4-cp38-abi3-win_arm64.whl", hash = "sha256:43ad4eedee7e049b9069bc015b7b095d320ed6d167ecec111f877de1540656e9", size = 616649, upload-time = "2026-03-25T10:57:29.623Z" },
+]
+
+[[package]]
+name = "nltk"
+version = "3.10.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "defusedxml" },
+    { name = "joblib" },
+    { name = "regex" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e0/e6/fe51d2bb1a3b446f59c5c8165999a9fee208bc346af90a7cbf7657bc0d75/nltk-3.10.3.tar.gz", hash = "sha256:bb9327a461c3811c2fa4900e03840401f2126adfb30c0072827c433bd2444ea4", size = 5137152, upload-time = "2026-08-12T23:46:37.258Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b6/6d/ebd2af4640b12168fdf0cb74b6118df2f32a2f62ec7e0c06fbfd80706639/nltk-3.10.3-py3-none-any.whl", hash = "sha256:ff9598a8e20518ee0d557745890cc4435b9578489e2dcbc69c4f81fa060caf7c", size = 1798643, upload-time = "2026-08-12T23:44:13.478Z" },
 ]
 
 [[package]]
@@ -5230,7 +5263,7 @@ wheels = [
 
 [[package]]
 name = "prismal-ai"
-version = "3.12.0"
+version = "3.13.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -5347,6 +5380,9 @@ analytics = [
     { name = "pandas" },
     { name = "plotly" },
 ]
+compression = [
+    { name = "llmlingua" },
+]
 datetime = [
     { name = "ntplib" },
     { name = "tzdata" },
@@ -5462,6 +5498,9 @@ qdrant = [
     { name = "langchain-qdrant" },
     { name = "qdrant-client" },
 ]
+rerank = [
+    { name = "sentence-transformers" },
+]
 sqlite-vec = [
     { name = "sqlite-vec" },
 ]
@@ -5526,6 +5565,7 @@ requires-dist = [
     { name = "lightning", marker = "extra == 'ml-dl'", specifier = ">=2.4.0" },
     { name = "litellm", specifier = ">=1.58.0" },
     { name = "lizard", marker = "extra == 'dev'", specifier = ">=1.17.0" },
+    { name = "llmlingua", marker = "extra == 'compression'", specifier = ">=0.2.2" },
     { name = "loguru", specifier = ">=0.7.0" },
     { name = "matplotlib", marker = "extra == 'analytics'", specifier = ">=3.9.4" },
     { name = "mcp", specifier = ">=1.28.1" },
@@ -5582,6 +5622,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.4" },
     { name = "scikit-learn", marker = "extra == 'ml'", specifier = ">=1.5.0" },
     { name = "sentence-transformers", specifier = ">=3.3.1" },
+    { name = "sentence-transformers", marker = "extra == 'rerank'", specifier = ">=3.3.1" },
     { name = "setuptools", specifier = ">=83.0.0" },
     { name = "shap", marker = "extra == 'ml'", specifier = ">=0.45.0" },
     { name = "soupsieve", specifier = ">=2.8.4" },
@@ -5609,7 +5650,7 @@ requires-dist = [
     { name = "xxhash", specifier = ">=3.5.0" },
     { name = "yfinance", marker = "extra == 'finance'", specifier = ">=0.2.50" },
 ]
-provides-extras = ["postgres", "mongodb", "local-embeddings", "ollama", "analytics", "ml", "ml-dl", "finance", "datetime", "maintenance", "lancedb", "sqlite-vec", "qdrant", "pgvector", "a2a", "multimodal", "multimodal-local", "multimodal-premium", "multimodal-embed", "guardrails-ai", "all", "dev"]
+provides-extras = ["postgres", "mongodb", "local-embeddings", "ollama", "analytics", "ml", "ml-dl", "finance", "datetime", "maintenance", "lancedb", "sqlite-vec", "qdrant", "pgvector", "a2a", "multimodal", "multimodal-local", "multimodal-premium", "multimodal-embed", "guardrails-ai", "rerank", "compression", "all", "dev"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pre-commit", specifier = ">=4.5.1" }]

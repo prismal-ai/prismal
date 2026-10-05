@@ -5,11 +5,11 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | TKE (Token Efficiency) |
-| **Target package version** | `3.13.0` (SemVer minor — new opt-in functionality, not yet started) |
+| **Target package version** | `3.13.0` (SemVer minor — new opt-in functionality) |
 | **Reviewers** | Tech Lead, AI Architect, Security Lead, FinOps |
 | **Priority** | P1 (cost) — TKE1 is a hard prerequisite of GW, AMR and MEM; TKE10 is P3 (optional stretch) |
 | **Depends on** | LH (`loop-hardening/`, shipped 3.7.0), C (`cost-budget-governance/`), OBS (`ObservabilityPort`), V (`agent-eval-harness/`), H (`runtime-hardening/`) |

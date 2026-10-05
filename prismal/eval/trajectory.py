@@ -48,6 +48,7 @@ async def capture_trajectory(
     tool_errors = 0
     tokens = 0
     cost_usd = 0.0
+    input_usage = _InputUsage()
     final_answer = ""
     terminated = False
 
@@ -65,6 +66,7 @@ async def capture_trajectory(
                     tool_errors += errors
                     tokens += toks
                     cost_usd += cost
+                    input_usage.add(message)
                     if answer is not None:
                         final_answer = answer
                     security_signals.extend(_message_signals(message))
@@ -85,6 +87,10 @@ async def capture_trajectory(
         latency_ms=latency_ms,
         terminated=terminated,
         security_signals=security_signals,
+        prompt_tokens=input_usage.prompt_tokens,
+        cache_read_tokens=input_usage.cache_read_tokens,
+        llm_calls=input_usage.llm_calls,
+        input_cost_usd=input_usage.input_cost_usd,
     )
 
 
@@ -230,6 +236,35 @@ def _usage_of(message: Any) -> tuple[int, float]:
 
     estimate = compute_cost_usd(model, counts.prompt_tokens, counts.completion_tokens)
     return tokens, estimate.cost_usd
+
+
+class _InputUsage:
+    """Input-side accumulator for the TKE token report (SPEC-TKE-ACC-005)."""
+
+    def __init__(self) -> None:
+        self.prompt_tokens = 0
+        self.cache_read_tokens = 0
+        self.llm_calls = 0
+        self.input_cost_usd = 0.0
+
+    def add(self, message: Any) -> None:
+        counts = extract_token_usage(message)
+        if counts.total == 0:
+            return
+        self.llm_calls += 1
+        self.prompt_tokens += counts.prompt_tokens
+        self.cache_read_tokens += counts.cache_read_tokens
+        model = _model_of(message)
+        if model:
+            from prismal.providers.cost import compute_cost_usd
+
+            self.input_cost_usd += compute_cost_usd(
+                model,
+                counts.prompt_tokens,
+                0,
+                cache_read_tokens=counts.cache_read_tokens,
+                cache_write_tokens=counts.cache_write_tokens,
+            ).cost_usd
 
 
 def _model_of(message: Any) -> str:

@@ -36,6 +36,7 @@ def to_markdown(card: Scorecard) -> str:
         f"- **Tool-error rate:** {card.tool_error_rate:.1%}",
         f"- **Avg cost (USD):** {card.avg_cost_usd:.6f}",
         f"- **Avg latency (ms):** {card.avg_latency_ms:.1f}",
+        *_token_lines(card),
         "",
         "| Case | Passed | Steps | Tool calls | Tool errors | Assertions |",
         "|---|---|---|---|---|---|",
@@ -50,6 +51,19 @@ def to_markdown(card: Scorecard) -> str:
             f"{passed_assertions}/{total_assertions} |"
         )
     return "\n".join(lines) + "\n"
+
+
+def _token_lines(card: Scorecard) -> list[str]:
+    """Token-efficiency bullets (Phase TKE — SPEC-TKE-ACC-005); empty when absent."""
+    report = card.token_report
+    if report is None:
+        return []
+    return [
+        f"- **Tokens per successful task:** {report.tokens_per_successful_task:.1f}",
+        f"- **Cache-hit ratio:** {report.cache_hit_ratio:.1%}",
+        f"- **LLM calls per task:** {report.mean_trajectory_length:.2f}",
+        f"- **Input cost per success (USD):** {report.input_cost_usd_per_success:.6f}",
+    ]
 
 
 def to_langfuse(card: Scorecard, *, settings: Settings | None = None) -> None:

@@ -37,6 +37,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any, cast
 
+from prismal.agents.handoff import handoff_text
 from prismal.agents.skynet.types import SwarmOrder, SwarmPlan, WorkerResult
 from prismal.core.exceptions import SkynetError, SkynetPlanError
 from prismal.core.logging import get_logger
@@ -367,7 +368,8 @@ class SkynetSupervisor:
         parts: list[str] = [f"Goal: {goal}", "", "Worker results:"]
         for result in results:
             status = "ok" if result.success else f"FAILED ({result.error})"
-            parts.append(f"[{result.order_id} / {status}] {result.output}")
+            text = handoff_text(result.output, result.envelope)
+            parts.append(f"[{result.order_id} / {status}] {text}")
         return "\n".join(parts)
 
     async def _default_plan(self, messages: list[dict[str, str]]) -> SwarmPlan:

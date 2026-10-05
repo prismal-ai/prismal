@@ -27,12 +27,12 @@ import asyncio
 import json
 import re
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
     from pathlib import Path
 
     from langchain_core.runnables import RunnableConfig
@@ -41,7 +41,11 @@ if TYPE_CHECKING:
     from prismal.agents.context_compaction import ContextCompactor
     from prismal.agents.extension.ports import ToolProviderPort
     from prismal.agents.extension.providers import StubToolProvider
+    from prismal.agents.state import AgentState
+    from prismal.agents.tool_output_budget import ToolOutputBudget
+    from prismal.agents.tool_search import DeferredToolSet
     from prismal.budget.guard import BudgetGuard
+    from prismal.core.config import Settings
     from prismal.security.indirect_injection import IndirectInjectionDetector
     from prismal.security.runaway import RunawayGuard
     from prismal.security.tool_policy import RunToolPolicy
@@ -926,6 +930,105 @@ def _llm_error_fallback(
     raise llm_exc
 
 
+def tool_gate_react_kwargs(
+    state: AgentState,
+    *,
+    agent_name: str,
+    capabilities: list[str] | None = None,
+    provider: ToolProviderPort | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """``react_loop`` kwargs for mask-mode gating (Phase TKE — SPEC-TKE-GAT-001).
+
+    Mirrors :func:`context_compaction_react_kwargs`: returns ``{}`` unless the
+    TKE master flag is on, ``tool_gating_mode == "mask"``, a phase resolves and
+    the provider exposes an allow-set — so splatting it into ``react_loop`` is
+    byte-for-byte the legacy call when off. Never raises; if the allow-set
+    itself cannot be computed it fails **closed** (empty allow-set).
+    """
+    try:
+        if settings is None:
+            from prismal.core.config import get_settings
+
+            settings = get_settings()
+        if not (settings.token_efficiency_enabled and settings.tool_gating_mode == "mask"):
+            return {}
+        from prismal.agents.loop_phase import resolve_phase
+
+        phase = resolve_phase(state)
+        resolved = provider if provider is not None else get_tool_provider()
+        allowed_fn = getattr(resolved, "allowed_tool_names", None)
+        if phase is None or allowed_fn is None:
+            return {}
+    except Exception as exc:
+        logger.warning("tool_gate.kwargs_failed", agent=agent_name, error=str(exc))
+        return {}
+    try:
+        allow_set = allowed_fn(agent_name=agent_name, capabilities=capabilities, phase=phase)
+    except Exception as exc:
+        # Mask mode exposes the full list, so an unresolvable allow-set must
+        # fail closed (deny every call) rather than allow everything.
+        logger.warning("tool_gate.allow_set_failed", agent=agent_name, error=str(exc))
+        return {"tool_allow_set": frozenset(), "tool_phase": phase}
+    if allow_set is None:
+        return {}
+    return {"tool_allow_set": allow_set, "tool_phase": phase}
+
+
+def _default_tool_output_budget() -> ToolOutputBudget | None:
+    """Settings-resolved budget, or ``None`` when TKE / the budget flag is off."""
+    try:
+        from prismal.core.config import get_settings
+
+        settings = get_settings()
+        if not (settings.token_efficiency_enabled and settings.tool_output_budget_enabled):
+            return None
+        from prismal.agents.tool_output_budget import ToolOutputBudget
+
+        return ToolOutputBudget(settings=settings)
+    except Exception:
+        return None
+
+
+def _sync_deferred_tools(
+    deferred: DeferredToolSet,
+    tool_map: dict[str, BaseTool],
+    llm: object,
+    rebind_llm: Callable[[list[BaseTool]], object] | None,
+) -> object:
+    """Append newly activated deferred tools and re-bind the model (append-only)."""
+    exposed = deferred.exposed()
+    new = [t for t in exposed if t.name not in tool_map]
+    if not new:
+        return llm
+    for tool in new:
+        tool_map[tool.name] = tool
+    if rebind_llm is None:
+        return llm
+    search = tool_map.get("search_tools")
+    return rebind_llm([*exposed, *([search] if search is not None else [])])
+
+
+def _with_allowed_tools_hint(
+    messages: list[object], allow_set: frozenset[str], phase: str | None
+) -> list[object]:
+    """Append the mask-mode hint to the tail user turn (never the system prompt)."""
+    from langchain_core.messages import HumanMessage
+
+    from prismal.agents.tool_gate import allowed_tools_hint
+
+    if not messages or not isinstance(messages[-1], HumanMessage):
+        return messages
+    tail = messages[-1]
+    hint = allowed_tools_hint(allow_set, phase or "")
+    content = tail.content
+    if isinstance(content, str):
+        new_tail = tail.model_copy(update={"content": f"{content}\n{hint}"})
+    else:
+        new_tail = tail.model_copy(update={"content": [*content, {"type": "text", "text": hint}]})
+    return [*messages[:-1], new_tail]
+
+
 async def react_loop(
     llm: object,
     tools: list[BaseTool],
@@ -939,6 +1042,13 @@ async def react_loop(
     tool_policy: RunToolPolicy | None = None,
     runaway_guard: RunawayGuard | None = None,
     context_compactor: ContextCompactor | None = None,
+    tool_allow_set: frozenset[str] | None = None,
+    tool_phase: str | None = None,
+    audit_logger: Any | None = None,
+    deferred_tools: DeferredToolSet | None = None,
+    rebind_llm: Callable[[list[BaseTool]], object] | None = None,
+    tool_output_budget: ToolOutputBudget | None = None,
+    tenant: str = "default",
 ) -> object:
     """Execute a ReAct (Reason + Act) tool loop until the LLM returns a final answer.
 
@@ -975,6 +1085,24 @@ async def react_loop(
             LLM response is metered and a hard cap before a call returns a
             best-effort partial answer instead of calling the model. ``None``
             (the default) leaves behaviour unchanged.
+        tool_allow_set: Phase TKE mask-mode allow-set (SPEC-TKE-GAT-001). A
+            call outside it is never executed — it gets a synthetic
+            ``ToolMessage``, is audited and counted — and the allowed names
+            are appended as a hint to the tail user turn. ``None`` (default)
+            leaves behaviour unchanged.
+        tool_phase: The phase the allow-set belongs to (for messages/metrics).
+        audit_logger: Optional :class:`AuditLogger` for masked-call auditing.
+        deferred_tools: Phase TKE deferred-loading set (SPEC-TKE-DEF-001). When
+            ``search_tools`` activates tools, they are appended (never
+            reordered) to the dispatch map and the model is re-bound through
+            *rebind_llm* with ``exposed() + [search_tools]``.
+        rebind_llm: Re-binds the model to a new tool list (e.g.
+            ``lambda ts: base_llm.bind_tools(ts)``).
+        tool_output_budget: Phase TKE per-tool output budget (SPEC-TKE-OUT-001),
+            applied after the Phase H screen; replaces the legacy 4 000-char
+            cap. ``None`` resolves it from settings (``None`` when disabled ⇒
+            legacy cap, unchanged).
+        tenant: Artifact-store tenant for budgeted outputs (run id = session id).
 
     Returns:
         The final :class:`~langchain_core.messages.AIMessage` produced by
@@ -985,6 +1113,11 @@ async def react_loop(
 
     tool_map: dict[str, BaseTool] = {t.name: t for t in tools}
     loop_messages: list[object] = list(messages)
+    output_budget = (
+        tool_output_budget if tool_output_budget is not None else _default_tool_output_budget()
+    )
+    if tool_allow_set is not None:
+        loop_messages = _with_allowed_tools_hint(loop_messages, tool_allow_set, tool_phase)
     response = AIMessage(content="")
 
     # Consecutive failure counter per tool name — reset to 0 on success.
@@ -1042,10 +1175,25 @@ async def react_loop(
         # Tools rate-limited within THIS iteration (transient — do not count
         # toward the permanent failure budget; the service is just throttling).
         _rate_limited_this_iter: set[str] = set()
+        masked_this_iter = 0
 
         for tc in tool_calls:
             tool_name: str = tc["name"]
             tool_fn = tool_map.get(tool_name)
+
+            if tool_allow_set is not None and tool_name not in tool_allow_set:
+                # Phase TKE mask mode — fail-closed: never execute (SPEC-TKE-GAT-001).
+                from prismal.agents.tool_gate import (
+                    check_tool_call,
+                    masked_tool_message,
+                    record_masked_call,
+                )
+
+                verdict = check_tool_call(tool_name, tool_allow_set, tool_phase)
+                record_masked_call(verdict, agent=agent_name, audit_logger=audit_logger)
+                loop_messages.append(masked_tool_message(tc, verdict))
+                masked_this_iter += 1
+                continue
 
             if tool_fn is None:
                 logger.warning(
@@ -1147,10 +1295,18 @@ async def react_loop(
                         )
                         result = f"Tool error: {exc}"
 
-            # Cap individual tool results to avoid token explosion.
-            if len(result) > 4_000:
+            if output_budget is not None and output_budget.enabled:
+                # Phase TKE — budget after the Phase H screen (SPEC-TKE-OUT-001).
+                result = output_budget.apply(
+                    tool_name, result, run_id=session_id or "run", tenant=tenant
+                ).content
+            elif len(result) > 4_000:
+                # Cap individual tool results to avoid token explosion.
                 result = result[:4_000] + "\n…[truncated]"
             loop_messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
+
+        if deferred_tools is not None:
+            llm = _sync_deferred_tools(deferred_tools, tool_map, llm, rebind_llm)
 
         # ── All-tools-failed early exit ───────────────────────────────────
         # Fire only when every call in this iteration had a *permanent* error
@@ -1158,7 +1314,7 @@ async def react_loop(
         # transient — the service is reachable, just throttling — so they do
         # not count as a permanent failure and the loop must continue to the
         # next iteration where the back-off window has likely reset.
-        if successful_calls == 0 and not _rate_limited_this_iter:
+        if successful_calls == 0 and not _rate_limited_this_iter and not masked_this_iter:
             logger.warning(
                 "react_loop.all_tools_failed",
                 agent=agent_name,
@@ -1264,4 +1420,5 @@ __all__ = [
     "react_loop",
     "resolve_provider",
     "set_tool_provider",
+    "tool_gate_react_kwargs",
 ]

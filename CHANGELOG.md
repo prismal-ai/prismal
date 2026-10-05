@@ -18,6 +18,110 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   half-made release, so v3.12.0 shipped to PyPI and GHCR without a GitHub
   Release.
 
+## [3.13.0] — 2026-10-05
+
+> Phase TKE — **Token Efficiency**, the first phase of wave 2026-10
+> (`specs/wave-2026-10-implementation-plan.md`). It measures first and then
+> cuts tokens without changing agent behaviour. Everything is gated by
+> `token_efficiency_enabled` (default `False`), and every sub-flag takes
+> effect only with that master flag on. With it off, the compiled supervisor
+> graph, `get_tools_for_agent()`, `SecurePromptBuilder.build()`, the
+> `ChatLiteLLM` construction and the metered `Usage` numbers are identical to
+> v3.12.0 (snapshot + disabled-contract tests). LLM construction follows
+> `docs/adr/ADR-WAVE-001-llm-construction-contract.md`. Provider facts were
+> verified in `specs/token-efficiency/VERIFY.md`.
+
+### Added
+- **Cache-aware accounting (TKE1).**
+  - `TokenCounts`/`Usage` gain `cache_read_tokens`, `cache_write_tokens`,
+    `reasoning_tokens` and `cost_source`, plus `cache_hit_ratio` and
+    `uncached_prompt_tokens`.
+  - `extract_token_usage()` reads the LangChain token details and raw
+    provider shapes.
+  - `compute_cost_usd(..., cache_read_tokens=, cache_write_tokens=,
+    reported_cost_usd=, response=)` uses gateway → LiteLLM (cache-aware) →
+    table → none precedence.
+  - `CostMeter.record_response(..., reported_cost_usd=)` adds kind-split
+    `prismal.llm_input_tokens_total` and `prismal.llm_reasoning_tokens_total`
+    counters and a `prismal.llm_cache_hit_ratio` histogram.
+  - `RunSummary` gains cache fields.
+  - `eval/metrics_tokens.py`: `TokenReport`, baseline save/load and
+    `check_token_regression`. The token report appears in every scorecard.
+  - New CLI options: `python -m prismal.eval token-gate` and
+    `run --write-token-baseline`.
+- **Prompt caching (TKE2).** `providers/prompt_cache.py` provides
+  `detect_cache_family`, `CachePolicy` (`config/prompt_cache.yaml`),
+  `apply_cache_policy` and `CacheAwareChatModel`.
+  - Anthropic: `cache_control` on the last tool, the system prompt and the
+    last stable message.
+  - OpenAI: `prompt_cache_key`.
+  - Tools are bound sorted by name and serialized with `stable_dumps`.
+  - `ProviderRegistry.get_llm(..., agent=)` and
+    `get_llm_with_fallback(..., agent=)` gain the `agent` argument.
+  - `utils/stable_json.py`.
+- **Cache-stable prompt layout (TKE2).** `SecurePromptBuilder(layout=...)` adds
+  `PromptLayout.CACHE_STABLE`, `TurnContext`, an HMAC `prefix_canary()`,
+  `detect_leak()` and `canaries`. `GuardrailsEngine.validate_output(canary=)`
+  now accepts several canaries. Leak-detection recall on the red-team corpus
+  is the same for both layouts. The supervisor moves recalled memory to the
+  tail turn context.
+- **Cache-safe tool exposure (TKE3, delta to LH2).**
+  - `agents/tool_gate.py` and `CompositeToolProvider(tool_gating_mode="mask")`
+    with `allowed_tool_names()`.
+  - The allow-set is enforced in `react_loop(tool_allow_set=, tool_phase=)` and
+    `ActionInterceptor.set_tool_allow_set()`.
+  - `tool_gate_react_kwargs()` fails closed.
+  - `build_default_tool_provider(settings)` wires the LH phase map and the
+    gating mode when `tool_gating_enabled` is on.
+  - `agents/tool_search.py`: BM25 `ToolSearchIndex`, `search_tools`,
+    append-only `DeferredToolSet`, `plan_deferred_tools`, and native
+    `defer_loading` for the Anthropic family.
+  - `react_loop(deferred_tools=, rebind_llm=)`.
+- **Observation masking + artifact store (TKE4, delta to LH1).**
+  - `agents/artifacts.py`: in-memory and SQLite `ArtifactStorePort` scoped to
+    tenant and run, with TTL and a `read_artifact` tool.
+  - `CompactionStrategy.MASK_OBSERVATIONS`: stubs keep the same id and
+    tool_call_id, and the payload is stored before masking.
+  - Optional `relevance_fn`, and high/low-water hysteresis.
+- **Tool-output budgets + TOON (TKE5).** `agents/tool_output_budget.py`
+  produces a head+tail excerpt plus an artifact ref. It is applied in
+  `react_loop` (replacing the 4 000-char cap when enabled) and in the new
+  `tool_output_budget_middleware`, which runs just outside the hardening
+  middleware. `utils/toon.py`, `utils/token_estimate.py`.
+- **Effort per role (TKE6).** `llm_effort_by_agent`, `llm_max_tokens_by_agent`
+  and the `recommended` profile. `reasoning_effort` is sent only to
+  reasoning-capable models.
+- **Handoff envelopes (TKE7).** `agents/handoff.py`: `HandoffEnvelope`,
+  `build_envelope`, `maybe_envelope` and a per-run artifact store
+  (`get_run_artifact_store` / `clear_run_artifact_store`). Wired into Skynet
+  (`WorkerResult.envelope`; reducer and evaluator read summaries), MoA
+  (`MoAResult.proposer_envelopes`), Kokoro (judge reads summaries), BRP,
+  `parallel_research` and the spawner (`get_envelope`). For BRP and the spawner
+  the envelope is attached but nothing reads it yet, so they save no tokens.
+- **RAG context budget (TKE8).**
+  - `rag/context_budget.py`, `providers/rerank.py` (cross-encoder) and
+    `providers/compression.py` (LLMLingua-2), with new extras `[rerank]` and
+    `[compression]`.
+  - Wired into `RAGEngine`, CRAG, HyDE and Hybrid.
+- Settings: the TKE block in `core/config.py` with `_validate_token_efficiency`.
+  `context_compaction_strategy` now accepts `mask_observations`.
+- Exceptions: `TokenEfficiencyError` hierarchy (`ArtifactNotFound`,
+  `MaskedToolCallError`, …).
+- Metrics: 15 counters and 2 histograms (`SPEC-TKE-OTEL-001`).
+- Docs and examples: `docs/token-efficiency.md`, `examples/token_efficiency.py`,
+  ADR-WAVE-001.
+
+### Fixed
+- `tests/unit/agents/conftest.py` no longer replaces a real, installed
+  `langchain_litellm` with a `MagicMock`. The stub leaked into later test
+  modules depending on run order.
+
+### Known gaps
+- The committed token baseline (TKE1-08) and the eval A/B run (TKE9-04) are
+  pending. Trajectories capture 0 tokens for internal LLM calls, so a live run
+  and/or meter-based capture is needed before the CI token gate can block.
+- TKE10 (code mode for MCP chains, optional P3) is deferred.
+
 ## [3.12.0] — 2026-07-12
 
 > Fase S+ — **Skynet S+ (heterogeneous / metered / remote swarms)**. Follow-up

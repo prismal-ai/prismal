@@ -104,6 +104,10 @@ class _RunAccumulator:
             usage=self.usage,
             latency_ms=self.latency_ms,
             scores=list(self.scores),
+            cache_read_tokens=self.usage.cache_read_tokens,
+            cache_write_tokens=self.usage.cache_write_tokens,
+            reasoning_tokens=self.usage.reasoning_tokens,
+            cache_hit_ratio=self.usage.cache_hit_ratio,
         )
 
 

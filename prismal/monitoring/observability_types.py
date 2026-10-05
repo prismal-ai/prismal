@@ -79,6 +79,11 @@ class RunSummary:
     scores: list[ScoreAnnotation] = field(default_factory=list)
     started_at: float = 0.0
     ended_at: float | None = None
+    # Token Efficiency (Phase TKE — SPEC-TKE-ACC-005): derived from ``usage``.
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    reasoning_tokens: int = 0
+    cache_hit_ratio: float = 0.0
 
 
 __all__ = [

@@ -76,15 +76,37 @@ class CostMeter:
         wall_clock_s: float = 0.0,
         agent: str | None = None,
         pattern: str | None = None,
+        reported_cost_usd: float | None = None,
     ) -> Usage:
-        """Meter one LLM response: extract tokens, price them, accumulate."""
+        """Meter one LLM response: extract tokens, price them, accumulate.
+
+        With ``token_efficiency_enabled`` (TKE — SPEC-TKE-ACC-004) cache tokens
+        are normalized, priced at their cache rate and split into the
+        ``llm_input_tokens{kind}`` metrics; otherwise pricing uses the v3.12.0
+        arguments only. A gateway-reported cost always wins when given.
+        """
         tokens = extract_token_usage(message)
-        estimate = compute_cost_usd(
-            model,
-            tokens.prompt_tokens,
-            tokens.completion_tokens,
-            settings=self._settings,
-        )
+        tke = bool(getattr(self._settings, "token_efficiency_enabled", False))
+        if tke:
+            tokens = tokens.normalized()
+            estimate = compute_cost_usd(
+                model,
+                tokens.prompt_tokens,
+                tokens.completion_tokens,
+                settings=self._settings,
+                cache_read_tokens=tokens.cache_read_tokens,
+                cache_write_tokens=tokens.cache_write_tokens,
+                reported_cost_usd=reported_cost_usd,
+            )
+        else:
+            estimate = compute_cost_usd(
+                model,
+                tokens.prompt_tokens,
+                tokens.completion_tokens,
+                settings=self._settings,
+                reported_cost_usd=reported_cost_usd,
+            )
+        detailed = tke or reported_cost_usd is not None
         usage = Usage(
             prompt_tokens=tokens.prompt_tokens,
             completion_tokens=tokens.completion_tokens,
@@ -92,7 +114,13 @@ class CostMeter:
             calls=1,
             wall_clock_s=wall_clock_s,
             estimated=estimate.estimated,
+            cache_read_tokens=tokens.cache_read_tokens if tke else 0,
+            cache_write_tokens=tokens.cache_write_tokens if tke else 0,
+            reasoning_tokens=tokens.reasoning_tokens if tke else 0,
+            cost_source=estimate.source if detailed else "",
         )
+        if tke:
+            self._emit_tke_otel(usage, agent=agent, model=model)
         return self.record(usage, agent=agent, pattern=pattern, model=model)
 
     # ── internals ─────────────────────────────────────────────────────────────
@@ -124,6 +152,29 @@ class CostMeter:
                 otel.record_histogram(
                     "cost_per_call_usd", usage.cost_usd, attributes={"model": model or ""}
                 )
+
+    def _emit_tke_otel(self, usage: Usage, *, agent: str | None, model: str) -> None:
+        with suppress(Exception):
+            from prismal.monitoring.otel import OTelManager
+
+            otel = OTelManager()
+            base = {"agent": agent or "", "model": model}
+            uncached = max(
+                0, usage.prompt_tokens - usage.cache_read_tokens - usage.cache_write_tokens
+            )
+            for kind, value in (
+                ("uncached", uncached),
+                ("cache_read", usage.cache_read_tokens),
+                ("cache_write", usage.cache_write_tokens),
+            ):
+                otel.increment_counter("llm_input_tokens", value, attributes={**base, "kind": kind})
+            if usage.reasoning_tokens:
+                otel.increment_counter(
+                    "llm_reasoning_tokens", usage.reasoning_tokens, attributes=base
+                )
+            otel.record_histogram(
+                "llm_cache_hit_ratio", usage.cache_hit_ratio, attributes={"agent": agent or ""}
+            )
 
     def _bridge(self, usage: Usage, model: str) -> None:
         if self._cost_tracker is None or self._session_id is None:

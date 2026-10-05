@@ -395,6 +395,77 @@ class OTelManager:
             description="Evaluation-dataset exports by format (langsmith|langfuse)",
         )
 
+        self._register_tke_metrics()
+
+    def _register_tke_metrics(self) -> None:
+        """Token Efficiency (Phase TKE — SPEC-TKE-OTEL-001)."""
+        counters = {
+            "llm_input_tokens": (
+                "prismal.llm_input_tokens_total",
+                "Input tokens by kind (uncached|cache_read|cache_write), agent, model",
+            ),
+            "llm_reasoning_tokens": (
+                "prismal.llm_reasoning_tokens_total",
+                "Reasoning tokens (subset of completion tokens) by agent, model",
+            ),
+            "prompt_cache_breakpoints": (
+                "prismal.prompt_cache_breakpoints_total",
+                "Prompt-cache breakpoints placed (by family)",
+            ),
+            "prompt_cache_layout_fallbacks": (
+                "prismal.prompt_cache_layout_fallbacks_total",
+                "Cache-stable prompt layout fallbacks to legacy",
+            ),
+            "tool_gate_masked_calls": (
+                "prismal.tool_gate_masked_calls_total",
+                "Tool calls blocked by mask-mode gating (by agent, phase)",
+            ),
+            "tool_search_calls": (
+                "prismal.tool_search_calls_total",
+                "search_tools meta-tool invocations (by agent)",
+            ),
+            "tool_deferred_activated": (
+                "prismal.tool_deferred_activated_total",
+                "Deferred tools activated into the exposed list (by agent)",
+            ),
+            "observations_masked": (
+                "prismal.observations_masked_total",
+                "Tool observations replaced by an artifact stub",
+            ),
+            "observations_mask_errors": (
+                "prismal.observations_mask_errors_total",
+                "Observation masks skipped because the artifact write failed",
+            ),
+            "artifacts_stored": (
+                "prismal.artifacts_stored_total",
+                "Artifacts stored (by kind)",
+            ),
+            "artifact_reads": ("prismal.artifact_reads_total", "Artifact reads"),
+            "tool_output_truncated": (
+                "prismal.tool_output_truncated_total",
+                "Tool outputs truncated to their budget (by tool)",
+            ),
+            "toon_encoded": ("prismal.toon_encoded_total", "Payloads encoded as TOON"),
+            "handoff_envelopes": (
+                "prismal.handoff_envelopes_total",
+                "Handoff envelopes built (by pattern)",
+            ),
+            "rag_passages_dropped": (
+                "prismal.rag_passages_dropped_total",
+                "Retrieved passages dropped by the RAG context budget",
+            ),
+        }
+        for key, (name, description) in counters.items():
+            self._counters[key] = self._meter.create_counter(name, description=description)
+        self._histograms["llm_cache_hit_ratio"] = self._meter.create_histogram(
+            "prismal.llm_cache_hit_ratio",
+            description="Per-call prompt-cache hit ratio (cache_read / prompt) by agent",
+        )
+        self._histograms["rag_context_tokens"] = self._meter.create_histogram(
+            "prismal.rag_context_tokens",
+            description="Estimated tokens of RAG context passed to the model",
+        )
+
     @contextmanager
     def start_span(
         self,

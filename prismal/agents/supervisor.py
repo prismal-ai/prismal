@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from langchain_core.messages import BaseMessage
 
     from prismal.agents.state import AgentState
+    from prismal.core.config import Settings
 
 logger = get_logger("prismal.agents.supervisor")
 
@@ -490,6 +491,21 @@ def _derive_user_id(state: AgentState) -> str:
     return head or "unknown"
 
 
+def _split_per_request_context(context: str, settings: Settings) -> tuple[str, str]:
+    """Place per-request *context* for prompt caching (Phase TKE — TKE2-08).
+
+    Returns ``(system_suffix, tail_suffix)``. Legacy: the context is appended to
+    the system prompt (unchanged behaviour). Cache-stable layout: the system
+    prompt stays static and the context moves to a ``<turn_context>`` block at
+    the tail of the final instruction, keeping the cached prefix byte-identical.
+    """
+    if not (settings.token_efficiency_enabled and settings.prompt_layout == "cache_stable"):
+        return context, ""
+    if not context:
+        return "", ""
+    return "", f"\n<turn_context>{context.strip()}</turn_context>"
+
+
 async def _recall_memory_context(state: AgentState) -> str:
     """Recall user preferences and format them as a system-prompt suffix.
 
@@ -893,6 +909,7 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
 
         llm = ProviderRegistry().get_llm_with_fallback()
         memory_context = await _recall_memory_context(state)
+        system_suffix, tail_suffix = _split_per_request_context(memory_context, get_settings())
         routing_messages = [
             SystemMessage(
                 content=build_system_prompt(
@@ -902,7 +919,7 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
                     get_settings().skynet_enabled,
                     get_settings().blind_review_pipeline_enabled,
                 )
-                + memory_context
+                + system_suffix
             ),
             *trimmed,
             HumanMessage(
@@ -910,6 +927,7 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
                     "Based on the conversation above, which agent should handle "
                     "the next step? Respond with ONLY the agent name or 'END'."
                 )
+                + tail_suffix
             ),
         ]
         response = await llm.ainvoke(routing_messages)
@@ -1103,8 +1121,9 @@ async def hierarchical_supervisor_node(
         # the same cross-session preferences as the flat supervisor.
         memory_context = await _recall_memory_context(state)
 
+        system_suffix, tail_suffix = _split_per_request_context(memory_context, get_settings())
         routing_messages = [
-            SystemMessage(content=_HIERARCHICAL_SYSTEM_PROMPT + memory_context),
+            SystemMessage(content=_HIERARCHICAL_SYSTEM_PROMPT + system_suffix),
             *trimmed,
             HumanMessage(
                 content=(
@@ -1112,6 +1131,7 @@ async def hierarchical_supervisor_node(
                     "orchestrator should handle the next step? "
                     "Respond with ONLY the target name or 'END'."
                 )
+                + tail_suffix
             ),
         ]
 

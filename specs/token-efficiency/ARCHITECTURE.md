@@ -5,11 +5,11 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | TKE |
-| **Target package version** | `3.13.0` (SemVer minor — new opt-in functionality, not yet started) |
+| **Target package version** | `3.13.0` (SemVer minor — new opt-in functionality) |
 | **PLAN** | `specs/token-efficiency/PLAN.md` |
 | **SPEC** | `specs/token-efficiency/SPEC.md` |
 | **TASKS** | `specs/token-efficiency/TASKS.md` |

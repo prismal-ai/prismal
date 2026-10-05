@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
+from prismal.rag.context_budget import apply_context_budget, effective_k
 from prismal.rag.crag import CRAGPipeline, RetrievedChunk
 from prismal.rag.loaders import SUPPORTED_EXTENSIONS, DocumentProcessorFactory
 from prismal.rag.vector_store_factory import VectorStoreFactory
@@ -211,7 +212,9 @@ class RAGEngine:
             span.set_attribute("prismal.k", k)
 
             logger.info("rag_engine_search", query_len=len(query), k=k)
-            raw_results = self._store.similarity_search(query, k=k)
+            # Phase TKE (SPEC-TKE-RAG-001): over-fetch ``rag_retrieve_k`` when the
+            # context budget is active; identical to ``k`` otherwise.
+            raw_results = self._store.similarity_search(query, k=effective_k(k, self._settings))
 
             chunks: list[RetrievedChunk] = []
             for i, (doc, score) in enumerate(raw_results):
@@ -222,6 +225,7 @@ class RAGEngine:
                     content=doc.page_content,
                 )
                 chunks.append(chunk)
+            chunks = apply_context_budget(query, chunks, self._settings)
 
             span.set_attribute("prismal.num_results", len(chunks))
             otel.increment_counter("rag_queries")

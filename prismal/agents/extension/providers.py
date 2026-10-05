@@ -15,7 +15,7 @@ and the fixed-tool-agent exemption (DD-TPI-004).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from prismal.core.logging import get_logger
 
@@ -183,8 +183,12 @@ class CompositeToolProvider:
         max_total: int = _MAX_TOTAL_TOOLS,
         fixed_tool_agents: frozenset[str] = _FIXED_TOOL_AGENTS,
         phase_capability_map: Mapping[str, Mapping[str, list[str]]] | None = None,
+        tool_gating_mode: str = "remove",
     ) -> None:
         self._providers: tuple[ToolProviderPort, ...] = tuple(providers)
+        # Phase TKE (SPEC-TKE-GAT-001): "remove" = LH2 exactly; "mask" keeps the
+        # exposed list phase-independent and exposes the allow-set separately.
+        self._tool_gating_mode = tool_gating_mode
         self._max_total = max_total
         self._fixed_tool_agents = fixed_tool_agents
         self._phase_capability_map = phase_capability_map or {}
@@ -241,7 +245,35 @@ class CompositeToolProvider:
         capabilities: list[str] | None = None,
         phase: str | None = None,
     ) -> list[BaseTool]:
-        """Return the merged, deduplicated, capped tool list for *agent_name*."""
+        """Return the merged, deduplicated, capped tool list for *agent_name*.
+
+        In ``mask`` mode (Phase TKE) the phase is not used to narrow the list:
+        the full list is returned **name-sorted** so it is byte-stable across
+        phases; :meth:`allowed_tool_names` exposes the execution allow-set.
+        """
+        if self._tool_gating_mode == "mask":
+            full = self._resolve(agent_name, capabilities, None)
+            return sorted(full, key=lambda t: t.name)
+        return self._resolve(agent_name, capabilities, phase)
+
+    def allowed_tool_names(
+        self,
+        *,
+        agent_name: str,
+        capabilities: list[str] | None,
+        phase: str | None,
+    ) -> frozenset[str] | None:
+        """Phase allow-set for mask mode; ``None`` = no restriction (SPEC-TKE-GAT-001)."""
+        if phase is None or agent_name in self._fixed_tool_agents:
+            return None
+        if self._phase_capability_map.get(agent_name, {}).get(phase) is None:
+            return None
+        return frozenset(t.name for t in self._resolve(agent_name, capabilities, phase))
+
+    def _resolve(
+        self, agent_name: str, capabilities: list[str] | None, phase: str | None
+    ) -> list[BaseTool]:
+        """LH2 resolution: phase-narrowed, merged, deduplicated, capped."""
         stubs = (
             self._stub_provider.get_tools(agent_name=agent_name)
             if self._stub_provider is not None
@@ -369,7 +401,6 @@ async def build_default_tool_provider(
         mcp_config_path: Override for the MCP server config. ``None`` uses
             the default ``config/mcp_servers.yaml``.
     """
-    del settings  # reserved — Y5 toggles consume it
     providers: list[ToolProviderPort] = []
 
     try:
@@ -402,7 +433,22 @@ async def build_default_tool_provider(
         "tool_provider.default_built",
         providers=[type(p).__name__ for p in providers],
     )
-    return CompositeToolProvider(providers)
+    return CompositeToolProvider(providers, **_gating_kwargs(settings))
+
+
+def _gating_kwargs(settings: Settings | None) -> dict[str, Any]:
+    """LH phase map + TKE gating mode for the default composite (opt-in; ``{}`` when off)."""
+    if settings is None or not settings.tool_gating_enabled:
+        return {}
+    mode = (
+        "mask"
+        if settings.token_efficiency_enabled and settings.tool_gating_mode == "mask"
+        else "remove"
+    )
+    return {
+        "phase_capability_map": load_phase_capability_map(settings.tool_gating_phase_map_path),
+        "tool_gating_mode": mode,
+    }
 
 
 def load_phase_capability_map(path: str | None = None) -> dict[str, dict[str, list[str]]]:

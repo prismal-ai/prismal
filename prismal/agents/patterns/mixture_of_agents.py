@@ -29,6 +29,12 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from prismal.agents.handoff import (
+    HandoffEnvelope,
+    envelope_to_message_text,
+    handoff_scope,
+    maybe_run_envelope,
+)
 from prismal.core.config import get_settings
 from prismal.core.exceptions import MoAError
 from prismal.core.logging import get_logger
@@ -68,11 +74,15 @@ class MoAResult:
             subsequent entry is one aggregator pass (single-element list).
         providers_used: Proposer model ids whose calls succeeded. Failed
             proposers are omitted.
+        proposer_envelopes: Handoff envelopes of the proposer outputs (Phase
+            TKE, SPEC-TKE-HND-001), aligned with ``providers_used``; the first
+            aggregator pass reads their summaries. Empty when disabled.
     """
 
     final_answer: str
     layer_outputs: list[list[str]] = field(default_factory=list)
     providers_used: list[str] = field(default_factory=list)
+    proposer_envelopes: list[HandoffEnvelope] = field(default_factory=list)
 
 
 class MixtureOfAgents:
@@ -111,8 +121,10 @@ class MixtureOfAgents:
         state: Any,
         budget_guard_fn: Callable[[dict[str, object]], Awaitable[bool]] | None = None,
     ) -> MoAResult:
-        """Run proposers in parallel, then ``n_aggregator_layers`` refinements."""
-        del state  # reserved for future hooks
+        """Run proposers in parallel, then ``n_aggregator_layers`` refinements.
+
+        ``state`` scopes handoff-envelope artifacts (``session_id`` / ``org_id``).
+        """
         otel = OTelManager()
         with otel.start_span("moa.generate") as span:
             span.set_attribute("prismal.moa.query_len", len(query))
@@ -126,7 +138,12 @@ class MixtureOfAgents:
 
             layer_outputs: list[list[str]] = [list(proposer_outputs)]
             aggregator_llm = registry.get_llm(self._aggregator_model)
-            current = list(proposer_outputs)
+            envelopes = self._envelope_proposals(proposer_outputs, state)
+            current = (
+                [envelope_to_message_text(env) for env in envelopes]
+                if envelopes
+                else list(proposer_outputs)
+            )
             for layer_idx in range(self._n_aggregator_layers):
                 # Budget pre-check before each aggregator refinement layer; a soft
                 # cap stops further layers and returns the current best synthesis.
@@ -156,7 +173,21 @@ class MixtureOfAgents:
                 final_answer=final_answer,
                 layer_outputs=layer_outputs,
                 providers_used=providers_used,
+                proposer_envelopes=envelopes,
             )
+
+    def _envelope_proposals(self, proposals: list[str], state: Any) -> list[HandoffEnvelope]:
+        """Envelope each proposal when enabled (TKE7-03); ``[]`` when disabled."""
+        run_id, tenant = handoff_scope(state)
+        envelopes: list[HandoffEnvelope] = []
+        for proposal in proposals:
+            env = maybe_run_envelope(
+                proposal, settings=self._settings, run_id=run_id, tenant=tenant, pattern="moa"
+            )
+            if env is None:
+                return []
+            envelopes.append(env)
+        return envelopes
 
     async def _run_proposers(
         self, registry: ProviderRegistry, query: str

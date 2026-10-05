@@ -1,0 +1,15 @@
+# TKE0 — Verify before build
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-10-05 |
+| **Method** | Inspection and execution against the pinned environment: `litellm` 1.86.2, `langchain-litellm` 0.6.6, `langchain-core` 1.4.7, `langgraph` 1.2.5 (no live provider calls) |
+
+| Task | Fact | Outcome |
+|---|---|---|
+| TKE0-01 | Usage fields through `ChatLiteLLM` | **Confirmed (shape changed vs. SPEC).** `langchain_litellm._create_usage_metadata` writes `usage_metadata.input_token_details.{cache_read,cache_creation}` from `cache_read_input_tokens` / `cache_creation_input_tokens` (Anthropic), falling back to `prompt_tokens_details.{cached_tokens,cache_creation_tokens}` (OpenAI/OpenRouter/DeepSeek). It also writes `output_token_details.reasoning` from `completion_tokens_details.reasoning_tokens`. `response_metadata` carries **no** `token_usage` (it is in `llm_output`), so precedence step 1 (LangChain-standard) covers every provider through ChatLiteLLM. Step 2 stays for raw/other messages. `input_tokens` = LiteLLM `prompt_tokens`, which already **includes** cached tokens (OpenAI semantics, normalized by LiteLLM for Anthropic). |
+| TKE0-02 | LiteLLM cache pricing | **Confirmed.** `litellm.cost_per_token(model, prompt_tokens, completion_tokens, cache_read_input_tokens=, cache_creation_input_tokens=)` exists and treats `prompt_tokens` as total incl. cached. Example: claude-sonnet-4-5, 1000 prompt / 800 cached → 0.00084 USD vs 0.003 uncached. `completion_cost(completion_response=…)` exists for raw `ModelResponse`s. |
+| TKE0-03 | `cache_control` passthrough; `prompt_cache_key` / retention | **Confirmed by source.** `ChatLiteLLM` keeps list-content blocks as-is, so `cache_control` on content blocks reaches LiteLLM. The Anthropic transform reads `cache_control` on tool dicts and on `function.cache_control`. OpenAI params `prompt_cache_key` and `prompt_cache_retention` are in LiteLLM's supported OpenAI params. Max 4 breakpoints and a 20-block lookback are kept as config values in `config/prompt_cache.yaml` (Anthropic docs; not re-checked live). |
+| TKE0-04 | Native tool search (`defer_loading`) | **Confirmed by source.** The LiteLLM Anthropic transform handles `defer_loading` and the `tool_search_tool_{regex,bm25}_20251119` tool types. The capability table starts with the `anthropic_explicit` family only. |
+| TKE0-05 | `supports_reasoning` / `reasoning_effort` | **Confirmed.** `litellm.supports_reasoning(model=…)` → True for claude-sonnet-4-5, o3-mini, gemini-2.5-pro and openrouter/anthropic/*; False for gpt-4o and deepseek-chat. |
+| TKE0-06 | Canary placement + per-request values | **Confirmed.** `SecurePromptBuilder.build()` appends `<!-- canary:{uuid4} -->` to the **system** message on every call, which defeats prefix caching. Leak check: `GuardrailsEngine.validate_output(text, canary)` (substring match). `grep cache_control prismal/` → 0. Per-request values in system prompts: the supervisor appends `memory_context` (recall results) to its system message (`supervisor.py` routing and hierarchical nodes). No timestamps or ids were found in agent system prompts. `build_system_prompt()` itself is static. |

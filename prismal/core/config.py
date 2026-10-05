@@ -770,6 +770,114 @@ class Settings(BaseSettings):
         description="Phase -> capability-override table path.",
     )
 
+    # --- TKE --- Token Efficiency (Phase TKE — SPEC-TKE-CFG-001) ────────
+    # Every sub-flag is effective only when token_efficiency_enabled=True;
+    # master off ⇒ every pre-TKE behaviour is byte-for-byte unchanged.
+    token_efficiency_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for the token-efficiency layer (Phase TKE).",
+    )
+    prompt_cache_enabled: bool = Field(
+        default=False,
+        description="Apply provider prompt-cache policy (cache_control / prompt_cache_key).",
+    )
+    prompt_cache_ttl: str = Field(default="5m", description="Prompt-cache TTL: 5m | 1h.")
+    prompt_cache_scope: str = Field(
+        default="tenant",
+        description="Prompt-cache prefix scope: tenant (tenant id in prefix hash) | global.",
+    )
+    prompt_cache_policy_path: str = Field(
+        default="config/prompt_cache.yaml",
+        description="Volatile provider cache facts (breakpoints, lookback, min prefix).",
+    )
+    prompt_canary_secret: SecretStr = Field(
+        default=SecretStr(""),
+        description="HMAC secret for the cache-stable prefix canary (never logged/mirrored).",
+    )
+    prompt_layout: str = Field(
+        default="legacy",
+        description="SecurePromptBuilder default layout: legacy | cache_stable.",
+    )
+    tool_gating_mode: str = Field(
+        default="remove",
+        description="LH tool gating mode: remove (LH2 exactly) | mask (cache-safe allow-set).",
+    )
+    tool_defer_enabled: bool = Field(default=False, description="Deferred tool loading.")
+    tool_defer_threshold: int = Field(
+        default=30, ge=1, description="Tool count above which non-core tools are deferred."
+    )
+    tool_defer_core: list[str] = Field(
+        default_factory=list, description="Tool names always exposed when deferring."
+    )
+    context_mask_keep_turns: int = Field(
+        default=10, ge=0, description="Recent human/AI turns whose observations stay unmasked."
+    )
+    context_mask_relevance_keep: float = Field(
+        default=0.8,
+        ge=0.0,
+        le=1.0,
+        description="Observations scoring >= this (relevance_fn) stay unmasked.",
+    )
+    context_compaction_high_water: int = Field(
+        default=0, ge=0, description="Hysteresis high-water token mark (0 = LH trigger)."
+    )
+    context_compaction_low_water: int = Field(
+        default=0, ge=0, description="Hysteresis low-water token mark."
+    )
+    artifact_store_backend: str = Field(
+        default="memory", description="Artifact store backend: memory | sqlite."
+    )
+    artifact_store_path: str = Field(
+        default="data/artifacts.db", description="SQLite artifact store path."
+    )
+    artifact_ttl_s: int = Field(default=86400, ge=0, description="Artifact TTL in seconds.")
+    tool_output_budget_enabled: bool = Field(
+        default=False, description="Cap tool outputs reaching messages (head+tail excerpt)."
+    )
+    tool_output_max_tokens_default: int = Field(
+        default=2000, ge=0, description="Default per-tool output budget (estimated tokens)."
+    )
+    tool_output_max_tokens_by_tool: dict[str, int] = Field(
+        default_factory=dict, description="Per-tool output budget overrides."
+    )
+    tool_output_toon_enabled: bool = Field(
+        default=False, description="Encode uniform tabular tool/RAG results as TOON."
+    )
+    llm_effort_enabled: bool = Field(
+        default=False, description="Per-agent reasoning effort / max_tokens."
+    )
+    llm_effort_profile: str = Field(
+        default="none", description="Effort profile: none | recommended."
+    )
+    llm_effort_by_agent: dict[str, str] = Field(
+        default_factory=dict, description="Agent -> reasoning effort (low|medium|high)."
+    )
+    llm_max_tokens_by_agent: dict[str, int] = Field(
+        default_factory=dict, description="Agent -> max output tokens."
+    )
+    handoff_envelope_enabled: bool = Field(
+        default=False, description="Multi-agent handoff envelopes (summary + artifact refs)."
+    )
+    handoff_summary_max_tokens: int = Field(
+        default=1500, ge=0, description="Envelope summary cap (estimated tokens)."
+    )
+    rag_context_budget_enabled: bool = Field(
+        default=False, description="Fit retrieved RAG context to a token budget."
+    )
+    rag_context_budget_tokens: int = Field(
+        default=3000, ge=0, description="RAG context budget (estimated tokens)."
+    )
+    rag_retrieve_k: int = Field(default=20, ge=1, description="Chunks retrieved before budget.")
+    rag_rerank_enabled: bool = Field(
+        default=False, description="Cross-encoder rerank ([rerank] extra)."
+    )
+    rag_passage_compression_enabled: bool = Field(
+        default=False, description="LLMLingua-2 prose compression ([compression] extra)."
+    )
+    codeact_mcp_code_mode_enabled: bool = Field(
+        default=False, description="Code-mode for MCP chains (TKE10, optional P3)."
+    )
+
     # ── Blind Review Pipeline (Phase BRP — SPEC-BRP-CFG-001) ──────────
     # Opt-in; False ⇒ graph byte-for-byte unchanged (mirrors kokoro_enabled /
     # skynet_enabled / budget_enabled).
@@ -2215,11 +2323,56 @@ class Settings(BaseSettings):
         ``context_compaction_strategy`` so a typo fails fast at load time
         rather than silently disabling a control.
         """
-        valid_strategies = {"truncate", "summarize"}
+        valid_strategies = {"truncate", "summarize", "mask_observations"}  # + TKE MSK-001
         if self.context_compaction_strategy not in valid_strategies:
             raise ValueError(
                 f"PRISMAL_CONTEXT_COMPACTION_STRATEGY={self.context_compaction_strategy!r} "
                 f"is invalid; expected one of {sorted(valid_strategies)}."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_token_efficiency(self) -> "Settings":
+        """Validate the token-efficiency settings (SPEC-TKE-CFG-001).
+
+        Numeric floors are enforced by their Fields; here we reject unknown
+        literals, negative per-tool/per-agent budgets and an inverted
+        hysteresis band so a typo fails fast at load time.
+        """
+        literals: dict[str, set[str]] = {
+            "prompt_cache_ttl": {"5m", "1h"},
+            "prompt_cache_scope": {"tenant", "global"},
+            "prompt_layout": {"legacy", "cache_stable"},
+            "tool_gating_mode": {"remove", "mask"},
+            "artifact_store_backend": {"memory", "sqlite"},
+            "llm_effort_profile": {"none", "recommended"},
+        }
+        for name, allowed in literals.items():
+            value = getattr(self, name)
+            if value not in allowed:
+                raise ValueError(
+                    f"PRISMAL_{name.upper()}={value!r} is invalid; "
+                    f"expected one of {sorted(allowed)}."
+                )
+        bad_effort = {
+            agent: level
+            for agent, level in self.llm_effort_by_agent.items()
+            if level not in {"low", "medium", "high"}
+        }
+        if bad_effort:
+            raise ValueError(
+                f"PRISMAL_LLM_EFFORT_BY_AGENT has invalid levels {bad_effort}; "
+                "expected low | medium | high."
+            )
+        for name in ("tool_output_max_tokens_by_tool", "llm_max_tokens_by_agent"):
+            negative = {k: v for k, v in getattr(self, name).items() if v < 0}
+            if negative:
+                raise ValueError(f"PRISMAL_{name.upper()} has negative values {negative}.")
+        high, low = self.context_compaction_high_water, self.context_compaction_low_water
+        if high > 0 and low >= high:
+            raise ValueError(
+                f"PRISMAL_CONTEXT_COMPACTION_LOW_WATER={low} must be below "
+                f"PRISMAL_CONTEXT_COMPACTION_HIGH_WATER={high}."
             )
         return self
 

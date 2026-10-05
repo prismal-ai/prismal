@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from prismal.agents.handoff import handoff_scope
 from prismal.agents.kokoro.deliberation import deliberate
 from prismal.agents.kokoro.soul_agent import SoulAgent
 from prismal.agents.subgraphs.kokoro._helpers import get_kokoro, last_query, merge_kokoro
@@ -60,12 +61,15 @@ def make_deliberate_node(
             return merge_kokoro(state, error="kokoro: no query message to deliberate on")
 
         agents = [SoulAgent(soul, generate_fn=generate_fn, settings=settings) for soul in souls]
+        run_id, tenant = handoff_scope(state)
         try:
             result = await deliberate(
                 query,
                 agents,
                 agreement_fn=agreement_fn,
                 settings=settings,
+                run_id=run_id,
+                tenant=tenant,
             )
         except KokoroError as exc:
             logger.warning("kokoro_deliberate_error", error=str(exc))

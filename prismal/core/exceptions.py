@@ -977,6 +977,30 @@ class StructuredOutputReaskExhausted(StructuredOutputGuardError):  # noqa: N818 
 # ── Loop Hardening (Phase LH) ───────────────────────────────────────────────
 
 
+class TokenEfficiencyError(PrismalError):
+    """Base for errors raised by the token-efficiency layer (Phase TKE)."""
+
+
+class TokenEfficiencyConfigError(TokenEfficiencyError):
+    """Invalid token-efficiency configuration (load time only)."""
+
+
+class PromptCacheError(TokenEfficiencyError):
+    """Internal — never escapes ``apply_cache_policy`` (fail-open)."""
+
+
+class ArtifactStoreError(TokenEfficiencyError):
+    """An artifact store operation failed."""
+
+
+class ArtifactNotFound(ArtifactStoreError):  # noqa: N818 — SPEC-TKE-ERR-001 name
+    """Missing id **or** tenant/run scope mismatch (indistinguishable by design)."""
+
+
+class MaskedToolCallError(TokenEfficiencyError):
+    """Internal — a masked tool call is surfaced as a synthetic ``ToolMessage``."""
+
+
 class LoopHardeningError(PrismalError):
     """Base for errors raised by the loop-hardening layer (Phase LH)."""
 
@@ -1014,6 +1038,8 @@ __all__ = [
     "A2AError",
     "AdapterError",
     "AdaptiveRAGError",
+    "ArtifactNotFound",
+    "ArtifactStoreError",
     "AudioAgentError",
     "BlindReviewBlindnessViolationError",
     "BlindReviewConfigError",
@@ -1056,6 +1082,7 @@ __all__ = [
     "MCPConnectionError",
     "MCPError",
     "MCPToolError",
+    "MaskedToolCallError",
     "MediaValidationError",
     "MemoryError",
     "MemoryRedactionError",
@@ -1077,6 +1104,7 @@ __all__ = [
     "PluginLoadError",
     "PolicyDenied",
     "PrismalError",
+    "PromptCacheError",
     "ProviderError",
     "ProviderTimeoutError",
     "RAGError",
@@ -1103,6 +1131,8 @@ __all__ = [
     "SwarmWorkerError",
     "TTSError",
     "ToTError",
+    "TokenEfficiencyConfigError",
+    "TokenEfficiencyError",
     "ToolGatingConfigError",
     "ToolProviderNotConfigured",
     "VectorStoreBackendUnavailable",

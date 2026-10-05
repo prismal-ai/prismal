@@ -29,10 +29,12 @@ Example::
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
+from prismal.agents.handoff import maybe_run_envelope
 from prismal.agents.skynet.supervisor import _parse_json_object
 from prismal.agents.skynet.types import SwarmOrder, WorkerResult
 from prismal.budget.types import Usage
@@ -145,7 +147,9 @@ class SwarmWorker:
             prompt_builder if prompt_builder is not None else SecurePromptBuilder()
         )
 
-    async def execute(self, order: SwarmOrder) -> WorkerResult:
+    async def execute(
+        self, order: SwarmOrder, *, run_id: str = "run", tenant: str = "default"
+    ) -> WorkerResult:
         """Execute one order and return a :class:`WorkerResult` (RF-SKY-05).
 
         Builds a secure prompt from ``order.instruction`` (+ small context),
@@ -157,9 +161,13 @@ class SwarmWorker:
 
         Args:
             order: The sub-order to execute.
+            run_id: Run scope for the handoff-envelope artifact (Phase TKE).
+            tenant: Tenant scope for the handoff-envelope artifact (Phase TKE).
 
         Returns:
-            The worker's result (``success=False`` carries the error).
+            The worker's result (``success=False`` carries the error).  When
+            handoff envelopes are enabled a successful result also carries an
+            ``envelope`` (SPEC-TKE-HND-001); otherwise it is unchanged.
         """
         otel = OTelManager()
         with otel.start_span("skynet.worker") as span:
@@ -191,7 +199,23 @@ class SwarmWorker:
                 )
             span.set_attribute("prismal.skynet.success", result.success)
             span.set_attribute("prismal.skynet.tool_calls", result.tool_calls)
+            return self._with_envelope(result, run_id=run_id, tenant=tenant)
+
+    def _with_envelope(self, result: WorkerResult, *, run_id: str, tenant: str) -> WorkerResult:
+        """Attach a handoff envelope to a successful result when enabled (TKE7-02)."""
+        if not result.success:
             return result
+        env = maybe_run_envelope(
+            result.output,
+            settings=self._settings,
+            run_id=run_id,
+            tenant=tenant,
+            pattern="skynet",
+            usage=result.usage,
+        )
+        if env is None:
+            return result
+        return dataclasses.replace(result, envelope=env)
 
     # ── helpers ───────────────────────────────────────────────────────────────
 

@@ -29,6 +29,7 @@ from prismal.core.exceptions import HyDEError
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
 from prismal.providers.registry import ProviderRegistry
+from prismal.rag.context_budget import apply_context_budget, effective_k
 from prismal.rag.crag import RetrievedChunk
 from prismal.rag.embeddings import EmbeddingsFactory
 from prismal.security.prompt_builder import SecurePromptBuilder
@@ -117,7 +118,9 @@ class HyDERetriever:
             hypothesis_embedding = await self._embed_hypothesis(hypothesis)
             span.set_attribute("prismal.hypothesis_embedding_dims", len(hypothesis_embedding))
 
-            raw_results = self._store.similarity_search(hypothesis, k=k)
+            raw_results = self._store.similarity_search(
+                hypothesis, k=effective_k(k, self._settings)
+            )
             chunks: list[RetrievedChunk] = []
             for i, (doc, score) in enumerate(raw_results):
                 chunks.append(
@@ -128,6 +131,8 @@ class HyDERetriever:
                         content=doc.page_content,
                     )
                 )
+            # Phase TKE (SPEC-TKE-RAG-001): rerank against the *original* query.
+            chunks = apply_context_budget(query, chunks, self._settings)
             span.set_attribute("prismal.num_results", len(chunks))
             otel.increment_counter("rag_queries")
 

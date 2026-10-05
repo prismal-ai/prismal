@@ -326,6 +326,45 @@ async def hardening_middleware(
     return update
 
 
+async def tool_output_budget_middleware(
+    next_fn: NodeFn,
+    state: AgentState,
+    metadata: NodeMetadata,  # noqa: ARG001 — Middleware signature requires it
+) -> dict[str, Any]:
+    """Cap ``ToolMessage`` contents in the node update (Phase TKE — SPEC-TKE-OUT-001).
+
+    Sits just *outside* :func:`hardening_middleware`, so it sees the update
+    after taint/PII handling and the artifact keeps the sanitized payload. A
+    passthrough when TKE or ``tool_output_budget_enabled`` is off.
+    """
+    update = await next_fn(state)
+    settings = get_settings()
+    if not (
+        getattr(settings, "token_efficiency_enabled", False)
+        and getattr(settings, "tool_output_budget_enabled", False)
+    ):
+        return update
+    messages = update.get("messages") if isinstance(update, dict) else None
+    if not isinstance(messages, list):
+        return update
+    from langchain_core.messages import ToolMessage
+
+    from prismal.agents.tool_output_budget import ToolOutputBudget
+
+    budget = ToolOutputBudget(settings=settings)
+    run_id = str(state.get("session_id") or "run")
+    tenant = str((state.get("metadata") or {}).get("org_id") or "default")
+    capped: list[Any] = []
+    for msg in messages:
+        if isinstance(msg, ToolMessage) and isinstance(msg.content, str):
+            with suppress(Exception):
+                out = budget.apply(msg.name or "tool", msg.content, run_id=run_id, tenant=tenant)
+                if out.truncated:
+                    msg = msg.model_copy(update={"content": out.content})
+        capped.append(msg)
+    return {**update, "messages": capped}
+
+
 # ── Node I/O Type-Safety (Phase NTS — SPEC-NTS-MDW-001) ───────────────────────
 
 
@@ -408,6 +447,7 @@ DEFAULT_MIDDLEWARE_STACK: list[Middleware] = [
     audit_middleware,
     retry_middleware,
     timeout_middleware,
+    tool_output_budget_middleware,
     hardening_middleware,
     node_io_validation_middleware,
 ]
@@ -446,4 +486,5 @@ __all__ = [
     "retry_middleware",
     "security_middleware",
     "timeout_middleware",
+    "tool_output_budget_middleware",
 ]

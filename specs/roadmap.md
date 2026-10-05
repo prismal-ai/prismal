@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | **Last updated** | 2026-10-04 |
-| **Package version** | 3.12.0 |
+| **Package version** | 3.13.0 |
 | **Author** | Ernesto Crespo |
 | **Latest spec** | `token-efficiency/` (TKE) · `llm-gateway-providers/` (GW) · `typed-decision-models/` (DEC) · `adaptive-model-routing/` (AMR) · `protocol-upgrades-2026/` (PRT) · `agentic-memory/` (MEM) — 2026-10-04 |
-| **Latest shipped** | `skynet-swarm-plus/` (Phase S+) — v3.12.0, 2026-07-12 |
+| **Latest shipped** | `token-efficiency/` (Phase TKE) — v3.13.0, 2026-10-05 (not yet tagged) |
 
 Living index of every SDD under `specs/`: what has shipped, what is pending,
 and in which order the pending work fits together. Statuses are verified
@@ -44,6 +44,7 @@ Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented).
 | [`observability-integration/`](./observability-integration/) | OBS | ✅ | Opt-in `ObservabilityPort` (queryable `RunSummary`, LangSmith/Langfuse parity, dataset export). Extended by TKE1 (cache fields) and HRS (host read surface). Docs: `docs/observability-integration.md` · **v3.9.0** |
 | [`agent-identity-governance/` ID8 addendum](./agent-identity-governance/) | IDN | ✅ | `PermissionManager` grants keyed by DID (closes ID6-02) · **v3.10.0** (3.10.1/3.10.2: A2A card re-exports) |
 | [`skynet-swarm-plus/`](./skynet-swarm-plus/) | S+ | ✅ | Heterogeneous specialist swarms (`RoleRegistry`), truthfully metered workers (shared `CostMeter`), remote A2A workers. Opt-in. Docs: `docs/skynet.md` · **v3.12.0** |
+| [`token-efficiency/`](./token-efficiency/) | TKE | ✅ | Measure-first token layer, opt-in (`token_efficiency_enabled`): cache-aware accounting + `TokenReport`/`token-gate`, `CacheAwareChatModel` prompt caching + cache-stable prompt layout (HMAC prefix canary, red-team leak parity), mask-mode tool gating + BM25 deferred tools (delta to LH2), observation masking + `ArtifactStore` + hysteresis (delta to LH1), tool-output budgets + TOON, effort per role, handoff envelopes, RAG context budget (`[rerank]`/`[compression]`). TKE10 deferred; baseline capture pending (TKE1-08). Docs: `docs/token-efficiency.md` · **v3.13.0** |
 
 ## 📋 Ready to implement (full SDD: PLAN + SPEC + ARCHITECTURE + TASKS)
 
@@ -53,7 +54,6 @@ Sourced from the 2026-10-04 gap analysis
 
 | Spec | Phase | What it adds | Depends on | Effort |
 |---|---|---|---|---|
-| [`token-efficiency/`](./token-efficiency/) | TKE | Cache-aware accounting (measure first) · provider prompt caching + cache-stable prompt layout (canary relocation, DD-TKE-004) · cache-safe tool exposure (`mask` mode + deferred tool loading — delta to LH2) · observation masking + `ArtifactStore` (delta to LH1) · tool-output budgets + TOON · effort per role · multi-agent handoff envelopes · RAG context budget · CI token-regression gate · optional code-mode (P3) | LH, C, OBS, V, H | ~29.5 d (+2.8 d P3) |
 | [`llm-gateway-providers/`](./llm-gateway-providers/) | GW | `GatewayPort` + adapters: **OpenRouter** (provider prefs, ZDR/`data_collection:deny`, model fallbacks, reported cost, `/generation` reconciliation, `/key` credit), **OpenCode Zen/Go** (per-model wire protocol, `x-opencode-session`, coding-agent scope, `QuotaLedger` 5 h/weekly/monthly), **OmniRoute** (self-hosted, min version 3.8.49, subscription-OAuth upstream ban), generic OpenAI-compatible; sticky `session_id` for cache hits; per-tenant keys via vault; no double fallback | W, R, IDN, C, TKE1 | ~23.3 d |
 | [`typed-decision-models/`](./typed-decision-models/) | DEC | `DecisionPort` + **Laya** (local, Apache-2.0) / **Jev** (TypeSafe API or OpenRouter) / LLM fallback cascade; calibration + shadow mode; integrations: supervisor routing, eval-judge cascade, HITL bands, tool proposal, RAG relevance, compaction relevance, Skynet evaluator, safety pre-screen (escalate-only); forbidden uses enforced by tests | H, V, GW (optional) | ~24.4 d |
 | [`adaptive-model-routing/`](./adaptive-model-routing/) | AMR | `RoutingPolicyPort`: static tiers, budget-aware downgrade, cascade with adequacy check, **OmniRouter** batch assignment (Lagrangian dual), cache affinity, intent-keyed plan cache (APC), response cache, `BatchExecutor` | GW, TKE1, DEC, C, V | ~22.4 d |
@@ -67,11 +67,11 @@ and `DELTA-2026-10-usage-agui.md` in the webchat / tui / chatbot bootstrap specs
 
 ### Target package versions (strict SemVer — minor per phase)
 
-Current: **`3.12.0`** (all phases through S+ shipped; LH `3.7.0`, NTS `3.8.0`, OBS `3.9.0`, ID8 `3.10.0`, BRP `3.11.0`, S+ `3.12.0`).
+Current: **`3.13.0`** (TKE implemented; all phases through S+ shipped; LH `3.7.0`, NTS `3.8.0`, OBS `3.9.0`, ID8 `3.10.0`, BRP `3.11.0`, S+ `3.12.0`).
 
 | Order | Phase | Spec | Target version |
 |---|---|---|---|
-| 📋 1 | TKE | [`token-efficiency/`](./token-efficiency/) | `3.13.0` |
+| ✅ 1 | TKE | [`token-efficiency/`](./token-efficiency/) | **`3.13.0`** (implemented 2026-10-05) |
 | 📋 2 | GW | [`llm-gateway-providers/`](./llm-gateway-providers/) | `3.14.0` |
 | 📋 3 | DEC | [`typed-decision-models/`](./typed-decision-models/) | `3.15.0` |
 | 📋 4 | AMR | [`adaptive-model-routing/`](./adaptive-model-routing/) | `3.16.0` |

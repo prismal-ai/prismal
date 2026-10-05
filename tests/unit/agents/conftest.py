@@ -50,7 +50,9 @@ def _isolate_llm_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 # ── langchain_litellm stub ─────────────────────────────────────────────────
 # Only inject if not already available (venv case has real package).
-if "langchain_litellm" not in sys.modules:
+try:
+    import langchain_litellm  # noqa: F401
+except ImportError:  # pragma: no cover — only when the package is absent
     _llm_stub = MagicMock()
     _llm_stub.ChatLiteLLM = MagicMock
     sys.modules["langchain_litellm"] = _llm_stub
