@@ -399,6 +399,7 @@ class OTelManager:
         self._register_tke_metrics()
         self._register_gw_metrics()
         self._register_dec_metrics()
+        self._register_amr_metrics()
 
     def _register_tke_metrics(self) -> None:
         """Token Efficiency (Phase TKE — SPEC-TKE-OTEL-001)."""
@@ -540,6 +541,31 @@ class OTelManager:
             "prismal.decision_shadow_agreement_ratio",
             description="Shadow-mode agreement with the reference path, by integration, language",
         )
+
+    def _register_amr_metrics(self) -> None:
+        """Adaptive Model Routing (Phase AMR — SPEC-AMR-OTEL-001)."""
+        counters = {
+            "routing_decisions": (
+                "prismal.routing_decisions_total",
+                "Routing decisions by policy and tier",
+            ),
+            "routing_escalations": (
+                "prismal.routing_escalations_total",
+                "Cascade escalations (and accepted-at-cap) by reason",
+            ),
+            "plan_cache_hits": ("prismal.plan_cache_hits_total", "Plan-cache hits by intent"),
+            "plan_cache_misses": (
+                "prismal.plan_cache_misses_total",
+                "Plan-cache misses by reason",
+            ),
+            "batch_jobs": ("prismal.batch_jobs_total", "Provider batch jobs by final status"),
+            "routing_savings_usd": (
+                "prismal.routing_savings_usd",
+                "Frontier counterfactual cost minus actual cost (micro-USD)",
+            ),
+        }
+        for key, (name, description) in counters.items():
+            self._counters[key] = self._meter.create_counter(name, description=description)
 
     @contextmanager
     def start_span(

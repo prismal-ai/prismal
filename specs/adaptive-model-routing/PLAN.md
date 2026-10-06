@@ -5,11 +5,11 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` (2026-10-06, v3.16.0) |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | AMR (Adaptive Model Routing) |
-| **Target package version** | `3.16.0` (SemVer minor — new opt-in functionality, not yet started) |
+| **Target package version** | `3.16.0` (SemVer minor — new opt-in functionality) |
 | **Reviewers** | Tech Lead, AI Architect, FinOps, Security Lead |
 | **Priority** | P1 (largest remaining cost lever after prompt caching) |
 | **Related** | `docs/gap-analysis-gateways-tokens-decisions-2026-10.md` (§2 rows "Routing" / "Model choice", §3.1 OmniRouter, §3.3 rows #4, #9, #10), `specs/token-efficiency/` (TKE1 usage fields, TKE6 effort), `specs/llm-gateway-providers/` (GW `gw:` model refs, no-double-fallback), `specs/typed-decision-models/` (DEC `DecisionPort`), `specs/cost-budget-governance/` (C `BudgetGuard`), `specs/agent-eval-harness/` (V predictor data) |
@@ -18,9 +18,9 @@
 
 ## 1. Executive Summary
 
-Prismal chooses models **statically**: one global `default_model` plus per-feature settings (`skynet_worker_model`, `kokoro_judge_model`, `blind_review_*_model`, …). Every turn of every agent pays for whatever model the operator wired, regardless of how hard the request is, how much budget is left, or whether a cheaper model would have produced an equally good answer. The literature since 2023 is unambiguous that this is the single largest controllable cost lever after prompt caching: FrugalGPT cascades report up to 98 % cost reduction at matched quality **[verify]**, RouteLLM ~2× cheaper with strong/weak routing **[verify]**, and OmniRouter (Mei, Xu, Guo, Lin, Zhang — Rutgers; arXiv 2502.20576; KDD Explorations) reports up to +6.30 % accuracy and ≥ 10.15 % lower cost than S3, PO, EmbedLLM, RouterDC, Hybrid-LLM and CARROT by assigning a **batch** of queries jointly under an accuracy floor and per-model concurrency caps **[verify]**.
+Prismal chooses models **statically**: one global `default_model` plus per-feature settings (`skynet_worker_model`, `kokoro_judge_model`, `blind_review_*_model`, …). Every turn of every agent pays for whatever model the operator wired, regardless of how hard the request is, how much budget is left, or whether a cheaper model would have produced an equally good answer. The literature since 2023 is unambiguous that this is the single largest controllable cost lever after prompt caching: FrugalGPT cascades report up to 98 % cost reduction at matched quality, RouteLLM ~2× cheaper with strong/weak routing, and OmniRouter (Mei, Xu, Guo, Lin, Zhang — Rutgers; arXiv 2502.20576 v6; venue not verifiable) reports up to +6.30 % accuracy and ≥ 10.15 % lower cost than S3, PO, EmbedLLM, RouterDC, Hybrid-LLM and CARROT by assigning a **batch** of queries jointly under an accuracy floor and per-model concurrency caps (verified 2026-10-06, `docs/routing.md#verified-facts`).
 
-**Adaptive Model Routing (Phase AMR)** introduces a `RoutingPolicyPort` with composable policies — static tier map, budget-aware downgrade, cheapest-first cascade with typed adequacy checks, and an OmniRouter-style batch assigner for fan-out workloads (Skynet, MoA, eval sets) — plus two orthogonal savers: an **intent-keyed plan cache** (Agentic Plan Caching, −50.31 % cost / −27.28 % latency **[verify]**) and a **BatchExecutor** for offline jobs via provider batch APIs. Everything is opt-in behind `adaptive_routing_enabled=False`; with the flag off the compiled supervisor graph and every existing output are byte-for-byte unchanged.
+**Adaptive Model Routing (Phase AMR)** introduces a `RoutingPolicyPort` with composable policies — static tier map, budget-aware downgrade, cheapest-first cascade with typed adequacy checks, and an OmniRouter-style batch assigner for fan-out workloads (Skynet, MoA, eval sets) — plus two orthogonal savers: an **intent-keyed plan cache** (Agentic Plan Caching, −50.31 % cost / −27.28 % latency, arXiv 2506.14852) and a **BatchExecutor** for offline jobs via provider batch APIs. Everything is opt-in behind `adaptive_routing_enabled=False`; with the flag off the compiled supervisor graph and every existing output are byte-for-byte unchanged.
 
 ---
 
@@ -31,7 +31,7 @@ Prismal chooses models **statically**: one global `default_model` plus per-featu
 - **Routing spends a frontier call.** `agents/intent_router.py::match_intent()` is a regex short-circuit; every non-regex turn goes to the LLM `SUPERVISOR` with the default (frontier) model. DEC-ROUTE (3.15.0) attacks the routing call itself; AMR attacks the *model choice of the routed agent*.
 - **Budget only cuts, never adapts.** `budget/guard.py::BudgetGuard.check()` returns a `BudgetStatus(within, soft_exceeded, hard_exceeded, …)`; soft caps today only shorten patterns via `Degradation(reduce=True)`. Nothing downgrades the model when a soft cap is hit.
 - **No plan reuse.** `agents/patterns/llm_compiler.py` and plan-and-execute flows call a planner LLM for every request, even for repetitive read-only workflows with identical intent and target.
-- **No batch pricing.** Eval runs, BRP offline mode, contextual chunk generation (TKE8) and future memory consolidation (MEM4) run synchronously at full on-demand price; provider batch APIs offer ~50 % discounts **[verify]**.
+- **No batch pricing.** Eval runs, BRP offline mode, contextual chunk generation (TKE8) and future memory consolidation (MEM4) run synchronously at full on-demand price; provider batch APIs offer 50 % discounts (Anthropic, OpenAI; OpenRouter "typically").
 - **Measurement prerequisite is in place by 3.13.0.** TKE1 adds `cache_read_tokens` / `cache_write_tokens` / `reasoning_tokens` to `budget/types.py::Usage` and gateway-reported cost precedence to `providers/cost.py` — AMR's savings counter (`prismal.routing_savings_usd`) is computed from these, never estimated ad hoc.
 
 ---
@@ -67,12 +67,12 @@ Prismal chooses models **statically**: one global `default_model` plus per-featu
 - **AMR2** — `CascadePolicy`: start at cheapest allowed tier; escalate on (a) structured-output validation failure, (b) DecisionPort Noul adequacy below τ, (c) repeated tool-call errors; max 2 escalations; **cache affinity** (once a thread escalates it stays).
 - **AMR3** — `BatchAssignmentPolicy` (OmniRouter-style Lagrangian dual decomposition + greedy fallback) and `SuccessPredictor` (per (intent, tier) historical success table from the eval harness, optional DecisionPort Score blend, output-length table from TKE1 usage).
 - **AMR4** — `PlanCache` (intent-keyed, read-only intents only, TTL, invalidation on tool-catalog/prompt version change, small-tier adaptation) and `ResponseCache` (exact key, deterministic read-only tool-free turns, off by default).
-- **AMR5** — `BatchExecutor` over provider batch APIs (Anthropic Message Batches, OpenAI Batch, OpenRouter `:batch` **[verify]**), polling with backoff, batch-price metering.
+- **AMR5** — `BatchExecutor` over provider batch APIs (Anthropic Message Batches, OpenAI Batch, OpenRouter `:batch` — a true async batch API), polling with backoff, batch-price metering.
 - **AMR6** — integration (supervisor-routed agents, Skynet, MoA, eval harness), OTel, `docs/routing.md`, notebook, example.
 
 ### Out of Scope
 - Training a BERT dual-head predictor as in the paper (prismal ships a table predictor; a learned predictor is pluggable via `SuccessPredictorPort`).
-- Embedding-based semantic response caches as a default (0–12 % hit rate on agentic workloads per arXiv 2602.18922 **[verify]**); pluggable only.
+- Embedding-based semantic response caches as a default (arXiv 2602.18922 reports only 0–12 % *cache accuracy* for APC-style caching and 37.9 % for GPTCache on real agent benchmarks — corrected 2026-10-06); pluggable only.
 - Provider selection for a given model (owned by gateways — see DD-AMR-006).
 - Replacing DEC-ROUTE (agent selection) — AMR selects the *model* for the already-selected agent.
 - Changing `BudgetGuard` semantics or hard-cap behavior.

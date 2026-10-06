@@ -18,6 +18,102 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   half-made release, so v3.12.0 shipped to PyPI and GHCR without a GitHub
   Release.
 
+## [3.16.0] — 2026-10-06
+
+> Phase AMR — **Adaptive Model Routing**, the fourth phase of wave 2026-10.
+> A `RoutingPolicyPort` picks the model **string** per agent call (ADR-WAVE-001
+> step 1) — static tier map, budget-aware downgrade, cheapest-first cascade with
+> typed adequacy checks — plus an OmniRouter-style batch assigner for fan-outs,
+> an intent-keyed plan cache, an exact response cache and a provider
+> `BatchExecutor`. Prismal picks *which model*; gateways pick *which provider*.
+> Everything is gated by `adaptive_routing_enabled` (default `False`) and starts
+> in `shadow`; with it off, `get_llm()` builds the 3.15.0 `ChatLiteLLM`
+> arguments and the supervisor graph is unchanged (contract + snapshot tests).
+> Guide: `docs/routing.md` (AMR0 verified facts in its `#verified-facts` section).
+
+### Added
+- **Types and ports.** `prismal/routing/types.py` (`ModelTier`, `TIER_ORDER` —
+  `auto` is terminal —, `TaskFeatures`, `ModelChoice`, `RoutingOutcome`) and
+  `routing/ports.py` (`RoutingPolicyPort`, `SuccessPredictorPort`).
+- **Policies** (`routing/policies/`): `StaticTierPolicy` + `load_tier_models`
+  with the shipped **parity map** `config/routing_tiers.yaml` (all tiers
+  `null` ⇒ `default_model`, so 26+ agents keep their 3.15.0 model);
+  `BudgetAwarePolicy` (one-tier downgrade on the soft cap, never below the risk
+  floor, never on a tainted turn; hard caps untouched); `CascadePolicy` +
+  `AdequacyChecker` (start tier, capability filter, escalation on structured
+  failure / inadequate answer / tool errors / high-risk abstention, cap 2;
+  adequacy is a DEC Noul over a `DecisionStateBuilder` state);
+  `CompositePolicy` (`BudgetAware(Cascade(Static))`, inward fallback,
+  first-escalation-wins).
+- **Per-run selection** (`routing/select.py`, `routing/features.py`):
+  deterministic LLM-free features (intent, token estimate, agent risk map,
+  language, turn taint), seeding trio mirroring `budget/resolve.py`, same-turn
+  stickiness + cross-turn **escalation affinity** (no re-descent), fail-open
+  policies (`fallback:<err>`), fail-closed **security floors** (risk floor,
+  no `auto` for critical, tainted never below static), `shadow` mode,
+  `prismal.routing_savings_usd` vs a frontier counterfactual.
+- **Registry.** `ProviderRegistry.get_llm` / `get_llm_with_fallback` gain
+  keyword-only `features=` / `state=` (ADR-WAVE-001 §2.1): explicit `model=`
+  wins; under a cascade a `gw:` call carries no gateway `models[]` and no
+  `settings.fallback_model` (SPEC-AMR-GW-001). The shared registry contract
+  test gained the AMR flag-off, parity, shadow and fail-open cases.
+- **Agents.** `coder`, `researcher`, `data_analyst`, `file_manager`,
+  `cron_manager`, `critic` adopt `llm_route_kwargs()` + `track_outcome()`
+  (`routing/outcome.py`; `react_loop` notes failed tool calls); `rag_agent`,
+  `planner`, `parallel_researcher`, `codeact` adopt the model choice only. All
+  calls are byte-identical with routing off.
+- **Batch assignment** (`routing/policies/batch_assignment.py`,
+  `routing/predictor.py`): `TableSuccessPredictor` (Beta-Binomial per
+  (intent, tier), served-model attribution, output-length table,
+  `load_predictor_table`, `export_predictor_table`, cold-start
+  `config/routing_predictor/v1.json`); `BatchAssignmentPolicy.assign()` —
+  Lagrangian dual with primal recovery, greedy fallback, max-accuracy
+  `feasible=False` path, waves, eligibility masks; deterministic, never raises
+  (N=200, K=8 p95 ≈ 40 ms). `routing/fanout.py` wires it into **Skynet**
+  (`SkynetSupervisor(batch_policy=)`, `order.context["routing_model"]`) and
+  **MoA** (proposers assigned, aggregator static).
+- **Plan cache and response cache** (`routing/plan_cache.py`,
+  `routing/response_cache.py`): canonical intent keys with tenant, tool-scope
+  hash and prompt version; memory LRU and SQLite backends; read-only intent
+  allowlist, no write/exec tools, untainted input; small-tier adaptation via
+  `SecurePromptBuilder` + Kahn DAG re-validation; `LLMCompiler(plan_cache=)`.
+- **BatchExecutor** (`routing/batch.py`, `providers/batch_adapters.py`):
+  Anthropic Message Batches and OpenRouter `:batch` (raw `httpx`), OpenAI
+  Batch (LiteLLM); capped exponential backoff with jitter, deadline, sync
+  fallback; tainted / HITL-gated / data-policy-rejected requests never
+  uploaded. `compute_cost_usd(..., batch=True)` applies `batch_price_ratio`
+  (ADR-WAVE-001 §2.3).
+- **Eval.** `python -m prismal.eval run --routing <policy>` and
+  `routing-gate --static --routed` (−40 % cost / ≤ 1 pt quality target;
+  `prismal/eval/metrics_routing.py`).
+- **Settings** (`core/config.py`, `# --- AMR ---`): `adaptive_routing_enabled`,
+  `routing_*`, `plan_cache_*`, `response_cache_enabled`, `batch_*`,
+  `batch_price_ratio`; `_validate_routing` (refuses to start without a
+  `critical` floor when enabled). Exceptions: `RoutingError`,
+  `RoutingConfigError`, `BatchAssignmentError`, `PlanCacheError`,
+  `BatchExecutorError`. OTel: `prismal.routing_decisions_total`,
+  `routing_escalations_total`, `plan_cache_hits_total` / `misses_total`,
+  `batch_jobs_total`, `routing_savings_usd`; span `prismal.routing.select`.
+- Docs `docs/routing.md`, example `examples/adaptive_routing.py`.
+
+### Security
+- An independent review before release found and fixed (each with a regression
+  test): floors skipped for same-turn sticky choices; a shared process-wide
+  bucket for session-less calls; fan-outs ignoring taint, the YAML floor and
+  gateway data policy; `metadata.routing` hints able to lower risk and forged
+  affinity accepted; the settings floor default silently overriding a stricter
+  YAML floor; OpenRouter batch bodies without privacy defaults; API keys sent
+  to provider-returned `results_url` hosts; routing newly activating the
+  gateway agent map in shadow; transport errors escalating the tier; cascade
+  features colliding across agents; double billing when batch results fail;
+  plans cached before execution and shared across users of one org.
+
+### Notes
+- AMR0 changed two spec assumptions: LiteLLM 1.86.2 cannot create Anthropic
+  batches (raw `httpx` adapter instead) and arXiv 2602.18922 reports APC
+  *cache accuracy* 0–12 %, not a semantic-cache hit rate.
+- Open: the eval-gate measurement on a real eval set and the notebook.
+
 ## [3.15.0] — 2026-10-05
 
 > Phase DEC — **Typed Decision Models**, the third phase of wave 2026-10.

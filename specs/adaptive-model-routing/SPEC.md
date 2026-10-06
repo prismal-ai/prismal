@@ -5,11 +5,11 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` (2026-10-06, v3.16.0) |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | AMR |
-| **Target package version** | `3.16.0` (SemVer minor — new opt-in functionality, not yet started) |
+| **Target package version** | `3.16.0` (SemVer minor — new opt-in functionality) |
 | **PLAN** | `specs/adaptive-model-routing/PLAN.md` |
 | **Architecture** | `specs/adaptive-model-routing/ARCHITECTURE.md` |
 | **TASKS** | `specs/adaptive-model-routing/TASKS.md` |

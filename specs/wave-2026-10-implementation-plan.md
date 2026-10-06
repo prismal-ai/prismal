@@ -7,7 +7,7 @@
 | **Baseline** | `prismal` v3.12.0 (tag `prismal/v3.12.0`) |
 | **Source** | `docs/gap-analysis-gateways-tokens-decisions-2026-10.md`, `specs/roadmap.md` (wave 9) |
 | **Scope** | The seven `READY` SDDs of the wave: TKE, GW, DEC, AMR, PRT, HRS, MEM |
-| **Status** | `ACTIVE` — M0, M1 (TKE, v3.13.0) and M2 (GW, v3.14.0) done 2026-10-05; next: M3 (DEC). Per-task detail stays in each spec's `TASKS.md` |
+| **Status** | `ACTIVE` — M0, M1 (TKE, v3.13.0), M2 (GW, v3.14.0) and M3 (DEC, v3.15.0) done 2026-10-05; M4 (AMR, v3.16.0) done 2026-10-06; next: M5 (PRT + HRS). Per-task detail stays in each spec's `TASKS.md` |
 
 This document does **not** replace the per-spec `TASKS.md`. It sequences them, closes the
 cross-spec gaps found while reading them together, and defines milestones with a done-gate.
@@ -179,7 +179,9 @@ Run on separate branches while M1 is in progress; they merge but are **released*
 
 ---
 
-### M4 — AMR: Adaptive Model Routing → 3.16.0 (22.4 d; needs TKE1, GW1, DEC1)
+### M4 — AMR: Adaptive Model Routing → 3.16.0 (22.4 d; needs TKE1, GW1, DEC1) — ✅ IMPLEMENTED 2026-10-06
+
+> **Implemented 2026-10-06** with strict TDD. AMR0 changed two facts (`docs/routing.md#verified-facts`): LiteLLM 1.86.2 cannot create Anthropic batches (raw `httpx` adapter), and arXiv 2602.18922's 0–12 % is APC *cache accuracy*, not a semantic-cache hit rate; OpenRouter `:batch` is a true async API. An independent review found 19 issues (floors skipped for sticky choices, shared session-less bucket, fan-out taint/floor/gateway eligibility, forgeable hints/affinity, YAML floor overridden by the settings default, OpenRouter privacy defaults and key leak to `results_url`, shadow activating the gateway agent map, …); all security and correctness items are fixed with regression tests. Open: the −40 % / ≤ 1 pt eval gate still has to be measured on a real eval set (tooling shipped: `eval run --routing`, `routing-gate`); notebook.
 
 | Phase | Tasks | Est. | Gate |
 |---|---|---|---|

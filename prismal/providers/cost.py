@@ -51,6 +51,7 @@ def compute_cost_usd(
     reported_cost_usd: float | None = None,
     response: object | None = None,
     cost_mode: Literal["metered", "subscription"] = "metered",
+    batch: bool = False,
 ) -> CostEstimate:
     """Return the USD :class:`CostEstimate` for one LLM call.
 
@@ -65,6 +66,10 @@ def compute_cost_usd(
     3. ``settings.budget_pricing[model]`` (per-1k input/output/cache_read/
        cache_write; cache rates fall back to ``input``) → ``"table"``.
     4. ``CostEstimate(0.0, "none")``.
+
+    ``batch=True`` (AMR5-05) multiplies the litellm / table price (steps 2-3) by
+    ``settings.batch_price_ratio``; a gateway-reported cost and a subscription
+    estimate are unchanged, and ``source`` never changes.
     """
     if cost_mode == "subscription":
         if reported_cost_usd is not None:
@@ -84,7 +89,7 @@ def compute_cost_usd(
     if reported_cost_usd is not None:
         return CostEstimate(cost_usd=float(reported_cost_usd), source="gateway")
 
-    return _priced(
+    estimate = _priced(
         model,
         prompt_tokens,
         completion_tokens,
@@ -93,6 +98,21 @@ def compute_cost_usd(
         cache_write_tokens,
         response,
     )
+    if batch and estimate.source in ("litellm", "table"):
+        return CostEstimate(
+            cost_usd=estimate.cost_usd * _batch_ratio(settings), source=estimate.source
+        )
+    return estimate
+
+
+def _batch_ratio(settings: Settings | None) -> float:
+    """``settings.batch_price_ratio``, else the configured field default (never hard-coded)."""
+    ratio = getattr(settings, "batch_price_ratio", None) if settings is not None else None
+    if isinstance(ratio, (int, float)):
+        return float(ratio)
+    from prismal.core.config import Settings as _Settings
+
+    return float(_Settings.model_fields["batch_price_ratio"].default)
 
 
 def _priced(

@@ -28,8 +28,10 @@ if TYPE_CHECKING:
     from langchain_core.messages import BaseMessage
     from langchain_core.runnables.fallbacks import RunnableWithFallbacks
 
+    from prismal.agents.state import AgentState
     from prismal.providers.gateways.base import ResolvedModel
     from prismal.providers.gateways.router import GatewayRouter
+    from prismal.routing.types import TaskFeatures
 
 logger = get_logger("prismal.providers.registry")
 
@@ -66,6 +68,14 @@ class _SameGatewayFallbackEligible(Exception, metaclass=ABCMeta):  # noqa: N818 
         return issubclass(subclass, Exception) and not issubclass(
             subclass, (GatewayPaymentRequired, GatewayPolicyError)
         )
+
+
+def _without_model_fallback(target: ResolvedModel) -> ResolvedModel:
+    """SPEC-AMR-GW-001: under a cascade the gateway must not fall back across models."""
+    from dataclasses import replace
+
+    body = {k: v for k, v in target.extra_body.items() if k != "models"}
+    return replace(target, extra_body=body, owns_model_fallback=False)
 
 
 class ProviderRegistry:
@@ -144,6 +154,8 @@ class ProviderRegistry:
         *,
         agent: str | None = None,
         session_id: str | None = None,
+        features: TaskFeatures | None = None,
+        state: AgentState | None = None,
     ) -> BaseChatModel:
         """
         Return a LangChain-compatible LLM for the specified model.
@@ -161,13 +173,56 @@ class ProviderRegistry:
                 per-agent effort; ``None`` lets the wrapper read the node name
                 from the call's ``langgraph_node`` metadata (ADR-WAVE-001 §2.1).
             session_id: Session id (Phase GW) — hashed for sticky gateway routing.
+            features: Task features (Phase AMR) — with ``adaptive_routing_enabled``
+                and no explicit *model*, a routing policy picks the model string.
+            state: Agent state (Phase AMR) — the per-run routing registry key;
+                features are extracted from it when *features* is None.
 
         Returns:
             A ``ChatLiteLLM`` instance (implements ``BaseChatModel``) — wrapped in
             a ``CacheAwareChatModel`` when ``token_efficiency_enabled`` and
             ``prompt_cache_enabled`` / ``llm_effort_enabled`` are on.
         """
-        return self._build_llm(model, streaming, temperature, agent, session_id)[0]
+        routed, cascade = self._route(model, agent, features, state)
+        return self._build_llm(routed, streaming, temperature, agent, session_id, cascade)[0]
+
+    # ── Phase AMR — adaptive model choice (ADR-WAVE-001 step 1) ──────────────
+
+    def _route(
+        self,
+        model: str | None,
+        agent: str | None,
+        features: TaskFeatures | None,
+        state: AgentState | None,
+    ) -> tuple[str | None, bool]:
+        """``(model, cascade_active)``: explicit model > policy choice > default.
+
+        Flag off, no *features*, an explicit *model*, an agent pinned in
+        ``llm_gateway_agent_map``, shadow mode or any routing failure
+        (fail-open) ⇒ *model* unchanged (the 3.15.0 path).
+        """
+        s = self._settings
+        if model is not None or not s.adaptive_routing_enabled or features is None:
+            return model, False  # SPEC-AMR-INT-001: features is the routing opt-in
+        name = features.agent or agent
+        if not name:
+            return model, False
+        if s.llm_gateways_enabled and name in s.llm_gateway_agent_map:
+            return model, False  # an operator-pinned gateway route beats adaptive routing
+        try:
+            from prismal.routing import select as routing_select
+            from prismal.routing.types import ModelTier
+
+            choice = routing_select.select_model(
+                state if state is not None else {}, name, settings=s, features=features
+            )
+        except Exception as exc:
+            logger.warning("provider.routing_failed", agent=name, error=type(exc).__name__)
+            return model, False
+        if s.routing_mode != "enforce" or choice.model_ref == s.default_model:
+            return model, False
+        cascade = s.routing_policy in {"cascade", "composite"} and choice.tier is not ModelTier.AUTO
+        return choice.model_ref, cascade
 
     def _build_llm(
         self,
@@ -176,12 +231,15 @@ class ProviderRegistry:
         temperature: float | None,
         agent: str | None,
         session_id: str | None,
+        cascade: bool = False,
     ) -> tuple[BaseChatModel, ResolvedModel | None]:
         """ADR-WAVE-001 pipeline; also returns the gateway target (``None`` = legacy)."""
         resolved_model = model if model is not None else self._settings.default_model
         temp = temperature if temperature is not None else self._settings.temperature
         gateway = self._resolve_gateway(model, resolved_model, agent, session_id)
         if gateway is not None:
+            if cascade:
+                gateway = _without_model_fallback(gateway)
             return self._gateway_llm(gateway, streaming, temp, agent), gateway
 
         # Ollama local models are much slower than cloud providers — use
@@ -359,6 +417,8 @@ class ProviderRegistry:
         *,
         agent: str | None = None,
         session_id: str | None = None,
+        features: TaskFeatures | None = None,
+        state: AgentState | None = None,
     ) -> BaseChatModel | RunnableWithFallbacks[LanguageModelInput, BaseMessage]:
         """
         Return a primary LLM wrapped with an optional automatic fallback.
@@ -380,7 +440,14 @@ class ProviderRegistry:
             configured) or a ``RunnableWithFallbacks`` wrapping both
             models.
         """
-        primary, primary_target = self._build_llm(model, streaming, temperature, agent, session_id)
+        model, cascade = self._route(model, agent, features, state)
+        primary, primary_target = self._build_llm(
+            model, streaming, temperature, agent, session_id, cascade
+        )
+        if cascade:
+            # SPEC-AMR-GW-001: the cascade *is* the fallback — no settings.fallback_model.
+            logger.debug("provider.fallback_skipped", reason="routing_cascade")
+            return primary
         if primary_target is not None and primary_target.owns_model_fallback:
             # DD-GW-003: the gateway owns model fallback — never wrap twice.
             logger.debug(

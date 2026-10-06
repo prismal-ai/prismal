@@ -77,6 +77,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
+from prismal.routing.outcome import llm_route_kwargs, record_agent_outcome
 from prismal.security.action_interceptor import ActionInterceptor
 
 if TYPE_CHECKING:
@@ -521,7 +522,7 @@ async def codeact_node(state: AgentState) -> dict[str, Any]:
         }
 
     max_iterations = settings.codeact_max_iterations
-    llm = ProviderRegistry().get_llm_with_fallback()
+    llm = ProviderRegistry().get_llm_with_fallback(**llm_route_kwargs("codeact", state))
 
     # Seed the conversation with the last ``_HISTORY_WINDOW`` messages so
     # we carry over the user request and any prior context without
@@ -619,6 +620,10 @@ async def codeact_node(state: AgentState) -> dict[str, Any]:
             )
             break
 
+    # Phase AMR: failed code blocks feed the cascade's tool_errors trigger (no-op when off).
+    record_agent_outcome(
+        state, "codeact", success=consecutive_failures == 0, tool_errors=consecutive_failures
+    )
     if final_reply is None:
         final_reply = (
             f"CodeAct reached max_iterations={max_iterations} without a "

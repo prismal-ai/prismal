@@ -1112,6 +1112,7 @@ async def react_loop(
     from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
     from prismal.agents.artifacts import anonymous_run_id
+    from prismal.routing.outcome import note_tool_error
 
     tool_map: dict[str, BaseTool] = {t.name: t for t in tools}
     loop_messages: list[object] = list(messages)
@@ -1295,6 +1296,7 @@ async def react_loop(
                     else:
                         # Permanent-style failure: increment the failure budget.
                         _tool_fail_counts[tool_name] = _tool_fail_counts.get(tool_name, 0) + 1
+                        note_tool_error()  # Phase AMR: cascade tool_errors trigger
                         logger.warning(
                             "react_loop.tool_error",
                             agent=agent_name,

@@ -1076,6 +1076,29 @@ class DecisionBackendError(DecisionError):
     """Internal — a backend failure; the cascade converts it into an abstention."""
 
 
+# ── Adaptive Model Routing (Phase AMR — SPEC-AMR-ERR-001) ────────────────────
+
+
+class RoutingError(PrismalError):
+    """Base for errors raised by the adaptive-routing layer (Phase AMR)."""
+
+
+class RoutingConfigError(RoutingError, ValueError):
+    """Invalid tier map / risk floor — load time only (fail-closed, SEC-001)."""
+
+
+class BatchAssignmentError(RoutingError):
+    """Internal — ``BatchAssignmentPolicy.assign()`` never raises it outward."""
+
+
+class PlanCacheError(RoutingError):
+    """Plan-cache backend I/O failure; caught, counted and treated as a miss."""
+
+
+class BatchExecutorError(RoutingError):
+    """A batch job failed and ``allow_sync_fallback`` is False."""
+
+
 class LoopHardeningError(PrismalError):
     """Base for errors raised by the loop-hardening layer (Phase LH)."""
 

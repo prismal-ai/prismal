@@ -5,11 +5,11 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` (2026-10-06, v3.16.0) |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | AMR |
-| **Target package version** | `3.16.0` (SemVer minor — new opt-in functionality, not yet started) |
+| **Target package version** | `3.16.0` (SemVer minor — new opt-in functionality) |
 | **PLAN** | `specs/adaptive-model-routing/PLAN.md` |
 | **SPEC** | `specs/adaptive-model-routing/SPEC.md` |
 | **TASKS** | `specs/adaptive-model-routing/TASKS.md` |
@@ -33,7 +33,7 @@ Precedents: the per-run registry pattern (`budget/resolve.py`, `security/hardeni
 - **Budget signal exists.** `get_budget_guard(state).check()` gives `BudgetStatus` in O(1); no new metering path.
 - **Outcome signals exist or arrive earlier in the roadmap.** Structured-output validation errors are raised by LangChain `with_structured_output`; tool errors are visible in `react_loop`; adequacy comes from DEC `DecisionPort` (3.15.0); usage/cache fields from TKE1 (3.13.0); served model from GW (3.14.0).
 - **Batch fan-out seams exist.** `SkynetSupervisor.plan()` yields N orders before `Send`; `MixtureOfAgents.generate` builds its proposer list up front; the eval harness iterates a fixed case list.
-- **No new heavy dependency.** The solver is pure Python (lists, `heapq`); batch adapters reuse `httpx`/LiteLLM already pinned. LiteLLM batch support per provider is **[verify]** (AMR0).
+- **No new heavy dependency.** The solver is pure Python (lists, `heapq`); batch adapters reuse `httpx`/LiteLLM already pinned. AMR0: LiteLLM 1.86.2 supports the OpenAI batch path but cannot create Anthropic batches, so the Anthropic and OpenRouter adapters use raw `httpx`.
 
 ## 3. Proposed Architecture
 
@@ -143,7 +143,7 @@ The dual value `D(λ, μ) = L(x*(λ, μ), λ, μ)` is a lower bound on the prima
 
 **Complexity.** Matrix build `O(N·K)` predictor calls (O(1) table lookups). Dual: `O(T·N·K)` time, `O(N·K)` memory — N=200, K=8, T=200 ⇒ 3.2·10⁵ inner operations (< 50 ms CPython target). Greedy: `O(N·K·log(N·K))` heap operations plus at most `N·(K−1)` upgrades. Deterministic: no randomness, fixed tie-breaks.
 
-**Departures from the paper (documented).** OmniRouter uses a BERT dual-head predictor (capability via sigmoid, output-length bucket via softmax) blended with top-k retrieval of similar past queries, evaluated on 2,700 questions (MMLU, GPQA-Diamond, MATH-500, GSM8K) over 10 models with 81.3 % predictor capability accuracy **[verify]**. Prismal ships a Beta-Binomial table keyed by `(intent, tier)` with optional DecisionPort Score blending and a median output-length table from TKE1 usage — no training dependency, explainable, and replaceable through `SuccessPredictorPort`. The optimization structure (objective, constraints, dual decomposition with adaptive multipliers) follows the paper.
+**Departures from the paper (documented).** OmniRouter uses a BERT dual-head predictor (capability via sigmoid, output-length bucket via softmax) blended with top-k retrieval of similar past queries, evaluated on 2,700 questions (MMLU, GPQA-Diamond, MATH-500, GSM8K) over 10 models with 81.3 % predictor capability accuracy (top-16 retrieval; verified 2026-10-06). Prismal ships a Beta-Binomial table keyed by `(intent, tier)` with optional DecisionPort Score blending and a median output-length table from TKE1 usage — no training dependency, explainable, and replaceable through `SuccessPredictorPort`. The optimization structure (objective, constraints, dual decomposition with adaptive multipliers) follows the paper.
 
 ### 3.5 Plan cache flow
 
@@ -177,10 +177,10 @@ Eval-harness data already exists per intent; a Beta-Binomial table is determinis
 Prismal owns **which model** (semantic choice: tier, capability, budget, accuracy floor); gateways own **which provider serves that model** (OpenRouter `provider.sort`, `only/ignore`, ZDR). Consequences: (a) under `CascadePolicy`, gateway model-level fallbacks (`models: [...]`) and `settings.fallback_model` are disabled for the call — the cascade *is* the fallback; (b) gateway-native auto routers (`openrouter/auto`) are allowed only as tier `AUTO`, which is terminal (no escalation from/to it) and excluded from batch assignment because its cost/accuracy are not predictable; (c) the served model reported by the gateway is the unit of predictor feedback; (d) gateway data-policy denials are applied as eligibility masks *before* selection. This prevents compounding retries, unaccountable cost, and contradictory routing loops.
 
 ### DD-AMR-007: Intent-keyed plan cache, semantic cache not default
-Agentic workloads show 0–12 % hit rates for embedding semantic caches **[verify]** while APC reports −50.31 % cost / −27.28 % latency with keyed plan templates **[verify]**. The fix is canonical intent keys plus a tiered cascade (exact key → adaptation by a small model → planner). Embedding backends remain pluggable.
+On real agent benchmarks, arXiv 2602.18922 measures only 0–12 % cache accuracy for APC-style caching and 37.9 % for GPTCache, while APC (arXiv 2506.14852) reports −50.31 % cost / −27.28 % latency with keyed plan templates (verified 2026-10-06). The fix is canonical intent keys plus a tiered cascade (exact key → adaptation by a small model → planner). Embedding backends remain pluggable.
 
 ### DD-AMR-008: Batch API behind a provider-isolated port
-Batch APIs are provider-specific (JSONL uploads, custom ids, 24 h windows **[verify]**); adapters live in `providers/` (Rule #4). The executor always has a synchronous fallback so offline jobs never stall.
+Batch APIs are provider-specific (OpenAI JSONL uploads, Anthropic/OpenRouter inline JSON, custom ids, 24 h windows — verified 2026-10-06); adapters live in `providers/` (Rule #4). The executor always has a synchronous fallback so offline jobs never stall.
 
 ### DD-AMR-009: Security floors are fail-closed
 Cost logic is fail-open (any error ⇒ static choice). Risk floors are not: an invalid floor configuration refuses startup, and tainted turns never downgrade below the static tier.

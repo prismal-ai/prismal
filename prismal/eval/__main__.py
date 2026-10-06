@@ -8,6 +8,9 @@ Subcommands::
     python -m prismal.eval gate    --current run.json --baseline baseline.json [--tolerance 0.02]
     python -m prismal.eval token-gate --current run.json
                                    [--baseline tests/eval/baselines/tokens.json] [--report-only]
+    python -m prismal.eval run     --suite SET.yaml --routing cascade --json routed.json
+    python -m prismal.eval routing-gate --static static.json --routed routed.json
+                                   [--min-savings 0.40] [--max-quality-drop 1.0] [--report-only]
 
 Deterministic with fakes by default; ``--live-api`` opts into real models. Exit
 code is ``0`` on success, ``1`` on a failed gate, matching CI conventions.
@@ -24,6 +27,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from prismal.core.config import get_settings
+from prismal.eval.metrics_routing import (
+    DEFAULT_MAX_QUALITY_DROP_PTS,
+    DEFAULT_MIN_SAVINGS_RATIO,
+    build_routing_report,
+    check_routing_gate,
+)
 from prismal.eval.metrics_tokens import (
     DEFAULT_BASELINE_PATH,
     TokenReport,
@@ -56,6 +65,11 @@ def build_parser() -> argparse.ArgumentParser:
         dest="token_baseline_out",
         help="Write this run's TokenReport as the token baseline JSON (Phase TKE)",
     )
+    run.add_argument(
+        "--routing",
+        choices=["static", "cascade", "budget_aware", "composite", "batch"],
+        help="Run under this adaptive-routing policy in enforce mode (Phase AMR)",
+    )
 
     redteam = sub.add_parser("redteam", help="Run the adversarial corpus")
     redteam.add_argument("--corpus", required=True, help="Path to the red-team corpus YAML")
@@ -77,6 +91,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--report-only", action="store_true", help="Print violations but always exit 0"
     )
 
+    routing_gate = sub.add_parser(
+        "routing-gate", help="Compare a routed scorecard against the static baseline (AMR)"
+    )
+    routing_gate.add_argument("--static", required=True, help="Static-baseline scorecard JSON")
+    routing_gate.add_argument("--routed", required=True, help="Routed-run scorecard JSON")
+    routing_gate.add_argument(
+        "--min-savings", type=float, default=DEFAULT_MIN_SAVINGS_RATIO, help="Min cost saving"
+    )
+    routing_gate.add_argument(
+        "--max-quality-drop",
+        type=float,
+        default=DEFAULT_MAX_QUALITY_DROP_PTS,
+        help="Max pass-rate drop (percentage points)",
+    )
+    routing_gate.add_argument(
+        "--report-only", action="store_true", help="Print violations but always exit 0"
+    )
+
     return parser
 
 
@@ -87,9 +119,40 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_gate(args)
     if args.command == "token-gate":
         return _cmd_token_gate(args)
+    if args.command == "routing-gate":
+        return _cmd_routing_gate(args)
     if args.command == "redteam":
         return _cmd_run(args, suite_path=args.corpus, loader=_load_corpus)
+    if getattr(args, "routing", None):
+        return _with_routing(
+            args.routing, lambda: _cmd_run(args, suite_path=args.suite, loader=EvalSet.from_yaml)
+        )
     return _cmd_run(args, suite_path=args.suite, loader=EvalSet.from_yaml)
+
+
+def _with_routing(policy: str, run: Callable[[], int]) -> int:
+    """Run under *policy* (enforce) via an injected config source, then restore."""
+    from prismal.core.config_source import (
+        ChainedConfigSource,
+        EnvConfigSource,
+        MappingConfigSource,
+        get_config_source,
+        set_config_source,
+    )
+
+    previous = get_config_source()
+    overrides = MappingConfigSource(
+        {
+            "PRISMAL_ADAPTIVE_ROUTING_ENABLED": "true",
+            "PRISMAL_ROUTING_POLICY": policy,
+            "PRISMAL_ROUTING_MODE": "enforce",
+        }
+    )
+    set_config_source(ChainedConfigSource([overrides, previous or EnvConfigSource()]))
+    try:
+        return run()
+    finally:
+        set_config_source(previous)
 
 
 def _cmd_run(args: argparse.Namespace, *, suite_path: str, loader: Callable[[str], EvalSet]) -> int:
@@ -153,6 +216,26 @@ def _cmd_token_gate(args: argparse.Namespace) -> int:
         return 0
     for line in problems:
         print(f"TOKEN REGRESSION: {line}")
+    return 0 if args.report_only else 1
+
+
+def _cmd_routing_gate(args: argparse.Namespace) -> int:
+    """Cost/quality gate of a routed run vs the static baseline (AMR6-04)."""
+    report = build_routing_report(_load_scorecard(args.static), _load_scorecard(args.routed))
+    print(
+        f"routing_savings_usd={report.savings_usd:.6g} savings={report.savings_ratio:.1%} "
+        f"quality_drop_pts={report.quality_drop_pts:.2f}"
+    )
+    problems = check_routing_gate(
+        report,
+        min_savings_ratio=args.min_savings,
+        max_quality_drop_pts=args.max_quality_drop,
+    )
+    if not problems:
+        print("ROUTING GATE PASS: savings target met within the quality budget")
+        return 0
+    for line in problems:
+        print(f"ROUTING GATE FAIL: {line}")
     return 0 if args.report_only else 1
 
 

@@ -1070,6 +1070,87 @@ class Settings(BaseSettings):
         default=None, description="Model for the terminal llm tier (None = provider default)."
     )
 
+    # --- AMR --- Adaptive Model Routing (Phase AMR — SPEC-AMR-CFG-001) ────
+    # Every sub-feature is effective only with adaptive_routing_enabled=True;
+    # flag off ⇒ get_llm() kwargs and the compiled graph equal 3.15.0.
+    adaptive_routing_enabled: bool = Field(
+        default=False, description="Master opt-in for adaptive model routing (Phase AMR)."
+    )
+    routing_mode: Literal["shadow", "enforce"] = Field(
+        default="shadow",
+        description="shadow computes choices + counterfactual savings but keeps the static model.",
+    )
+    routing_policy: Literal["static", "cascade", "budget_aware", "composite", "batch"] = Field(
+        default="static", description="Top-level routing policy."
+    )
+    routing_tier_models: str = Field(
+        default="config/routing_tiers.yaml",
+        description="YAML with tier → model ref, agent → tier and the risk floor.",
+    )
+    routing_risk_floor: dict[str, str] = Field(
+        default_factory=lambda: {"high": "medium", "critical": "frontier"},
+        description="Minimum tier per risk tier (fail-closed, SPEC-AMR-SEC-001).",
+    )
+    routing_tier_capabilities: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            "nano": [],
+            "small": ["tools", "structured_output"],
+            "medium": ["tools", "structured_output"],
+            "frontier": ["tools", "structured_output"],
+        },
+        description="Capabilities per tier (tools | structured_output) used by the cascade.",
+    )
+    routing_cascade_start_tier: str = Field(default="small", description="Cascade entry tier.")
+    routing_cascade_max_escalations: int = Field(default=2, ge=0, description="Escalation cap.")
+    routing_cascade_tool_error_threshold: int = Field(
+        default=2, ge=1, description="Tool errors in one call before escalating."
+    )
+    routing_adequacy_tau: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Adequacy Noul P(true) threshold."
+    )
+    routing_adequacy_timeout_ms: int = Field(
+        default=800, ge=1, description="Adequacy check budget (ms); timeout ⇒ abstain."
+    )
+    routing_cache_affinity_enabled: bool = Field(
+        default=True, description="Sticky model per (session, agent) after escalation."
+    )
+    routing_batch_alpha: float = Field(
+        default=0.8, description="Mean predicted accuracy floor (alpha)."
+    )
+    routing_model_concurrency: dict[str, int] = Field(
+        default_factory=dict,
+        description="Per-model concurrency cap C_j (missing ⇒ parallel_max_workers).",
+    )
+    routing_batch_max_iter: int = Field(default=200, ge=1, description="Dual iterations.")
+    routing_batch_eps: float = Field(
+        default=0.01, gt=0.0, le=1.0, description="Relative duality-gap stop criterion."
+    )
+    routing_predictor_path: str | None = Field(
+        default=None, description="Versioned predictor table (config/routing_predictor/*.json)."
+    )
+    plan_cache_enabled: bool = Field(default=False, description="Intent-keyed plan cache.")
+    plan_cache_ttl_s: int = Field(default=86_400, ge=1, description="Plan cache TTL (s).")
+    plan_cache_intents: list[str] = Field(
+        default_factory=list, description="Read-only intent allowlist for the plan cache."
+    )
+    plan_cache_backend: Literal["memory", "sqlite"] = Field(
+        default="memory", description="Plan cache backend."
+    )
+    plan_cache_path: str = Field(
+        default="data/plan_cache.sqlite", description="SQLite plan cache file."
+    )
+    plan_cache_max_entries: int = Field(default=1024, ge=1, description="In-memory LRU size.")
+    response_cache_enabled: bool = Field(default=False, description="Exact response cache.")
+    batch_api_enabled: bool = Field(default=False, description="BatchExecutor (provider batches).")
+    batch_poll_initial_s: float = Field(default=10.0, gt=0.0, description="First poll delay (s).")
+    batch_poll_max_s: float = Field(default=300.0, gt=0.0, description="Poll delay cap (s).")
+    batch_price_ratio: float = Field(
+        default=0.5,
+        gt=0.0,
+        le=1.0,
+        description="Batch price / on-demand price (verified in AMR0-03; ADR-WAVE-001 §2.3).",
+    )
+
     # ── Blind Review Pipeline (Phase BRP — SPEC-BRP-CFG-001) ──────────
     # Opt-in; False ⇒ graph byte-for-byte unchanged (mirrors kokoro_enabled /
     # skynet_enabled / budget_enabled).
@@ -2669,6 +2750,55 @@ class Settings(BaseSettings):
             from prismal.decisions.calibration import validate_enforce_calibration
 
             validate_enforce_calibration(self)
+        return self
+
+    @model_validator(mode="after")
+    def _validate_routing(self) -> "Settings":
+        """Validate the adaptive-routing settings (SPEC-AMR-CFG-001, SEC-001) at load time."""
+        tiers = ("nano", "small", "medium", "frontier")
+        risks = ("low", "medium", "high", "critical")
+        if not 0.0 < self.routing_batch_alpha <= 1.0:
+            raise ValueError(
+                f"PRISMAL_ROUTING_BATCH_ALPHA={self.routing_batch_alpha} must be in (0, 1]."
+            )
+        negative = {m: c for m, c in self.routing_model_concurrency.items() if c < 0}
+        if negative:
+            raise ValueError(f"PRISMAL_ROUTING_MODEL_CONCURRENCY has negative caps {negative}.")
+        if self.routing_cascade_start_tier not in tiers:
+            raise ValueError(
+                f"PRISMAL_ROUTING_CASCADE_START_TIER={self.routing_cascade_start_tier!r}; "
+                f"expected one of {tiers}."
+            )
+        if self.routing_cascade_max_escalations > 3:
+            raise ValueError("PRISMAL_ROUTING_CASCADE_MAX_ESCALATIONS must be <= 3.")
+        for risk, tier in self.routing_risk_floor.items():
+            if risk not in risks or tier not in tiers:
+                raise ValueError(
+                    f"PRISMAL_ROUTING_RISK_FLOOR[{risk!r}]={tier!r}: risk must be one of "
+                    f"{risks} and tier one of {tiers} (auto is never a floor)."
+                )
+        unknown_caps = [t for t in self.routing_tier_capabilities if t not in tiers]
+        if unknown_caps:
+            raise ValueError(f"PRISMAL_ROUTING_TIER_CAPABILITIES has unknown tiers {unknown_caps}.")
+        if self.batch_poll_initial_s > self.batch_poll_max_s:
+            raise ValueError("PRISMAL_BATCH_POLL_INITIAL_S must be <= PRISMAL_BATCH_POLL_MAX_S.")
+        if self.adaptive_routing_enabled:
+            # SEC-001 fail-closed: a usable floor for critical risk is mandatory.
+            if "critical" not in self.routing_risk_floor:
+                raise ValueError(
+                    "PRISMAL_ROUTING_RISK_FLOOR must define a 'critical' floor when "
+                    "adaptive routing is enabled."
+                )
+            if self.routing_policy == "batch" and not self.routing_predictor_path:
+                raise ValueError("routing_policy='batch' requires PRISMAL_ROUTING_PREDICTOR_PATH.")
+            from pathlib import Path
+
+            if Path(self.routing_tier_models).is_file():
+                # SEC-001: an invalid tier map / risk_floor refuses to start (a
+                # missing file is tolerated: tiers fall back to default_model).
+                from prismal.routing.policies.static import load_tier_models
+
+                load_tier_models(self.routing_tier_models)
         return self
 
     @model_validator(mode="after")

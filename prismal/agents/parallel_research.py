@@ -46,6 +46,7 @@ from prismal.budget.resolve import get_budget_guard
 from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
+from prismal.routing.outcome import llm_route_kwargs
 from prismal.security.hardening_run import hardening_react_kwargs
 
 if TYPE_CHECKING:
@@ -136,7 +137,7 @@ async def parallel_researcher_worker(state: AgentState) -> dict[str, Any]:
         }
 
     registry = ProviderRegistry()
-    llm = registry.get_llm_with_fallback()
+    llm = registry.get_llm_with_fallback(**llm_route_kwargs("parallel_researcher", state))
     tools = get_tools_for_agent("researcher")
     llm_with_tools = llm.bind_tools(tools) if tools else llm
 

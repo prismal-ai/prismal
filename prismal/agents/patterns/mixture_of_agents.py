@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from prismal.core.config import Settings
+    from prismal.routing.fanout import BatchAssignerPort
 
 logger = get_logger("prismal.agents.patterns.mixture_of_agents")
 
@@ -97,6 +98,9 @@ class MixtureOfAgents:
             previous). Must be ≥ 1.
         settings: Prismal settings. ``None`` resolves via
             :func:`~prismal.core.config.get_settings`.
+        batch_policy: Phase AMR ``BatchAssignmentPolicy`` — with adaptive
+            routing enforced, the proposer slots are assigned jointly; the
+            aggregator always keeps ``aggregator_model`` (SPEC-AMR-INT-002).
     """
 
     def __init__(
@@ -105,6 +109,7 @@ class MixtureOfAgents:
         aggregator_model: str | None = None,
         n_aggregator_layers: int = 1,
         settings: Settings | None = None,
+        batch_policy: BatchAssignerPort | None = None,
     ) -> None:
         if not proposer_models:
             raise ValueError("proposer_models must be non-empty")
@@ -114,6 +119,7 @@ class MixtureOfAgents:
         self._aggregator_model = aggregator_model or proposer_models[0]
         self._n_aggregator_layers = n_aggregator_layers
         self._settings = settings if settings is not None else get_settings()
+        self._batch_policy = batch_policy
 
     async def generate(
         self,
@@ -202,19 +208,36 @@ class MixtureOfAgents:
             llm = registry.get_llm(model)
             return await self._propose(llm, query)
 
+        models = self._routed_proposers(query)
         results = await asyncio.gather(
-            *(_propose_one(m) for m in self._proposer_models),
+            *(_propose_one(m) for m in models),
             return_exceptions=True,
         )
         outputs: list[str] = []
         providers: list[str] = []
-        for model, result in zip(self._proposer_models, results, strict=True):
+        for model, result in zip(models, results, strict=True):
             if isinstance(result, BaseException):
                 logger.warning("moa_proposer_failed", model=model, error=str(result))
                 continue
             outputs.append(result)
             providers.append(model)
         return outputs, providers
+
+    def _routed_proposers(self, query: str) -> list[str]:
+        """Phase AMR: batch-assigned proposer models when enforced, else configured."""
+        if self._settings.routing_mode != "enforce":
+            return self._proposer_models
+        from prismal.routing.fanout import assign_fanout, fanout_features
+
+        ids = [f"proposer-{i}" for i in range(len(self._proposer_models))]
+        features = fanout_features("mixture_agent", query, needs_tools=False)
+        choices = assign_fanout([(i, features) for i in ids], self._batch_policy, self._settings)
+        if not choices:
+            return self._proposer_models
+        return [
+            choices[i].model_ref if i in choices else default
+            for i, default in zip(ids, self._proposer_models, strict=True)
+        ]
 
     async def _propose(self, llm: Any, query: str) -> str:
         builder = SecurePromptBuilder()

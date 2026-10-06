@@ -244,7 +244,7 @@ class SwarmWorker:
         user = self._compose_user_content(order)
         messages = self._prompt_builder.build(system=system, user=user)
 
-        model = self._model_for(role)
+        model = self._routed_model(order) or self._model_for(role)
         usage = Usage()
         if self._worker_fn is not None:
             raw = await self._worker_fn(messages)
@@ -378,6 +378,14 @@ class SwarmWorker:
         if self._specialists_active():
             return role.capabilities or [order.role]
         return [order.role]
+
+    def _routed_model(self, order: SwarmOrder) -> str | None:
+        """Phase AMR: the batch-assigned model, only when routing is enforced."""
+        s = self._settings
+        if not (s.adaptive_routing_enabled and s.routing_mode == "enforce"):
+            return None
+        ref = order.context.get("routing_model")
+        return ref if isinstance(ref, str) and ref else None
 
     def _model_for(self, role: SpecialistRole) -> str | None:
         """Per-role model when active, else the Phase-S ``skynet_worker_model``."""
