@@ -18,6 +18,78 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   half-made release, so v3.12.0 shipped to PyPI and GHCR without a GitHub
   Release.
 
+## [3.15.0] — 2026-10-05
+
+> Phase DEC — **Typed Decision Models**, the third phase of wave 2026-10.
+> Closed questions (Choice / Score / Noul) are answered by a cascade of typed
+> decision models — a deterministic rule hook, **Laya** (local, Apache-2.0) and
+> **Jev** (TypeSafe API, OpenRouter or `laya-serve`) — before falling back to
+> today's LLM path. A decision *proposes*; deterministic code *authorizes*.
+> Everything is gated by `decisions_enabled` (default `False`) plus one flag
+> per integration, and every integration starts in `shadow`. With it off, the
+> compiled supervisor graph and node outputs are identical to 3.14.0 (graph
+> snapshot test). Guide: `docs/decisions.md` (verified vendor facts in its
+> `#verified-facts` section).
+
+### Added
+- **Types and port.** `prismal/decisions/`:
+  - `types.py`: `QuestionSpec` (+ `schema_hash`), `Decision` (calibrated
+    `answer_confidence`; vendor confidence kept only as `spread_confidence`),
+    `GatePolicy` (τ low .85 / medium .90 / high .97 / critical never; raise-only overrides).
+  - `ports.py`: `DecisionPort` plus `guarded_decide` (never raises: errors,
+    timeouts and over-limit input become abstentions).
+  - `state.py`: `DecisionStateBuilder` — the decision analogue of
+    `SecurePromptBuilder`: sanitized, fenced, labelled untrusted fields; EN/ES
+    authority-claim and injection flags taint the state.
+  - `validation.py`: registration-time lint for forbidden uses (counting,
+    arithmetic, dates; EN/ES) and `FORBIDDEN_DECISION_USES`.
+  - `gate.py`: `evaluate_gate` and a derangement option shuffle against
+    first-option bias.
+- **Cascade** (`cascade.py`): rule → laya → jev → llm, one shared non-LLM
+  time budget, calibration application, taint corroboration, per-language
+  gating, hash-only `decision.made` audit records, OTel metrics.
+- **Backends** (`decisions/adapters/`): Jev-compatible `/systemone` HTTP
+  (TypeSafe, OpenRouter, laya-serve incl. `/systemone/batch`; model-mismatch
+  abstention; usage metered in `CostMeter` with `cost_source="decision"`),
+  in-process Laya (deferred import, `to_thread`, fp16 warning), Jev SDK shim,
+  LLM fallback (structured output through `SecurePromptBuilder`), fake. New
+  extras `[laya]` and `[jev]`.
+- **Calibration** (`calibration.py`): temperature scaling (Laya) / isotonic
+  map (Jev), ECE, τ fitting, model-pinned `CalibrationStore`. `enforce`
+  without a valid record (or with ECE above `decision_max_ece`) refuses to
+  start. A Spanish slice must pass on its own before `es` traffic enforces.
+- **Shadow mode** (`shadow.py`): `ShadowRunner`, `AgreementReport`,
+  `promotion_ready`, drift auto-demotion to shadow.
+- **Integrations**:
+  - Wired in-graph: supervisor routing after `match_intent()` (DEC-ROUTE),
+    CRAG per-chunk relevance (DEC-RAG), and an escalate-only guardrail
+    pre-screen through `security/decision_bridge.py` (DEC-SAFE).
+  - Library functions: the eval-judge cascade (DEC-EVAL; never for
+    math/code/logic rubrics; 5 % LLM audit), HITL bands (irreversible or
+    critical actions always go to a human), tool proposal, a compaction
+    relevance scorer, and a Skynet text scorer.
+- **Composition**: `build_runtime(..., decision_vault=)` → `RuntimeContext.decisions`
+  (tenant keys `jev_api_key@<org_id>`); `use_decision_runtime()` binds it per
+  request in `context` mode.
+- **CLI**: `python -m prismal.decisions calibrate` (labeled JSONL → calibration
+  file) and `bench` (live, opt-in latency / cost).
+- Settings block `# --- DEC ---` + `_validate_decisions`; `Decision*`
+  exceptions; `_register_dec_metrics()`; example `examples/typed_decisions.py`.
+
+### Security
+- EN/ES injection corpus (seeded with Octomind's "pre-approved" attack)
+  asserts zero forbidden transitions against a fully manipulated backend. Also
+  covered: option-order shuffle, forbidden-use AST and behaviour tests, and a
+  secret-leak test.
+- An independent review found these, all fixed with regression tests:
+  - The terminal LLM tier ignored taint.
+  - HITL could `auto`-approve on an LLM verdict.
+  - Nested fence markers could escape the fence.
+  - `context` mode silently built an unaudited global runtime.
+  - Shadow recording was quadratic.
+  - Non-finite probabilities or calibration values were accepted.
+  - Unsafe MCP tool names were accepted.
+
 ## [3.14.0] — 2026-10-05
 
 > Phase GW — **LLM Gateway Providers**, the second phase of wave 2026-10.

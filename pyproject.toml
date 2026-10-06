@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ============================================================
 [project]
 name = "prismal-ai"
-version = "3.14.0"
+version = "3.15.0"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -257,6 +257,14 @@ compression = [
   "llmlingua>=0.2.2",
 ]
 
+# Typed Decision Models (Phase DEC) — backends imported only in prismal/decisions/adapters/
+laya = [
+  "laya>=0.3.28",                  # Convai Laya local encoders (Apache-2.0; DEC0-06)
+]
+jev = [
+  "typesafe-sdk>=0.7.2,<0.8",      # TypeSafe Jev SDK (DEC0-02); the HTTP transport needs none
+]
+
 # All optional extras combined
 all = [
   "prismal-ai[postgres,mongodb,local-embeddings,ollama,analytics,ml,finance,datetime,maintenance,lancedb,sqlite-vec,qdrant,pgvector,a2a,multimodal,multimodal-local,multimodal-premium,multimodal-embed,guardrails-ai]",
@@ -417,6 +425,8 @@ module = [
   "guardrails", "guardrails.*",
   # Token Efficiency (Phase TKE) — lazy-imported inside providers/compression.py.
   "llmlingua", "llmlingua.*",
+  # Typed Decision Models (Phase DEC) — lazy-imported inside prismal/decisions/adapters/.
+  "laya", "laya.*", "typesafe_sdk", "typesafe_sdk.*",
 ]
 ignore_missing_imports = true
 

@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` (full SDD, not implemented) |
+| **Status** | `IMPLEMENTED` (2026-10-05, v3.15.0) |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | DEC |

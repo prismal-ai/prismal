@@ -398,6 +398,7 @@ class OTelManager:
 
         self._register_tke_metrics()
         self._register_gw_metrics()
+        self._register_dec_metrics()
 
     def _register_tke_metrics(self) -> None:
         """Token Efficiency (Phase TKE — SPEC-TKE-OTEL-001)."""
@@ -498,6 +499,46 @@ class OTelManager:
         self._gauges["gateway_quota_remaining"] = self._meter.create_gauge(
             "prismal.gateway_quota_remaining",
             description="Remaining gateway quota by gateway, window",
+        )
+
+    def _register_dec_metrics(self) -> None:
+        """Typed Decision Models (Phase DEC — SPEC-DEC-OTEL-001)."""
+        counters = {
+            "decisions": (
+                "prismal.decisions_total",
+                "Typed decisions by integration, backend, outcome",
+            ),
+            "llm_calls_avoided": (
+                "prismal.llm_calls_avoided_total",
+                "LLM calls replaced by an accepted non-LLM decision, by integration",
+            ),
+            "decision_drift_alarms": (
+                "prismal.decision_drift_alarms_total",
+                "Auto-demotions to shadow after audited agreement fell below the floor",
+            ),
+            "decision_injection_flags": (
+                "prismal.decision_injection_flags_total",
+                "Decision states flagged for authority claims / injection, by integration",
+            ),
+            "decision_shuffle_inconsistent": (
+                "prismal.decision_shuffle_inconsistent_total",
+                "High-stakes Choice decisions whose option-order shuffle disagreed",
+            ),
+            "decision_model_mismatch": (
+                "prismal.decision_model_mismatch_total",
+                "Responses whose model differs from the pinned model, by backend",
+            ),
+        }
+        for key, (name, description) in counters.items():
+            self._counters[key] = self._meter.create_counter(name, description=description)
+        self._histograms["decision_latency_ms"] = self._meter.create_histogram(
+            "prismal.decision_latency_ms",
+            description="Typed decision latency per backend (ms)",
+        )
+        self._gauges = getattr(self, "_gauges", {})
+        self._gauges["decision_shadow_agreement_ratio"] = self._meter.create_gauge(
+            "prismal.decision_shadow_agreement_ratio",
+            description="Shadow-mode agreement with the reference path, by integration, language",
         )
 
     @contextmanager

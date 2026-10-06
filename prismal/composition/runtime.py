@@ -60,6 +60,7 @@ if TYPE_CHECKING:
         VectorStorePort,
     )
     from prismal.core.config import Settings
+    from prismal.decisions.runtime import DecisionRuntime
     from prismal.providers.gateways.router import GatewayRouter
 
 logger = get_logger("prismal.composition")
@@ -185,6 +186,8 @@ class RuntimeContext:
     observability: ObservabilityPort | None = None
     # LLM Gateway Providers (Phase GW) — None unless llm_gateways_enabled.
     gateways: GatewayRouter | None = None
+    # Typed Decision Models (Phase DEC) — None unless decisions_enabled.
+    decisions: DecisionRuntime | None = None
     _closers: list[Closer] = field(default_factory=list, repr=False)
     _closed: bool = field(default=False, repr=False)
 
@@ -365,6 +368,7 @@ async def build_runtime(
     graph: Any | None = None,
     a2a_agents: list[Any] | None = None,
     gateway_vault: Any | None = None,
+    decision_vault: Any | None = None,
 ) -> RuntimeContext:
     """Compose every core port in one call (SPEC-CR-003).
 
@@ -388,6 +392,9 @@ async def build_runtime(
         gateway_vault: Credential vault for tenant gateway keys (Phase GW,
             ``<auth_ref>@<org_id>``). ``None`` uses the identity vault when
             ``identity_enabled``, else an ``EnvVault`` over the config source.
+        decision_vault: Credential vault for decision backend keys (Phase DEC,
+            ``jev_api_key@<org_id>``). ``None`` falls back to the identity vault,
+            then to the injected settings (no ``os.environ`` reads).
 
     Returns:
         A :class:`RuntimeContext` with five non-null ports; usable as
@@ -507,6 +514,22 @@ async def build_runtime(
             except Exception as exc:
                 raise RuntimeCompositionError("gateways", str(exc)) from exc
 
+        # 6e. Typed decisions (Phase DEC) — opt-in. Cascade tiers from settings,
+        #     tenant-scoped keys; global mode installs the process runtime.
+        decisions: DecisionRuntime | None = None
+        if eff.decisions_enabled:
+            try:
+                decisions = await _compose_decisions(
+                    eff,
+                    org_id=org_id,
+                    vault=decision_vault or credential_vault,
+                    audit=audit,
+                    global_mode=resolved_mode == "global",
+                    closers=closers,
+                )
+            except Exception as exc:
+                raise RuntimeCompositionError("decisions", str(exc)) from exc
+
         # 7. Mode: global injects the singleton; context leaves globals untouched.
         if resolved_mode == "global":
             from prismal.agents.tool_registry import set_tool_provider
@@ -530,6 +553,7 @@ async def build_runtime(
         a2a_handler=a2a_handler,
         observability=observability,
         gateways=gateways,
+        decisions=decisions,
     )
     ctx._closers = closers
     logger.info(
@@ -590,6 +614,42 @@ async def _compose_gateways(
 
         closers.append(_uninstall)
     return router
+
+
+async def _compose_decisions(
+    settings: Settings,
+    *,
+    org_id: str | None,
+    vault: Any | None,
+    audit: AuditPort,
+    global_mode: bool,
+    closers: list[Closer],
+) -> DecisionRuntime:
+    """Build the decision cascade + runtime (Phase DEC); warm Laya when preloading."""
+    from prismal.decisions.cascade import DecisionCascade
+    from prismal.decisions.runtime import (
+        DecisionRuntime,
+        get_decision_runtime,
+        set_decision_runtime,
+    )
+
+    cascade = DecisionCascade.from_settings(settings, audit=audit, vault=vault, org_id=org_id)
+    runtime = DecisionRuntime(cascade=cascade, settings=settings)
+    closers.append(runtime.aclose)
+    if settings.laya_preload:
+        for backend in cascade.backends:
+            warmup = getattr(backend, "warmup", None)
+            if warmup is not None:
+                await warmup()
+    if global_mode:
+        set_decision_runtime(runtime)
+
+        def _uninstall() -> None:
+            if get_decision_runtime() is runtime:
+                set_decision_runtime(None)
+
+        closers.append(_uninstall)
+    return runtime
 
 
 # ── Test runtime (SPEC-CR-004) ───────────────────────────────────────────────

@@ -137,6 +137,14 @@ class GuardrailsEngine:
             reasons = [f"injection:{cat}" for cat in matched_categories]
             risk_score = self._compute_risk_score(matched_categories)
 
+            # Typed decisions (Phase DEC — DEC-SAFE): escalate-only pre-screen. It can
+            # add a reason, never remove one or relax the verdict; off ⇒ no-op.
+            from prismal.security import decision_bridge
+
+            if await decision_bridge.prescreen_escalates(sanitized, settings):
+                reasons.append("decision:prescreen_escalated")
+                span.set_attribute("prismal.decision_prescreen_escalated", True)
+
             # L3: NeMo Guardrails (optional)
             if self._nemo_layer is not None and self._nemo_layer.available:
                 nemo_blocked, nemo_category = await self._nemo_layer.check_input(sanitized)

@@ -907,7 +907,51 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
             span.set_attribute("prismal.routing_source", "intent_router")
             return _with_compaction(result, compaction_messages)
 
+        # Typed decisions (Phase DEC — DEC-ROUTE): no-op unless decisions_enabled +
+        # decision_routing_enabled. Enforce may accept a route without the routing
+        # LLM call; shadow only records the LLM route as its reference.
+        from prismal.decisions.integrations.route import maybe_decide_route
+
+        _settings = get_settings()
+        decision_route = await maybe_decide_route(
+            state,
+            effective_valid_routes(
+                _settings.enable_subgraphs,
+                _settings.multimodal_enabled,
+                _settings.kokoro_enabled,
+                _settings.skynet_enabled,
+                _settings.blind_review_pipeline_enabled,
+            ),
+            settings=_settings,
+        )
+
         llm = ProviderRegistry().get_llm_with_fallback()
+        if decision_route.accepted_route is not None:
+            decided = decision_route.accepted_route
+            next_agent_dec = _apply_routing_overrides(
+                None if decided == "END" else decided, state, session_id
+            )
+            span.set_attribute("prismal.routing_decision", next_agent_dec or "END")
+            span.set_attribute("prismal.routing_source", "decision")
+            logger.info(
+                "supervisor_routing_decision",
+                next_agent=next_agent_dec,
+                raw_response="decision",
+                session_id=session_id,
+            )
+            dec_messages: list[AIMessage] = []
+            if next_agent_dec is None:
+                dec_messages = await _build_direct_answer(llm, state, trimmed, session_id)
+                _spawn_memory_extraction(state)
+            return _with_compaction(
+                {
+                    "current_agent": "supervisor",
+                    "next_agent": next_agent_dec,
+                    "messages": dec_messages,
+                },
+                compaction_messages,
+            )
+
         memory_context = await _recall_memory_context(state)
         system_suffix, tail_suffix = _split_per_request_context(memory_context, get_settings())
         routing_messages = [
@@ -934,6 +978,7 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
         raw: str = str(response.content).strip()
 
         matched = _match_route(raw, session_id)
+        decision_route.record_reference(matched)
         next_agent: str | None = None if matched == "END" else matched
         next_agent = _apply_routing_overrides(next_agent, state, session_id)
 

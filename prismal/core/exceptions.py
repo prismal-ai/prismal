@@ -1049,6 +1049,33 @@ class GatewayPaymentRequired(GatewayError):  # noqa: N818 — SPEC-GW-ERR-001 na
         super().__init__(f"gateway {gateway!r} payment required: {reason}")
 
 
+# ── Typed Decision Models (Phase DEC — SPEC-DEC-ERR-001) ─────────────────────
+
+
+class DecisionError(PrismalError):
+    """Base for errors raised by the typed-decision layer (Phase DEC)."""
+
+
+class DecisionConfigError(DecisionError):
+    """Malformed question spec or decision configuration (construction / startup)."""
+
+
+class DecisionCalibrationError(DecisionError, ValueError):
+    """An integration is set to ``enforce`` without a valid calibration record.
+
+    Also a ``ValueError`` so pydantic surfaces it as a ``ValidationError`` when
+    raised from ``Settings._validate_decisions`` (CAL-002 startup refusal).
+    """
+
+
+class ForbiddenDecisionError(DecisionError):
+    """A question spec asks for a forbidden use (SPEC-DEC-SEC-002), raised at registration."""
+
+
+class DecisionBackendError(DecisionError):
+    """Internal — a backend failure; the cascade converts it into an abstention."""
+
+
 class LoopHardeningError(PrismalError):
     """Base for errors raised by the loop-hardening layer (Phase LH)."""
 

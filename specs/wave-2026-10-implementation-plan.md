@@ -163,7 +163,9 @@ Run on separate branches while M1 is in progress; they merge but are **released*
 
 ---
 
-### M3 — DEC: Typed Decision Models → 3.15.0 (24.4 d; DEC1 already done on Track P)
+### M3 — DEC: Typed Decision Models → 3.15.0 (24.4 d) — ✅ IMPLEMENTED 2026-10-05
+
+> **Implemented 2026-10-05** (DEC1 had not been done on Track P, so all of DEC0–DEC6 landed here). DEC0 changed four facts (`docs/decisions.md#verified-facts`): every Jev question type carries `criteria`; laya-serve batch is `/v1/systemone/batch`; bf16 drift is measured vs fp32; CMU's cascade is *more* accurate than the frontier judge. An independent security review found 9 issues (LLM tier ignored taint, HITL auto via LLM, fence escape, implicit global runtime in context mode, …), all fixed with regression tests. Open: DEC0-08 benchmarks not reproduced locally (GPU/live, opt-in `tests/live/decisions`); DEC4-02 two-level Choice benchmark (live); HITL/TOOL/CTX/SWARM ship as library functions (no in-graph wiring); DEC6-05 notebook (other repo).
 
 | Phase | Tasks | Est. | Gate |
 |---|---|---|---|

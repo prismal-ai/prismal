@@ -1000,6 +1000,76 @@ class Settings(BaseSettings):
     gateway_reconcile_delay_s: float = Field(default=2.0, ge=0.0)
     gateway_quota_poll_interval_s: int = Field(default=300, ge=1)
 
+    # --- DEC --- Typed Decision Models (Phase DEC — SPEC-DEC-CFG-001) ────
+    # Every integration is effective only with decisions_enabled=True plus its own
+    # decision_<integration>_enabled flag; enabled without a mode ⇒ shadow.
+    # Volatile vendor facts ([verify]) live here, never in code.
+    decisions_enabled: bool = Field(
+        default=False, description="Master opt-in for typed decision models (Phase DEC)."
+    )
+    decision_routing_enabled: bool = Field(default=False, description="DEC-ROUTE (INT-001).")
+    decision_eval_judge_enabled: bool = Field(default=False, description="DEC-EVAL (INT-002).")
+    decision_hitl_enabled: bool = Field(default=False, description="DEC-HITL (INT-003).")
+    decision_tool_proposal_enabled: bool = Field(default=False, description="DEC-TOOL (INT-004).")
+    decision_rag_relevance_enabled: bool = Field(default=False, description="DEC-RAG (INT-005).")
+    decision_ctx_relevance_enabled: bool = Field(default=False, description="DEC-CTX (INT-006).")
+    decision_swarm_eval_enabled: bool = Field(default=False, description="DEC-SWARM (INT-007).")
+    decision_safety_prescreen_enabled: bool = Field(
+        default=False, description="DEC-SAFE (INT-008)."
+    )
+    decision_backend_order: list[str] = Field(
+        default_factory=lambda: ["rule", "laya", "jev", "llm"],
+        description="Cascade tiers, tried in order (rule | laya | jev | llm).",
+    )
+    decision_modes: dict[str, str] = Field(
+        default_factory=dict,
+        description="Integration → off | shadow | enforce (enabled without entry ⇒ shadow).",
+    )
+    jev_base_url: str = Field(
+        default="https://api.typesafe.ai/v1",
+        description="Jev-compatible base URL: TypeSafe, OpenRouter or laya-serve.",
+    )
+    jev_api_key: SecretStr | None = Field(default=None, description="Jev bearer key.")
+    jev_model: str = Field(default="jev-1.13.0", description="Pinned Jev model (no *latest*).")
+    jev_transport: str = Field(default="http", description="http | sdk.")
+    jev_max_choice_options: int = Field(default=255, ge=2, description="Jev Choice option cap.")
+    jev_max_request_tokens: int = Field(default=64_000, ge=1, description="Jev request limit.")
+    laya_mode: str = Field(default="local", description="local (in-process) | http (laya-serve).")
+    laya_checkpoint: str = Field(default="laya-multilingual", description="Laya checkpoint.")
+    laya_base_url: str | None = Field(default=None, description="laya-serve base URL.")
+    laya_api_key: SecretStr | None = Field(default=None, description="LAYA_API_KEY bearer.")
+    laya_preload: bool = Field(default=False, description="Load Laya at startup (servers).")
+    laya_max_loaded: int = Field(default=2, ge=1, description="Max checkpoints kept loaded.")
+    laya_max_len: int = Field(default=1024, ge=1, description="Laya checkpoint context tokens.")
+    laya_max_choice_options: int = Field(
+        default=20, ge=2, description="Laya quality cap on Choice options."
+    )
+    laya_cuda_amp: str | None = Field(
+        default=None, description="Mirror of the host's LAYA_CUDA_AMP (fp16 required on GPU)."
+    )
+    decision_timeout_ms: int = Field(default=800, ge=1, description="Non-LLM tier budget (ms).")
+    decision_calibration_dir: str = Field(
+        default="config/decision_calibration", description="<decision_id>@<model>.json files."
+    )
+    decision_languages: list[str] = Field(
+        default_factory=lambda: ["en", "es"], description="Languages allowed to enforce."
+    )
+    decision_min_calibration_examples: int = Field(default=300, ge=1)
+    decision_max_ece: float = Field(default=0.05, gt=0.0, le=1.0)
+    decision_tau_overrides: dict[str, float] = Field(
+        default_factory=dict, description="Raise-only τ per risk tier (low|medium|high)."
+    )
+    decision_min_margin: float = Field(default=0.20, ge=0.0, le=1.0)
+    decision_shadow_sample_rate: float = Field(default=1.0, ge=0.0, le=1.0)
+    decision_eval_audit_rate: float = Field(default=0.05, ge=0.0, le=1.0)
+    decision_auto_demote: bool = Field(default=True, description="SHD-002 drift auto-demote.")
+    decision_demote_floor: float = Field(
+        default=0.95, ge=0.0, le=1.0, description="Rolling audited agreement floor (SHD-002)."
+    )
+    decision_llm_fallback_model: str | None = Field(
+        default=None, description="Model for the terminal llm tier (None = provider default)."
+    )
+
     # ── Blind Review Pipeline (Phase BRP — SPEC-BRP-CFG-001) ──────────
     # Opt-in; False ⇒ graph byte-for-byte unchanged (mirrors kokoro_enabled /
     # skynet_enabled / budget_enabled).
@@ -2551,6 +2621,54 @@ class Settings(BaseSettings):
                 raise ValueError(
                     f"PRISMAL_LLM_GATEWAY_OPENAI_COMPATIBLE[{name!r}] needs a base_url."
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_decisions(self) -> "Settings":
+        """Validate the typed-decision settings (SPEC-DEC-CFG-001, CAL-002) at load time."""
+        backends = {"rule", "laya", "jev", "llm"}
+        unknown = [b for b in self.decision_backend_order if b not in backends]
+        if unknown:
+            raise ValueError(f"PRISMAL_DECISION_BACKEND_ORDER has unknown backends {unknown}.")
+        from prismal.decisions.catalog import INTEGRATION_FLAGS
+
+        for integration, mode in self.decision_modes.items():
+            if integration not in INTEGRATION_FLAGS:
+                raise ValueError(
+                    f"PRISMAL_DECISION_MODES key {integration!r} is not one of "
+                    f"{sorted(INTEGRATION_FLAGS)}."
+                )
+            if mode not in {"off", "shadow", "enforce"}:
+                raise ValueError(
+                    f"PRISMAL_DECISION_MODES[{integration!r}]={mode!r}; "
+                    "expected off|shadow|enforce."
+                )
+        if "latest" in self.jev_model.lower() or not re.search(r"\d+\.\d+", self.jev_model):
+            raise ValueError(f"PRISMAL_JEV_MODEL={self.jev_model!r} must be a pinned version.")
+        if self.jev_transport not in {"http", "sdk"}:
+            raise ValueError(f"PRISMAL_JEV_TRANSPORT={self.jev_transport!r}; expected http|sdk.")
+        if self.laya_mode not in {"local", "http"}:
+            raise ValueError(f"PRISMAL_LAYA_MODE={self.laya_mode!r}; expected local|http.")
+        if self.laya_mode == "http" and not self.laya_base_url:
+            raise ValueError("PRISMAL_LAYA_MODE=http requires PRISMAL_LAYA_BASE_URL.")
+        if not self.decision_languages:
+            raise ValueError("PRISMAL_DECISION_LANGUAGES must name at least one language.")
+        tier_defaults = {"low": 0.85, "medium": 0.90, "high": 0.97}
+        for tier, tau in self.decision_tau_overrides.items():
+            if tier not in tier_defaults:
+                raise ValueError(
+                    f"PRISMAL_DECISION_TAU_OVERRIDES key {tier!r} must be low|medium|high "
+                    "(critical is never auto-accepted)."
+                )
+            if not tier_defaults[tier] <= tau <= 1.0:
+                raise ValueError(
+                    f"PRISMAL_DECISION_TAU_OVERRIDES[{tier!r}]={tau} must be in "
+                    f"[{tier_defaults[tier]}, 1.0] (raise-only)."
+                )
+        if self.decisions_enabled:
+            from prismal.decisions.calibration import validate_enforce_calibration
+
+            validate_enforce_calibration(self)
         return self
 
     @model_validator(mode="after")

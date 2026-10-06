@@ -169,13 +169,25 @@ class CRAGPipeline:
 
         # ── Step 2: GRADE ─────────────────────────────────────────────────────
         graded: list[RetrievedChunk] = []
+        # Typed decisions (Phase DEC — DEC-RAG): accepted per-chunk relevance
+        # verdicts skip the LLM grader for that chunk only; off ⇒ no-op.
+        from prismal.decisions.integrations.rag import maybe_grade_candidates
+
+        decided = await maybe_grade_candidates(
+            query, [c.content for c in candidates], self._settings
+        )
         with otel.start_span("crag.grade") as grade_span:
-            for candidate in candidates:
-                score = await self._grade_document(
-                    query=query,
-                    content=candidate.content,
-                    fallback_score=candidate.relevance_score,
-                )
+            for index, candidate in enumerate(candidates):
+                pre_graded = decided.score(index)
+                if pre_graded is not None:
+                    score = pre_graded
+                else:
+                    score = await self._grade_document(
+                        query=query,
+                        content=candidate.content,
+                        fallback_score=candidate.relevance_score,
+                    )
+                    decided.record(index, score >= _RELEVANCE_THRESHOLD)
                 chunk = RetrievedChunk(
                     source=candidate.source,
                     chunk_id=candidate.chunk_id,
