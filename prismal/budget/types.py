@@ -98,6 +98,9 @@ class Usage:
     cache_write_tokens: int = 0
     reasoning_tokens: int = 0
     cost_source: str = ""
+    equivalent_usd: float = 0.0  # Phase GW: list-price equivalent of subscription calls
+    gateway: str = ""  # Phase GW: last gateway that served a call
+    served_model: str = ""  # Phase GW: last upstream model reported by a gateway
 
     @property
     def total_tokens(self) -> int:
@@ -114,7 +117,7 @@ class Usage:
     def __add__(self, other: Usage) -> Usage:
         """Add each dimension; ``estimated`` is the logical OR of both operands.
 
-        ``cost_source`` keeps the last non-empty source.
+        ``cost_source``, ``gateway`` and ``served_model`` keep the last non-empty value.
         """
         return Usage(
             prompt_tokens=self.prompt_tokens + other.prompt_tokens,
@@ -127,6 +130,9 @@ class Usage:
             cache_write_tokens=self.cache_write_tokens + other.cache_write_tokens,
             reasoning_tokens=self.reasoning_tokens + other.reasoning_tokens,
             cost_source=other.cost_source or self.cost_source,
+            equivalent_usd=self.equivalent_usd + other.equivalent_usd,
+            gateway=other.gateway or self.gateway,
+            served_model=other.served_model or self.served_model,
         )
 
 

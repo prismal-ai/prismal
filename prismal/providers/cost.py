@@ -11,7 +11,7 @@ rather than breaking a turn.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import litellm
 from litellm.types.utils import ModelResponse
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-_AUTHORITATIVE_SOURCES = frozenset({"gateway", "litellm"})
+_AUTHORITATIVE_SOURCES = frozenset({"gateway", "litellm", "subscription"})
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,8 @@ class CostEstimate:
     """The USD cost of one call and where the figure came from."""
 
     cost_usd: float
-    source: str  # "gateway" | "litellm" | "table" | "none"
+    source: str  # "subscription" | "gateway" | "litellm" | "table" | "none"
+    equivalent_usd: float = 0.0  # Phase GW: list-price equivalent of a subscription call
 
     @property
     def estimated(self) -> bool:
@@ -49,11 +50,15 @@ def compute_cost_usd(
     cache_write_tokens: int = 0,
     reported_cost_usd: float | None = None,
     response: object | None = None,
+    cost_mode: Literal["metered", "subscription"] = "metered",
 ) -> CostEstimate:
     """Return the USD :class:`CostEstimate` for one LLM call.
 
     ``prompt_tokens`` is the total input *including* cached tokens.
 
+    0. ``cost_mode="subscription"`` (flat-fee gateway plan, Phase GW) →
+       ``CostEstimate(0.0, "subscription", equivalent_usd=…)`` where the
+       equivalent is ``reported_cost_usd`` if given, else the steps 2-3 price.
     1. ``reported_cost_usd`` (gateway-billed) → ``source="gateway"``.
     2. ``litellm.completion_cost(response)`` for a raw ``ModelResponse``, else
        ``litellm.cost_per_token`` with cache kwargs → ``"litellm"``.
@@ -61,9 +66,45 @@ def compute_cost_usd(
        cache_write; cache rates fall back to ``input``) → ``"table"``.
     4. ``CostEstimate(0.0, "none")``.
     """
+    if cost_mode == "subscription":
+        if reported_cost_usd is not None:
+            equivalent = float(reported_cost_usd)
+        else:
+            equivalent = _priced(
+                model,
+                prompt_tokens,
+                completion_tokens,
+                settings,
+                cache_read_tokens,
+                cache_write_tokens,
+                response,
+            ).cost_usd
+        return CostEstimate(cost_usd=0.0, source="subscription", equivalent_usd=equivalent)
+
     if reported_cost_usd is not None:
         return CostEstimate(cost_usd=float(reported_cost_usd), source="gateway")
 
+    return _priced(
+        model,
+        prompt_tokens,
+        completion_tokens,
+        settings,
+        cache_read_tokens,
+        cache_write_tokens,
+        response,
+    )
+
+
+def _priced(
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    settings: Settings | None,
+    cache_read_tokens: int,
+    cache_write_tokens: int,
+    response: object | None,
+) -> CostEstimate:
+    """Steps 2-4 of the precedence: litellm → table → none."""
     if isinstance(response, ModelResponse):
         try:
             total = float(litellm.completion_cost(completion_response=response))

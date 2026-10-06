@@ -5,6 +5,7 @@ Loads from environment variables (prefix: PRISMAL_) and optional .env file. All
 configuration is validated at startup.
 """
 
+import re
 from collections.abc import Mapping
 from contextvars import ContextVar
 from functools import lru_cache
@@ -877,6 +878,127 @@ class Settings(BaseSettings):
     codeact_mcp_code_mode_enabled: bool = Field(
         default=False, description="Code-mode for MCP chains (TKE10, optional P3)."
     )
+
+    # --- GW --- LLM Gateway Providers (Phase GW — SPEC-GW-CFG-001) ───────
+    # Every gateway is effective only when llm_gateways_enabled=True plus its own
+    # *_enabled flag; master off ⇒ get_llm() kwargs and the graph equal v3.13.0.
+    llm_gateways_enabled: bool = Field(
+        default=False, description="Master opt-in for LLM gateway providers (Phase GW)."
+    )
+    llm_gateway_agent_map: dict[str, str] = Field(
+        default_factory=dict, description="Agent name → 'gw:<gateway>/<model>' reference."
+    )
+    llm_gateway_openai_compatible: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Generic gateways: name → {base_url, auth_ref?, headers?, "
+        "owns_model_fallback?}.",
+    )
+    llm_gateway_tenant_key_fallback: bool = Field(
+        default=False,
+        description="Allow the global key when a tenant key is missing (bills the operator).",
+    )
+    openrouter_enabled: bool = Field(default=False, description="Enable OpenRouter.")
+    openrouter_api_key: SecretStr = Field(default=SecretStr(""), description="OpenRouter key.")
+    openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1")
+    openrouter_app_url: str = Field(default="", description="HTTP-Referer attribution header.")
+    openrouter_app_title: str = Field(
+        default="prismal", description="X-OpenRouter-Title attribution header."
+    )
+    openrouter_app_categories: list[str] = Field(
+        default_factory=list, description="X-OpenRouter-Categories attribution header."
+    )
+    openrouter_session_stickiness: bool = Field(
+        default=True, description="Send a hashed session_id for sticky provider routing."
+    )
+    openrouter_plugins: list[str] = Field(
+        default_factory=list, description="Allowed: response-healing, context-compression, pdf."
+    )
+    openrouter_auto_allowed_models: list[str] = Field(
+        default_factory=list, description="openrouter/auto model wildcards (e.g. anthropic/*)."
+    )
+    openrouter_auto_tier: str | None = Field(
+        default=None, description="openrouter/auto cost tier: low|medium|high|xhigh|max."
+    )
+    openrouter_require_zdr: bool = Field(
+        default=True, description="provider.data_collection='deny' + provider.zdr=true."
+    )
+    openrouter_provider_sort: str | None = Field(
+        default=None, description="provider.sort: price | throughput | latency."
+    )
+    openrouter_max_price: dict[str, float] = Field(
+        default_factory=dict, description="provider.max_price {prompt, completion} USD/M."
+    )
+    openrouter_only: list[str] = Field(default_factory=list, description="provider.only.")
+    openrouter_ignore: list[str] = Field(default_factory=list, description="provider.ignore.")
+    openrouter_fallback_models: list[str] = Field(
+        default_factory=list, description="Gateway-owned model fallback (extra_body.models)."
+    )
+    openrouter_allowed_variants: list[str] = Field(
+        default_factory=lambda: ["floor", "nitro", "exacto"],
+        description="Allowed ':<variant>' suffixes (free/batch are opt-in).",
+    )
+    openrouter_allow_auto: bool = Field(
+        default=False, description="Allow openrouter/auto (hands model choice to the gateway)."
+    )
+    openrouter_systemone_base_url: str | None = Field(
+        default=None, description="Forward reference for DEC (SystemOne endpoint)."
+    )
+    opencode_zen_enabled: bool = Field(default=False, description="Enable OpenCode Zen.")
+    opencode_go_enabled: bool = Field(default=False, description="Enable OpenCode Go.")
+    opencode_api_key: SecretStr = Field(default=SecretStr(""), description="OpenCode key.")
+    opencode_zen_base_url: str = Field(default="https://opencode.ai/zen/v1")
+    opencode_go_base_url: str = Field(default="https://opencode.ai/zen/go/v1")
+    opencode_model_protocols_path: str = Field(
+        default="config/opencode_models.yaml", description="Per-model wire-protocol map."
+    )
+    opencode_refresh_models: bool = Field(
+        default=False, description="Refresh the protocol map from /v1/models at startup."
+    )
+    opencode_go_allowed_agents: list[str] = Field(
+        default_factory=lambda: ["coder", "codeact_agent", "dev_pipeline", "code_review"],
+        description="Agents allowed on OpenCode Go (ToS: coding agents only).",
+    )
+    opencode_denied_models: list[str] = Field(
+        default_factory=lambda: ["grok*", "muse-spark*", "deepseek-v4-flash*"],
+        description="Retention deny-list (fnmatch, case-insensitive) — VERIFY.md GW0-06.",
+    )
+    opencode_go_monthly_cap_usd: float = Field(
+        default=0.0, ge=0.0, description="Go monthly allowance in USD; 0 disables the ledger."
+    )
+    opencode_go_window_5h_ratio: float = Field(default=0.20, description="5 h window ratio.")
+    opencode_go_window_week_ratio: float = Field(default=0.50, description="Weekly ratio.")
+    opencode_go_quota_action: str = Field(
+        default="refuse", description="On an exhausted window: refuse | downgrade."
+    )
+    opencode_go_downgrade_model: str | None = Field(
+        default=None, description="gw: ref used when the action is downgrade."
+    )
+    omniroute_enabled: bool = Field(default=False, description="Enable OmniRoute.")
+    omniroute_api_key: SecretStr = Field(default=SecretStr(""), description="OmniRoute key.")
+    omniroute_base_url: str = Field(default="http://localhost:20128/v1")
+    omniroute_min_version: str = Field(
+        default="3.8.51", description="CVE-2026-88062 floor (VERIFY.md GW0-07)."
+    )
+    omniroute_allow_unknown_version: bool = Field(
+        default=False, description="Allow an OmniRoute whose version cannot be determined."
+    )
+    omniroute_declared_version: str | None = Field(
+        default=None, description="Operator-declared version when detection finds none."
+    )
+    omniroute_upstream_attestation: str | None = Field(
+        default=None, description="Mandatory: api_keys_only | subscription_oauth."
+    )
+    omniroute_allow_subscription_upstreams: bool = Field(
+        default=False, description="Allow subscription-OAuth upstreams (ToS-violating)."
+    )
+    omniroute_denied_combos: list[str] = Field(
+        default_factory=list, description="Model/combo deny-list (fnmatch)."
+    )
+    gateway_reconcile_enabled: bool = Field(
+        default=False, description="Reconcile reported cost against the generation API."
+    )
+    gateway_reconcile_delay_s: float = Field(default=2.0, ge=0.0)
+    gateway_quota_poll_interval_s: int = Field(default=300, ge=1)
 
     # ── Blind Review Pipeline (Phase BRP — SPEC-BRP-CFG-001) ──────────
     # Opt-in; False ⇒ graph byte-for-byte unchanged (mirrors kokoro_enabled /
@@ -2374,6 +2496,61 @@ class Settings(BaseSettings):
                 f"PRISMAL_CONTEXT_COMPACTION_LOW_WATER={low} must be below "
                 f"PRISMAL_CONTEXT_COMPACTION_HIGH_WATER={high}."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_llm_gateways(self) -> "Settings":
+        """Validate the gateway settings (SPEC-GW-CFG-001) so typos fail at load time."""
+        literals: dict[str, set[str | None]] = {
+            "openrouter_provider_sort": {None, "price", "throughput", "latency"},
+            "openrouter_auto_tier": {None, "low", "medium", "high", "xhigh", "max"},
+            "opencode_go_quota_action": {"refuse", "downgrade"},
+            "omniroute_upstream_attestation": {None, "api_keys_only", "subscription_oauth"},
+        }
+        for name, allowed in literals.items():
+            value = getattr(self, name)
+            if value not in allowed:
+                raise ValueError(
+                    f"PRISMAL_{name.upper()}={value!r} is invalid; expected one of "
+                    f"{sorted(a for a in allowed if a is not None)}."
+                )
+        for name in ("opencode_go_window_5h_ratio", "opencode_go_window_week_ratio"):
+            ratio = getattr(self, name)
+            if not 0.0 < ratio <= 1.0:
+                raise ValueError(f"PRISMAL_{name.upper()}={ratio} must be in (0, 1].")
+        if self.opencode_go_quota_action == "downgrade" and not self.opencode_go_downgrade_model:
+            raise ValueError(
+                "PRISMAL_OPENCODE_GO_QUOTA_ACTION=downgrade requires "
+                "PRISMAL_OPENCODE_GO_DOWNGRADE_MODEL."
+            )
+        semver = re.compile(r"^\d+\.\d+\.\d+$")
+        for name in ("omniroute_min_version", "omniroute_declared_version"):
+            version = getattr(self, name)
+            if version is not None and not semver.match(version):
+                raise ValueError(f"PRISMAL_{name.upper()}={version!r} is not MAJOR.MINOR.PATCH.")
+        bad_refs = {a: r for a, r in self.llm_gateway_agent_map.items() if not r.startswith("gw:")}
+        if bad_refs:
+            raise ValueError(f"PRISMAL_LLM_GATEWAY_AGENT_MAP values must be gw: refs: {bad_refs}.")
+        bad_plugins = set(self.openrouter_plugins) - {
+            "response-healing",
+            "context-compression",
+            "pdf",
+        }
+        if bad_plugins:
+            raise ValueError(
+                f"PRISMAL_OPENROUTER_PLUGINS has unsupported ids {sorted(bad_plugins)}."
+            )
+        name_re = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
+        builtin = {"openrouter", "opencode", "opencode-go", "omniroute"}
+        for name, entry in self.llm_gateway_openai_compatible.items():
+            if not name_re.match(name) or name in builtin:
+                raise ValueError(
+                    f"PRISMAL_LLM_GATEWAY_OPENAI_COMPATIBLE name {name!r} is invalid or reserved."
+                )
+            if not isinstance(entry, dict) or not entry.get("base_url"):
+                raise ValueError(
+                    f"PRISMAL_LLM_GATEWAY_OPENAI_COMPATIBLE[{name!r}] needs a base_url."
+                )
         return self
 
     @model_validator(mode="after")

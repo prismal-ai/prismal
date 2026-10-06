@@ -5,11 +5,11 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | GW (LLM Gateway Providers) |
-| **Target package version** | `3.14.0` (SemVer minor — new opt-in functionality, not yet started) |
+| **Target package version** | `3.14.0` (SemVer minor — new opt-in functionality) |
 | **Reviewers** | Tech Lead, AI Architect, Security Lead, FinOps |
 | **Priority** | P1 (cost control, provider diversity, data-retention guarantees) |
 | **Depends on** | W (`ConfigSourcePort`), R (`build_runtime` / `RuntimeContext`), IDN (`CredentialVault`), C (`CostMeter` / `BudgetGuard`), TKE1 (cache/reasoning usage fields + `reported_cost_usd` precedence) |

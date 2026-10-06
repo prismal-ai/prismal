@@ -18,6 +18,96 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   half-made release, so v3.12.0 shipped to PyPI and GHCR without a GitHub
   Release.
 
+## [3.14.0] — 2026-10-05
+
+> Phase GW — **LLM Gateway Providers**, the second phase of wave 2026-10.
+> Agents can route through OpenRouter, OpenCode Zen/Go, OmniRoute or any
+> OpenAI-compatible gateway. LiteLLM stays the only transport. Everything is
+> gated by `llm_gateways_enabled` (default `False`) plus one `*_enabled` flag
+> per gateway. With it off, the compiled supervisor graph and the kwargs of
+> every `ProviderRegistry.get_llm()` call are identical to 3.13.0 (graph
+> snapshot test plus the shared registry contract test
+> `tests/unit/providers/test_registry_contract.py`, created here as ADR-WAVE-001
+> requires). Guide: `docs/gateways.md`. Verified vendor facts:
+> `specs/llm-gateway-providers/VERIFY.md`.
+
+### Added
+- **Gateway port and router.** `prismal/providers/gateways/`:
+  - `base.py` / `policy.py`: value objects, `GatewayPort`, `gw:` reference grammar.
+  - `openai_compatible.py`: the generic adapter, shared by the others.
+  - `router.py`: `GatewayRouter`, `build_gateway_router`, and
+    `get/set/use_gateway_router` (ContextVar first, then the process global).
+- **`GatewayChatLiteLLM`** (`chat_model.py`). The innermost model in the
+  ADR-WAVE-001 stack. It captures served model, generation id, billed cost and
+  cost mode into `response_metadata["prismal_gateway"]`, for sync, async and
+  streaming calls. It maps HTTP 402 to a non-retryable `GatewayPaymentRequired`,
+  runs the quota preflight before any network call, and hides the key in
+  `repr`.
+- **Registry.** `ProviderRegistry(gateway_router=)` and
+  `get_llm(..., session_id=)`. **No double fallback**: a gateway that owns
+  model fallback returns the primary unwrapped with `max_retries=0`, and a
+  same-gateway fallback never retries 402 or policy errors.
+- **OpenRouter** (`openrouter.py`):
+  - Attribution headers.
+  - Privacy defaults `provider.data_collection="deny"` and `provider.zdr=true`.
+  - `require_parameters` when tools are bound.
+  - A hashed sticky `session_id`.
+  - Gateway-owned `models[]` fallback.
+  - Variant allow-list and a gated `openrouter/auto` (`auto-router` plugin).
+  - A plugin allow-list.
+  - `/api/v1/key` quotas and `/api/v1/generation` stats.
+- **OpenCode Zen/Go** (`opencode.py`, `config/opencode_models.yaml`):
+  - A per-model wire-protocol map (`openai/`, `anthropic/`, `openai/responses/`).
+  - `User-Agent` and a hashed `x-opencode-session`.
+  - The Go coding-agent ToS guard and a retention deny-list.
+  - Go meters as `subscription`, with a downgrade target.
+  - `refresh_protocols()` from `/v1/models`.
+- **QuotaLedger** (`quota.py`). Go 5 h / weekly / monthly windows and the
+  OpenRouter `:free` daily request window, scoped per `(org, gateway)`, with a
+  fake-clock-testable store.
+- **OmniRoute** (`omniroute.py`). A fail-closed startup gate (mandatory key,
+  upstream attestation, version floor), a combo deny-list, and a warning for a
+  public plain-HTTP base URL. `resolve()` refuses until the gate passes.
+- **Cost.**
+  - `compute_cost_usd(..., cost_mode=)`: `"subscription"` returns
+    `cost_usd=0` and `CostEstimate.equivalent_usd`.
+  - `CostMeter` reads gateway metadata and tags OTel with `gateway` /
+    `served_model`. It records ledger usage and schedules reconciliation.
+  - `Usage` gains `equivalent_usd`, `gateway` and `served_model`;
+    `RunSummary` gains the same three.
+  - `budget/usage.py::extract_gateway_meta`.
+  - `BudgetGuard.degradation()` returns `reduce` with
+    `reason="gateway_quota:<window>"` after a quota downgrade.
+- **Reconciliation and quotas.** `CostReconciler` (bounded, alert-only drift
+  histogram) and `GatewayQuotaPoller` (`gateway_quota_remaining` gauge).
+- **Composition.**
+  - `build_runtime(..., gateway_vault=)` composes `RuntimeContext.gateways`.
+  - Tenant keys are `<auth_ref>@<org_id>`, with no global fallback unless
+    `llm_gateway_tenant_key_fallback`.
+  - Startup gates run before first use; a failing or crashing gate disables the
+    gateway.
+  - Reconciler and poller lifecycles are managed.
+- **Settings**: the GW block in `core/config.py` with `_validate_llm_gateways`.
+  **Exceptions**: the `GatewayError` tree. **Metrics**: the six
+  `prismal.gateway_*` metrics (`OTelManager.set_gauge` is new).
+- Examples: `examples/gateways_{openrouter,opencode,omniroute}.py` (offline).
+  Opt-in live smoke tests: `tests/live/test_gateways_live.py` (`live_api`).
+
+### Changed
+These facts changed at GW0 verification (`VERIFY.md`):
+- **OmniRoute floor.** CVE-2026-88062 affects OmniRoute ≤ 3.8.50 with no named
+  patch, so the default `omniroute_min_version` is `3.8.51`, not 3.8.49.
+  OmniRoute documents no version endpoint, so `omniroute_declared_version` is
+  new.
+- **OpenCode deny-list.** DeepSeek ZDR on OpenCode ended on 2026-08-31, so
+  `deepseek-v4-flash*` joins the default `opencode_denied_models`.
+
+### Known gaps
+- The prisma-notebooks notebook (GW6-07) lives in another repository and is
+  not part of this change.
+- `config/opencode_models.yaml` is illustrative. Refresh it, or edit it, before
+  production use.
+
 ## [3.13.0] — 2026-10-05
 
 > Phase TKE — **Token Efficiency**, the first phase of wave 2026-10

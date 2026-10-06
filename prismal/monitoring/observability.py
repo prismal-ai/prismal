@@ -108,6 +108,9 @@ class _RunAccumulator:
             cache_write_tokens=self.usage.cache_write_tokens,
             reasoning_tokens=self.usage.reasoning_tokens,
             cache_hit_ratio=self.usage.cache_hit_ratio,
+            gateway=self.usage.gateway,
+            served_model=self.usage.served_model,
+            equivalent_usd=self.usage.equivalent_usd,
         )
 
 

@@ -1001,6 +1001,54 @@ class MaskedToolCallError(TokenEfficiencyError):
     """Internal — a masked tool call is surfaced as a synthetic ``ToolMessage``."""
 
 
+# ── LLM Gateway Providers (Phase GW — SPEC-GW-ERR-001) ───────────────────────
+
+
+class GatewayError(PrismalError):
+    """Base for errors raised by the LLM gateway layer (Phase GW)."""
+
+
+class GatewayConfigError(GatewayError):
+    """Malformed gateway reference or configuration (load/startup/resolve time)."""
+
+
+class GatewayCredentialError(GatewayError):
+    """A gateway key is missing — carries the ``auth_ref`` name, never the value."""
+
+    def __init__(self, auth_ref: str, *, gateway: str) -> None:
+        self.auth_ref = auth_ref
+        self.gateway = gateway
+        super().__init__(f"gateway {gateway!r}: no credential for {auth_ref!r}")
+
+
+class GatewayPolicyError(GatewayError):
+    """Fail-closed ToS / data-policy / security guard (raised before any network I/O)."""
+
+    def __init__(self, reason: str, *, gateway: str, agent: str | None = None) -> None:
+        self.reason = reason
+        self.gateway = gateway
+        self.agent = agent
+        super().__init__(f"gateway {gateway!r} policy denied: {reason} (agent={agent!r})")
+
+
+class GatewayQuotaExhausted(GatewayError):  # noqa: N818 — SPEC-GW-ERR-001 name
+    """A flat-fee quota window is exhausted (refused before any network call)."""
+
+    def __init__(self, *, gateway: str, window: str) -> None:
+        self.gateway = gateway
+        self.window = window
+        super().__init__(f"gateway {gateway!r} quota window {window!r} exhausted")
+
+
+class GatewayPaymentRequired(GatewayError):  # noqa: N818 — SPEC-GW-ERR-001 name
+    """HTTP 402 from a gateway — non-retryable; ``reason`` mapped from ``limit_source``."""
+
+    def __init__(self, *, gateway: str, reason: str) -> None:
+        self.gateway = gateway
+        self.reason = reason
+        super().__init__(f"gateway {gateway!r} payment required: {reason}")
+
+
 class LoopHardeningError(PrismalError):
     """Base for errors raised by the loop-hardening layer (Phase LH)."""
 
@@ -1066,6 +1114,12 @@ __all__ = [
     "EvalSetError",
     "ExtensionError",
     "FusionError",
+    "GatewayConfigError",
+    "GatewayCredentialError",
+    "GatewayError",
+    "GatewayPaymentRequired",
+    "GatewayPolicyError",
+    "GatewayQuotaExhausted",
     "GuardrailsModernizationError",
     "HierarchicalRAGError",
     "HyDEError",

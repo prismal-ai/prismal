@@ -5,11 +5,11 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | GW |
-| **Target package version** | `3.14.0` (SemVer minor — new opt-in functionality, not yet started) |
+| **Target package version** | `3.14.0` (SemVer minor — new opt-in functionality) |
 | **PLAN** | `specs/llm-gateway-providers/PLAN.md` |
 | **Architecture** | `specs/llm-gateway-providers/ARCHITECTURE.md` |
 | **TASKS** | `specs/llm-gateway-providers/TASKS.md` |
@@ -227,7 +227,7 @@ def load_opencode_model_protocols(path: str | None = None) -> dict[str, dict[str
 - IF a model id is absent from the protocol map, THEN THE SYSTEM SHALL raise `GatewayConfigError("unknown_opencode_model")`. Protocols are never guessed.
 - THE SYSTEM SHALL send `User-Agent: prismal/<package version>` and `x-opencode-session: sha256(org_id + ":" + session_id)[:32]`, which is stable for a session and never the raw id.
 - WHERE the plan is `go` and `agent` is not in `opencode_go_allowed_agents` (default `["coder","codeact_agent","dev_pipeline","code_review"]`), THE SYSTEM SHALL raise `GatewayPolicyError("opencode_go_agent_not_allowed")` before any network I/O, and SHALL treat `agent=None` as not allowed.
-- IF the upstream model matches `opencode_denied_models` (default `["grok*","muse-spark*"]` **[verify]**), THEN THE SYSTEM SHALL raise `GatewayPolicyError("retention_denied_model")`.
+- IF the upstream model matches `opencode_denied_models` (default `["grok*","muse-spark*","deepseek-v4-flash*"]` — amended 2026-10-05 (GW0-06): the DeepSeek ZDR ended 2026-08-31 and V4 Flash is now used for training), THEN THE SYSTEM SHALL raise `GatewayPolicyError("retention_denied_model")`.
 - WHERE the plan is `go`, THE SYSTEM SHALL set `cost_mode="subscription"`.
 
 ## SPEC-GW-OMNI-001: OmniRoute (`gateways/omniroute.py`)
@@ -238,8 +238,10 @@ class OmniRouteGateway(OpenAICompatibleGateway):
 ```
 - THE SYSTEM SHALL resolve `gw:omniroute/<model>` to `litellm_model="openai/<model>"` with `api_base=omniroute_base_url` (default `http://localhost:20128/v1`).
 - IF `omniroute_api_key` resolves empty, THEN THE SYSTEM SHALL raise `GatewayCredentialError` at startup. A key is mandatory.
-- IF the detected version is below `omniroute_min_version` (default `3.8.49`, CVE-2026-88062), THEN THE SYSTEM SHALL raise `GatewayPolicyError("omniroute_vulnerable_version")` and SHALL mark the gateway unavailable.
+- IF the detected version is below `omniroute_min_version` (default `3.8.51` — amended 2026-10-05 (GW0-07): the advisory lists ≤ 3.8.50 as affected with no named patch, so 3.8.49 is not a fix), THEN THE SYSTEM SHALL raise `GatewayPolicyError("omniroute_vulnerable_version")` and SHALL mark the gateway unavailable.
 - IF the version cannot be detected and `omniroute_allow_unknown_version` is false (default), THEN THE SYSTEM SHALL refuse the gateway the same way.
+- *Amended 2026-10-05 (implementation, security review):* until `astartup_check()` has passed, `resolve()` SHALL raise `GatewayPolicyError("omniroute_unverified_version")`; `GatewayRouter.astartup()` SHALL disable any gateway whose startup check raises an unexpected exception (`reason="startup_check_failed"`) — startup gates fail closed.
+- *Amended 2026-10-05 (GW0-07):* OmniRoute documents no version endpoint. `detect_version()` reads a `version` field from `GET <root>/api/monitoring/health` or an `x-omniroute-version` header when present; otherwise it uses `omniroute_declared_version` (operator-declared, logged at startup as declared) before falling back to "unknown".
 - IF `omniroute_upstream_attestation` is unset, or is `"subscription_oauth"` while `omniroute_allow_subscription_upstreams` is false, THEN THE SYSTEM SHALL refuse to enable OmniRoute.
 - IF the requested model or combo matches `omniroute_denied_combos`, THEN THE SYSTEM SHALL raise `GatewayPolicyError("omniroute_denied_combo")`.
 - WHEN `omniroute_base_url` uses plain `http` to a non-loopback, non-private host, THE SYSTEM SHALL log a `warning` once and increment `prismal.gateway_policy_denials_total{reason="omniroute_public_http"}` (warn only).
@@ -357,7 +359,7 @@ class RuntimeContext:  # existing dataclass, NEW field:
 
 def build_runtime(settings: Settings | None = None, *, org_id: str | None = None, ...) -> RuntimeContext: ...
 ```
-- WHEN `build_runtime(org_id="acme")` runs with gateways enabled, THE SYSTEM SHALL resolve each gateway key from `CredentialVault` as `<auth_ref>@acme` (for example `openrouter_api_key@acme`).
+- WHEN `build_runtime(org_id="acme")` runs with gateways enabled, THE SYSTEM SHALL resolve each gateway key from `CredentialVault` as `<auth_ref>@acme` (for example `openrouter_api_key@acme`). *Amended 2026-10-05 (GW0-08):* the accessor is `vault.resolve(ref).value`; `CredentialResolutionError` maps to "missing".
 - IF the tenant key is missing and `llm_gateway_tenant_key_fallback` is false (default), THEN THE SYSTEM SHALL disable that gateway for the tenant, and calls to it SHALL raise `GatewayCredentialError`. They never use the global key.
 - WHEN `RuntimeContext.aclose()` runs, THE SYSTEM SHALL drain the reconciler and close gateway HTTP clients.
 
@@ -381,12 +383,13 @@ def build_runtime(settings: Settings | None = None, *, org_id: str | None = None
 | `opencode_zen_enabled` / `opencode_go_enabled` / `opencode_api_key` | `bool` / `bool` / `SecretStr` | `False` / `False` / `""` | |
 | `opencode_zen_base_url` / `opencode_go_base_url` | `str` | see SPEC-GW-OC-001 | |
 | `opencode_model_protocols_path` / `opencode_refresh_models` | `str` / `bool` | `config/opencode_models.yaml` / `False` | Protocol map; refresh from `/v1/models` |
-| `opencode_go_allowed_agents` / `opencode_denied_models` | `list[str]` | 4 coding agents / `["grok*","muse-spark*"]` | ToS guard; retention deny-list |
+| `opencode_go_allowed_agents` / `opencode_denied_models` | `list[str]` | 4 coding agents / `["grok*","muse-spark*","deepseek-v4-flash*"]` | ToS guard; retention deny-list (amended GW0-06) |
 | `opencode_go_monthly_cap_usd` | `float` | `0.0` | `0` = ledger disabled |
 | `opencode_go_window_5h_ratio` / `_week_ratio` | `float` | `0.20` / `0.50` | |
 | `opencode_go_quota_action` / `opencode_go_downgrade_model` | `str` / `str \| None` | `"refuse"` / `None` | `refuse`\|`downgrade` (model required for downgrade) |
 | `omniroute_enabled` / `omniroute_api_key` / `omniroute_base_url` | `bool` / `SecretStr` / `str` | `False` / `""` / `http://localhost:20128/v1` | |
-| `omniroute_min_version` / `omniroute_allow_unknown_version` | `str` / `bool` | `"3.8.49"` / `False` | CVE-2026-88062 floor |
+| `omniroute_min_version` / `omniroute_allow_unknown_version` | `str` / `bool` | `"3.8.51"` / `False` | CVE-2026-88062 floor (amended GW0-07) |
+| `omniroute_declared_version` | `str \| None` | `None` | Operator-declared version used when detection finds none (GW0-07) |
 | `omniroute_upstream_attestation` | `str \| None` | `None` | `api_keys_only`\|`subscription_oauth` |
 | `omniroute_allow_subscription_upstreams` / `omniroute_denied_combos` | `bool` / `list[str]` | `False` / `[]` | ToS-violating if true; documented |
 | `gateway_reconcile_enabled` / `gateway_reconcile_delay_s` / `gateway_quota_poll_interval_s` | `bool` / `float` / `int` | `False` / `2.0` / `300` | |
@@ -420,7 +423,7 @@ class GatewayPaymentRequired(GatewayError):         # HTTP 402, non-retryable
 |---|---|---|
 | BASE-001..003, POL-001, GEN-001 | MUST | Protocol conformance; secret never in `repr`; grammar table; legacy strings → `None`; resolved kwargs captured |
 | OR-001 | MUST | Request capture: headers, `provider` object, `models`; 402 typed and not retried |
-| OC-001, OMNI-001 | MUST | Protocol → LiteLLM prefix table; guards fail closed with zero requests; `3.8.48` refused, `3.8.49` accepted |
+| OC-001, OMNI-001 | MUST | Protocol → LiteLLM prefix table; guards fail closed with zero requests; `3.8.50` refused, `3.8.51` accepted (GW0-07) |
 | RTR-001, REG-001, SNAP-001 | MUST | Precedence; no I/O in `resolve`; no double fallback; no `os.environ` writes; snapshot + kwargs contract |
 | QUOTA-001, COST-001 | MUST | Window arithmetic with a fake clock; refuse before network; precedence matrix incl. `subscription` |
 | COMP-001, CFG-001, ERR-001 | MUST | Per-tenant key isolation, no global fallback by default; validation errors at load |

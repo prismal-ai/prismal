@@ -76,6 +76,7 @@ class OTelManager:
         self.enabled: bool = False
         self._counters: dict[str, Any] = {}
         self._histograms: dict[str, Any] = {}
+        self._gauges: dict[str, Any] = {}
         self._setup()
 
     def _setup(self) -> None:
@@ -396,6 +397,7 @@ class OTelManager:
         )
 
         self._register_tke_metrics()
+        self._register_gw_metrics()
 
     def _register_tke_metrics(self) -> None:
         """Token Efficiency (Phase TKE — SPEC-TKE-OTEL-001)."""
@@ -466,6 +468,38 @@ class OTelManager:
             description="Estimated tokens of RAG context passed to the model",
         )
 
+    def _register_gw_metrics(self) -> None:
+        """LLM Gateway Providers (Phase GW — SPEC-GW-OTEL-001)."""
+        counters = {
+            "gateway_requests": (
+                "prismal.gateway_requests_total",
+                "Completed gateway calls by gateway, requested_model, served_model",
+            ),
+            "gateway_fallbacks": (
+                "prismal.gateway_fallbacks_total",
+                "Gateway-owned model fallbacks (served model differs from requested)",
+            ),
+            "gateway_policy_denials": (
+                "prismal.gateway_policy_denials_total",
+                "Fail-closed gateway policy/ToS/security denials by gateway, reason",
+            ),
+            "gateway_errors": (
+                "prismal.gateway_errors_total",
+                "Fail-open gateway lookups and 402/429 responses by gateway, kind",
+            ),
+        }
+        for key, (name, description) in counters.items():
+            self._counters[key] = self._meter.create_counter(name, description=description)
+        self._histograms["gateway_cost_drift_usd"] = self._meter.create_histogram(
+            "prismal.gateway_cost_drift_usd",
+            description="|authoritative - reported| gateway cost per reconciled call",
+        )
+        self._gauges = getattr(self, "_gauges", {})
+        self._gauges["gateway_quota_remaining"] = self._meter.create_gauge(
+            "prismal.gateway_quota_remaining",
+            description="Remaining gateway quota by gateway, window",
+        )
+
     @contextmanager
     def start_span(
         self,
@@ -533,6 +567,18 @@ class OTelManager:
         if histogram is not None:
             with suppress(Exception):
                 histogram.record(value, attributes or {})
+
+    def set_gauge(
+        self,
+        metric: str,
+        value: float,
+        attributes: dict[str, Any] | None = None,
+    ) -> None:
+        """Set a named gauge metric (no-op when unknown or OTEL is disabled)."""
+        gauge = getattr(self, "_gauges", {}).get(metric)
+        if gauge is not None:
+            with suppress(Exception):
+                gauge.set(value, attributes or {})
 
     def shutdown(self) -> None:
         """Flush and shut down all OTEL providers."""

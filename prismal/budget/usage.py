@@ -9,9 +9,12 @@ yield zeros so metering can never break a turn.
 
 from __future__ import annotations
 
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from prismal.budget.types import TokenCounts
+
+if TYPE_CHECKING:
+    from prismal.providers.gateways.base import GatewayCallMeta
 
 
 def extract_token_usage(message: object) -> TokenCounts:
@@ -47,6 +50,23 @@ def extract_token_usage(message: object) -> TokenCounts:
         cache_write_tokens=cache_write or raw_write,
         reasoning_tokens=reasoning or raw_reasoning,
     )
+
+
+def extract_gateway_meta(message: object) -> GatewayCallMeta | None:
+    """Gateway call metadata from ``response_metadata["prismal_gateway"]`` (SPEC-GW-COST-001).
+
+    A pure dict read (the value object holds no provider SDK types). Never raises;
+    ``None`` when the message did not come through a gateway.
+    """
+    try:
+        metadata = getattr(message, "response_metadata", None)
+        if not isinstance(metadata, dict):
+            return None
+        from prismal.providers.gateways.base import GatewayCallMeta
+
+        return GatewayCallMeta.from_dict(metadata.get("prismal_gateway"))
+    except Exception:
+        return None
 
 
 def _standard_details(meta: dict[str, object]) -> tuple[int, int, int]:

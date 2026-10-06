@@ -5,11 +5,11 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | GW |
-| **Target package version** | `3.14.0` (SemVer minor — new opt-in functionality, not yet started) |
+| **Target package version** | `3.14.0` (SemVer minor — new opt-in functionality) |
 | **PLAN** | `specs/llm-gateway-providers/PLAN.md` |
 | **SPEC** | `specs/llm-gateway-providers/SPEC.md` |
 | **TASKS** | `specs/llm-gateway-providers/TASKS.md` |
@@ -114,7 +114,7 @@ Default provider load balancing is left to OpenRouter (skip providers with an ou
 ```
 build_runtime(settings, org_id="acme")
    └─► build_gateway_router(settings, org_id="acme",
-                            secret_resolver=lambda ref: vault.get(f"{ref}@acme"))   [verify accessor]
+                            secret_resolver=lambda ref: vault.resolve(f"{ref}@acme").value)   (verified GW0-08)
           ├─ OpenRouterGateway / OpenCodeGateway(zen|go) / OmniRouteGateway / OpenAICompatibleGateway(*)
           ├─ QuotaLedger scoped (org_id, gateway)
           └─ await router.astartup()   # OmniRoute version + attestation, optional /v1/models refresh
@@ -162,7 +162,7 @@ Every wiring point is gated by `llm_gateways_enabled`, and each gateway also has
 ### 5.1 ToS / compliance
 - **OpenCode Go** is "designed for OpenCode and other coding agents"; validated third-party clients include Claude Code, Codex and Kilo Code CLI **[verify]**. Prismal therefore limits Go to coding-agent roles (`coder`, `codeact_agent`, `dev_pipeline`, `code_review`). Using Go for general chat, RAG or swarm workers is denied by default. Zen (pay-as-you-go) carries no such restriction **[verify]**.
 - **OmniRoute subscription-OAuth upstreams** route traffic through consumer subscription accounts (Claude Code, Codex, Gemini CLI). This violates those providers' terms and has led to account bans (issue #4118). Prismal cannot inspect OmniRoute's 4-tier combos, so the guard is layered: a mandatory startup attestation, `omniroute_allow_subscription_upstreams=False`, a combo-name deny-list, and documentation. Choosing `subscription_oauth` requires an explicit flag and logs a warning at every startup.
-- **OmniRoute CVE-2026-88062** (GHSA-hf57-cqmx-p4gr): unauthenticated RCE when `requireLogin=false`, fixed in 3.8.49. Prismal refuses versions below `omniroute_min_version`, refuses unknown versions by default, requires an API key, and warns on public plain-HTTP base URLs. Docs: install only from the official repository (npm `omniroute`, Docker `diegosouzapw/omniroute`), because many look-alike forks exist. Bind to loopback or a private network, and never expose it publicly. OmniRoute stores keys with AES-256-GCM, but that does not protect a publicly reachable admin surface.
+- **OmniRoute CVE-2026-88062** (GHSA-hf57-cqmx-p4gr): unauthenticated RCE when `requireLogin=false`, listed as affecting ≤ 3.8.50 with no named patch (GW0-07, 2026-10-05); the default floor is 3.8.51. Prismal refuses versions below `omniroute_min_version`, refuses unknown versions by default, requires an API key, and warns on public plain-HTTP base URLs. Docs: install only from the official repository (npm `omniroute`, Docker `diegosouzapw/omniroute`), because many look-alike forks exist. Bind to loopback or a private network, and never expose it publicly. OmniRoute stores keys with AES-256-GCM, but that does not protect a publicly reachable admin surface.
 
 ### 5.2 Data retention defaults
 | Gateway | Default | Enforceable by prismal |

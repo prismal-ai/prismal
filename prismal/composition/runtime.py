@@ -60,6 +60,7 @@ if TYPE_CHECKING:
         VectorStorePort,
     )
     from prismal.core.config import Settings
+    from prismal.providers.gateways.router import GatewayRouter
 
 logger = get_logger("prismal.composition")
 
@@ -182,6 +183,8 @@ class RuntimeContext:
     a2a_handler: Any | None = None
     # Observability integration (Phase OBS) — None unless observability_enabled.
     observability: ObservabilityPort | None = None
+    # LLM Gateway Providers (Phase GW) — None unless llm_gateways_enabled.
+    gateways: GatewayRouter | None = None
     _closers: list[Closer] = field(default_factory=list, repr=False)
     _closed: bool = field(default=False, repr=False)
 
@@ -361,6 +364,7 @@ async def build_runtime(
     mcp_config_path: Path | None = None,
     graph: Any | None = None,
     a2a_agents: list[Any] | None = None,
+    gateway_vault: Any | None = None,
 ) -> RuntimeContext:
     """Compose every core port in one call (SPEC-CR-003).
 
@@ -381,6 +385,9 @@ async def build_runtime(
             returned context as ``a2a_handler`` (the host mounts its routes).
         a2a_agents: Optional remote A2A agents (Agent Card URLs or ``AgentCard``
             objects) to expose as tools when A2A outbound is enabled.
+        gateway_vault: Credential vault for tenant gateway keys (Phase GW,
+            ``<auth_ref>@<org_id>``). ``None`` uses the identity vault when
+            ``identity_enabled``, else an ``EnvVault`` over the config source.
 
     Returns:
         A :class:`RuntimeContext` with five non-null ports; usable as
@@ -485,6 +492,21 @@ async def build_runtime(
             except Exception as exc:
                 raise RuntimeCompositionError("observability", str(exc)) from exc
 
+        # 6d. LLM gateways (Phase GW) — opt-in. Tenant-scoped keys, startup gates
+        #     run before first use (fail-closed), optional cost reconciler.
+        gateways: GatewayRouter | None = None
+        if eff.llm_gateways_enabled:
+            try:
+                gateways = await _compose_gateways(
+                    eff,
+                    org_id=org_id,
+                    vault=gateway_vault or credential_vault,
+                    global_mode=resolved_mode == "global",
+                    closers=closers,
+                )
+            except Exception as exc:
+                raise RuntimeCompositionError("gateways", str(exc)) from exc
+
         # 7. Mode: global injects the singleton; context leaves globals untouched.
         if resolved_mode == "global":
             from prismal.agents.tool_registry import set_tool_provider
@@ -507,6 +529,7 @@ async def build_runtime(
         policy_engine=policy_engine,
         a2a_handler=a2a_handler,
         observability=observability,
+        gateways=gateways,
     )
     ctx._closers = closers
     logger.info(
@@ -517,6 +540,56 @@ async def build_runtime(
         collection=cfg.collection_name,
     )
     return ctx
+
+
+async def _compose_gateways(
+    settings: Settings,
+    *,
+    org_id: str | None,
+    vault: Any | None,
+    global_mode: bool,
+    closers: list[Closer],
+) -> GatewayRouter | None:
+    """Build, start and register the gateway router (SPEC-GW-COMP-001)."""
+    from prismal.identity.vault import EnvVault
+    from prismal.providers.gateways.router import (
+        build_gateway_router,
+        get_gateway_router,
+        set_gateway_router,
+        vault_secret_resolver,
+    )
+
+    resolver = vault_secret_resolver(
+        vault if vault is not None else EnvVault(settings), org_id=org_id, settings=settings
+    )
+    router = build_gateway_router(settings, org_id=org_id, secret_resolver=resolver)
+    if router is None:
+        return None
+    closers.append(router.aclose)
+    await router.astartup()
+    if settings.gateway_reconcile_enabled:
+        from prismal.providers.gateways.reconcile import CostReconciler
+
+        router.reconciler = CostReconciler(router, settings=settings)
+        closers.append(router.reconciler.drain)
+    if router.ledger is not None or any(
+        (gw := router.get(name)) is not None and gw.profile.capabilities.has_quota_api
+        for name in router.names()
+    ):
+        from prismal.providers.gateways.poller import GatewayQuotaPoller
+
+        router.quota_poller = GatewayQuotaPoller(router)
+        router.quota_poller.start()
+        closers.append(router.quota_poller.aclose)
+    if global_mode:
+        set_gateway_router(router)
+
+        def _uninstall() -> None:
+            if get_gateway_router() is router:
+                set_gateway_router(None)
+
+        closers.append(_uninstall)
+    return router
 
 
 # ── Test runtime (SPEC-CR-004) ───────────────────────────────────────────────

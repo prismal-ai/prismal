@@ -7,7 +7,7 @@
 | **Baseline** | `prismal` v3.12.0 (tag `prismal/v3.12.0`) |
 | **Source** | `docs/gap-analysis-gateways-tokens-decisions-2026-10.md`, `specs/roadmap.md` (wave 9) |
 | **Scope** | The seven `READY` SDDs of the wave: TKE, GW, DEC, AMR, PRT, HRS, MEM |
-| **Status** | `ACTIVE` — M0 and M1 (TKE, v3.13.0) done 2026-10-05; next: M2 (GW). Per-task detail stays in each spec's `TASKS.md` |
+| **Status** | `ACTIVE` — M0, M1 (TKE, v3.13.0) and M2 (GW, v3.14.0) done 2026-10-05; next: M3 (DEC). Per-task detail stays in each spec's `TASKS.md` |
 
 This document does **not** replace the per-spec `TASKS.md`. It sequences them, closes the
 cross-spec gaps found while reading them together, and defines milestones with a done-gate.
@@ -148,6 +148,8 @@ Run on separate branches while M1 is in progress; they merge but are **released*
 ---
 
 ### M2 — GW: LLM Gateway Providers → 3.14.0 (23.3 d; starts once TKE1 is merged)
+
+> **Implemented 2026-10-05.** GW0 changed three facts (`llm-gateway-providers/VERIFY.md`): OmniRoute floor 3.8.51 (CVE-2026-88062 affects ≤ 3.8.50), no OmniRoute version endpoint (`omniroute_declared_version`), DeepSeek ZDR on OpenCode ended 2026-08-31 (deny-list). Open: GW6-07 notebook (other repo); `config/opencode_models.yaml` is illustrative.
 
 | Phase | Tasks | Est. | Gate |
 |---|---|---|---|
