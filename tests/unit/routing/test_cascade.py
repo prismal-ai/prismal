@@ -288,3 +288,13 @@ async def test_adequacy_fences_untrusted_text() -> None:
     state = port.calls[-1][0]
     assert "the request" in state["request"] and state["request"] != "the request"
     assert "the answer" in state["answer"] and state["answer"] != "the answer"
+
+
+def test_feature_memory_is_small_and_bounded() -> None:
+    from prismal.routing.policies import cascade as cascade_mod
+
+    assert cascade_mod._MAX_REMEMBERED <= 64
+    policy = _cascade()
+    for i in range(cascade_mod._MAX_REMEMBERED * 3):
+        policy.select(_features(agent=f"a{i}"))
+    assert len(policy._features) <= cascade_mod._MAX_REMEMBERED

@@ -55,7 +55,9 @@ ADEQUACY_QUESTION = QuestionSpec(
 )
 
 _HIGH_RISK = frozenset({RiskTier.HIGH, RiskTier.CRITICAL})
-_MAX_REMEMBERED = 4096
+# Fallback only (record_outcome passes features on the outcome): keep it small so
+# _MAX_RUNS per-session policies cannot hold millions of entries.
+_MAX_REMEMBERED = 64
 
 
 class AdequacyChecker:
