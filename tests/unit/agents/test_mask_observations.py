@@ -296,7 +296,7 @@ async def test_compact_delegates_to_mask_with_default_scope() -> None:
     compactor = ContextCompactor(settings=_settings(), artifact_store=store)
     result = await compactor.compact(_history())
     assert result.strategy is CompactionStrategy.MASK_OBSERVATIONS
-    assert store.calls[0]["run_id"] == "run"
+    assert store.calls[0]["run_id"].startswith("anon-")  # never a shared constant
     assert store.calls[0]["tenant"] == "default"
 
 
@@ -356,3 +356,32 @@ async def test_maybe_compact_context_mask_uses_session_and_org() -> None:
         assert store.calls[0]["tenant"] == "acme"
     finally:
         clear_context_compaction_run(state)
+
+
+# ── tenant isolation (security review 2026-10-05) ────────────────────────────
+
+
+async def test_compact_list_mask_uses_given_scope() -> None:
+    store = FakeStore()
+    compactor = ContextCompactor(settings=_settings(), artifact_store=store)
+    await compactor.compact_list(_history(), run_id="sess-1", tenant="acme")
+    assert {(c["run_id"], c["tenant"]) for c in store.calls} == {("sess-1", "acme")}
+
+
+async def test_compact_list_mask_without_scope_is_never_shared() -> None:
+    store = FakeStore()
+    compactor = ContextCompactor(settings=_settings(), artifact_store=store)
+    await compactor.compact_list(_history())
+    await compactor.compact_list(_history())
+    run_ids = [c["run_id"] for c in store.calls]
+    assert "run" not in run_ids
+    assert all(r.startswith("anon-") for r in run_ids)
+    assert run_ids[0] != run_ids[-1]  # each anonymous call gets its own scope
+
+
+def test_run_scope_without_session_is_anonymous_and_unique() -> None:
+    state = create_initial_state(session_id="")
+    first, tenant = cc._run_scope(state)
+    second, _ = cc._run_scope(state)
+    assert tenant == "default"
+    assert first.startswith("anon-") and first != second

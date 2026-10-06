@@ -363,6 +363,15 @@ def build_artifact_store(settings: Settings | None = None) -> ArtifactStorePort:
     raise ArtifactStoreError(f"unknown artifact store backend: {backend!r}")
 
 
+def anonymous_run_id() -> str:
+    """A fresh, unguessable run scope for callers without a ``session_id``.
+
+    Never a shared constant: two anonymous runs must not see each other's
+    artifacts, even inside the same tenant.
+    """
+    return f"anon-{secrets.token_hex(8)}"
+
+
 def make_read_artifact_tool(
     store: ArtifactStorePort,
     *,
@@ -409,6 +418,7 @@ __all__ = [
     "ArtifactStorePort",
     "InMemoryArtifactStore",
     "SqliteArtifactStore",
+    "anonymous_run_id",
     "build_artifact_store",
     "make_read_artifact_tool",
 ]

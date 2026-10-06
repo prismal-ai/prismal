@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import pytest
@@ -191,7 +192,9 @@ class TestOverBudget:
         out = _apply(b, "s", "k" * 100)
         assert out.truncated is True
         assert out.content.strip().startswith("[truncated:")
-        assert "k" not in out.content.replace("tokens", "")
+        # The artifact id is random urlsafe text and may contain "k": drop it first.
+        marker = re.sub(r"artifact=\S+;", "artifact=;", out.content)
+        assert "k" not in marker.replace("tokens", "")
 
     def test_lazy_store_built_from_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import prismal.agents.tool_output_budget as mod

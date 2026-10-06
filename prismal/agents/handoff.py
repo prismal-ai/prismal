@@ -20,10 +20,16 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import re
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from prismal.agents.artifacts import ArtifactRef, ArtifactStorePort, build_artifact_store
+from prismal.agents.artifacts import (
+    ArtifactRef,
+    ArtifactStorePort,
+    anonymous_run_id,
+    build_artifact_store,
+)
 from prismal.budget.types import Usage
 from prismal.core.config import get_settings
 from prismal.utils.token_estimate import estimate_tokens
@@ -218,35 +224,50 @@ def handoff_text(raw: str, envelope: HandoffEnvelope | None) -> str:
 
 
 def handoff_scope(state: object) -> tuple[str, str]:
-    """``(run_id, tenant)`` for envelope artifacts — ``session_id`` / ``metadata.org_id``."""
+    """``(run_id, tenant)`` for envelope artifacts — ``session_id`` / ``metadata.org_id``.
+
+    Without a ``session_id`` the run id is a fresh anonymous scope, never a
+    shared constant.
+    """
     if not isinstance(state, dict):
-        return "run", "default"
+        return anonymous_run_id(), "default"
     raw = cast("dict[str, Any]", state)
     metadata = raw.get("metadata") or {}
     org_id = metadata.get("org_id") if isinstance(metadata, dict) else None
-    return str(raw.get("session_id") or "run"), str(org_id or "default")
+    return str(raw.get("session_id") or anonymous_run_id()), str(org_id or "default")
 
 
 # ── per-run shared artifact store ────────────────────────────────────────────
 #
-# In-process registry keyed by run id (mirror of ``context_compaction._RUN_ENGINES``):
-# producers and reducers of one run share a store so ``read_artifact`` can reach
-# the full text behind an envelope. Live stores never enter checkpointed state.
-_RUN_STORES: dict[str, ArtifactStorePort] = {}
+# In-process registry keyed by ``(tenant, run_id)`` (mirror of
+# ``context_compaction._RUN_ENGINES``): producers and reducers of one run share a
+# store so ``read_artifact`` can reach the full text behind an envelope. Live
+# stores never enter checkpointed state. The registry is an LRU bounded by
+# ``_MAX_RUN_STORES`` so runs whose host never calls
+# :func:`clear_run_artifact_store` cannot grow memory without limit.
+_MAX_RUN_STORES = 256
+_RUN_STORES: OrderedDict[tuple[str, str], ArtifactStorePort] = OrderedDict()
 
 
-def get_run_artifact_store(run_id: str, settings: Settings | None = None) -> ArtifactStorePort:
-    """Return the artifact store shared by *run_id*, building it on first use."""
-    store = _RUN_STORES.get(run_id)
+def get_run_artifact_store(
+    run_id: str, settings: Settings | None = None, *, tenant: str = "default"
+) -> ArtifactStorePort:
+    """Return the artifact store shared by ``(tenant, run_id)``, building it on first use."""
+    key = (tenant, run_id)
+    store = _RUN_STORES.get(key)
     if store is None:
         store = build_artifact_store(settings)
-        _RUN_STORES[run_id] = store
+        _RUN_STORES[key] = store
+        while len(_RUN_STORES) > _MAX_RUN_STORES:
+            _RUN_STORES.popitem(last=False)
+    else:
+        _RUN_STORES.move_to_end(key)
     return store
 
 
-def clear_run_artifact_store(run_id: str) -> None:
-    """Release the per-run store for *run_id* (idempotent)."""
-    _RUN_STORES.pop(run_id, None)
+def clear_run_artifact_store(run_id: str, *, tenant: str = "default") -> None:
+    """Release the per-run store for ``(tenant, run_id)`` (idempotent)."""
+    _RUN_STORES.pop((tenant, run_id), None)
 
 
 def maybe_run_envelope(
@@ -270,7 +291,7 @@ def maybe_run_envelope(
     return maybe_envelope(
         text,
         settings=s,
-        store=get_run_artifact_store(run_id, s),
+        store=get_run_artifact_store(run_id, s, tenant=tenant),
         run_id=run_id,
         tenant=tenant,
         pattern=pattern,

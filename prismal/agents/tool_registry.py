@@ -1111,8 +1111,12 @@ async def react_loop(
     """
     from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
+    from prismal.agents.artifacts import anonymous_run_id
+
     tool_map: dict[str, BaseTool] = {t.name: t for t in tools}
     loop_messages: list[object] = list(messages)
+    # One artifact scope per loop: never a shared constant across sessions/tenants.
+    artifact_run_id = session_id or anonymous_run_id()
     output_budget = (
         tool_output_budget if tool_output_budget is not None else _default_tool_output_budget()
     )
@@ -1130,7 +1134,13 @@ async def react_loop(
         if partial is not None:
             return partial
         if context_compactor is not None:
-            loop_messages = list(await context_compactor.compact_list(loop_messages))  # type: ignore[arg-type]
+            loop_messages = list(
+                await context_compactor.compact_list(
+                    loop_messages,  # type: ignore[arg-type]
+                    run_id=artifact_run_id,
+                    tenant=tenant,
+                )
+            )
         try:
             response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
                 llm,
@@ -1298,7 +1308,7 @@ async def react_loop(
             if output_budget is not None and output_budget.enabled:
                 # Phase TKE — budget after the Phase H screen (SPEC-TKE-OUT-001).
                 result = output_budget.apply(
-                    tool_name, result, run_id=session_id or "run", tenant=tenant
+                    tool_name, result, run_id=artifact_run_id, tenant=tenant
                 ).content
             elif len(result) > 4_000:
                 # Cap individual tool results to avoid token explosion.
@@ -1333,7 +1343,13 @@ async def react_loop(
                 )
             )
             if context_compactor is not None:
-                loop_messages = list(await context_compactor.compact_list(loop_messages))  # type: ignore[arg-type]
+                loop_messages = list(
+                    await context_compactor.compact_list(
+                        loop_messages,  # type: ignore[arg-type]
+                        run_id=artifact_run_id,
+                        tenant=tenant,
+                    )
+                )
             try:
                 response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
                     llm,
@@ -1376,7 +1392,13 @@ async def react_loop(
             )
         )
         if context_compactor is not None:
-            loop_messages = list(await context_compactor.compact_list(loop_messages))  # type: ignore[arg-type]
+            loop_messages = list(
+                await context_compactor.compact_list(
+                    loop_messages,  # type: ignore[arg-type]
+                    run_id=artifact_run_id,
+                    tenant=tenant,
+                )
+            )
         try:
             response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
                 llm,

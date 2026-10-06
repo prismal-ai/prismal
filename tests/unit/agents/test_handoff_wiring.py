@@ -83,8 +83,10 @@ class TestHelpers:
         assert handoff_scope(state) == ("s1", "acme")
 
     def test_handoff_scope_defaults(self) -> None:
-        assert handoff_scope({}) == ("run", "default")
-        assert handoff_scope(None) == ("run", "default")
+        for state in ({}, None):
+            run_id, tenant = handoff_scope(state)
+            assert run_id.startswith("anon-")  # never a shared constant
+            assert tenant == "default"
 
     def test_handoff_text_without_envelope_is_raw(self) -> None:
         assert handoff_text("raw text", None) == "raw text"

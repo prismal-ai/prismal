@@ -311,11 +311,13 @@ class TestMaybeRunEnvelope:
             assert env is not None
             ref = env.artifacts[0]
             assert (
-                get_run_artifact_store("run-on").get(ref.id, run_id="run-on", tenant="t").content
+                get_run_artifact_store("run-on", tenant="t")
+                .get(ref.id, run_id="run-on", tenant="t")
+                .content
                 == text
             )
         finally:
-            clear_run_artifact_store("run-on")
+            clear_run_artifact_store("run-on", tenant="t")
 
 
 def test_envelope_enabled_requires_real_true_flags() -> None:
@@ -323,3 +325,41 @@ def test_envelope_enabled_requires_real_true_flags() -> None:
     from unittest.mock import MagicMock
 
     assert envelope_enabled(MagicMock()) is False
+
+
+# ── security review 2026-10-05: scope + retention ────────────────────────────
+
+
+def test_handoff_scope_without_session_is_anonymous() -> None:
+    from prismal.agents.handoff import handoff_scope
+
+    run_a, tenant = handoff_scope({"metadata": {}})
+    run_b, _ = handoff_scope("not-a-dict")
+    assert tenant == "default"
+    assert run_a.startswith("anon-") and run_b.startswith("anon-") and run_a != run_b
+
+
+def test_run_store_is_keyed_by_tenant() -> None:
+    from prismal.agents import handoff
+
+    handoff._RUN_STORES.clear()
+    a = handoff.get_run_artifact_store("r1", tenant="t1")
+    b = handoff.get_run_artifact_store("r1", tenant="t2")
+    assert a is not b
+    assert handoff.get_run_artifact_store("r1", tenant="t1") is a
+    handoff.clear_run_artifact_store("r1", tenant="t1")
+    assert ("t1", "r1") not in handoff._RUN_STORES
+    handoff._RUN_STORES.clear()
+
+
+def test_run_store_registry_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    from prismal.agents import handoff
+
+    handoff._RUN_STORES.clear()
+    monkeypatch.setattr(handoff, "_MAX_RUN_STORES", 3)
+    first = handoff.get_run_artifact_store("r0")
+    for i in range(1, 5):
+        handoff.get_run_artifact_store(f"r{i}")
+    assert len(handoff._RUN_STORES) == 3
+    assert handoff.get_run_artifact_store("r0") is not first  # oldest evicted
+    handoff._RUN_STORES.clear()

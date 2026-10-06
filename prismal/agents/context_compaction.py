@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, ToolMessage
 
-from prismal.agents.artifacts import build_artifact_store
+from prismal.agents.artifacts import anonymous_run_id, build_artifact_store
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
 from prismal.utils.token_estimate import estimate_tokens
@@ -187,7 +187,7 @@ class ContextCompactor:
         self,
         messages: Sequence[BaseMessage],
         *,
-        run_id: str = "run",
+        run_id: str | None = None,
         tenant: str = "default",
     ) -> CompactionResult:
         """Split *messages* into an older segment and a verbatim recent tail.
@@ -201,7 +201,9 @@ class ContextCompactor:
         """
         strategy = self._effective_strategy()
         if strategy is CompactionStrategy.MASK_OBSERVATIONS:
-            return await self.mask_observations(messages, run_id=run_id, tenant=tenant)
+            return await self.mask_observations(
+                messages, run_id=run_id or anonymous_run_id(), tenant=tenant
+            )
         keep_recent = self._settings.context_compaction_keep_recent
 
         if keep_recent >= len(messages):
@@ -281,7 +283,13 @@ class ContextCompactor:
         updates.extend(result.replaced)
         return {"messages": updates}
 
-    async def compact_list(self, messages: Sequence[BaseMessage]) -> list[BaseMessage]:
+    async def compact_list(
+        self,
+        messages: Sequence[BaseMessage],
+        *,
+        run_id: str | None = None,
+        tenant: str = "default",
+    ) -> list[BaseMessage]:
         """Trim/summarize a plain in-memory message list — position-based.
 
         For an ephemeral list that has not round-tripped through the
@@ -291,7 +299,9 @@ class ContextCompactor:
         ``RemoveMessage``-by-id mechanism. Never mutates *messages*; always
         returns a new list. Returns *messages* unchanged (as a list) when not due.
         In mask mode (SPEC-TKE-MSK-001) masked observations are substituted at
-        their positions (no id required, since substitution is positional).
+        their positions (no id required, since substitution is positional),
+        stored under ``(tenant, run_id)``; without a ``run_id`` a fresh
+        anonymous scope is used so callers never share artifacts.
         """
         should, _reason = self.should_compact(messages)
         if not should:
@@ -300,7 +310,9 @@ class ContextCompactor:
         strategy = self._effective_strategy()
         if strategy is CompactionStrategy.MASK_OBSERVATIONS:
             out = list(messages)
-            replacements = self._mask(messages, run_id="run", tenant="default", require_id=False)
+            replacements = self._mask(
+                messages, run_id=run_id or anonymous_run_id(), tenant=tenant, require_id=False
+            )
             for idx, new in replacements:
                 out[idx] = new
             if replacements:
@@ -642,7 +654,7 @@ def _fingerprint(messages: Sequence[BaseMessage]) -> tuple[object, ...]:
 def _run_scope(state: AgentState) -> tuple[str, str]:
     """``(run_id, tenant)`` for artifact scoping (SPEC-TKE-MSK-001)."""
     raw = cast("dict[str, Any]", state)
-    run_id = str(raw.get("session_id") or "run")
+    run_id = str(raw.get("session_id") or anonymous_run_id())
     metadata = raw.get("metadata") or {}
     org_id = metadata.get("org_id") if isinstance(metadata, dict) else None
     return run_id, str(org_id or "default")

@@ -206,7 +206,12 @@ the spawner. In BRP the reviewers must see the full spec and implementation,
 so the envelope is attached only as metadata. Note also that with envelopes on,
 Skynet's `concat` and `first_success` reducers return the envelope text
 (summary plus artifact pointer), not the raw text. Run artifact stores live in
-memory until the host calls `clear_run_artifact_store(run_id)`.
+memory until the host calls `clear_run_artifact_store(run_id, tenant=...)`.
+The registry is keyed by `(tenant, run_id)` and holds at most 256 runs (least
+recently used are evicted first). Every artifact scope comes from the
+`session_id` and `metadata.org_id`; when there is no `session_id`, a fresh
+anonymous scope (`anon-<random>`) is used, never a shared constant, so runs
+without a session never see each other's artifacts.
 
 ## TKE8 — RAG context budget
 
