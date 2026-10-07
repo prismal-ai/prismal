@@ -20,10 +20,10 @@ import json
 from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import IO, TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable, Iterator, Mapping
     from pathlib import Path
 
     from prismal.budget.guard import BudgetGuard
@@ -397,6 +397,9 @@ _MAX_PAGE_SIZE = 200
 _MAX_FIELD_CHARS = 256
 #: Hard bound on the records one :func:`audit_page` call parses (newest first).
 AUDIT_SCAN_MAX_RECORDS = 100_000
+#: Longest audit line (in characters) the host surface will load; longer lines are
+#: drained in bounded chunks and never parsed (resource-exhaustion guard).
+AUDIT_MAX_LINE_CHARS = 64 * 1024
 _ENVELOPE_KEYS = frozenset({"timestamp", "event", "prev_hash", "entry_hash", "org_id", "actor"})
 _ACTOR_KEYS = ("actor", "agent_id", "user_id")
 #: Field names whose *scalar* values are safe to show (identifiers, names,
@@ -485,9 +488,37 @@ def _entry_view(seq: int, entry: Mapping[str, Any]) -> AuditEntryView:
     )
 
 
+def _iter_records(fh: IO[str]) -> Iterator[str | None]:
+    """Yield each non-blank line of *fh*, or ``None`` for an oversized one.
+
+    Never holds more than :data:`AUDIT_MAX_LINE_CHARS` + 1 characters of a line:
+    an oversized line is drained chunk by chunk and reported as ``None`` so the
+    caller keeps the absolute ``seq`` numbering without ever parsing it.
+    """
+    limit = AUDIT_MAX_LINE_CHARS
+    while True:
+        line = fh.readline(limit + 1)
+        if not line:
+            return
+        if len(line) > limit and not line.endswith("\n"):
+            while True:
+                rest = fh.readline(limit)
+                if not rest or rest.endswith("\n"):
+                    break
+            yield None
+        elif line.strip():
+            yield line
+
+
 def _count_records(path: Path) -> int:
     with path.open(encoding="utf-8") as fh:
-        return sum(1 for ln in fh if ln.strip())
+        return sum(1 for _ in _iter_records(fh))
+
+
+def _scan_cap(max_records: int | None) -> int:
+    """Clamp a caller-supplied record bound to ``[0, AUDIT_SCAN_MAX_RECORDS]``."""
+    hard = AUDIT_SCAN_MAX_RECORDS
+    return min(hard, max(0, int(hard if max_records is None else max_records)))
 
 
 def audit_page(
@@ -511,12 +542,17 @@ def audit_page(
     kept. When the log holds more records than the bound, older ones are not
     visible and ``total`` is ``None`` (unknown). ``seq`` stays the absolute
     1-based position among non-blank lines, matching :func:`verify_audit_chain`.
+    *max_records* is clamped to :data:`AUDIT_SCAN_MAX_RECORDS`; a page wholly past
+    the scan window returns empty without reading the file; a line longer than
+    :data:`AUDIT_MAX_LINE_CHARS` keeps its ``seq`` but is skipped unparsed.
     """
     page = max(1, int(page))
     page_size = min(_MAX_PAGE_SIZE, max(1, int(page_size)))
-    cap = max(1, int(AUDIT_SCAN_MAX_RECORDS if max_records is None else max_records))
+    cap = max(1, _scan_cap(max_records))
+    start = (page - 1) * page_size
     path = audit_log_path(audit)
-    if path is None:
+    if path is None or start >= cap:
+        # Past the scan window: nothing visible, nothing to read (total unknown).
         return AuditPageView(page=page, page_size=page_size, total=None, entries=())
     if not path.exists():
         return AuditPageView(page=page, page_size=page_size, total=0, entries=())
@@ -529,8 +565,8 @@ def audit_page(
     matched = 0
     with path.open(encoding="utf-8") as fh:
         # seq numbers non-blank lines, matching verify_audit_chain.
-        for seq, line in enumerate((ln for ln in fh if ln.strip()), start=1):
-            if seq <= skip:
+        for seq, line in enumerate(_iter_records(fh), start=1):
+            if seq <= skip or line is None:
                 continue
             try:
                 entry = json.loads(line)
@@ -547,7 +583,6 @@ def audit_page(
             matched += 1
             kept.append((seq, entry))
     newest = list(reversed(kept))
-    start = (page - 1) * page_size
     entries = tuple(_entry_view(seq, e) for seq, e in newest[start : start + page_size])
     total = None if skip else matched
     return AuditPageView(page=page, page_size=page_size, total=total, entries=entries)
@@ -561,22 +596,41 @@ def verify_audit_chain(audit: Any, *, max_records: int = 10_000) -> AuditChainSt
     sort_keys=True)`` and links ``prev_hash`` from the genesis ``"0" * 64`` — this
     verifies what the code actually writes. The chain is one process-wide file,
     so it is verified as a whole regardless of the context's tenant.
+
+    Bounded work: the log is streamed, *max_records* is clamped to
+    :data:`AUDIT_SCAN_MAX_RECORDS`, counting stops at the first record past the
+    cap (⇒ ``unverified``), and an oversized line is never loaded (⇒ ``unverified``).
     """
     unverified = AuditChainStatus(status="unverified", checked=0, first_broken_seq=None)
+    cap = _scan_cap(max_records)
     path = audit_log_path(audit)
     if path is None:
         return unverified
     if not path.exists():
         return AuditChainStatus(status="valid", checked=0, first_broken_seq=None)
     try:
+        # Pass 1 (streamed, no parsing): stop as soon as the log exceeds the cap.
         with path.open(encoding="utf-8") as fh:
-            lines = [ln for ln in fh if ln.strip()]
+            for count, _ in enumerate(_iter_records(fh), start=1):
+                if count > cap:
+                    return unverified
+        with path.open(encoding="utf-8") as fh:
+            return _verify_stream(_iter_records(fh), unverified)
     except (OSError, UnicodeDecodeError):
         return unverified
-    if len(lines) > max_records:
-        return unverified
+
+
+def _verify_stream(records: Iterator[str | None], unverified: AuditChainStatus) -> AuditChainStatus:
+    """Walk the SHA-256 chain over already-bounded *records*.
+
+    An oversized record cannot be loaded, so the chain is ``unverified`` (not
+    proven broken) from that point.
+    """
     expected_prev = _GENESIS_HASH
-    for seq, line in enumerate(lines, start=1):
+    seq = 0
+    for seq, line in enumerate(records, start=1):
+        if line is None:
+            return unverified
         try:
             entry = json.loads(line)
             stored = entry.pop("entry_hash")
@@ -587,7 +641,7 @@ def verify_audit_chain(audit: Any, *, max_records: int = 10_000) -> AuditChainSt
         if not ok:
             return AuditChainStatus(status="broken", checked=seq, first_broken_seq=seq)
         expected_prev = str(stored)
-    return AuditChainStatus(status="valid", checked=len(lines), first_broken_seq=None)
+    return AuditChainStatus(status="valid", checked=seq, first_broken_seq=None)
 
 
 # ── decisions_report (SPEC-HRS-DEC-001) ───────────────────────────────────────

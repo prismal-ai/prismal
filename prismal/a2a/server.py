@@ -495,9 +495,15 @@ class A2AServerHandler:
         return record
 
     def _in_scope(self, task_id: str, scope: _Scope | None) -> bool:
-        """Legacy lookups: ``scope=None`` ⇒ unscoped (pre-PRT); else the tenant must own it."""
+        """Legacy lookups: the tenant must own it.
+
+        ``scope=None`` (pre-PRT, unscoped) only reaches tasks an unscoped call
+        created: a task a scoped request recorded has an owner in the task store
+        and is treated as not found, so an unscoped get/cancel can never read or
+        mutate another tenant's task.
+        """
         if scope is None:
-            return True
+            return self._task_store.peek(task_id) is None
         try:
             self._scoped_record(task_id, scope)
         except _V1Error:

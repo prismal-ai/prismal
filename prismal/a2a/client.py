@@ -94,10 +94,16 @@ class A2AClient:
         local_org_id: str | None = None,
         principal: str | None = None,
         http_client: Any | None = None,
+        allow_insecure_localhost: bool = False,
+        allow_private_hosts: bool = False,
     ) -> None:
         """``tenant`` / the card's interface tenant only fill the outbound A2A
         ``tenant`` param; the OAuth vault partition is ``local_org_id`` (+
-        ``principal``) from the local authenticated context — never remote data."""
+        ``principal``) from the local authenticated context — never remote data.
+
+        The RPC URL adopted from the remote card is validated before every
+        request (:meth:`_rpc_url`); ``allow_insecure_localhost`` /
+        ``allow_private_hosts`` are the same opt-ins as the OAuth endpoint policy."""
         if protocol not in ("auto", "0.3", "1.0"):
             raise ValueError(f"unsupported A2A protocol: {protocol!r}")
         self._protocol: ClientProtocol = protocol
@@ -109,6 +115,8 @@ class A2AClient:
         self._strict = strict
         self._local_org_id = local_org_id
         self._principal = principal
+        self._allow_insecure_localhost = allow_insecure_localhost
+        self._allow_private_hosts = allow_private_hosts
         self._version: v1c.A2AProtocolVersion | None = None
         self._card_v1: AgentCardV1 | None = None
         self._card_tenant: str | None = None
@@ -195,6 +203,51 @@ class A2AClient:
             except httpx.HTTPError as exc:
                 last_exc = exc
         raise A2AAgentUnavailable(self._card_url, f"discovery failed: {last_exc!r}")
+
+    def _sends_credentials(self) -> bool:
+        """Conservative: would any request to the RPC URL carry a credential?"""
+        if self._auth.scheme != "none":
+            return True
+        return self._card_v1 is not None and bool(self._card_v1.security_requirements)
+
+    def _rpc_url(self, card: AgentCard) -> str:
+        """Validate the card-supplied RPC URL before any request is sent to it.
+
+        The URL comes from remote data, so it gets the outbound policy the card
+        URL got from :class:`A2AConnectionManager`: when credentials would be
+        sent, or an allowlist / strict mode is configured, it must be HTTPS, not
+        a literal private IP (same opt-ins as the OAuth endpoints) and match the
+        allowlist; when credentials would be sent it must also share the origin
+        of the URL the card was discovered at, so a token issued for host A is
+        never replayed to host B. No auth + no allowlist ⇒ unchanged behaviour.
+        """
+        from prismal.a2a.oauth import _origin, _require_https
+        from prismal.core.exceptions import A2AOAuthError
+
+        url = card.url
+        with_creds = self._sends_credentials()
+        if not (with_creds or self._allowlist or self._strict):
+            return url
+        try:
+            _require_https(
+                url,
+                allow_insecure_localhost=self._allow_insecure_localhost,
+                allow_private_hosts=self._allow_private_hosts,
+                allowlist=self._allowlist,
+                strict=self._strict,
+            )
+        except A2AOAuthError as exc:
+            reason = str(exc).replace("OAuth endpoint", "A2A RPC URL")
+            logger.warning("a2a.rpc_url_denied", host=_host_of(url))
+            raise A2AAgentUnavailable(self._card_url, reason) from exc
+        if with_creds and _origin(url) != _origin(self._card_url):
+            logger.warning("a2a.rpc_url_denied", host=_host_of(url))
+            raise A2AAgentUnavailable(
+                self._card_url,
+                "A2A RPC URL origin differs from the discovered card origin; "
+                "refusing to send credentials",
+            )
+        return url
 
     async def _auth_headers(self) -> dict[str, str]:
         if self._auth.scheme == "bearer" and self._auth.bearer_token is not None:
@@ -285,12 +338,13 @@ class A2AClient:
         if skill_id is not None:
             params["skillId"] = skill_id
         body = {"jsonrpc": "2.0", "id": task_id, "method": "message/send", "params": params}
+        rpc_url = self._rpc_url(card)
         headers = await self._auth_headers()
         headers["Accept"] = "text/event-stream"
 
         try:
             async with aconnect_sse(
-                self._http(), "POST", card.url, json=body, headers=headers
+                self._http(), "POST", rpc_url, json=body, headers=headers
             ) as event_source:
                 async for sse in event_source.aiter_sse():
                     artifact, done = self._parse_event(sse.data)
@@ -317,12 +371,13 @@ class A2AClient:
             params["metadata"] = {"skillId": skill_id}
         rid = uuid.uuid4().hex
         body = {"jsonrpc": "2.0", "id": rid, "method": method, "params": self._v1_params(params)}
+        rpc_url = self._rpc_url(card)
         headers = await self._auth_headers()
         headers["Accept"] = "text/event-stream"
         headers[v1c.VERSION_HEADER] = v1c.A2A_V1_PROTOCOL_VERSION
         try:
             async with aconnect_sse(
-                self._http(), "POST", card.url, json=body, headers=headers
+                self._http(), "POST", rpc_url, json=body, headers=headers
             ) as event_source:
                 async for sse in event_source.aiter_sse():
                     artifacts, done = self._parse_v1_event(sse.data)
@@ -388,10 +443,11 @@ class A2AClient:
             "method": method,
             "params": self._v1_params(payload),
         }
+        rpc_url = self._rpc_url(card)
         headers = await self._auth_headers()
         headers[v1c.VERSION_HEADER] = v1c.A2A_V1_PROTOCOL_VERSION
         try:
-            resp = await self._http().post(card.url, json=body, headers=headers)
+            resp = await self._http().post(rpc_url, json=body, headers=headers)
             resp.raise_for_status()
             obj = resp.json()
             if "error" in obj:
@@ -441,13 +497,14 @@ class A2AClient:
             "method": "tasks/cancel",
             "params": {"id": task_id},
         }
+        rpc_url = self._rpc_url(card)
         try:
             headers = await self._auth_headers()
             if self._version == "1.0":
                 body["method"] = v1c.METHOD_CANCEL_TASK
                 body["params"] = self._v1_params({"id": task_id})
                 headers[v1c.VERSION_HEADER] = v1c.A2A_V1_PROTOCOL_VERSION
-            resp = await self._http().post(card.url, json=body, headers=headers)
+            resp = await self._http().post(rpc_url, json=body, headers=headers)
             resp.raise_for_status()
         except httpx.HTTPError as exc:  # pragma: no cover - best effort
             logger.warning("a2a.cancel_failed", task_id=task_id, error=str(exc))

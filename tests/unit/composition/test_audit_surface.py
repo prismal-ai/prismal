@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -251,3 +252,146 @@ def test_unreadable_log_is_unverified(audit: AuditLogger, log_path: Path) -> Non
     log_path.unlink()
     log_path.mkdir()  # a directory where the file should be → unreadable
     assert _ctx(audit).verify_audit_chain().status == "unverified"
+
+
+# ── resource bounds (M5 review finding 3 / 3b) ────────────────────────────────
+
+
+class _CountingFile(io.StringIO):
+    """In-memory log that counts every line read (iteration or ``readline``)."""
+
+    def __init__(self, text: str) -> None:
+        super().__init__(text)
+        self.reads = 0
+
+    def readline(self, size: int | None = -1) -> str:
+        self.reads += 1
+        return super().readline(-1 if size is None else size)
+
+    def __next__(self) -> str:
+        self.reads += 1
+        return super().__next__()
+
+
+class _FakeLogPath:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.files: list[_CountingFile] = []
+
+    def exists(self) -> bool:
+        return True
+
+    def open(self, *_a: Any, **_kw: Any) -> _CountingFile:
+        fh = _CountingFile(self.text)
+        self.files.append(fh)
+        return fh
+
+    @property
+    def reads(self) -> int:
+        return sum(f.reads for f in self.files)
+
+
+@pytest.fixture
+def big_log(monkeypatch: pytest.MonkeyPatch) -> _FakeLogPath:
+    from prismal.composition import host_surface as hs
+
+    fake = _FakeLogPath("".join(json.dumps({"event": "x", "n": i}) + "\n" for i in range(500)))
+    monkeypatch.setattr(hs, "audit_log_path", lambda _audit: fake)
+    return fake
+
+
+def test_verify_streams_and_stops_after_max_records_plus_one(big_log: _FakeLogPath) -> None:
+    from prismal.composition import host_surface as hs
+
+    status = hs.verify_audit_chain(object(), max_records=10)
+    assert status == AuditChainStatus("unverified", 0, None)
+    assert big_log.reads <= 12  # never the whole 500-line log
+
+
+def test_verify_max_records_is_clamped_to_the_hard_maximum(
+    big_log: _FakeLogPath, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from prismal.composition import host_surface as hs
+
+    monkeypatch.setattr(hs, "AUDIT_SCAN_MAX_RECORDS", 5)
+    status = hs.verify_audit_chain(object(), max_records=10**9)
+    assert status.status == "unverified"
+    assert big_log.reads <= 7
+
+
+def test_runtime_verify_with_huge_max_records_is_clamped(
+    audit: AuditLogger, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from prismal.composition import host_surface as hs
+
+    monkeypatch.setattr(hs, "AUDIT_SCAN_MAX_RECORDS", 3)
+    assert _ctx(audit).verify_audit_chain(max_records=10**9).status == "unverified"
+
+
+def test_far_out_page_returns_empty_without_scanning(
+    big_log: _FakeLogPath, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from prismal.composition import host_surface as hs
+
+    parsed: list[str] = []
+    real_loads = hs.json.loads
+    monkeypatch.setattr(
+        hs.json, "loads", lambda raw, *a, **k: parsed.append(raw) or real_loads(raw)
+    )
+    page = hs.audit_page(object(), org_id=None, page=10**9, page_size=200)
+    assert page.entries == () and page.page == 10**9 and page.page_size == 200
+    assert big_log.reads == 0 and parsed == []
+
+
+def test_audit_page_max_records_is_clamped(
+    audit: AuditLogger, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from prismal.composition import host_surface as hs
+
+    monkeypatch.setattr(hs, "AUDIT_SCAN_MAX_RECORDS", 2)
+    page = hs.audit_page(audit, org_id=None, max_records=10**9)
+    assert page.total is None and [e.seq for e in page.entries] == [7, 6]
+
+
+def _append_oversized(log_path: Path) -> None:
+    from prismal.composition import host_surface as hs
+
+    big = json.dumps({"event": "big", "pad": "A" * (hs.AUDIT_MAX_LINE_CHARS * 3)})
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(big + "\n")
+
+
+def test_oversized_line_is_skipped_and_later_lines_parse(
+    audit: AuditLogger, log_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from prismal.composition import host_surface as hs
+
+    _append_oversized(log_path)
+    audit.log_event("after", {"n": 1})
+    parsed: list[str] = []
+    real_loads = hs.json.loads
+    monkeypatch.setattr(
+        hs.json, "loads", lambda raw, *a, **k: parsed.append(raw) or real_loads(raw)
+    )
+    page = _ctx(audit).audit_page(page_size=3)
+    # the oversized line keeps its seq (8) but is never parsed; seq 9 still parses
+    assert [e.seq for e in page.entries] == [9, 7, 6]
+    assert page.entries[0].event == "after"
+    assert page.total == 8
+    assert all(len(raw) <= hs.AUDIT_MAX_LINE_CHARS for raw in parsed)
+
+
+def test_oversized_line_makes_chain_unverified_without_parsing_it(
+    audit: AuditLogger, log_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from prismal.composition import host_surface as hs
+
+    _append_oversized(log_path)
+    parsed: list[str] = []
+    real_loads = hs.json.loads
+    monkeypatch.setattr(
+        hs.json, "loads", lambda raw, *a, **k: parsed.append(raw) or real_loads(raw)
+    )
+    status = hs.verify_audit_chain(audit)
+    assert status.status == "unverified"
+    assert all(len(raw) <= hs.AUDIT_MAX_LINE_CHARS for raw in parsed)

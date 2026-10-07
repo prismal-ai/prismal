@@ -15,7 +15,7 @@ from prismal.a2a.client import A2AAgentNode, A2AClient
 from prismal.a2a.provider import A2AToolProvider
 from prismal.a2a.types import A2AAuth, A2AMessage, A2APart, AgentCard
 from prismal.a2a.v1.types import ListTasksRequest, ListTasksResult
-from prismal.core.exceptions import A2AOAuthError, A2AVersionError
+from prismal.core.exceptions import A2AError, A2AOAuthError, A2AVersionError
 
 pytestmark = pytest.mark.unit
 
@@ -501,7 +501,9 @@ class TestLocalVaultPartition:
         respx.get(CARD_URL).mock(return_value=httpx.Response(200, json=_device_card("t")))
         rpc = respx.post(V1_RPC).mock(return_value=_stream(DONE_EV))
         client = A2AClient(CARD_URL, prompter=_Prompter(), strict=True)
-        with pytest.raises(A2AOAuthError):
+        # Strict + empty allowlist: the card's RPC URL is now denied first
+        # (A2AAgentUnavailable) — before any OAuth endpoint is even contacted.
+        with pytest.raises(A2AError):
             _ = [a async for a in client.send_task(_msg())]
         assert rpc.call_count == 0
         await client.aclose()
