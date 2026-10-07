@@ -1,0 +1,1 @@
+{"jsonrpc": "2.0", "id": "g1", "method": "GetTask", "params": {"tenant": "acme", "id": "task-1", "historyLength": 1}}

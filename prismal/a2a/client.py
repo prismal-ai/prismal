@@ -16,6 +16,16 @@ every delegation is audited (without content).
 
 HTTP/SSE imports are deferred so the base install need not carry the ``[a2a]``
 extra unless A2A is used.
+
+Phase PRT (SPEC-PRT-A2A-006): ``A2AClient(protocol="auto"|"0.3"|"1.0",
+tenant=, prompter=)``. ``auto`` runs :func:`~prismal.a2a.negotiation.select_outbound`
+once on the discovered card (cached with it); a v1 peer gets v1 envelopes
+(``SendStreamingMessage`` / ``CancelTask`` / ``ListTasks`` with the
+``A2A-Version`` header and ``tenant``) while :meth:`A2AClient.discover` still
+returns the internal :class:`AgentCard` projection, so
+:class:`~prismal.a2a.provider.A2AToolProvider` and :class:`A2AAgentNode` work
+unchanged. Interactive OAuth is selected from the v1 card's security schemes
+(:func:`~prismal.a2a.oauth.select_oauth_flow`).
 """
 
 from __future__ import annotations
@@ -23,20 +33,29 @@ from __future__ import annotations
 import fnmatch
 import json
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
+from prismal.a2a import convert
+from prismal.a2a.negotiation import count_a2a_request, select_interface_url, select_outbound
 from prismal.a2a.types import A2AArtifact, A2AAuth, A2AMessage, A2APart, AgentCard
-from prismal.core.exceptions import A2AAgentUnavailable
+from prismal.a2a.v1 import constants as v1c
+from prismal.a2a.v1.types import AgentCardV1, ListTasksResult, StreamResponse
+from prismal.core.exceptions import A2AAgentUnavailable, A2AVersionError
 from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Sequence
 
     from langchain_core.messages import BaseMessage
 
+    from prismal.a2a.oauth import AuthorizationPrompter, DeviceCodeFlow, PkceAuthorizationCodeFlow
+    from prismal.a2a.v1.types import ListTasksRequest
     from prismal.agents.extension import NodeFn, SecurityLevel
+    from prismal.agents.extension.ports import CredentialVaultPort
     from prismal.agents.state import AgentState
+
+ClientProtocol = Literal["auto", "0.3", "1.0"]
 
 logger = get_logger(__name__)
 
@@ -65,7 +84,36 @@ class A2AClient:
         auth: A2AAuth | None = None,
         max_retries: int = 2,
         timeout_s: float = 30.0,
+        protocol: ClientProtocol = "auto",
+        tenant: str | None = None,
+        prompter: AuthorizationPrompter | None = None,
+        vault: CredentialVaultPort | None = None,
+        redirect_uri: str | None = None,
+        allowlist: Sequence[str] | None = None,
+        strict: bool = False,
+        local_org_id: str | None = None,
+        principal: str | None = None,
+        http_client: Any | None = None,
     ) -> None:
+        """``tenant`` / the card's interface tenant only fill the outbound A2A
+        ``tenant`` param; the OAuth vault partition is ``local_org_id`` (+
+        ``principal``) from the local authenticated context — never remote data."""
+        if protocol not in ("auto", "0.3", "1.0"):
+            raise ValueError(f"unsupported A2A protocol: {protocol!r}")
+        self._protocol: ClientProtocol = protocol
+        self._tenant = tenant
+        self._prompter = prompter
+        self._vault = vault
+        self._redirect_uri = redirect_uri
+        self._allowlist = list(allowlist) if allowlist else None
+        self._strict = strict
+        self._local_org_id = local_org_id
+        self._principal = principal
+        self._version: v1c.A2AProtocolVersion | None = None
+        self._card_v1: AgentCardV1 | None = None
+        self._card_tenant: str | None = None
+        self._oauth_flow: PkceAuthorizationCodeFlow | DeviceCodeFlow | None = None
+        self._oauth_resolved = False
         if isinstance(card_or_url, AgentCard):
             self._card: AgentCard | None = card_or_url
             self._card_url = card_or_url.url
@@ -75,7 +123,7 @@ class A2AClient:
         self._auth = auth or A2AAuth()
         self._max_retries = max(1, max_retries)
         self._timeout_s = timeout_s
-        self._client: Any = None  # httpx.AsyncClient (deferred)
+        self._client: Any = http_client  # httpx.AsyncClient (deferred unless injected)
         self._oauth_token: str | None = None
 
     def _http(self) -> Any:
@@ -91,6 +139,44 @@ class A2AClient:
             await self._client.aclose()
             self._client = None
 
+    @property
+    def protocol_version(self) -> v1c.A2AProtocolVersion | None:
+        """The negotiated outbound version (``None`` until the card is known)."""
+        return self._version
+
+    def _pick_version(self, raw: dict[str, Any]) -> v1c.A2AProtocolVersion:
+        if self._protocol == "auto":
+            return select_outbound(raw)
+        chosen = select_outbound(raw, preferred=self._protocol)
+        if chosen != self._protocol:
+            raise A2AVersionError(
+                f"remote agent does not advertise A2A {self._protocol} over JSON-RPC"
+            )
+        return chosen
+
+    def _adopt_card(self, raw: dict[str, Any]) -> AgentCard:
+        """Negotiate on a raw card and project it onto the internal model (cached)."""
+        version = self._pick_version(raw)
+        if "supportedInterfaces" in raw and "url" not in raw:
+            card_v1 = AgentCardV1.model_validate(raw)
+            url, tenant = select_interface_url(raw, version)
+            card = convert.card_to_internal(card_v1).model_copy(
+                update={"url": url or "", "protocol_version": version}
+            )
+            self._card_v1 = card_v1
+            self._card_tenant = tenant
+        else:
+            card = AgentCard.model_validate(raw)
+        self._version = version
+        self._card = card
+        return card
+
+    async def _ensure_card(self) -> AgentCard:
+        card = await self.discover()
+        if self._version is None:
+            self._version = self._pick_version(card.model_dump(by_alias=True))
+        return card
+
     async def discover(self) -> AgentCard:
         """Fetch and cache the remote Agent Card (GET well-known)."""
         if self._card is not None:
@@ -105,8 +191,7 @@ class A2AClient:
             try:
                 resp = await self._http().get(url)
                 resp.raise_for_status()
-                self._card = AgentCard.model_validate(resp.json())
-                return self._card
+                return self._adopt_card(resp.json())
             except httpx.HTTPError as exc:
                 last_exc = exc
         raise A2AAgentUnavailable(self._card_url, f"discovery failed: {last_exc!r}")
@@ -117,7 +202,49 @@ class A2AClient:
         if self._auth.scheme == "oauth2_client_credentials":
             token = await self._fetch_oauth_token()
             return {"Authorization": f"Bearer {token}"}
+        flow = self._card_oauth_flow()
+        if flow is not None:
+            secret = await flow.access_token()
+            return {"Authorization": f"Bearer {secret.get_secret_value()}"}
         return {}
+
+    def _card_oauth_flow(self) -> PkceAuthorizationCodeFlow | DeviceCodeFlow | None:
+        """Interactive OAuth required by a v1 card (``securityRequirements``), cached."""
+        if self._oauth_resolved:
+            return self._oauth_flow
+        card = self._card_v1
+        if card is None or self._auth.scheme != "none" or not card.security_requirements:
+            return None
+        from prismal.a2a.oauth import select_oauth_flow
+
+        self._oauth_flow = select_oauth_flow(
+            card,
+            auth=self._auth,
+            prompter=self._prompter,
+            redirect_uri=self._redirect_uri,
+            vault=self._vault,
+            org_id=self._local_org_id,
+            principal=self._principal,
+            http_client=self._http(),
+            agent_url=self._card_url,
+            allowlist=self._allowlist,
+            strict=self._strict,
+        )
+        self._oauth_resolved = True
+        return self._oauth_flow
+
+    def _effective_tenant(self) -> str | None:
+        return self._tenant if self._tenant is not None else self._card_tenant
+
+    def _v1_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        tenant = self._effective_tenant()
+        return {**params, "tenant": tenant} if tenant is not None else params
+
+    @staticmethod
+    def _count(method: str, outcome: str, version: str = v1c.A2A_V1_PROTOCOL_VERSION) -> None:
+        count_a2a_request(
+            protocol_version=version, direction="outbound", method=method, outcome=outcome
+        )
 
     async def _fetch_oauth_token(self) -> str:
         if self._oauth_token is not None:
@@ -144,11 +271,15 @@ class A2AClient:
     async def send_task(
         self, message: A2AMessage, *, skill_id: str | None = None
     ) -> AsyncIterator[A2AArtifact]:
-        """Send a task (``message/send``) and stream A2A artifacts over SSE."""
+        """Send a task and stream A2A artifacts over SSE (v1 or ``message/send``)."""
         import httpx
         from httpx_sse import aconnect_sse
 
-        card = await self.discover()
+        card = await self._ensure_card()
+        if self._version == "1.0":
+            async for v1_artifact in self._send_task_v1(card, message, skill_id=skill_id):
+                yield v1_artifact
+            return
         task_id = uuid.uuid4().hex
         params: dict[str, Any] = {"message": message.model_dump(by_alias=True), "taskId": task_id}
         if skill_id is not None:
@@ -169,6 +300,111 @@ class A2AClient:
                         break
         except httpx.HTTPError as exc:
             raise A2AAgentUnavailable(self._card_url, f"send_task failed: {exc!r}") from exc
+
+    async def _send_task_v1(
+        self, card: AgentCard, message: A2AMessage, *, skill_id: str | None
+    ) -> AsyncIterator[A2AArtifact]:
+        import httpx
+        from httpx_sse import aconnect_sse
+
+        method = v1c.METHOD_SEND_STREAMING_MESSAGE
+        params: dict[str, Any] = {
+            "message": convert.message_from_internal(message).model_dump(
+                by_alias=True, exclude_none=True, mode="json"
+            )
+        }
+        if skill_id is not None:
+            params["metadata"] = {"skillId": skill_id}
+        rid = uuid.uuid4().hex
+        body = {"jsonrpc": "2.0", "id": rid, "method": method, "params": self._v1_params(params)}
+        headers = await self._auth_headers()
+        headers["Accept"] = "text/event-stream"
+        headers[v1c.VERSION_HEADER] = v1c.A2A_V1_PROTOCOL_VERSION
+        try:
+            async with aconnect_sse(
+                self._http(), "POST", card.url, json=body, headers=headers
+            ) as event_source:
+                async for sse in event_source.aiter_sse():
+                    artifacts, done = self._parse_v1_event(sse.data)
+                    for artifact in artifacts:
+                        yield artifact
+                    if done:
+                        break
+        except httpx.HTTPError as exc:
+            self._count(method, "error")
+            raise A2AAgentUnavailable(self._card_url, f"send_task failed: {exc!r}") from exc
+        except A2AAgentUnavailable:
+            self._count(method, "error")
+            raise
+        self._count(method, "ok")
+
+    @staticmethod
+    def _parse_v1_event(data: str) -> tuple[list[A2AArtifact], bool]:
+        """One v1 ``StreamResponse`` → (artifacts, terminal?). Tolerant of bad events."""
+        try:
+            obj = json.loads(data)
+        except json.JSONDecodeError:
+            return [], False
+        if isinstance(obj, dict) and "error" in obj:
+            raise A2AAgentUnavailable("remote", f"jsonrpc error: {obj['error']}")
+        result = obj.get("result") if isinstance(obj, dict) else None
+        if not isinstance(result, dict):
+            return [], False
+        try:
+            event = StreamResponse.model_validate(result)
+        except Exception:
+            return [], False
+        if event.artifact_update is not None:
+            return [convert.artifact_to_internal(event.artifact_update.artifact)], False
+        if event.status_update is not None:
+            return [], event.status_update.status.state.value in v1c.TERMINAL_STATES
+        if event.task is not None:
+            arts = [convert.artifact_to_internal(a) for a in event.task.artifacts or []]
+            return arts, event.task.status.state.value in v1c.TERMINAL_STATES
+        if event.message is not None:
+            msg = convert.message_to_internal(event.message)
+            return [A2AArtifact(artifact_id=event.message.message_id, parts=msg.parts)], True
+        return [], False
+
+    async def list_tasks(self, params: ListTasksRequest) -> ListTasksResult:
+        """v1 ``ListTasks`` (tenant injected). A v0.3 peer ⇒ :class:`A2AVersionError`, no I/O."""
+        import httpx
+
+        if self._protocol == "0.3":
+            raise A2AVersionError("ListTasks requires an A2A 1.0 peer")
+        if self._card is not None:  # known peer: decide without any I/O
+            if self._version is None:
+                self._version = self._pick_version(self._card.model_dump(by_alias=True))
+            if self._version != "1.0":
+                raise A2AVersionError("ListTasks requires an A2A 1.0 peer")
+        card = await self._ensure_card()
+        if self._version != "1.0":
+            raise A2AVersionError("ListTasks requires an A2A 1.0 peer")
+        method = v1c.METHOD_LIST_TASKS
+        payload = params.model_dump(by_alias=True, exclude_none=True, mode="json")
+        body = {
+            "jsonrpc": "2.0",
+            "id": uuid.uuid4().hex,
+            "method": method,
+            "params": self._v1_params(payload),
+        }
+        headers = await self._auth_headers()
+        headers[v1c.VERSION_HEADER] = v1c.A2A_V1_PROTOCOL_VERSION
+        try:
+            resp = await self._http().post(card.url, json=body, headers=headers)
+            resp.raise_for_status()
+            obj = resp.json()
+            if "error" in obj:
+                raise A2AAgentUnavailable(self._card_url, f"jsonrpc error: {obj['error']}")
+            result = ListTasksResult.model_validate(obj["result"])
+        except (httpx.HTTPError, KeyError, ValueError) as exc:
+            self._count(method, "error")
+            raise A2AAgentUnavailable(self._card_url, f"list_tasks failed: {exc!r}") from exc
+        except A2AAgentUnavailable:
+            self._count(method, "error")
+            raise
+        self._count(method, "ok")
+        return result
 
     @staticmethod
     def _parse_event(data: str) -> tuple[A2AArtifact | None, bool]:
@@ -198,8 +434,8 @@ class A2AClient:
         """Best-effort ``tasks/cancel`` for a running task."""
         import httpx
 
-        card = await self.discover()
-        body = {
+        card = await self._ensure_card()
+        body: dict[str, Any] = {
             "jsonrpc": "2.0",
             "id": task_id,
             "method": "tasks/cancel",
@@ -207,6 +443,10 @@ class A2AClient:
         }
         try:
             headers = await self._auth_headers()
+            if self._version == "1.0":
+                body["method"] = v1c.METHOD_CANCEL_TASK
+                body["params"] = self._v1_params({"id": task_id})
+                headers[v1c.VERSION_HEADER] = v1c.A2A_V1_PROTOCOL_VERSION
             resp = await self._http().post(card.url, json=body, headers=headers)
             resp.raise_for_status()
         except httpx.HTTPError as exc:  # pragma: no cover - best effort
@@ -222,10 +462,20 @@ class A2AConnectionManager:
         allowlist: list[str],
         strict: bool = True,
         auth: A2AAuth | None = None,
+        local_org_id: str | None = None,
+        principal: str | None = None,
+        prompter: AuthorizationPrompter | None = None,
+        vault: CredentialVaultPort | None = None,
+        redirect_uri: str | None = None,
     ) -> None:
         self._allowlist = list(allowlist)
         self._strict = strict
         self._auth = auth
+        self._local_org_id = local_org_id
+        self._principal = principal
+        self._prompter = prompter
+        self._vault = vault
+        self._redirect_uri = redirect_uri
         self._pool: dict[str, A2AClient] = {}
 
     async def get_client(self, card_url: str) -> A2AClient:
@@ -236,7 +486,17 @@ class A2AConnectionManager:
             raise A2AAgentUnavailable(card_url, "host not in outbound allowlist")
         client = self._pool.get(card_url)
         if client is None:
-            client = A2AClient(card_url, auth=self._auth)
+            client = A2AClient(
+                card_url,
+                auth=self._auth,
+                allowlist=self._allowlist,
+                strict=self._strict,
+                local_org_id=self._local_org_id,
+                principal=self._principal,
+                prompter=self._prompter,
+                vault=self._vault,
+                redirect_uri=self._redirect_uri,
+            )
             self._pool[card_url] = client
         return client
 

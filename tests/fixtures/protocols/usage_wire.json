@@ -1,0 +1,34 @@
+{
+  "contract": "prismal usage wire",
+  "spec": "SPEC-PRT-USG-001 (prismal) = SPEC-RH2-USG-001 (prismal-server) = SPEC-CS2-USG-001 (prismal-sdk)",
+  "since": "3.17.0",
+  "rule": "exactly these 12 keys, in this order; changes require a coordinated minor in all three repos",
+  "keys": [
+    {"name": "prompt_tokens", "type": "int", "min": 0, "doc": "All input tokens, including cached reads/writes"},
+    {"name": "completion_tokens", "type": "int", "min": 0, "doc": "All output tokens, including reasoning"},
+    {"name": "cache_read_tokens", "type": "int", "min": 0, "doc": "Subset of prompt_tokens served from provider cache"},
+    {"name": "cache_write_tokens", "type": "int", "min": 0, "doc": "Subset of prompt_tokens written to provider cache"},
+    {"name": "reasoning_tokens", "type": "int", "min": 0, "doc": "Subset of completion_tokens"},
+    {"name": "total_tokens", "type": "int", "min": 0, "doc": "prompt_tokens + completion_tokens"},
+    {"name": "calls", "type": "int", "min": 0, "doc": "LLM calls aggregated"},
+    {"name": "cost_usd", "type": "float", "min": 0, "doc": "USD, rounded to 6 decimals"},
+    {"name": "cost_source", "type": "str", "enum": ["gateway", "litellm", "table", "subscription", "none", "mixed"]},
+    {"name": "estimated", "type": "bool", "doc": "true unless every call was priced by gateway or litellm"},
+    {"name": "served_model", "type": "str|null", "doc": "Model that served the last call"},
+    {"name": "gateway", "type": "str|null", "doc": "GW gateway name; null = direct provider"}
+  ],
+  "example": {
+    "prompt_tokens": 1200,
+    "completion_tokens": 300,
+    "cache_read_tokens": 800,
+    "cache_write_tokens": 0,
+    "reasoning_tokens": 40,
+    "total_tokens": 1500,
+    "calls": 2,
+    "cost_usd": 0.004321,
+    "cost_source": "gateway",
+    "estimated": false,
+    "served_model": "anthropic/claude-sonnet-4.5",
+    "gateway": "openrouter"
+  }
+}

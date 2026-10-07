@@ -1,0 +1,1 @@
+{"jsonrpc": "2.0", "id": "c1", "method": "CancelTask", "params": {"tenant": "acme", "id": "task-1", "metadata": {"why": "user"}}}

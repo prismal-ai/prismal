@@ -1,0 +1,38 @@
+{
+  "name": "empty_run",
+  "description": "No chunks at all: RUN_STARTED, snapshot, RUN_FINISHED.",
+  "context": {
+    "run_id": "run-1",
+    "thread_id": "thread-1"
+  },
+  "initial_state": {},
+  "input": [],
+  "end": {
+    "kind": "finish",
+    "result": null
+  },
+  "summary_usage_wire": null,
+  "expected": [
+    {
+      "type": "RUN_STARTED",
+      "timestamp": 1760000000000,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "protocolVersion": "1.0"
+    },
+    {
+      "type": "STATE_SNAPSHOT",
+      "timestamp": 1760000000001,
+      "snapshot": {}
+    },
+    {
+      "type": "RUN_FINISHED",
+      "timestamp": 1760000000002,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "outcome": {
+        "type": "success"
+      }
+    }
+  ]
+}

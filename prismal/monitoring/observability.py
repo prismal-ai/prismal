@@ -196,6 +196,14 @@ class _RunRegistry:
         acc = self._runs.get(run_id)
         return acc.to_summary(run_id) if acc is not None else None
 
+    def session_summaries(self, session_id: str) -> list[RunSummary]:
+        """Every retained run of *session_id*, oldest first (PRT5-06)."""
+        return [
+            acc.to_summary(run_id)
+            for run_id, acc in list(self._runs.items())
+            if acc.session_id == session_id
+        ]
+
 
 def _export_records(summaries: Iterable[RunSummary], fmt: DatasetFormat) -> list[dict[str, Any]]:
     """Serialize *summaries* into per-format evaluation-dataset records (SPEC-OBS-PAR-003).
@@ -330,6 +338,10 @@ class DefaultObservabilityProvider:
             self._otel.increment_counter("observability_runs", 1, {"result": "completed"})
         return summary
 
+    def session_summaries(self, session_id: str) -> list[RunSummary]:
+        """Every retained run of *session_id* (PRT5-06 ``get_run_summary(turn="all")``)."""
+        return self._registry.session_summaries(session_id)
+
     def export_dataset(self, run_ids: Sequence[str], *, fmt: DatasetFormat) -> list[dict[str, Any]]:
         """Export known runs as per-format dataset records (unknown ids skipped)."""
         summaries = [s for rid in run_ids if (s := self._registry.summary(rid)) is not None]
@@ -387,6 +399,10 @@ class FakeObservabilityProvider:
     def get_run_summary(self, run_id: str) -> RunSummary | None:
         """Return the run snapshot, or ``None`` if unknown."""
         return self._registry.summary(run_id)
+
+    def session_summaries(self, session_id: str) -> list[RunSummary]:
+        """Every retained run of *session_id* (PRT5-06 ``get_run_summary(turn="all")``)."""
+        return self._registry.session_summaries(session_id)
 
     def export_dataset(self, run_ids: Sequence[str], *, fmt: DatasetFormat) -> list[dict[str, Any]]:
         """Export known runs as per-format dataset records (unknown ids skipped)."""

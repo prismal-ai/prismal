@@ -167,3 +167,86 @@ except RuntimeCompositionError as exc:
 `vector_store_backend`, `collection`) and `aclose` logs
 `composition.runtime_teardown` — parity with `mcp_initialized` /
 `vector_store.created`.
+
+---
+
+## 8. Host read surface (HRS, 3.17.0)
+
+`prismal-server` 0.2 reads engine state only through a small, versioned,
+**read-only** surface (`specs/composition-root/DELTA-2026-10-host-read-surface.md`).
+Everything is reached as **methods on the `RuntimeContext`** returned by
+`build_runtime` (no new imports); the frozen view dataclasses live in
+`prismal.composition.host_surface` (re-exported from `prismal.composition`) and
+may be imported for annotations / `isinstance` only. Their field names are the
+host wire names.
+
+### Per-tenant configuration — `build_runtime(config_source=)`
+
+```python
+ctx = await build_runtime(org_id="acme", config_source=tenant_source, mode="context")
+```
+
+When `config_source` is given the runtime's settings are
+`build_settings(ChainedConfigSource([config_source, <process source>]))` — the
+tenant source wins, the process source (the injected global one, else the
+default `EnvConfigSource`) fills the gaps — then `overrides` are layered on
+top. `settings` is ignored in that case. Nothing global is mutated: neither
+`set_config_source` nor `os.environ`. With `config_source=None` the behaviour is
+unchanged. The effective settings are exposed as `ctx.settings`
+(`build_test_runtime(settings=...)` accepts one too).
+
+### Read methods
+
+| Method | Returns | Notes |
+|---|---|---|
+| `budget_status(*, thread_id=None)` | `BudgetStatusView` | `BudgetGuard.check()` over the thread's per-run meter (`turn` / `session`, keyed by `session_id` = `thread_id`). `status` ∈ `within\|soft_exceeded\|hard_exceeded\|disabled\|unknown`; `breached_dimension` ∈ `tokens\|cost_usd\|calls\|wall_clock_s`; a `0` limit ⇒ `remaining=None`. No `thread_id`, an unseeded thread or another tenant's thread ⇒ `unknown`. `tenant` scope ⇒ `unknown` (Phase C has no tenant-wide meter yet). |
+| `await quota_windows()` | `list[QuotaWindowView]` | One view per gateway window (`credit\|5h\|daily\|weekly\|monthly`; engine `day/week/month` are renamed). `source="api"` for the gateway API, `"ledger"` for `QuotaLedger`; ledger USD windows are `unit="usd_equivalent"`. A failing gateway is omitted and counted. |
+| `audit_page(*, page=1, page_size=50, since=None)` | `AuditPageView` | Newest first, `page_size ≤ 200`, `seq` = 1-based record number in the log. Tenant contexts see records whose `org_id` field matches; records without `org_id` are visible only to an `org_id=None` context. `fields` is hash-first via an **allowlist**: numbers, booleans and `None` pass; a string (≤ 256 chars) passes only under a known-safe key (identifiers, agent/tool/model names, status/outcome/mode verdicts, and names ending in `_hash`, `_count`, `_length`, `_ms`, `_id`, …); every other value — any other string (e.g. `params`, `args`, `messages`, `inputs`, `result_preview`, `reason`) and every nested dict / list under any key — becomes `sha256:<16 hex>`. Bounded work: only the newest 100 000 records (`host_surface.AUDIT_SCAN_MAX_RECORDS`) are parsed; on a larger log older records are not paged and `total=None` (unknown). `total=None` when the audit port is not a file-backed `AuditLogger`. |
+| `verify_audit_chain(*, max_records=10_000)` | `AuditChainStatus` | `valid`, `broken` (+ `first_broken_seq`) or `unverified` (non-file audit port, unreadable log, or more than `max_records` records). Verifies the whole log file (the chain is process-wide). |
+| `decisions_report(*, since=None, until=None)` | `DecisionsReportView` | One row per DEC integration: `mode` (`resolve_mode`), `samples` / `agreement_ratio` from `ShadowRunner.report()` (`None` when `samples=0`), outcome counts and `llm_calls_avoided` from the in-process recorder. `decisions_enabled=False` ⇒ `enabled=False`, no rows. |
+| `routing_report(*, since=None, until=None)` | `RoutingReportView` | Per routing policy: decisions (by tier), escalations (by reason), plan-cache hits, `estimated_savings_usd` = Σ `prismal.routing_savings_usd` µUSD / 1e6. Escalations and plan-cache hits carry no policy label at their emit sites, so they are attributed to the configured `routing_policy` (which always has a row). `adaptive_routing_enabled=False` ⇒ `enabled=False`, no rows. |
+
+`a2a_routes()` (HRS1-08) lands with the A2A v1 Agent Card.
+
+**Never raise.** Every method returns its documented fallback (`unknown`,
+`unverified`, empty list/page, `enabled=False`) on an internal failure and
+increments `prismal.host_surface_errors_total{method}`. No method mutates engine
+state.
+
+### Report recorders and tenant scoping
+
+`prismal.monitoring.host_stats` keeps a process `DecisionStatsRecorder` and
+`RoutingStatsRecorder`, fed by a tap in `OTelManager.increment_counter` — i.e.
+at exactly the same points as the OTel counters (`decisions`,
+`llm_calls_avoided`, `routing_decisions`, `routing_escalations`,
+`plan_cache_hits`, `routing_savings_usd`), and also when OTel is disabled. They
+keep 1-minute buckets for `host_surface_stats_retention_h` (default 168 h), bound
+per-bucket key cardinality, and are thread-safe. A report's `window.since` is
+clamped to the later of the process start and the retention horizon (never
+extrapolated); `until` is clamped to now. Recorders are in-process and reset on
+restart.
+
+A sample's tenant comes from its `tenant` / `org_id` attribute when present,
+else from the `current_org` ContextVar. The DEC cascade tags `decisions` /
+`llm_calls_avoided` with `tenant` from the decide `context["org_id"]`, and AMR
+tags `routing_decisions` / `routing_savings_usd` from `state["metadata"]["org_id"]`
+— only when known, never invented. Everything else (e.g. `routing_escalations`,
+`plan_cache_hits`) relies on the ContextVar, so a multi-tenant host **wraps each
+graph run** in `ctx.bind_org()`:
+
+```python
+with ctx.bind_org():  # sync context manager over host_stats.use_org(ctx.org_id)
+    result = await graph.ainvoke(state, config)
+```
+
+`bind_org()` nests and restores the previous binding on exit (also on error);
+`org_id=None` binds "no tenant". The A2A inbound handler binds the request's
+tenant itself. A report for a context with `org_id=None` sees **all** samples;
+a tenant context sees only its own (unattributed samples belong to no tenant).
+
+### Deviation from the DELTA
+
+The DELTA describes the audit chain as xxhash. The L5 `AuditLogger` actually
+chains with **SHA-256** over `json.dumps(entry_without_entry_hash,
+sort_keys=True)` with `prev_hash` linking from the genesis `"0" * 64`;
+`verify_audit_chain` verifies what the code writes.

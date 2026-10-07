@@ -5,15 +5,25 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` (2026-10-06, v3.17.0; wire pins amended by `docs/adr/ADR-PRT-001-protocol-pins.md`) |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
-| **Target package version** | `3.17.0` (SemVer minor — new opt-in functionality, not yet started) |
+| **Target package version** | `3.17.0` (SemVer minor — new opt-in functionality) |
 | **PLAN** | `specs/protocol-upgrades-2026/PLAN.md` |
 | **Architecture** | `specs/protocol-upgrades-2026/ARCHITECTURE.md` |
 | **TASKS** | `specs/protocol-upgrades-2026/TASKS.md` |
 
 ---
+
+> **Amended 2026-10-06 (PRT0):** every **[verify]** name below is superseded by
+> `docs/adr/ADR-PRT-001-protocol-pins.md`. Main changes: A2A version `"1.0"`, PascalCase v1
+> methods (`ListTasks`, not `tasks/list`), `tenant` in request params, `TASK_STATE_*` states,
+> `Part` oneof without `kind`, `supportedInterfaces[].protocolBinding`, no `multi_tenant`
+> capability, header-less requests default to 0.3, last page token `""`; MCP stays on the
+> `mcp` 1.28.1 SDK for legacy (stateless + tasks in-house on `httpx`), `cacheScope`
+> `public`/`private`, tasks `tasks/get|update|cancel`; AG-UI `"1.0"` has no `USAGE`/`INTERRUPT`
+> events (usage on `RUN_FINISHED.usage[]`, interrupts on `RUN_FINISHED.outcome`) and adds
+> `SUBAGENT_ERROR`.
 
 ## Conventions
 

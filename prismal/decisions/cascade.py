@@ -128,7 +128,8 @@ class DecisionCascade:
             await self._model_tiers(state, pending, resolved, policy, corroborate, allow_llm)
             self._finish_all(pending, resolved, reason=None)
 
-        self._emit(state, resolved, integration=integration, mode=mode)
+        tenant = (context or {}).get("org_id") or None
+        self._emit(state, resolved, integration=integration, mode=mode, tenant=tenant)
         self._audit_all(state, track, resolved, integration, mode, policy, context)
         return resolved
 
@@ -422,13 +423,21 @@ class DecisionCascade:
         *,
         integration: str,
         mode: DecisionMode,
+        tenant: str | None = None,
     ) -> None:
+        # HRS: tag the host-report counters with the tenant only when it is known.
+        scope = {"tenant": tenant} if tenant else {}
         if state.injection_flags:
             inc("decision_injection_flags", {"integration": integration})
         for d in resolved.values():
             inc(
                 "decisions",
-                {"integration": integration, "backend": d.backend, "outcome": d.outcome.value},
+                {
+                    "integration": integration,
+                    "backend": d.backend,
+                    "outcome": d.outcome.value,
+                    **scope,
+                },
             )
             hist("decision_latency_ms", d.latency_ms, {"backend": d.backend})
             if (
@@ -436,7 +445,7 @@ class DecisionCascade:
                 and d.outcome is Outcome.ACCEPTED
                 and d.backend != LLM_TIER
             ):
-                inc("llm_calls_avoided", {"integration": integration})
+                inc("llm_calls_avoided", {"integration": integration, **scope})
 
     def _audit_all(
         self,

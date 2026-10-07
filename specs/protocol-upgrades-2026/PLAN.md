@@ -5,11 +5,11 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` (2026-10-06, v3.17.0; wire pins amended by `docs/adr/ADR-PRT-001-protocol-pins.md`) |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | PRT (Protocol Upgrades 2026) |
-| **Target package version** | `3.17.0` (SemVer minor — new opt-in functionality, not yet started) |
+| **Target package version** | `3.17.0` (SemVer minor — new opt-in functionality) |
 | **Reviewers** | Tech Lead, AI Architect, Security Lead |
 | **Priority** | P1 (interop with the 2026 agent ecosystem; unblocks `prismal-server` 0.2 AG-UI mode and A2A v1 routes) |
 | **Related** | `docs/gap-analysis-gateways-tokens-decisions-2026-10.md` (§2 "Protocols" row, §3.4 last row, §5 row 5), `specs/a2a-interop/` (Phase I — the v0.3 stack this spec makes dual-stack), `specs/tool-provider-injection/` (Fase Y — `McpToolProvider`), `specs/composition-root/` (Fase R — per-tenant `RuntimeContext`), `specs/token-efficiency/` (TKE1 usage fields, TKE3 forward reference to `ttlMs`), `specs/identity/` (IDN — `CredentialVault`), satellite deltas `prismal-server/specs/host-v0.2-usage-gateways-agui/`, `prismal-sdk/specs/client-v0.2-usage-agui/` |

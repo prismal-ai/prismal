@@ -1,0 +1,225 @@
+{
+  "name": "tool_error",
+  "description": "A tool call whose ToolMessage has status=error; content is passed through as produced.",
+  "context": {
+    "run_id": "run-1",
+    "thread_id": "thread-1"
+  },
+  "initial_state": {},
+  "input": [
+    [
+      "messages",
+      [
+        {
+          "__class__": "AIMessageChunk",
+          "content": "",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "AIMessageChunk",
+          "id": "msg-1",
+          "tool_calls": [
+            {
+              "name": "read_file",
+              "args": {
+                "path": "/x"
+              },
+              "id": "call-1",
+              "type": "tool_call"
+            }
+          ],
+          "invalid_tool_calls": [],
+          "tool_call_chunks": [
+            {
+              "name": "read_file",
+              "args": "{\"path\": \"/x\"}",
+              "id": "call-1",
+              "index": 0,
+              "type": "tool_call_chunk"
+            }
+          ]
+        },
+        {
+          "langgraph_node": "agent",
+          "langgraph_step": 1
+        }
+      ]
+    ],
+    [
+      "messages",
+      [
+        {
+          "__class__": "ToolMessage",
+          "content": "Error: permission denied",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "tool",
+          "id": "tool-1",
+          "tool_call_id": "call-1",
+          "status": "error"
+        },
+        {
+          "langgraph_node": "tools",
+          "langgraph_step": 1
+        }
+      ]
+    ],
+    [
+      "updates",
+      {
+        "tools": {
+          "tool_errors": [
+            {
+              "tool": "read_file"
+            }
+          ]
+        }
+      }
+    ],
+    [
+      "messages",
+      [
+        {
+          "__class__": "AIMessageChunk",
+          "content": "I could not read the file.",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "AIMessageChunk",
+          "id": "msg-2",
+          "tool_calls": [],
+          "invalid_tool_calls": [],
+          "tool_call_chunks": [],
+          "chunk_position": "last"
+        },
+        {
+          "langgraph_node": "agent",
+          "langgraph_step": 1
+        }
+      ]
+    ]
+  ],
+  "end": {
+    "kind": "finish",
+    "result": null
+  },
+  "summary_usage_wire": {
+    "prompt_tokens": 50,
+    "completion_tokens": 10,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "reasoning_tokens": 0,
+    "total_tokens": 60,
+    "calls": 1,
+    "cost_usd": 0.0,
+    "cost_source": "table",
+    "estimated": true,
+    "served_model": null,
+    "gateway": null
+  },
+  "expected": [
+    {
+      "type": "RUN_STARTED",
+      "timestamp": 1760000000000,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "protocolVersion": "1.0"
+    },
+    {
+      "type": "STATE_SNAPSHOT",
+      "timestamp": 1760000000001,
+      "snapshot": {}
+    },
+    {
+      "type": "TOOL_CALL_START",
+      "timestamp": 1760000000002,
+      "toolCallId": "call-1",
+      "toolCallName": "read_file",
+      "parentMessageId": "msg-1"
+    },
+    {
+      "type": "TOOL_CALL_ARGS",
+      "timestamp": 1760000000003,
+      "toolCallId": "call-1",
+      "delta": "{\"path\": \"/x\"}"
+    },
+    {
+      "type": "TOOL_CALL_END",
+      "timestamp": 1760000000004,
+      "toolCallId": "call-1"
+    },
+    {
+      "type": "TOOL_CALL_RESULT",
+      "timestamp": 1760000000005,
+      "messageId": "tool-1",
+      "toolCallId": "call-1",
+      "content": "Error: permission denied",
+      "role": "tool"
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000006,
+      "stepName": "tools"
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000007,
+      "stepName": "tools"
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "timestamp": 1760000000008,
+      "messageId": "msg-2",
+      "role": "assistant"
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "timestamp": 1760000000009,
+      "messageId": "msg-2",
+      "delta": "I could not read the file."
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "timestamp": 1760000000010,
+      "messageId": "msg-2"
+    },
+    {
+      "type": "CUSTOM",
+      "timestamp": 1760000000011,
+      "name": "prismal.usage",
+      "value": {
+        "prompt_tokens": 50,
+        "completion_tokens": 10,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0,
+        "total_tokens": 60,
+        "calls": 1,
+        "cost_usd": 0.0,
+        "cost_source": "table",
+        "estimated": true,
+        "served_model": null,
+        "gateway": null
+      }
+    },
+    {
+      "type": "RUN_FINISHED",
+      "timestamp": 1760000000012,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "outcome": {
+        "type": "success"
+      },
+      "usage": [
+        {
+          "provider": "unknown",
+          "model": "unknown",
+          "inputTokens": 50,
+          "outputTokens": 10,
+          "totalTokens": 60,
+          "reasoningTokens": 0,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0
+        }
+      ]
+    }
+  ]
+}

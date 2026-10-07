@@ -1,0 +1,86 @@
+{
+  "name": "unknown_chunk_raw",
+  "description": "Unknown modes and custom payloads fall back to RAW carrying only {mode, payload_type}.",
+  "context": {
+    "run_id": "run-1",
+    "thread_id": "thread-1",
+    "include_state_deltas": false,
+    "include_usage": false
+  },
+  "initial_state": null,
+  "input": [
+    [
+      "debug",
+      {
+        "step": 1,
+        "payload": {
+          "type": "task"
+        }
+      }
+    ],
+    [
+      "custom",
+      {
+        "progress": 0.5
+      }
+    ],
+    [
+      "custom",
+      {
+        "type": "subagent",
+        "phase": "end",
+        "id": "never-started"
+      }
+    ]
+  ],
+  "end": {
+    "kind": "finish",
+    "result": null
+  },
+  "summary_usage_wire": null,
+  "expected": [
+    {
+      "type": "RUN_STARTED",
+      "timestamp": 1760000000000,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "protocolVersion": "1.0"
+    },
+    {
+      "type": "RAW",
+      "timestamp": 1760000000001,
+      "event": {
+        "mode": "debug",
+        "payload_type": "dict"
+      },
+      "source": "langgraph"
+    },
+    {
+      "type": "RAW",
+      "timestamp": 1760000000002,
+      "event": {
+        "mode": "custom",
+        "payload_type": "dict"
+      },
+      "source": "langgraph.custom"
+    },
+    {
+      "type": "RAW",
+      "timestamp": 1760000000003,
+      "event": {
+        "mode": "custom",
+        "payload_type": "dict"
+      },
+      "source": "langgraph.custom"
+    },
+    {
+      "type": "RUN_FINISHED",
+      "timestamp": 1760000000004,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "outcome": {
+        "type": "success"
+      }
+    }
+  ]
+}

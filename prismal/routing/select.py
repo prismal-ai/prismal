@@ -354,7 +354,8 @@ def select_model(
         },
     ):
         otel.increment_counter(
-            "routing_decisions", attributes={"policy": choice.policy, "tier": choice.tier.value}
+            "routing_decisions",
+            attributes={"policy": choice.policy, "tier": choice.tier.value, **_tenant_attr(state)},
         )
     if settings.routing_mode == "shadow":
         routing.setdefault("shadow", {})[agent] = {**_view(choice), "reason": choice.reason}
@@ -368,8 +369,20 @@ def select_model(
     return choice
 
 
+def _tenant_attr(state: Any) -> dict[str, str]:
+    """``{"tenant": org_id}`` when the run's metadata names one, else ``{}`` (HRS)."""
+    metadata = state.get("metadata") if isinstance(state, dict) else None
+    org_id = metadata.get("org_id") if isinstance(metadata, dict) else None
+    return {"tenant": str(org_id)} if org_id else {}
+
+
 def _record_savings(
-    choice: ModelChoice, outcome: RoutingOutcome, static: StaticTierPolicy, settings: Settings
+    choice: ModelChoice,
+    outcome: RoutingOutcome,
+    static: StaticTierPolicy,
+    settings: Settings,
+    *,
+    tenant: Mapping[str, str] | None = None,
 ) -> None:
     usage = outcome.usage
     if usage is None:
@@ -386,7 +399,7 @@ def _record_savings(
         OTelManager().increment_counter(
             "routing_savings_usd",
             saved_micro,
-            attributes={"policy": choice.policy, "tier": choice.tier.value},
+            attributes={"policy": choice.policy, "tier": choice.tier.value, **(tenant or {})},
         )
 
 
@@ -432,7 +445,7 @@ def record_outcome(state: Any, agent: str, outcome: RoutingOutcome) -> ModelChoi
             except Exception as exc:
                 logger.warning("routing.predictor_update_failed", error=type(exc).__name__)
         if settings.routing_mode == "enforce":  # shadow choices never ran
-            _record_savings(choice, outcome, static, settings)
+            _record_savings(choice, outcome, static, settings, tenant=_tenant_attr(state))
         return None
     features = bucket["features"].get(agent)
     if features is not None:

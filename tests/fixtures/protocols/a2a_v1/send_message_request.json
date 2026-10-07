@@ -1,0 +1,24 @@
+{
+  "jsonrpc": "2.0",
+  "id": "req-1",
+  "method": "SendMessage",
+  "params": {
+    "tenant": "acme",
+    "message": {
+      "messageId": "msg-1",
+      "contextId": "ctx-1",
+      "role": "ROLE_USER",
+      "parts": [
+        {"text": "Bill ACME 100 EUR", "mediaType": "text/plain"},
+        {"data": {"amount": 100, "currency": "EUR"}, "mediaType": "application/json"},
+        {"url": "https://files.acme/po.pdf", "mediaType": "application/pdf", "filename": "po.pdf"},
+        {"raw": "aGVsbG8=", "mediaType": "application/octet-stream", "filename": "h.bin", "metadata": {"k": "v"}}
+      ],
+      "metadata": {"trace": "t-1"},
+      "extensions": ["https://acme.example/ext/audit/v1"],
+      "referenceTaskIds": ["task-0"]
+    },
+    "configuration": {"acceptedOutputModes": ["text/plain"], "historyLength": 5, "blocking": true},
+    "metadata": {"origin": "crm"}
+  }
+}

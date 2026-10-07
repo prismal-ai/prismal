@@ -1,0 +1,203 @@
+{
+  "name": "react_text",
+  "description": "Plain ReAct answer streamed as text chunks, then the node update.",
+  "context": {
+    "run_id": "run-1",
+    "thread_id": "thread-1"
+  },
+  "initial_state": {
+    "current_agent": "supervisor"
+  },
+  "input": [
+    [
+      "messages",
+      [
+        {
+          "__class__": "AIMessageChunk",
+          "content": "Hello",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "AIMessageChunk",
+          "id": "msg-1",
+          "tool_calls": [],
+          "invalid_tool_calls": [],
+          "tool_call_chunks": []
+        },
+        {
+          "langgraph_node": "agent",
+          "langgraph_step": 1
+        }
+      ]
+    ],
+    [
+      "messages",
+      [
+        {
+          "__class__": "AIMessageChunk",
+          "content": ", world",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "AIMessageChunk",
+          "id": "msg-1",
+          "tool_calls": [],
+          "invalid_tool_calls": [],
+          "tool_call_chunks": []
+        },
+        {
+          "langgraph_node": "agent",
+          "langgraph_step": 1
+        }
+      ]
+    ],
+    [
+      "messages",
+      [
+        {
+          "__class__": "AIMessageChunk",
+          "content": "",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "AIMessageChunk",
+          "id": "msg-1",
+          "tool_calls": [],
+          "invalid_tool_calls": [],
+          "tool_call_chunks": [],
+          "chunk_position": "last"
+        },
+        {
+          "langgraph_node": "agent",
+          "langgraph_step": 1
+        }
+      ]
+    ],
+    [
+      "updates",
+      {
+        "agent": {
+          "current_agent": "agent",
+          "messages": [
+            "<omitted>"
+          ]
+        }
+      }
+    ]
+  ],
+  "end": {
+    "kind": "finish",
+    "result": null
+  },
+  "summary_usage_wire": {
+    "prompt_tokens": 1200,
+    "completion_tokens": 300,
+    "cache_read_tokens": 800,
+    "cache_write_tokens": 0,
+    "reasoning_tokens": 40,
+    "total_tokens": 1500,
+    "calls": 2,
+    "cost_usd": 0.004321,
+    "cost_source": "gateway",
+    "estimated": false,
+    "served_model": "anthropic/claude-sonnet-4.5",
+    "gateway": "openrouter"
+  },
+  "expected": [
+    {
+      "type": "RUN_STARTED",
+      "timestamp": 1760000000000,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "protocolVersion": "1.0"
+    },
+    {
+      "type": "STATE_SNAPSHOT",
+      "timestamp": 1760000000001,
+      "snapshot": {
+        "current_agent": "supervisor"
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "timestamp": 1760000000002,
+      "messageId": "msg-1",
+      "role": "assistant"
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "timestamp": 1760000000003,
+      "messageId": "msg-1",
+      "delta": "Hello"
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "timestamp": 1760000000004,
+      "messageId": "msg-1",
+      "delta": ", world"
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "timestamp": 1760000000005,
+      "messageId": "msg-1"
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000006,
+      "stepName": "agent"
+    },
+    {
+      "type": "STATE_DELTA",
+      "timestamp": 1760000000007,
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/current_agent",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000008,
+      "stepName": "agent"
+    },
+    {
+      "type": "CUSTOM",
+      "timestamp": 1760000000009,
+      "name": "prismal.usage",
+      "value": {
+        "prompt_tokens": 1200,
+        "completion_tokens": 300,
+        "cache_read_tokens": 800,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 40,
+        "total_tokens": 1500,
+        "calls": 2,
+        "cost_usd": 0.004321,
+        "cost_source": "gateway",
+        "estimated": false,
+        "served_model": "anthropic/claude-sonnet-4.5",
+        "gateway": "openrouter"
+      }
+    },
+    {
+      "type": "RUN_FINISHED",
+      "timestamp": 1760000000010,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "outcome": {
+        "type": "success"
+      },
+      "usage": [
+        {
+          "provider": "openrouter",
+          "model": "anthropic/claude-sonnet-4.5",
+          "inputTokens": 1200,
+          "outputTokens": 300,
+          "totalTokens": 1500,
+          "reasoningTokens": 40,
+          "cachedInputTokens": 800,
+          "cacheWriteInputTokens": 0
+        }
+      ]
+    }
+  ]
+}

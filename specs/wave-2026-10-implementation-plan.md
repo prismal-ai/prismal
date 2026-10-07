@@ -7,7 +7,7 @@
 | **Baseline** | `prismal` v3.12.0 (tag `prismal/v3.12.0`) |
 | **Source** | `docs/gap-analysis-gateways-tokens-decisions-2026-10.md`, `specs/roadmap.md` (wave 9) |
 | **Scope** | The seven `READY` SDDs of the wave: TKE, GW, DEC, AMR, PRT, HRS, MEM |
-| **Status** | `ACTIVE` — M0, M1 (TKE, v3.13.0), M2 (GW, v3.14.0) and M3 (DEC, v3.15.0) done 2026-10-05; M4 (AMR, v3.16.0) done 2026-10-06; next: M5 (PRT + HRS). Per-task detail stays in each spec's `TASKS.md` |
+| **Status** | `ACTIVE` — M0, M1 (TKE, v3.13.0), M2 (GW, v3.14.0) and M3 (DEC, v3.15.0) done 2026-10-05; M4 (AMR, v3.16.0) and M5 (PRT + HRS, v3.17.0) done 2026-10-06; next: M6 (MEM). Per-task detail stays in each spec's `TASKS.md` |
 
 This document does **not** replace the per-spec `TASKS.md`. It sequences them, closes the
 cross-spec gaps found while reading them together, and defines milestones with a done-gate.
@@ -195,7 +195,9 @@ Run on separate branches while M1 is in progress; they merge but are **released*
 
 ---
 
-### M5 — PRT + HRS → 3.17.0 (≈ 11.4 d remaining after Track P)
+### M5 — PRT + HRS → 3.17.0 (≈ 11.4 d remaining after Track P) — ✅ IMPLEMENTED 2026-10-06
+
+> **Implemented 2026-10-06** with strict TDD (Track P had not started, so PRT1–PRT4 were built here, not rebased). PRT0 pins live in `docs/adr/ADR-PRT-001-protocol-pins.md`: A2A `"1.0"` with PascalCase methods and a header-less default of 0.3; MCP 2026-07-28 is not in the pinned `mcp` 1.28.1 SDK, so the stateless adapter and tasks extension are in-house on `httpx`; AG-UI 1.0 has no `USAGE`/`INTERRUPT` events (usage ⇒ `RUN_FINISHED.usage[]` + `CUSTOM prismal.usage`, interrupts ⇒ `RUN_FINISHED.outcome`). Background security review fixed a cross-tenant A2A task overwrite and OAuth refresh-token exfiltration / vault-partition issues. Open: SUBAGENT_* emitters in Skynet/MoA, `mcp` 2.x migration, notebook.
 
 | Phase | Tasks | Est. | Gate |
 |---|---|---|---|

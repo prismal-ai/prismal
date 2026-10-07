@@ -420,3 +420,33 @@ async def test_from_settings_builds_tiers_in_order(tmp_path: Path) -> None:
     cascade = DecisionCascade.from_settings(s, rule_hook=lambda _s, _q: None)
     assert cascade.tier_names == ("rule", "jev", "laya")
     await cascade.aclose()
+
+
+async def test_metrics_carry_tenant_from_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """HRS finding 7: the DEC counters carry the tenant when the caller knows it."""
+    from prismal.monitoring import otel
+
+    seen: list[tuple[str, dict[str, Any] | None]] = []
+
+    def fake_inc(self: Any, metric: str, value: int = 1, attributes: Any = None) -> None:
+        seen.append((metric, attributes))
+
+    monkeypatch.setattr(otel.OTelManager, "increment_counter", fake_inc)
+    laya = FakeDecisionAdapter({ROUTE.id: _confident()}, name="laya", model="laya-m")
+    cascade = DecisionCascade([laya], calibration=_store(tmp_path, (ROUTE.id, "laya-m")))
+    await cascade.decide(
+        _state(), {ROUTE.id: ROUTE}, policy=POLICY, integration="route", context={"org_id": "acme"}
+    )
+    assert (
+        "decisions",
+        {"integration": "route", "backend": "laya", "outcome": "accepted", "tenant": "acme"},
+    ) in seen
+    assert ("llm_calls_avoided", {"integration": "route", "tenant": "acme"}) in seen
+    seen.clear()
+    # unknown tenant (no / empty org_id) ⇒ no tenant attribute is invented
+    await cascade.decide(
+        _state(), {ROUTE.id: ROUTE}, policy=POLICY, integration="route", context={"org_id": None}
+    )
+    assert all("tenant" not in (attrs or {}) for _, attrs in seen)

@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ============================================================
 [project]
 name = "prismal-ai"
-version = "3.16.0"
+version = "3.17.0"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -455,6 +455,7 @@ markers = [
   "live_api: Tests that call real LLM APIs (require API keys)",
   "eval: Agent evaluation-harness suites (Phase V; deterministic with fakes)",
   "redteam: Adversarial / red-team containment suites (Phase V)",
+  "interop: Official protocol conformance suites (PRT6-06; opt-in via PRISMAL_INTEROP=1)",
 ]
 filterwarnings = [
   "error",

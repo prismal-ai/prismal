@@ -23,6 +23,19 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+#: Counter keys mirrored into the in-process host-surface recorders (HRS —
+#: ``prismal.monitoring.host_stats``); kept literal so this module never imports it eagerly.
+_HOST_STATS_METRICS: frozenset[str] = frozenset(
+    {
+        "decisions",
+        "llm_calls_avoided",
+        "routing_decisions",
+        "routing_escalations",
+        "plan_cache_hits",
+        "routing_savings_usd",
+    }
+)
+
 
 class _NoOpSpan:
     """No-op span used when OTEL is disabled."""
@@ -400,6 +413,7 @@ class OTelManager:
         self._register_gw_metrics()
         self._register_dec_metrics()
         self._register_amr_metrics()
+        self._register_prt_metrics()
 
     def _register_tke_metrics(self) -> None:
         """Token Efficiency (Phase TKE — SPEC-TKE-OTEL-001)."""
@@ -567,6 +581,48 @@ class OTelManager:
         for key, (name, description) in counters.items():
             self._counters[key] = self._meter.create_counter(name, description=description)
 
+    def _register_prt_metrics(self) -> None:
+        """Protocol Upgrades + Host Read Surface (SPEC-PRT-OTEL-001, SPEC-HRS-SUR-002)."""
+        counters = {
+            "a2a_requests": (
+                "prismal.a2a_requests_total",
+                "A2A requests by protocol_version, direction, method, outcome",
+            ),
+            "a2a_oauth_tokens": ("prismal.a2a_oauth_tokens_total", "A2A OAuth tokens by flow"),
+            "mcp_protocol_negotiations": (
+                "prismal.mcp_protocol_negotiations_total",
+                "MCP adapter selections by mode",
+            ),
+            "mcp_tool_cache_hits": ("prismal.mcp_tool_cache_hits_total", "MCP tool-list hits"),
+            "mcp_tool_cache_misses": (
+                "prismal.mcp_tool_cache_misses_total",
+                "MCP tool-list cache misses",
+            ),
+            "mcp_tool_list_changes": (
+                "prismal.mcp_tool_list_changes_total",
+                "MCP tool lists whose content hash changed, by server",
+            ),
+            "mcp_tasks": ("prismal.mcp_tasks_total", "MCP tasks by final status"),
+            "mcp_input_requests": (
+                "prismal.mcp_input_requests_total",
+                "MCP input requests by kind and action",
+            ),
+            "agui_events": ("prismal.agui_events_total", "AG-UI events emitted by type"),
+            "agui_translation_errors": (
+                "prismal.agui_translation_errors_total",
+                "AG-UI translation errors (chunk dropped)",
+            ),
+            "host_surface_errors": (
+                "prismal.host_surface_errors_total",
+                "Host read-surface methods that fell back, by method",
+            ),
+        }
+        for key, (name, description) in counters.items():
+            self._counters[key] = self._meter.create_counter(name, description=description)
+        self._histograms["mcp_task_wait_s"] = self._meter.create_histogram(
+            "prismal.mcp_task_wait_s", description="MCP task wall-clock wait (s)"
+        )
+
     @contextmanager
     def start_span(
         self,
@@ -612,6 +668,11 @@ class OTelManager:
             value: Amount to increment.
             attributes: Optional OTEL attribute labels.
         """
+        if metric in _HOST_STATS_METRICS:  # HRS: in-process mirror, works with OTel off
+            with suppress(Exception):
+                from prismal.monitoring import host_stats
+
+                host_stats.record_metric(metric, value, attributes)
         counter = self._counters.get(metric)
         if counter is not None:
             with suppress(Exception):

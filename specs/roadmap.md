@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | **Last updated** | 2026-10-06 |
-| **Package version** | 3.16.0 |
+| **Package version** | 3.17.0 |
 | **Author** | Ernesto Crespo |
 | **Latest spec** | `token-efficiency/` (TKE) · `llm-gateway-providers/` (GW) · `typed-decision-models/` (DEC) · `adaptive-model-routing/` (AMR) · `protocol-upgrades-2026/` (PRT) · `agentic-memory/` (MEM) — 2026-10-04 |
-| **Latest shipped** | `adaptive-model-routing/` (Phase AMR) — v3.16.0, 2026-10-06 (not yet tagged); DEC v3.15.0; GW v3.14.0; TKE v3.13.0 |
+| **Latest shipped** | `protocol-upgrades-2026/` (Phase PRT) + host read surface (HRS) — v3.17.0, 2026-10-06 (not yet tagged); AMR v3.16.0; DEC v3.15.0; GW v3.14.0; TKE v3.13.0 |
 
 Living index of every SDD under `specs/`: what has shipped, what is pending,
 and in which order the pending work fits together. Statuses are verified
@@ -48,6 +48,8 @@ Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented).
 | [`llm-gateway-providers/`](./llm-gateway-providers/) | GW | ✅ | `providers/gateways/`: `GatewayPort` + router (ContextVar/global), `GatewayChatLiteLLM` (served model / billed cost capture, 402 mapping, quota preflight), OpenRouter (ZDR + `data_collection:deny` defaults, sticky `session_id`, gateway-owned fallback, `/key` + `/generation`), OpenCode Zen/Go (protocol map, Go ToS guard, `QuotaLedger`), OmniRoute (fail-closed startup gate, floor 3.8.51), generic OpenAI-compatible; no double fallback; `subscription` cost mode; reconciler + quota gauge; per-tenant vault keys in `build_runtime`. Opt-in `llm_gateways_enabled`. Docs: `docs/gateways.md` · **v3.14.0** |
 | [`typed-decision-models/`](./typed-decision-models/) | DEC | ✅ | `decisions/`: `DecisionPort` + cascade rule → Laya (local) → Jev (TypeSafe / OpenRouter / laya-serve) → LLM; `DecisionStateBuilder` (fenced untrusted state, EN/ES authority-claim taint), forbidden-use lint, τ per risk tier + derangement shuffle, model-pinned calibration (temperature / isotonic, ES slice), shadow → enforce with drift demotion, hash-only audit; wired into supervisor routing, CRAG grading and an escalate-only guardrail pre-screen; HITL/tool/eval/ctx/swarm as library functions. Opt-in `decisions_enabled`. Docs: `docs/decisions.md` · **v3.15.0** |
 | [`adaptive-model-routing/`](./adaptive-model-routing/) | AMR | ✅ | `routing/`: `RoutingPolicyPort` + static parity tier map, budget-aware soft-cap downgrade, cascade with DEC adequacy check + cache affinity, OmniRouter-style batch assignment (Lagrangian dual + greedy, Skynet/MoA), Beta-Binomial predictor, intent-keyed plan cache (`LLMCompiler`), response cache, `BatchExecutor` (Anthropic / OpenAI / OpenRouter `:batch`); fail-closed risk floors; `get_llm(features=, state=)`; eval `routing-gate`. Opt-in `adaptive_routing_enabled` (shadow first). Docs: `docs/routing.md` · **v3.16.0** |
+| [`protocol-upgrades-2026/`](./protocol-upgrades-2026/) | PRT | ✅ | A2A v0.3 + v1.0 dual-stack (`a2a/v1/`, header/method negotiation, codecs, per-version Agent Card, task store + `ListTasks`, PKCE/device-code OAuth, cross-tenant task guard), MCP 2026-07-28 stateless adapter (`legacy`/`stateless`/`auto`, in-house on `httpx`, `mcp` 1.28.1 kept) + `ttlMs` tool-list cache + tasks extension + input requests, AG-UI 1.0 translator (`events/agui.py`), 12-key usage wire; `interop` conformance marker. Wire pins: ADR-PRT-001. Docs: `docs/protocols-2026.md` · **v3.17.0** |
+| [`composition-root/` HRS delta](./composition-root/DELTA-2026-10-host-read-surface.md) | HRS | ✅ | `RuntimeContext` read methods (`budget_status`, `quota_windows`, `audit_page`, `verify_audit_chain`, `decisions_report`, `routing_report`, `a2a_routes`), frozen view types, in-process stats recorders, `build_runtime(config_source=)`. Docs: `docs/composition-root.md` §8 · **v3.17.0** |
 
 ## 📋 Ready to implement (full SDD: PLAN + SPEC + ARCHITECTURE + TASKS)
 
@@ -57,8 +59,6 @@ Sourced from the 2026-10-04 gap analysis
 
 | Spec | Phase | What it adds | Depends on | Effort |
 |---|---|---|---|---|
-| [`protocol-upgrades-2026/`](./protocol-upgrades-2026/) | PRT | A2A v1.0 dual-stack (0.3 deprecated), MCP 2026-07-28 stateless client + `ttlMs` tool-list cache + tasks extension, AG-UI 1.0 event translator with usage events | I, Y, R | ~22.2 d |
-| [`composition-root/DELTA-2026-10-host-read-surface.md`](./composition-root/DELTA-2026-10-host-read-surface.md) | HRS | Public host read surface: usage wire, budget status, audit chain verification, `build_runtime(config_source=)`, tenant Agent Card URLs, decision/routing reports — the only engine entry points `prismal-server` 0.2 may import | R, OBS, TKE1, DEC, AMR | ~4.0 d |
 | [`agentic-memory/`](./agentic-memory/) | MEM | `MemoryPort` over existing stores (no breaking change), typed + decision-gated writes (Jev-Mem), budgeted recall with sufficiency/stop, sleep-time consolidation, ACE playbooks (procedural), optional temporal-graph adapter; deletion rule-based / HITL only | DEC, TKE, R, AMR5 (optional) | ~20.9 d |
 
 Satellite repos received matching specs on the same date: `prismal-server/specs/host-v0.2-usage-gateways-agui/` (RH2, 0.2.0),
@@ -67,7 +67,7 @@ and `DELTA-2026-10-usage-agui.md` in the webchat / tui / chatbot bootstrap specs
 
 ### Target package versions (strict SemVer — minor per phase)
 
-Current: **`3.16.0`** (AMR implemented; DEC `3.15.0`; GW `3.14.0`; TKE `3.13.0`; all phases through S+ shipped; LH `3.7.0`, NTS `3.8.0`, OBS `3.9.0`, ID8 `3.10.0`, BRP `3.11.0`, S+ `3.12.0`).
+Current: **`3.17.0`** (PRT + HRS implemented; AMR `3.16.0`; DEC `3.15.0`; GW `3.14.0`; TKE `3.13.0`; all phases through S+ shipped; LH `3.7.0`, NTS `3.8.0`, OBS `3.9.0`, ID8 `3.10.0`, BRP `3.11.0`, S+ `3.12.0`).
 
 | Order | Phase | Spec | Target version |
 |---|---|---|---|
@@ -75,7 +75,7 @@ Current: **`3.16.0`** (AMR implemented; DEC `3.15.0`; GW `3.14.0`; TKE `3.13.0`;
 | ✅ 2 | GW | [`llm-gateway-providers/`](./llm-gateway-providers/) | **`3.14.0`** (implemented 2026-10-05) |
 | ✅ 3 | DEC | [`typed-decision-models/`](./typed-decision-models/) | **`3.15.0`** (implemented 2026-10-05) |
 | ✅ 4 | AMR | [`adaptive-model-routing/`](./adaptive-model-routing/) | **`3.16.0`** (implemented 2026-10-06) |
-| 📋 5 | PRT + HRS | [`protocol-upgrades-2026/`](./protocol-upgrades-2026/) + host read surface delta | `3.17.0` |
+| ✅ 5 | PRT + HRS | [`protocol-upgrades-2026/`](./protocol-upgrades-2026/) + host read surface delta | **`3.17.0`** (implemented 2026-10-06) |
 | 📋 6 | MEM | [`agentic-memory/`](./agentic-memory/) | `3.18.0` |
 
 > A2A v0.3 removal (PRT) is the first planned breaking change → `4.0.0`, not before all hosts speak v1.0.

@@ -1099,6 +1099,41 @@ class BatchExecutorError(RoutingError):
     """A batch job failed and ``allow_sync_fallback`` is False."""
 
 
+# ── Protocol Upgrades 2026 (Phase PRT — SPEC-PRT-ERR-001) ────────────────────
+
+
+class ProtocolUpgradeError(PrismalError):
+    """Base for errors raised by the protocol-upgrade layer (Phase PRT)."""
+
+
+class A2AVersionError(ProtocolUpgradeError, A2AError):
+    """Unsupported / mismatched A2A protocol version (e.g. v1-only call to a v0.3 peer)."""
+
+
+class A2AOAuthError(ProtocolUpgradeError, A2AError):
+    """An A2A OAuth grant failed or needs an interactive prompter that is absent."""
+
+
+class McpProtocolError(ProtocolUpgradeError):
+    """Base for MCP protocol-adapter errors."""
+
+
+class McpDiscoveryError(McpProtocolError):
+    """``server/discover`` failed where a stateless server was required."""
+
+
+class McpTaskError(McpProtocolError):
+    """An MCP task failed or was cancelled."""
+
+
+class McpTaskTimeout(McpTaskError):  # noqa: N818 — SPEC-PRT-ERR-001 name
+    """An MCP task exceeded ``mcp_task_timeout_s`` (it was cancelled)."""
+
+
+class AgUiTranslationError(ProtocolUpgradeError):
+    """Internal/tests only — the AG-UI translator itself never raises."""
+
+
 class LoopHardeningError(PrismalError):
     """Base for errors raised by the loop-hardening layer (Phase LH)."""
 

@@ -18,6 +18,102 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   half-made release, so v3.12.0 shipped to PyPI and GHCR without a GitHub
   Release.
 
+## [3.17.0] — 2026-10-06
+
+> Phase PRT + HRS — **Protocol Upgrades 2026** and the **host read surface**,
+> the fifth milestone of wave 2026-10. A2A moves to a **v0.3 + v1.0
+> dual-stack**, MCP gains the **2026-07-28 stateless** wire, a TTL tool-list
+> cache and the **tasks extension** (in-house on `httpx`; the `mcp` SDK stays
+> pinned at 1.28.1), and a pure **AG-UI 1.0** event translator lands in
+> `prismal/events/agui.py`. A shared 12-key **usage wire** and read-only
+> `RuntimeContext` methods give hosts (prismal-server) budget, quota, audit,
+> decision and routing views. Every switch defaults off: the graph, the v0.3
+> Agent Card and the MCP request sequence equal 3.16.0 (snapshot-tested).
+> Wire names are pinned in `docs/adr/ADR-PRT-001-protocol-pins.md`; guide:
+> `docs/protocols-2026.md`.
+
+### Added
+- **A2A v1.0 dual-stack** (`prismal/a2a/`): `v1/{constants,types}.py` (PascalCase
+  methods, `TASK_STATE_*`, `Part` oneof, `supportedInterfaces[]`),
+  `negotiation.py` (`A2A-Version` header ⇒ method family ⇒ header-less 0.3;
+  unsupported ⇒ -32009), `convert.py` (v0.3 ⇄ v1 ⇄ internal codecs),
+  `build_agent_card(..., protocol_version=)`, `a2a_route_paths()`,
+  `task_store.py` (`A2ATaskStorePort`, `InMemoryA2ATaskStore`, `ListTasks`
+  paging max 100), `oauth.py` (PKCE authorization code, device code, client
+  credentials) and `A2AClient(protocol=, tenant=, local_org_id=, ...)` +
+  `list_tasks()`. `A2AServerHandler.handle_rpc/stream_rpc(headers=, org_id=)`;
+  `headers=None` keeps 3.16.0 behaviour.
+- **MCP 2026-07-28** (`prismal/mcp/`): `constants.py`, `protocol.py`
+  (`LegacySessionAdapter`, `StatelessHttpAdapter` — `_meta` + `MCP-Protocol-Version`
+  / `Mcp-Method` / `Mcp-Name` headers, pagination, multi-round-trip input —,
+  `select_adapter` / `negotiate_stateless` with a per-server memo),
+  `tool_cache.py` (`McpToolListCache`: `ttlMs`, `cacheScope`, canonical hash,
+  identity-preserving refresh, LRU), `tasks.py` (`McpTaskPoller`: backoff,
+  timeout ⇒ cancel + `McpTaskTimeout`, run cancellation ⇒ `tasks/cancel`),
+  `input_requests.py` (`InputRequestHandler`, `DeclineAllInputHandler`).
+  `MCPServerConnection` selects the adapter on connect from
+  `mcp_protocol_mode` (`legacy` default | `stateless` | `auto`);
+  `McpToolProvider(settings=, tool_cache=, org_id=, principal=)`.
+- **AG-UI 1.0 translator** (`prismal/events/agui.py`): 31 event types, Pydantic
+  models, `to_sse()`, `AgUiContext`, `start_run` / `to_agui_events` /
+  `finish_run` / `error_run` (never raise); interrupts ⇒
+  `RUN_FINISHED.outcome`, usage ⇒ `CUSTOM prismal.usage` + native
+  `RUN_FINISHED.usage[]`; 12 golden transcripts; `examples/agui_translate.py`.
+- **Usage wire.** `RunSummary.to_usage_wire()` (12 keys) and
+  `prismal.monitoring.get_run_summary(session_id, turn="last"|"all")`;
+  contract fixture `tests/fixtures/protocols/usage_wire.json`.
+- **Host read surface (HRS)** (`prismal/composition/host_surface.py`,
+  `prismal/monitoring/host_stats.py`): `RuntimeContext.budget_status()`,
+  `quota_windows()`, `audit_page()`, `verify_audit_chain()`,
+  `decisions_report()`, `routing_report()`, `a2a_routes()` (route ⇔ card
+  contract), `bind_org()` (tenant attribution for the stats recorders) — fail-open, frozen view types re-exported from
+  `prismal.composition`; in-process 1-minute stats recorders fed by an
+  `OTelManager.increment_counter` tap; `build_runtime(config_source=)` builds a
+  per-runtime `Settings` without touching the global source or `os.environ`.
+- **Settings** (`# --- PRT ---`): `a2a_protocol_version`, `a2a_accept_legacy`,
+  `a2a_tasks_list_max_page_size`, `a2a_inbound_auth_schemes`,
+  `a2a_oauth_redirect_uri`, `mcp_protocol_mode`, `mcp_stateless_protocol_version`,
+  `mcp_tool_cache_*`, `mcp_tasks_enabled`, `mcp_task_poll_*`,
+  `mcp_task_timeout_s`, `agui_events_enabled`, `agui_include_*`,
+  `host_surface_stats_retention_h`; `_validate_protocol_upgrades`.
+- **Exceptions**: `ProtocolUpgradeError`, `A2AVersionError`, `A2AOAuthError`,
+  `McpProtocolError`, `McpDiscoveryError`, `McpTaskError`, `McpTaskTimeout`,
+  `AgUiTranslationError`.
+- **Metrics**: `prismal.a2a_requests_total`, `a2a_oauth_tokens_total`,
+  `mcp_protocol_negotiations_total`, `mcp_tool_cache_{hits,misses}_total`,
+  `mcp_tool_list_changes_total`, `mcp_tasks_total`, `mcp_input_requests_total`,
+  `agui_events_total`, `agui_translation_errors_total`,
+  `host_surface_errors_total`, histogram `mcp_task_wait_s`.
+- **Interop** (opt-in `interop` marker, `PRISMAL_INTEROP=1`): AG-UI 1.0 schema
+  over the golden transcripts, `a2a-tck`, `@modelcontextprotocol/conformance`.
+
+### Security
+- A2A: a `SendMessage` reusing a task id owned by another org or principal
+  answers TaskNotFound (v1 -32001, v0.3 -32004) and is audited
+  (`a2a.inbound.tenant_mismatch`); ownership is reserved under a lock before
+  the graph runs and scoped runs use a per-owner graph thread id, so records are
+  never overwritten across tenants.
+- A2A OAuth: refresh tokens are keyed by token-endpoint origin + agent URL in
+  the **local** org's vault partition (never a remote-card name or tenant),
+  bound to their `token_url`; endpoints must be `https`, literal private /
+  loopback / link-local IPs are rejected, and `a2a_strict` requires the
+  outbound allowlist.
+- MCP: a task result is accepted only when the client declared the tasks
+  extension (else cancelled + `McpTaskError`); stateless mode declines
+  sampling / roots; elicitations default to decline + hash audit.
+
+### Changed
+- `prismal/mcp/connection.py` opens streamable-HTTP with
+  `streamable_http_client(http_client=...)` (the deprecated
+  `streamablehttp_client` wrapper is gone; same client configuration).
+
+### Known limits
+- No component emits the AG-UI `subagent` custom payload yet, so Skynet / MoA
+  runs show `STEP_*` but no `SUBAGENT_*` events.
+- OAuth endpoint checks do not resolve DNS: outside `a2a_strict` with no
+  allowlist, a hostname resolving to an internal address is not caught.
+- The `mcp` 2.x SDK migration and gRPC / HTTP+JSON A2A bindings are out of scope.
+
 ## [3.16.0] — 2026-10-06
 
 > Phase AMR — **Adaptive Model Routing**, the fourth phase of wave 2026-10.

@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "ListTasks",
+  "params": {
+    "tenant": "acme",
+    "contextId": "ctx-1",
+    "status": "TASK_STATE_WORKING",
+    "pageSize": 50,
+    "pageToken": "eyJ0IjoiMjAyNi0xMC0wNlQxMDowMDowMFoiLCJpZCI6InRhc2stMSJ9",
+    "historyLength": 2,
+    "statusTimestampAfter": "2026-10-01T00:00:00Z",
+    "includeArtifacts": true
+  }
+}

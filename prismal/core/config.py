@@ -1151,6 +1151,54 @@ class Settings(BaseSettings):
         description="Batch price / on-demand price (verified in AMR0-03; ADR-WAVE-001 §2.3).",
     )
 
+    # --- PRT --- Protocol Upgrades 2026 + Host Read Surface (SPEC-PRT-CFG-001, HRS) ──
+    # Defaults keep A2A v0.3, the legacy MCP session path and no AG-UI: the graph,
+    # the v0.3 Agent Card and the MCP request sequence are unchanged (GRD-001).
+    a2a_protocol_version: Literal["0.3", "1.0"] = Field(
+        default="0.3", description="Agent Card version + default inbound A2A stack."
+    )
+    a2a_accept_legacy: bool = Field(
+        default=True, description="Accept v0.3 requests when v1 is the primary stack."
+    )
+    a2a_tasks_list_max_page_size: int = Field(
+        default=200, ge=1, description="Upper bound for v1 tasks/list page size."
+    )
+    a2a_inbound_auth_schemes: list[str] = Field(
+        default_factory=list, description="Security schemes advertised in the v1 Agent Card."
+    )
+    a2a_oauth_redirect_uri: str | None = Field(
+        default=None, description="PKCE redirect URI (host callback); secrets live in the vault."
+    )
+    mcp_protocol_mode: Literal["auto", "legacy", "stateless"] = Field(
+        default="legacy", description="MCP adapter selection (legacy = today's session path)."
+    )
+    mcp_stateless_protocol_version: str = Field(
+        default="2026-07-28", description="Protocol version sent by the stateless MCP adapter."
+    )
+    mcp_tool_cache_enabled: bool = Field(default=False, description="TTL MCP tool-list cache.")
+    mcp_tool_cache_default_ttl_s: int = Field(
+        default=300, ge=1, description="Tool-list TTL when the server sends no ttlMs."
+    )
+    mcp_tool_cache_max_ttl_s: int = Field(default=86_400, ge=1, description="TTL ceiling.")
+    mcp_tool_cache_max_entries: int = Field(default=256, ge=1, description="LRU bound.")
+    mcp_tasks_enabled: bool = Field(default=False, description="MCP tasks extension.")
+    mcp_task_poll_interval_s: float = Field(default=1.0, gt=0.0, description="First poll delay.")
+    mcp_task_poll_max_interval_s: float = Field(
+        default=15.0, gt=0.0, description="Poll delay ceiling."
+    )
+    mcp_task_timeout_s: float = Field(default=900.0, gt=0.0, description="Task wall-clock limit.")
+    agui_events_enabled: bool = Field(
+        default=False, description="Expose the AG-UI event translator to the host."
+    )
+    agui_include_state_deltas: bool = Field(default=True, description="Emit STATE_DELTA.")
+    agui_include_usage: bool = Field(default=True, description="Emit prismal.usage on finish.")
+    agui_include_metadata: bool = Field(
+        default=True, description="Emit prismal.routing / prismal.decision CUSTOM events."
+    )
+    host_surface_stats_retention_h: int = Field(
+        default=168, ge=1, description="Retention of the host-surface report recorders (h)."
+    )
+
     # ── Blind Review Pipeline (Phase BRP — SPEC-BRP-CFG-001) ──────────
     # Opt-in; False ⇒ graph byte-for-byte unchanged (mirrors kokoro_enabled /
     # skynet_enabled / budget_enabled).
@@ -2750,6 +2798,23 @@ class Settings(BaseSettings):
             from prismal.decisions.calibration import validate_enforce_calibration
 
             validate_enforce_calibration(self)
+        return self
+
+    @model_validator(mode="after")
+    def _validate_protocol_upgrades(self) -> "Settings":
+        """Validate the protocol-upgrade settings (SPEC-PRT-CFG-001) at load time."""
+        if self.mcp_tool_cache_default_ttl_s > self.mcp_tool_cache_max_ttl_s:
+            raise ValueError(
+                "PRISMAL_MCP_TOOL_CACHE_DEFAULT_TTL_S must be <= PRISMAL_MCP_TOOL_CACHE_MAX_TTL_S."
+            )
+        if self.mcp_task_poll_interval_s > self.mcp_task_poll_max_interval_s:
+            raise ValueError(
+                "PRISMAL_MCP_TASK_POLL_INTERVAL_S must be <= PRISMAL_MCP_TASK_POLL_MAX_INTERVAL_S."
+            )
+        if self.a2a_protocol_version == "0.3" and not self.a2a_accept_legacy:
+            raise ValueError(
+                "PRISMAL_A2A_ACCEPT_LEGACY=false requires PRISMAL_A2A_PROTOCOL_VERSION=1.0."
+            )
         return self
 
     @model_validator(mode="after")

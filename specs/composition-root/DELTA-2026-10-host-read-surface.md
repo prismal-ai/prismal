@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` (2026-10-06, v3.17.0) |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | HRS (Host Read Surface) — delta to Fase R `specs/composition-root/` (implemented) |
@@ -115,16 +115,16 @@ A2ARouteSpec(card_path: str, rpc_path: str, tenant_scoped: bool)
 
 | ID | Task | Est. | Dep | SPEC | Status |
 |---|---|---|---|---|---|
-| HRS1-01 | Reconcile §3 with the host's current guard; `host_surface.py` view types + re-exports | 0.4 d | — | SUR-001 | TODO |
-| HRS1-02 | `build_runtime(config_source=)` via chained source, no global mutation | 0.4 d | HRS1-01 | CMP-001 | TODO |
-| HRS1-03 | `budget_status()` over tenant / per-run meters | 0.5 d | HRS1-01 | BUD-001 | TODO |
-| HRS1-04 | `quota_windows()` flattening GW `QuotaSnapshot` | 0.3 d | HRS1-01, GW5 | QTA-001 | TODO |
-| HRS1-05 | `audit_page()` + `verify_audit_chain()` | 0.6 d | HRS1-01 | AUD-001/002 | TODO |
-| HRS1-06 | `DecisionStatsRecorder` + `decisions_report()` | 0.5 d | DEC3 | DEC-001, WIN-001 | TODO |
-| HRS1-07 | `RoutingStatsRecorder` + `routing_report()` | 0.5 d | AMR6 | RTE-001, WIN-001 | TODO |
-| HRS1-08 | `a2a_routes()` + card/route consistency | 0.3 d | PRT1-06 | A2A-001 | TODO |
-| HRS1-09 | Signature-snapshot test, fail-open tests, graph snapshot, `host_surface_errors_total` counter | 0.3 d | HRS1-02..08 | SUR-001/002, GRD-001 | TODO |
-| HRS1-10 | `docs/composition-root.md` "Host read surface" section | 0.2 d | HRS1-09 | — | TODO |
+| HRS1-01 | Reconcile §3 with the host's current guard; `host_surface.py` view types + re-exports | 0.4 d | — | SUR-001 | DONE |
+| HRS1-02 | `build_runtime(config_source=)` via chained source, no global mutation | 0.4 d | HRS1-01 | CMP-001 | DONE |
+| HRS1-03 | `budget_status()` over tenant / per-run meters | 0.5 d | HRS1-01 | BUD-001 | DONE |
+| HRS1-04 | `quota_windows()` flattening GW `QuotaSnapshot` | 0.3 d | HRS1-01, GW5 | QTA-001 | DONE |
+| HRS1-05 | `audit_page()` + `verify_audit_chain()` | 0.6 d | HRS1-01 | AUD-001/002 | DONE |
+| HRS1-06 | `DecisionStatsRecorder` + `decisions_report()` | 0.5 d | DEC3 | DEC-001, WIN-001 | DONE |
+| HRS1-07 | `RoutingStatsRecorder` + `routing_report()` | 0.5 d | AMR6 | RTE-001, WIN-001 | DONE |
+| HRS1-08 | `a2a_routes()` + card/route consistency | 0.3 d | PRT1-06 | A2A-001 | DONE |
+| HRS1-09 | Signature-snapshot test, fail-open tests, graph snapshot, `host_surface_errors_total` counter | 0.3 d | HRS1-02..08 | SUR-001/002, GRD-001 | DONE |
+| HRS1-10 | `docs/composition-root.md` "Host read surface" section | 0.2 d | HRS1-09 | — | DONE |
 | **Total** | | **~4.0 d** | | | |
 
 ## 6. Tests

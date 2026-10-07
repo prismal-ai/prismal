@@ -391,3 +391,29 @@ def test_savings_priced_with_run_settings_table(tiers_yaml: str) -> None:
     otel.return_value.increment_counter.assert_any_call(
         "routing_savings_usd", 8000, attributes={"policy": "cascade", "tier": "small"}
     )
+
+
+def test_counters_carry_tenant_from_state_metadata(tiers_yaml: str) -> None:
+    """HRS finding 7: AMR counters carry the tenant when the state knows it."""
+    s = _settings(tiers_yaml, routing_policy="cascade")
+    state = _state(org_id="acme")
+    with patch("prismal.routing.select.OTelManager") as otel:
+        select_model(state, "coder", settings=s)
+    otel.return_value.increment_counter.assert_any_call(
+        "routing_decisions", attributes={"policy": "cascade", "tier": "small", "tenant": "acme"}
+    )
+    usage = Usage(prompt_tokens=1000, completion_tokens=100, cost_usd=0.001, calls=1)
+
+    class _Est:
+        cost_usd = 0.011
+
+    with (
+        patch("prismal.routing.select.compute_cost_usd", return_value=_Est()),
+        patch("prismal.routing.select.OTelManager") as otel,
+    ):
+        record_outcome(state, "coder", RoutingOutcome(success=True, usage=usage))
+    otel.return_value.increment_counter.assert_any_call(
+        "routing_savings_usd",
+        10_000,
+        attributes={"policy": "cascade", "tier": "small", "tenant": "acme"},
+    )

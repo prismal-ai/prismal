@@ -5,11 +5,11 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` (2026-10-06, v3.17.0; wire pins amended by `docs/adr/ADR-PRT-001-protocol-pins.md`) |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | PRT |
-| **Target package version** | `3.17.0` (SemVer minor — new opt-in functionality, not yet started) |
+| **Target package version** | `3.17.0` (SemVer minor — new opt-in functionality) |
 | **PLAN** | `specs/protocol-upgrades-2026/PLAN.md` |
 | **SPEC** | `specs/protocol-upgrades-2026/SPEC.md` |
 | **TASKS** | `specs/protocol-upgrades-2026/TASKS.md` |
