@@ -47,6 +47,7 @@ from typing import TYPE_CHECKING, Any
 from prismal.core.exceptions import MemoryBackendUnavailable, MemoryErasureIncomplete
 from prismal.core.logging import get_logger
 from prismal.memory.v2.graph.sqlite import SqliteMemoryGraph
+from prismal.memory.v2.types import MemoryScope, within_erasure_scope
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -56,7 +57,6 @@ if TYPE_CHECKING:
         ForgetActor,
         MemoryEdge,
         MemoryRecord,
-        MemoryScope,
         RelationKind,
     )
 
@@ -68,6 +68,9 @@ CREATE TABLE IF NOT EXISTS mv2_graphiti_episodes (
     record_id    TEXT NOT NULL,
     episode_uuid TEXT NOT NULL,
     digest       TEXT NOT NULL,
+    user_id      TEXT,
+    agent        TEXT,
+    thread_id    TEXT,
     PRIMARY KEY (org_id, record_id)
 );
 """
@@ -163,19 +166,34 @@ class GraphitiMemoryGraph:
         if isinstance(episode_uuid, str):
             with self._lock:
                 self._index.execute(
-                    "INSERT OR REPLACE INTO mv2_graphiti_episodes VALUES (?, ?, ?, ?)",
-                    (key[0], key[1], episode_uuid, digest),
+                    "INSERT OR REPLACE INTO mv2_graphiti_episodes VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        key[0],
+                        key[1],
+                        episode_uuid,
+                        digest,
+                        scope.user_id,
+                        scope.agent,
+                        scope.thread_id,
+                    ),
                 )
                 self._index.commit()
 
     def _episode(self, key: tuple[str, str]) -> tuple[str, str] | None:
+        found = self._indexed(key)
+        return None if found is None else (found[0], found[1])
+
+    def _indexed(self, key: tuple[str, str]) -> tuple[str, str, MemoryScope] | None:
         with self._lock:
             row = self._index.execute(
-                "SELECT episode_uuid, digest FROM mv2_graphiti_episodes"
-                " WHERE org_id = ? AND record_id = ?",
+                "SELECT episode_uuid, digest, user_id, agent, thread_id"
+                " FROM mv2_graphiti_episodes WHERE org_id = ? AND record_id = ?",
                 key,
             ).fetchone()
-        return None if row is None else (str(row[0]), str(row[1]))
+        if row is None:
+            return None
+        scope = MemoryScope(org_id=key[0], user_id=row[2], agent=row[3], thread_id=row[4])
+        return str(row[0]), str(row[1]), scope
 
     async def add_edge(self, edge: MemoryEdge, *, scope: MemoryScope) -> None:
         """Store an explicit typed temporal edge (local)."""
@@ -259,9 +277,9 @@ class GraphitiMemoryGraph:
         failed = 0
         for rid in record_ids:
             key = (scope.org_id, rid)
-            known = self._episode(key)
-            if known is None:
-                continue
+            known = self._indexed(key)
+            if known is None or not within_erasure_scope(scope, known[2]):
+                continue  # never a wider or sibling scope's episode
             if not callable(remover):
                 failed += 1
                 continue

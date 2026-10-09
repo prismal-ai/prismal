@@ -162,6 +162,23 @@ async def test_purge_nodes_erases_nodes_and_incident_edges(graph: SqliteMemoryGr
     assert len(await graph.neighbors("a", scope=ORG_B, as_of=None)) == 1  # other tenant kept
 
 
+async def test_narrow_purge_never_erases_nodes_outside_its_scope(
+    graph: SqliteMemoryGraph,
+) -> None:
+    # Security review: purge matched org + id only, so a user-scoped erasure could
+    # remove another user's (or an org-wide) node and its edges.
+    alice = MemoryScope(org_id="org-a", user_id="alice")
+    bob = MemoryScope(org_id="org-a", user_id="bob")
+    await graph.upsert_node(_record("mine", alice))
+    await graph.upsert_node(_record("bobs", bob))
+    await graph.upsert_node(_record("shared", ORG_A))
+    await graph.add_edge(_edge("bobs", "shared"), scope=ORG_A)
+    removed = await graph.purge_nodes(["mine", "bobs", "shared"], scope=alice, _authorized=RULE)
+    assert removed == 1
+    assert graph.node_count(scope=ORG_A) == 2
+    assert len(await graph.neighbors("bobs", scope=ORG_A, as_of=None)) == 1
+
+
 async def test_purge_nodes_requires_actor(graph: SqliteMemoryGraph) -> None:
     with pytest.raises(TypeError):
         await graph.purge_nodes(["a"], scope=ORG_A, _authorized=None)  # type: ignore[arg-type]

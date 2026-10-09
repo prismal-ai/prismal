@@ -358,6 +358,7 @@ class PlaybookCurator:
             record = sources.get(rid) if sources is not None else None
             if (
                 record is None
+                or record.id != rid  # the lookup must return the cited record itself
                 or not _shared_with(record.scope, playbook)
                 or record.provenance.tainted
                 or record.provenance.trust != "trusted"

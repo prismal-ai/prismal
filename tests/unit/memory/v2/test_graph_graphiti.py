@@ -292,3 +292,16 @@ async def test_failed_episode_removal_raises_and_is_retryable() -> None:
         await graph.purge_nodes(["r1"], scope=ORG_A, _authorized=RULE)
     await graph.purge_nodes(["r1"], scope=ORG_A, _authorized=RULE)
     assert client.removed == ["ep-1"]
+
+
+async def test_narrow_purge_never_removes_episodes_outside_its_scope() -> None:
+    client = FakeGraphiti()
+    graph = GraphitiMemoryGraph(client)
+    alice = MemoryScope(org_id="org-a", user_id="alice")
+    bob = MemoryScope(org_id="org-a", user_id="bob")
+    await graph.upsert_node(_record("mine", alice))  # ep-1
+    await graph.upsert_node(_record("bobs", bob))  # ep-2
+    await graph.upsert_node(_record("shared", ORG_A))  # ep-3
+    await graph.purge_nodes(["mine", "bobs", "shared"], scope=alice, _authorized=RULE)
+    assert client.removed == ["ep-1"]
+    graph.close()

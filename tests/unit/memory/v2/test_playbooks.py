@@ -265,6 +265,17 @@ def test_t7_rejects_sources_narrower_than_the_shared_playbook() -> None:
     assert [b.text for b in out.bullets] == ["from org", "from own_agent"]
 
 
+def test_t7_source_lookup_must_return_the_cited_record() -> None:
+    # Security review: the lookup key was trusted as the record identity, so a
+    # mapping could vouch for a cited id with an unrelated trusted record.
+    out = _curator().curate(
+        _pb(),
+        [_add("laundered", sources=("injected",))],
+        sources={"injected": _rec("clean")},
+    )
+    assert out.bullets == ()
+
+
 def test_t7_without_source_lookup_is_fail_closed() -> None:
     out = _curator().curate(_pb(), [_add("cited", sources=("r1",)), _add("plain")])
     assert [b.text for b in out.bullets] == ["plain"]

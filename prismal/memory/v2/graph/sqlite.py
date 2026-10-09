@@ -20,7 +20,13 @@ import sqlite3
 import threading
 from typing import TYPE_CHECKING
 
-from prismal.memory.v2.types import ForgetActor, MemoryEdge, MemoryScope, RelationKind
+from prismal.memory.v2.types import (
+    ForgetActor,
+    MemoryEdge,
+    MemoryScope,
+    RelationKind,
+    within_erasure_scope,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -188,11 +194,11 @@ class SqliteMemoryGraph:
         """
         if not isinstance(_authorized, ForgetActor):
             raise TypeError("purge_nodes requires a ForgetActor")
-        ids = list(dict.fromkeys(record_ids))
-        if not ids:
-            return 0
-        marks = ",".join("?" for _ in ids)
         with self._lock:
+            ids = [rid for rid in dict.fromkeys(record_ids) if self._erasable(rid, scope)]
+            if not ids:
+                return 0
+            marks = ",".join("?" for _ in ids)
             self._conn.execute(
                 f"DELETE FROM mv2_edges WHERE org_id = ? AND "  # noqa: S608 - placeholders only
                 f"(src_id IN ({marks}) OR dst_id IN ({marks}))",
@@ -239,6 +245,22 @@ class SqliteMemoryGraph:
             self._conn.close()
 
     # ── internals ─────────────────────────────────────────────────────────────
+
+    def _erasable(self, record_id: str, scope: MemoryScope) -> bool:
+        """Deletion predicate: the node lies inside ``scope`` (never a wider/sibling one).
+
+        Unknown nodes carry no scope; only an org-wide erasure may clear their edges.
+        """
+        row = self._conn.execute(
+            "SELECT user_id, agent, thread_id FROM mv2_nodes WHERE org_id = ? AND id = ?",
+            (scope.org_id, record_id),
+        ).fetchone()
+        if row is None:
+            return scope.user_id is None and scope.agent is None and scope.thread_id is None
+        node_scope = MemoryScope(
+            org_id=scope.org_id, user_id=row[0], agent=row[1], thread_id=row[2]
+        )
+        return within_erasure_scope(scope, node_scope)
 
     def _node_visible(self, record_id: str, scope: MemoryScope) -> bool:
         """Unknown nodes are visible (edge is org-scoped); known ones must be covered."""

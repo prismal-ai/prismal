@@ -238,6 +238,26 @@ class ForgetActor:
             raise ValueError("ForgetActor(kind='human') requires an approval_id")
 
 
+_NARROWING_FIELDS = ("user_id", "agent", "thread_id")
+
+
+def within_erasure_scope(selector_scope: MemoryScope, record_scope: MemoryScope) -> bool:
+    """Deletion predicate: the record lies *inside* ``selector_scope`` (same width or narrower).
+
+    Every non-``None`` field of the selector must equal the record's; a wider
+    record (``None`` where the selector is set) never matches. This is **not**
+    :meth:`MemoryScope.covers`, which is the read predicate (a narrow request may
+    *see* wider shared records but must never *delete* them).
+    """
+    if record_scope.org_id != selector_scope.org_id:
+        return False
+    for name in _NARROWING_FIELDS:
+        want = getattr(selector_scope, name)
+        if want is not None and getattr(record_scope, name) != want:
+            return False
+    return True
+
+
 __all__ = [
     "ConsolidationReport",
     "ForgetActor",
@@ -259,4 +279,5 @@ __all__ = [
     "WriteOutcome",
     "WriteStatus",
     "new_record_id",
+    "within_erasure_scope",
 ]
