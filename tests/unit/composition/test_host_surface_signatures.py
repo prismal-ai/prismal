@@ -110,7 +110,10 @@ BUILD_RUNTIME_SIGNATURE = (
     "mode: \"Literal['global', 'context'] | None\" = None, "
     "collection_base: 'str' = 'default', mcp_config_path: 'Path | None' = None, "
     "graph: 'Any | None' = None, a2a_agents: 'list[Any] | None' = None, "
-    "gateway_vault: 'Any | None' = None, decision_vault: 'Any | None' = None) "
+    "gateway_vault: 'Any | None' = None, decision_vault: 'Any | None' = None, "
+    "memory_backend: 'MemoryBackendPort | None' = None, "
+    "memory_graph: 'MemoryGraphPort | None' = None, "
+    "memory_hooks: 'MemoryHooks | None' = None) "
     "-> 'RuntimeContext'"
 )
 

@@ -414,6 +414,7 @@ class OTelManager:
         self._register_dec_metrics()
         self._register_amr_metrics()
         self._register_prt_metrics()
+        self._register_mem_metrics()
 
     def _register_tke_metrics(self) -> None:
         """Token Efficiency (Phase TKE — SPEC-TKE-OTEL-001)."""
@@ -621,6 +622,34 @@ class OTelManager:
             self._counters[key] = self._meter.create_counter(name, description=description)
         self._histograms["mcp_task_wait_s"] = self._meter.create_histogram(
             "prismal.mcp_task_wait_s", description="MCP task wall-clock wait (s)"
+        )
+
+    def _register_mem_metrics(self) -> None:
+        """Agentic memory (Phase MEM — SPEC-MEM-OTEL-001)."""
+        counters = {
+            "memory_writes": ("prismal.memory_writes_total", "Memory writes by type, outcome"),
+            "memory_recall_stops": (
+                "prismal.memory_recall_stops_total",
+                "Memory recall stop reasons",
+            ),
+            "memory_consolidations": (
+                "prismal.memory_consolidations_total",
+                "Memory consolidation runs by status",
+            ),
+            "memory_forget": ("prismal.memory_forget_total", "Forget attempts by actor, outcome"),
+            "memory_taint_blocks": (
+                "prismal.memory_taint_blocks_total",
+                "Memory operations constrained by a taint rule (T1-T7)",
+            ),
+            "memory_tenancy_violations": (
+                "prismal.memory_tenancy_violations_total",
+                "Records dropped because their org_id did not match the request",
+            ),
+        }
+        for key, (name, description) in counters.items():
+            self._counters[key] = self._meter.create_counter(name, description=description)
+        self._histograms["memory_recall_tokens"] = self._meter.create_histogram(
+            "prismal.memory_recall_tokens", description="Tokens returned per memory recall"
         )
 
     @contextmanager

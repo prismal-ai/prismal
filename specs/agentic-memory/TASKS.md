@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` (2026-10-07, v3.18.0) |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | MEM |
@@ -22,6 +22,8 @@ Seven phases (MEM0–MEM6). MEM0 verifies every **[verify]** fact and the legacy
 
 Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`.
 
+> **Implemented 2026-10-07** (strict TDD). MEM0 facts and legacy signatures are recorded in `docs/memory.md#verified-facts-mem0-checked-2026-10-06`. Deviations (full list in `docs/memory.md#deviations-from-the-spec`): `memory_v2_backend` (the legacy setting owns `memory_backend`); a `decision_bridge.CascadeDecisionPort` adapts the DEC cascade to the controllers' `DecisionPort`; `register_consolidation_job` takes `consolidator_for`; no decision port ⇒ recall searches every type view. Open: decision-gated eval numbers on a calibrated backend, agent adoption of `memory_block_for_prompt`, MEM6-07 notebook.
+
 ## 2. Prerequisites
 
 - Shipped: DEC1–DEC3 (`DecisionPort`, cascade, calibration, shadow, audit), TKE2/TKE5 (layout, TOON, token heuristics), R (`build_runtime(org_id)`), H (`TaintRegistry`), IDN (human principals). Optional: AMR5 (`BatchExecutor`).
@@ -29,11 +31,11 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`.
 
 | ID | Task (verify before build) | Estimate | Dependency | SPEC | Status |
 |---|---|---|---|---|---|
-| MEM0-01 | Verify Jev-Mem (arXiv 2609.23986) figures (+11 % LoCoMo, 6.6× build, −36.7 % latency) and the write/read decision set (no forget decisions) | 0.1 d | — | WRT-001, RCL-001 | TODO |
-| MEM0-02 | Verify Mem0 (> 90 % tokens), Zep/Graphiti (DMR 94.8 %), sleep-time (≈ 5×), ACE (+10.6 %) figures | 0.2 d | — | CON-001, PBK-001 | TODO |
-| MEM0-03 | Verify Graphiti API, current version, licence and Python support for `[graph-memory]` | 0.2 d | — | GRF-001 | TODO |
-| MEM0-04 | Verify exact legacy signatures of `LongTermMemory`, `LongTermMemoryStore`, profile/preferences/history consumers; record in `docs/memory.md` | 0.2 d | — | ADP-001, ADP-002 | TODO |
-| MEM0-05 | Verify LoCoMo dataset licence; select a fixed redistributable subset or a generator | 0.1 d | — | EVL-001 | TODO |
+| MEM0-01 | Verify Jev-Mem (arXiv 2609.23986) figures (+11 % LoCoMo, 6.6× build, −36.7 % latency) and the write/read decision set (no forget decisions) | 0.1 d | — | WRT-001, RCL-001 | DONE |
+| MEM0-02 | Verify Mem0 (> 90 % tokens), Zep/Graphiti (DMR 94.8 %), sleep-time (≈ 5×), ACE (+10.6 %) figures | 0.2 d | — | CON-001, PBK-001 | DONE |
+| MEM0-03 | Verify Graphiti API, current version, licence and Python support for `[graph-memory]` | 0.2 d | — | GRF-001 | DONE |
+| MEM0-04 | Verify exact legacy signatures of `LongTermMemory`, `LongTermMemoryStore`, profile/preferences/history consumers; record in `docs/memory.md` | 0.2 d | — | ADP-001, ADP-002 | DONE |
+| MEM0-05 | Verify LoCoMo dataset licence; select a fixed redistributable subset or a generator | 0.1 d | — | EVL-001 | DONE |
 
 ## 3. Implementation Phases
 
@@ -41,17 +43,17 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`.
 
 | ID | Task | Estimate | Dependency | SPEC | Status |
 |---|---|---|---|---|---|
-| MEM1-01 | `core/config.py`: `memory_*` settings + `_validate_memory` | 0.4 d | — | CFG-001 | TODO |
-| MEM1-02 | `core/exceptions.py`: `AgenticMemoryError` hierarchy | 0.1 d | — | ERR-001 | TODO |
-| MEM1-03 | `memory/v2/types.py` (records, provenance, scope validation, outcomes, selectors) | 0.5 d | MEM1-01 | TYP-001, TYP-002 | TODO |
-| MEM1-04 | `memory/v2/ports.py`: `MemoryPort`, `MemoryBackendPort`, `MemoryGraphPort` | 0.3 d | MEM1-03 | PRT-001, PRT-002 | TODO |
-| MEM1-05 | `LongTermMemoryBackend` (`mv2_*` metadata, legacy-record mapping) | 0.6 d | MEM1-04, MEM0-04 | ADP-001 | TODO |
-| MEM1-06 | `LangGraphStoreBackend` (tenant namespaces) | 0.6 d | MEM1-04, MEM0-04 | ADP-001, TEN-001 | TODO |
-| MEM1-07 | `InMemoryBackend` (deterministic fake) | 0.2 d | MEM1-04 | ADP-001 | TODO |
-| MEM1-08 | `MemoryService` + per-tenant composition (`RuntimeContext.memory`), scope filters, violation drop + audit | 0.6 d | MEM1-05..07 | TEN-001, PRT-001 | TODO |
-| MEM1-09 | `ForgetPolicy`: request / execute, actor matrix, approval resolution, `include_derived`, audit; AST guard "only ForgetPolicy calls purge" | 0.7 d | MEM1-08 | DEL-001 | TODO |
-| MEM1-10 | `LegacyLongTermFacade`, `LegacyFactStoreFacade` (destructive ⇒ pending `ForgetRequest`) | 0.5 d | MEM1-09 | ADP-002 | TODO |
-| MEM1-11 | `migrate_legacy_records` (dry run, idempotent, annotate only) | 0.5 d | MEM1-05, MEM1-06 | ADP-002 | TODO |
+| MEM1-01 | `core/config.py`: `memory_*` settings + `_validate_memory` | 0.4 d | — | CFG-001 | DONE |
+| MEM1-02 | `core/exceptions.py`: `AgenticMemoryError` hierarchy | 0.1 d | — | ERR-001 | DONE |
+| MEM1-03 | `memory/v2/types.py` (records, provenance, scope validation, outcomes, selectors) | 0.5 d | MEM1-01 | TYP-001, TYP-002 | DONE |
+| MEM1-04 | `memory/v2/ports.py`: `MemoryPort`, `MemoryBackendPort`, `MemoryGraphPort` | 0.3 d | MEM1-03 | PRT-001, PRT-002 | DONE |
+| MEM1-05 | `LongTermMemoryBackend` (`mv2_*` metadata, legacy-record mapping) | 0.6 d | MEM1-04, MEM0-04 | ADP-001 | DONE |
+| MEM1-06 | `LangGraphStoreBackend` (tenant namespaces) | 0.6 d | MEM1-04, MEM0-04 | ADP-001, TEN-001 | DONE |
+| MEM1-07 | `InMemoryBackend` (deterministic fake) | 0.2 d | MEM1-04 | ADP-001 | DONE |
+| MEM1-08 | `MemoryService` + per-tenant composition (`RuntimeContext.memory`), scope filters, violation drop + audit | 0.6 d | MEM1-05..07 | TEN-001, PRT-001 | DONE |
+| MEM1-09 | `ForgetPolicy`: request / execute, actor matrix, approval resolution, `include_derived`, audit; AST guard "only ForgetPolicy calls purge" | 0.7 d | MEM1-08 | DEL-001 | DONE |
+| MEM1-10 | `LegacyLongTermFacade`, `LegacyFactStoreFacade` (destructive ⇒ pending `ForgetRequest`) | 0.5 d | MEM1-09 | ADP-002 | DONE |
+| MEM1-11 | `migrate_legacy_records` (dry run, idempotent, annotate only) | 0.5 d | MEM1-05, MEM1-06 | ADP-002 | DONE |
 
 **Done when:** v2 write via adapter is visible to unchanged legacy recall; legacy records map to `SEMANTIC/legacy/unknown`; empty `org_id` raises; cross-tenant record is dropped and audited; agent/decision/LLM actors get `MemoryForgetDenied`; backfill twice ⇒ second run annotates 0.
 
@@ -59,12 +61,12 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`.
 
 | ID | Task | Estimate | Dependency | SPEC | Status |
 |---|---|---|---|---|---|
-| MEM2-01 | Pre-filters: PII sanitizer reuse, length bounds, exact-hash dedupe ⇒ `merged` | 0.3 d | MEM1 | WRT-001 | TODO |
-| MEM2-02 | Worth (Noul) + type (Choice) in one `decide()`; `GatePolicy` acceptance; `SecurePromptBuilder` question text | 0.7 d | MEM2-01, DEC1 | WRT-001 | TODO |
-| MEM2-03 | Neighbors + batched relation Choices; edges; `UPDATES` supersession via `may_supersede` | 0.6 d | MEM2-02 | WRT-001, TNT-001 | TODO |
-| MEM2-04 | `memory/v2/taint.py`: T1–T7 (`candidate_taint`, `allowed_types`, `may_supersede`, `may_promote`) | 0.6 d | MEM1-03 | TNT-001 | TODO |
-| MEM2-05 | Low-confidence policy (`skip`/`llm`), `memory_write_gate` modes `off`/`llm` | 0.4 d | MEM2-02 | WRT-001 | TODO |
-| MEM2-06 | Shadow mode (`status="shadow"`, storage as gate `off`), hash-first audit | 0.4 d | MEM2-05 | WRT-001, SNP-001 | TODO |
+| MEM2-01 | Pre-filters: PII sanitizer reuse, length bounds, exact-hash dedupe ⇒ `merged` | 0.3 d | MEM1 | WRT-001 | DONE |
+| MEM2-02 | Worth (Noul) + type (Choice) in one `decide()`; `GatePolicy` acceptance; `SecurePromptBuilder` question text | 0.7 d | MEM2-01, DEC1 | WRT-001 | DONE |
+| MEM2-03 | Neighbors + batched relation Choices; edges; `UPDATES` supersession via `may_supersede` | 0.6 d | MEM2-02 | WRT-001, TNT-001 | DONE |
+| MEM2-04 | `memory/v2/taint.py`: T1–T7 (`candidate_taint`, `allowed_types`, `may_supersede`, `may_promote`) | 0.6 d | MEM1-03 | TNT-001 | DONE |
+| MEM2-05 | Low-confidence policy (`skip`/`llm`), `memory_write_gate` modes `off`/`llm` | 0.4 d | MEM2-02 | WRT-001 | DONE |
+| MEM2-06 | Shadow mode (`status="shadow"`, storage as gate `off`), hash-first audit | 0.4 d | MEM2-05 | WRT-001, SNP-001 | DONE |
 
 **Done when:** each gate mode produces the specified status; a tainted candidate labelled `SEMANTIC` by the fake decision is stored `EPISODIC`; a tainted `UPDATES` never supersedes an untainted record; shadow storage equals gate `off`.
 
@@ -72,11 +74,11 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`.
 
 | ID | Task | Estimate | Dependency | SPEC | Status |
 |---|---|---|---|---|---|
-| MEM3-01 | View routing Choice (top ≤ 2, p ≥ 0.2; abstain ⇒ default views) | 0.5 d | MEM1, DEC1 | RCL-001 | TODO |
-| MEM3-02 | Budgeted multi-hop retrieval + `traversal_score`; superseded/`as_of` handling | 0.8 d | MEM3-01 | RCL-001 | TODO |
-| MEM3-03 | Sufficiency Noul + all five stop reasons | 0.5 d | MEM3-02 | RCL-001 | TODO |
-| MEM3-04 | `render_items` (TOON / compact lines, `[untrusted]`), hard cap never exceeded | 0.5 d | MEM3-02, TKE5 | RCL-002, TNT-001 | TODO |
-| MEM3-05 | `memory_block_for_prompt` into the tail turn-context block; agent adoption behind flag | 0.4 d | MEM3-04 | RCL-002 | TODO |
+| MEM3-01 | View routing Choice (top ≤ 2, p ≥ 0.2; abstain ⇒ default views) | 0.5 d | MEM1, DEC1 | RCL-001 | DONE |
+| MEM3-02 | Budgeted multi-hop retrieval + `traversal_score`; superseded/`as_of` handling | 0.8 d | MEM3-01 | RCL-001 | DONE |
+| MEM3-03 | Sufficiency Noul + all five stop reasons | 0.5 d | MEM3-02 | RCL-001 | DONE |
+| MEM3-04 | `render_items` (TOON / compact lines, `[untrusted]`), hard cap never exceeded | 0.5 d | MEM3-02, TKE5 | RCL-002, TNT-001 | DONE |
+| MEM3-05 | `memory_block_for_prompt` into the tail turn-context block; agent adoption behind flag | 0.4 d | MEM3-04 | RCL-002 | DONE |
 
 **Done when:** recall never exceeds `budget_tokens` (property test); each stop reason reachable with fakes; tainted items rendered marked and absent from the prefix.
 
@@ -84,12 +86,12 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`.
 
 | ID | Task | Estimate | Dependency | SPEC | Status |
 |---|---|---|---|---|---|
-| MEM4-01 | `register_consolidation_job` on `CronExecutor` (per org, `memory_consolidation_cron`) | 0.4 d | MEM1 | CON-001 | TODO |
-| MEM4-02 | Duplicate merge (hash / sim ≥ 0.95 + `SUPPORTS`) via supersession | 0.5 d | MEM4-01 | CON-001 | TODO |
-| MEM4-03 | Contradiction resolution: newest-wins with provenance precedence | 0.5 d | MEM4-02, MEM2-04 | CON-001, TNT-001 | TODO |
-| MEM4-04 | Episodic → semantic summarization (T3 gate; `BatchExecutor` or small tier) | 0.7 d | MEM4-02, AMR5 (opt.) | CON-001 | TODO |
-| MEM4-05 | Retention rules → `ForgetPolicy.execute(actor=rule)` | 0.3 d | MEM1-09 | DEL-001 | TODO |
-| MEM4-06 | Watermark + item cap; idempotency (second run all zeros) | 0.3 d | MEM4-02 | CON-001 | TODO |
+| MEM4-01 | `register_consolidation_job` on `CronExecutor` (per org, `memory_consolidation_cron`) | 0.4 d | MEM1 | CON-001 | DONE |
+| MEM4-02 | Duplicate merge (hash / sim ≥ 0.95 + `SUPPORTS`) via supersession | 0.5 d | MEM4-01 | CON-001 | DONE |
+| MEM4-03 | Contradiction resolution: newest-wins with provenance precedence | 0.5 d | MEM4-02, MEM2-04 | CON-001, TNT-001 | DONE |
+| MEM4-04 | Episodic → semantic summarization (T3 gate; `BatchExecutor` or small tier) | 0.7 d | MEM4-02, AMR5 (opt.) | CON-001 | DONE |
+| MEM4-05 | Retention rules → `ForgetPolicy.execute(actor=rule)` | 0.3 d | MEM1-09 | DEL-001 | DONE |
+| MEM4-06 | Watermark + item cap; idempotency (second run all zeros) | 0.3 d | MEM4-02 | CON-001 | DONE |
 
 **Done when:** consolidation never calls `purge`; batch path used when available and metered; second run reports zeros.
 
@@ -97,10 +99,10 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`.
 
 | ID | Task | Estimate | Dependency | SPEC | Status |
 |---|---|---|---|---|---|
-| MEM5-01 | `Playbook`/`PlaybookDelta` types, deterministic `curate`, version history + rollback | 0.6 d | MEM1 | PBK-001 | TODO |
-| MEM5-02 | `generate` (trajectory reflections) + `reflect` (deltas) via small tier / `SecurePromptBuilder` | 0.9 d | MEM5-01 | PBK-001 | TODO |
-| MEM5-03 | `render_playbook` within budget; version pinning; prefix vs. tail placement by stability | 0.5 d | MEM5-01, TKE2 | PBK-001 | TODO |
-| MEM5-04 | Delta discipline (> 50 % rewrite rejected, ≤ max deltas) + T7 source exclusion | 0.3 d | MEM5-02, MEM2-04 | PBK-001, TNT-001 | TODO |
+| MEM5-01 | `Playbook`/`PlaybookDelta` types, deterministic `curate`, version history + rollback | 0.6 d | MEM1 | PBK-001 | DONE |
+| MEM5-02 | `generate` (trajectory reflections) + `reflect` (deltas) via small tier / `SecurePromptBuilder` | 0.9 d | MEM5-01 | PBK-001 | DONE |
+| MEM5-03 | `render_playbook` within budget; version pinning; prefix vs. tail placement by stability | 0.5 d | MEM5-01, TKE2 | PBK-001 | DONE |
+| MEM5-04 | Delta discipline (> 50 % rewrite rejected, ≤ max deltas) + T7 source exclusion | 0.3 d | MEM5-02, MEM2-04 | PBK-001, TNT-001 | DONE |
 
 **Done when:** a rewrite-style curator output is rejected; playbook bytes in the prefix are identical across turns of a run; tainted sources never cited.
 
@@ -108,14 +110,14 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`.
 
 | ID | Task | Estimate | Dependency | SPEC | Status |
 |---|---|---|---|---|---|
-| MEM6-01 | `SqliteMemoryGraph` (temporal edges, `as_of`, tenant scope) | 0.8 d | MEM1-04 | GRF-001, TEN-001 | TODO |
-| MEM6-02 | `GraphitiMemoryGraph` (`[graph-memory]`, deferred import) | 0.6 d | MEM6-01, MEM0-03 | GRF-001 | TODO |
-| MEM6-03 | `monitoring/otel.py`: 7 instruments + 3 spans | 0.3 d | MEM1 | OTEL-001 | TODO |
-| MEM6-04 | LoCoMo-style eval subset + legacy vs. v2 report in the eval harness | 0.8 d | MEM3, MEM0-05 | EVL-001 | TODO |
-| MEM6-05 | Snapshot: flags off ⇒ graph identical, no job registered, legacy call recording identical | 0.4 d | MEM5 | SNP-001, ADP-002 | TODO |
-| MEM6-06 | Integration + security tests (injection → deletion attempt, two-tenant isolation, erasure completeness) | 0.6 d | MEM4, MEM5 | DEL-001, TEN-001, TNT-001 | TODO |
-| MEM6-07 | `docs/memory.md` (incl. migration guide), `examples/agentic_memory.py`, notebook | 0.6 d | MEM6-06 | ADP-002 | TODO |
-| MEM6-08 | README/CHANGELOG (planned); AST guards (no graph SDK outside adapters, no provider imports) | 0.3 d | MEM6-07 | PRT-002 | TODO |
+| MEM6-01 | `SqliteMemoryGraph` (temporal edges, `as_of`, tenant scope) | 0.8 d | MEM1-04 | GRF-001, TEN-001 | DONE |
+| MEM6-02 | `GraphitiMemoryGraph` (`[graph-memory]`, deferred import) | 0.6 d | MEM6-01, MEM0-03 | GRF-001 | DONE |
+| MEM6-03 | `monitoring/otel.py`: 7 instruments + 3 spans | 0.3 d | MEM1 | OTEL-001 | DONE |
+| MEM6-04 | LoCoMo-style eval subset + legacy vs. v2 report in the eval harness | 0.8 d | MEM3, MEM0-05 | EVL-001 | DONE |
+| MEM6-05 | Snapshot: flags off ⇒ graph identical, no job registered, legacy call recording identical | 0.4 d | MEM5 | SNP-001, ADP-002 | DONE |
+| MEM6-06 | Integration + security tests (injection → deletion attempt, two-tenant isolation, erasure completeness) | 0.6 d | MEM4, MEM5 | DEL-001, TEN-001, TNT-001 | DONE |
+| MEM6-07 | `docs/memory.md` (incl. migration guide), `examples/agentic_memory.py`, notebook | 0.6 d | MEM6-06 | ADP-002 | DONE (docs + example; notebook TODO) |
+| MEM6-08 | README/CHANGELOG (planned); AST guards (no graph SDK outside adapters, no provider imports) | 0.3 d | MEM6-07 | PRT-002 | DONE |
 
 **Done when:** `uv run pytest -m unit` green; ruff / mypy --strict / bandit clean; coverage ≥ 80 % on `memory/v2/`; eval report meets PLAN §4 targets in shadow comparison.
 

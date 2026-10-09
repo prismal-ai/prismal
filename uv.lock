@@ -1875,6 +1875,24 @@ wheels = [
 ]
 
 [[package]]
+name = "graphiti-core"
+version = "0.30.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "neo4j" },
+    { name = "numpy" },
+    { name = "openai" },
+    { name = "posthog" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "tenacity" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4a/a1/3e0fe119b6f3116ef7671ae1b2d98ef70655ac634d9914e748b5f97ecacb/graphiti_core-0.30.2.tar.gz", hash = "sha256:b8ac6999705d350ebb53d799505d49b76f5d74c20265a09df4094645b5d8ada9", size = 6978112, upload-time = "2026-09-08T20:39:14.59Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/19/7ee37826a9dff81eb4d242a785c4ca76d2d510528dd52fc7dd10fb45d9cd/graphiti_core-0.30.2-py3-none-any.whl", hash = "sha256:97674a49514130db175faecf23221ce9338240be3cbe13a7e23e5a5033892b9f", size = 363163, upload-time = "2026-09-08T20:39:12.422Z" },
+]
+
+[[package]]
 name = "graphviz"
 version = "0.21"
 source = { registry = "https://pypi.org/simple" }
@@ -4259,6 +4277,18 @@ wheels = [
 ]
 
 [[package]]
+name = "neo4j"
+version = "6.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytz" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/db/024bd576bde5d97436d0acb71b41cf928c036ed8fec95ea1122eb05e47d1/neo4j-6.4.0.tar.gz", hash = "sha256:056676698f080b5af5b24b0fc5abb485b8db1b95edf366d01dcfd63bcff9b71d", size = 287786, upload-time = "2026-10-05T15:37:45.216Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c9/5d/519aefe3b38a490924641e980a16ea6c70f6c96c08d84cf661d32c4a08c2/neo4j-6.4.0-py3-none-any.whl", hash = "sha256:fdd048ba827be138063b045cf59e40056fbf0405ac02dadc24f64e369fbd9d3d", size = 390611, upload-time = "2026-10-05T15:37:43.491Z" },
+]
+
+[[package]]
 name = "nest-asyncio"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5197,6 +5227,21 @@ wheels = [
 ]
 
 [[package]]
+name = "posthog"
+version = "7.64.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "backoff" },
+    { name = "distro" },
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/14/df/ac0447cd251ac85735ea994a5c7dedb0cff1dadbefe1edc794c5e63eb550/posthog-7.64.1.tar.gz", hash = "sha256:6b998d48de8dc0ce73b138460f5f67daccb63cd50e614011d193a5437e0636fb", size = 734438, upload-time = "2026-10-06T15:27:03.529Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fd/17/89f78be89f25eca5838321e8d608384c0866167bb516260223098507f4d7/posthog-7.64.1-py3-none-any.whl", hash = "sha256:33208cd674e4cb421d95fa747d423becf1e933a11e5bc82447a8f98f854bd6e6", size = 858749, upload-time = "2026-10-06T15:27:01.672Z" },
+]
+
+[[package]]
 name = "pre-commit"
 version = "4.5.1"
 source = { registry = "https://pypi.org/simple" }
@@ -5317,7 +5362,7 @@ wheels = [
 
 [[package]]
 name = "prismal-ai"
-version = "3.17.0"
+version = "3.18.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -5478,6 +5523,9 @@ finance = [
     { name = "pandas-ta" },
     { name = "yfinance" },
 ]
+graph-memory = [
+    { name = "graphiti-core" },
+]
 guardrails-ai = [
     { name = "guardrails-ai" },
 ]
@@ -5596,6 +5644,7 @@ requires-dist = [
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=7.2.0" },
     { name = "flake8-cognitive-complexity", marker = "extra == 'dev'", specifier = ">=0.1.0" },
     { name = "flaml", marker = "extra == 'ml'", specifier = ">=2.3.0" },
+    { name = "graphiti-core", marker = "extra == 'graph-memory'", specifier = ">=0.30.2,<0.31" },
     { name = "guardrails-ai", marker = "extra == 'guardrails-ai'", specifier = ">=0.10.2" },
     { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.25.0" },
     { name = "httpx", specifier = ">=0.28.1" },
@@ -5712,7 +5761,7 @@ requires-dist = [
     { name = "xxhash", specifier = ">=3.5.0" },
     { name = "yfinance", marker = "extra == 'finance'", specifier = ">=0.2.50" },
 ]
-provides-extras = ["postgres", "mongodb", "local-embeddings", "ollama", "analytics", "ml", "ml-dl", "finance", "datetime", "maintenance", "lancedb", "sqlite-vec", "qdrant", "pgvector", "a2a", "multimodal", "multimodal-local", "multimodal-premium", "multimodal-embed", "guardrails-ai", "rerank", "compression", "laya", "jev", "all", "dev"]
+provides-extras = ["postgres", "mongodb", "local-embeddings", "ollama", "analytics", "ml", "ml-dl", "finance", "datetime", "maintenance", "lancedb", "sqlite-vec", "qdrant", "pgvector", "a2a", "multimodal", "multimodal-local", "multimodal-premium", "multimodal-embed", "guardrails-ai", "rerank", "compression", "laya", "jev", "graph-memory", "all", "dev"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pre-commit", specifier = ">=4.5.1" }]

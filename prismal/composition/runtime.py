@@ -74,6 +74,8 @@ if TYPE_CHECKING:
     from prismal.core.config import Settings
     from prismal.core.config_source import ConfigSourcePort
     from prismal.decisions.runtime import DecisionRuntime
+    from prismal.memory.v2.ports import MemoryBackendPort, MemoryGraphPort
+    from prismal.memory.v2.service import MemoryHooks, MemoryService
     from prismal.providers.gateways.router import GatewayRouter
 
 logger = get_logger("prismal.composition")
@@ -201,6 +203,8 @@ class RuntimeContext:
     gateways: GatewayRouter | None = None
     # Typed Decision Models (Phase DEC) — None unless decisions_enabled.
     decisions: DecisionRuntime | None = None
+    # Agentic memory (Phase MEM) — one tenant's MemoryService; None unless memory_v2_enabled.
+    memory: MemoryService | None = None
     # Host read surface (HRS) — the runtime's effective settings (None ⇒ process).
     settings: Settings | None = field(default=None, repr=False)
     _closers: list[Closer] = field(default_factory=list, repr=False)
@@ -550,6 +554,9 @@ async def build_runtime(
     a2a_agents: list[Any] | None = None,
     gateway_vault: Any | None = None,
     decision_vault: Any | None = None,
+    memory_backend: MemoryBackendPort | None = None,
+    memory_graph: MemoryGraphPort | None = None,
+    memory_hooks: MemoryHooks | None = None,
 ) -> RuntimeContext:
     """Compose every core port in one call (SPEC-CR-003).
 
@@ -582,6 +589,12 @@ async def build_runtime(
         decision_vault: Credential vault for decision backend keys (Phase DEC,
             ``jev_api_key@<org_id>``). ``None`` falls back to the identity vault,
             then to the injected settings (no ``os.environ`` reads).
+        memory_backend: Phase MEM — storage adapter for this tenant's
+            ``MemoryService`` (default: selected by ``memory_v2_backend``).
+        memory_graph: Phase MEM — temporal graph; required when
+            ``memory_graph_backend="graphiti"`` (never built implicitly).
+        memory_hooks: Phase MEM — host callables (LLM classifier, summarizer,
+            batch executor, playbook curator); required for the ``llm`` gate.
 
     Returns:
         A :class:`RuntimeContext` with five non-null ports; usable as
@@ -725,6 +738,37 @@ async def build_runtime(
             except Exception as exc:
                 raise RuntimeCompositionError("decisions", str(exc)) from exc
 
+        # 6f. Agentic memory (Phase MEM) — opt-in, one MemoryService per tenant
+        #     (SPEC-MEM-TEN-001): requires an org_id (fail-closed); injected
+        #     backend/graph win (the Graphiti graph is never built implicitly).
+        memory: MemoryService | None = None
+        if eff.memory_v2_enabled:
+            try:
+                from prismal.decisions.types import DecisionMode
+                from prismal.memory.v2.decision_bridge import CascadeDecisionPort
+                from prismal.memory.v2.service import build_memory_service
+
+                memory = build_memory_service(
+                    eff,
+                    org_id=org_id,
+                    backend=memory_backend,
+                    graph=memory_graph,
+                    decisions=(
+                        CascadeDecisionPort(
+                            decisions.cascade,
+                            org_id=org_id,
+                            mode=DecisionMode(eff.memory_mode),
+                        )
+                        if decisions is not None
+                        else None
+                    ),
+                    audit=audit,
+                    hooks=memory_hooks,
+                )
+            except Exception as exc:
+                raise RuntimeCompositionError("memory", str(exc)) from exc
+            closers.append(memory.aclose)
+
         # 7. Mode: global injects the singleton; context leaves globals untouched.
         if resolved_mode == "global":
             from prismal.agents.tool_registry import set_tool_provider
@@ -749,6 +793,7 @@ async def build_runtime(
         observability=observability,
         gateways=gateways,
         decisions=decisions,
+        memory=memory,
         settings=eff,
     )
     ctx._closers = closers
@@ -911,6 +956,7 @@ def build_test_runtime(
     org_id: str | None = None,
     collection_base: str = DEFAULT_COLLECTION_BASE,
     settings: Settings | None = None,
+    memory: MemoryService | None = None,
 ) -> RuntimeContext:
     """Compose a deterministic ``RuntimeContext`` with fakes (SPEC-CR-004).
 
@@ -950,6 +996,7 @@ def build_test_runtime(
         audit=_FakeAudit(),
         org_id=org_id,
         observability=observability,
+        memory=memory,
         settings=settings,
     )
 

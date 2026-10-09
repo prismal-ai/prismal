@@ -1166,11 +1166,53 @@ class BlindReviewBlindnessViolationError(BlindReviewPipelineError):
     """
 
 
+# ── Agentic Memory (Phase MEM — SPEC-MEM-ERR-001) ─────────────────────────────
+# The root is not named ``MemoryError``: that would shadow the Python builtin.
+
+
+class AgenticMemoryError(PrismalError):
+    """Base for errors raised by the agentic memory layer (Phase MEM)."""
+
+
+class MemoryConfigError(AgenticMemoryError):
+    """Invalid memory configuration detected at load or composition time."""
+
+
+class MemoryTenancyError(AgenticMemoryError):
+    """Empty or mismatched ``org_id`` on a memory operation (fail-closed)."""
+
+
+class MemoryForgetDenied(AgenticMemoryError):  # noqa: N818 — SPEC-MEM-ERR-001 name
+    """A deletion was attempted by an actor that is not a rule or an approved human."""
+
+
+class MemoryBackendUnavailable(AgenticMemoryError):  # noqa: N818 — SPEC-MEM-ERR-001 name
+    """A memory backend's optional extra is missing or the backend is down at startup."""
+
+
+class MemoryErasureIncomplete(AgenticMemoryError):  # noqa: N818 — SPEC-MEM-ERR-001 name
+    """Records were purged but a derived artifact (graph / playbooks) was not.
+
+    The request is left ``approved`` (a rule selector is re-targeted by the next
+    retention run) so the same execution can be retried; it is never ``executed``
+    while derived data survives.
+    """
+
+
+class MemoryScanLimitError(AgenticMemoryError):
+    """A backend scan hit its configured cap; results would be incomplete (fail-closed)."""
+
+
+class PlaybookDeltaError(AgenticMemoryError):
+    """A playbook curator output violates the delta discipline."""
+
+
 __all__ = [
     "A2AAgentUnavailable",
     "A2AError",
     "AdapterError",
     "AdaptiveRAGError",
+    "AgenticMemoryError",
     "ArtifactNotFound",
     "ArtifactStoreError",
     "AudioAgentError",
@@ -1223,8 +1265,14 @@ __all__ = [
     "MCPToolError",
     "MaskedToolCallError",
     "MediaValidationError",
+    "MemoryBackendUnavailable",
+    "MemoryConfigError",
+    "MemoryErasureIncomplete",
     "MemoryError",
+    "MemoryForgetDenied",
     "MemoryRedactionError",
+    "MemoryScanLimitError",
+    "MemoryTenancyError",
     "MissingDependencyError",
     "MoAError",
     "ModalityRouterError",
@@ -1239,6 +1287,7 @@ __all__ = [
     "NodeTimeoutError",
     "NodeValidationError",
     "PermissionDeniedError",
+    "PlaybookDeltaError",
     "PluginConflictError",
     "PluginLoadError",
     "PolicyDenied",

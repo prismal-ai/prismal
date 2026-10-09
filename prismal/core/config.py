@@ -28,6 +28,9 @@ _active_source: "ContextVar[ConfigSourcePort | None]" = ContextVar(
     "_prismal_active_config_source", default=None
 )
 
+# One crontab field: numbers, ranges, steps, lists, ``*``/``?`` and 3-letter names.
+_CRON_FIELD_RE = re.compile(r"[\d*?/,\-A-Za-z]+")
+
 
 class _ConfigSourceSettingsSource(EnvSettingsSource):
     """Adapt a :class:`ConfigSourcePort` into a Pydantic settings source.
@@ -1197,6 +1200,64 @@ class Settings(BaseSettings):
     )
     host_surface_stats_retention_h: int = Field(
         default=168, ge=1, description="Retention of the host-surface report recorders (h)."
+    )
+
+    # --- MEM --- Agentic Memory (Phase MEM — SPEC-MEM-CFG-001) ─────────────
+    # Off ⇒ legacy memory paths, the graph and the scheduler are unchanged (SNP-001).
+    # ``memory_v2_backend`` (not ``memory_backend``: the legacy LongTermMemoryStore owns
+    # that key — MEM0-04).
+    memory_v2_enabled: bool = Field(default=False, description="Master flag for memory v2.")
+    memory_mode: Literal["shadow", "enforce"] = Field(
+        default="shadow", description="shadow logs gate verdicts and stores as gate 'off'."
+    )
+    memory_v2_backend: Literal["legacy_long_term", "langgraph_store", "memory"] = Field(
+        default="legacy_long_term", description="Storage adapter for memory v2."
+    )
+    memory_v2_data_dir: str = Field(
+        default="",
+        description=(
+            "Directory of the per-tenant memory v2 SQLite files (backend + graph); empty = "
+            "<legacy data dir>/memory_v2. Never the legacy memory.db (its expire/clear would "
+            "bypass ForgetPolicy)."
+        ),
+    )
+    memory_write_gate: Literal["off", "decision", "llm"] = Field(
+        default="decision", description="Write gate mode."
+    )
+    memory_write_low_confidence: Literal["skip", "llm"] = Field(
+        default="skip", description="Policy when the write decision abstains or is below tau."
+    )
+    memory_relation_k: int = Field(default=5, ge=1, description="Neighbors for relation typing.")
+    memory_recall_budget_tokens: int = Field(default=1200, description="Hard recall token cap.")
+    memory_recall_max_hops: int = Field(default=3, ge=1, description="Recall hop cap.")
+    memory_sufficiency_tau: float = Field(default=0.8, description="Sufficiency threshold.")
+    memory_consolidation_cron: str = Field(
+        default="0 3 * * *", description="Consolidation schedule (crontab, per org)."
+    )
+    memory_consolidation_use_batch: bool = Field(
+        default=True, description="Summarize through the AMR BatchExecutor when available."
+    )
+    memory_consolidation_max_items: int = Field(
+        default=5000, ge=1, description="Records per consolidation run."
+    )
+    memory_retention_days_by_type: dict[str, int] = Field(
+        default_factory=lambda: {"episodic": 90},
+        description="Rule-based retention per memory type in days (0 = keep).",
+    )
+    memory_superseded_retention_days: int = Field(
+        default=30, ge=0, description="Purge superseded records after N days (0 = keep)."
+    )
+    memory_graph_backend: Literal["none", "sqlite", "graphiti"] = Field(
+        default="none", description="Temporal graph adapter."
+    )
+    memory_playbooks_enabled: bool = Field(default=False, description="Procedural memory.")
+    memory_playbook_budget_tokens: int = Field(default=600, description="Playbook token cap.")
+    memory_playbook_max_deltas: int = Field(default=10, ge=1, description="Deltas per cycle.")
+    memory_playbook_min_stable_runs: int = Field(
+        default=5, ge=1, description="Stable runs before the playbook enters the cached prefix."
+    )
+    memory_playbook_keep_versions: int = Field(
+        default=10, ge=1, description="Playbook versions kept for rollback."
     )
 
     # ── Blind Review Pipeline (Phase BRP — SPEC-BRP-CFG-001) ──────────
@@ -2814,6 +2875,40 @@ class Settings(BaseSettings):
         if self.a2a_protocol_version == "0.3" and not self.a2a_accept_legacy:
             raise ValueError(
                 "PRISMAL_A2A_ACCEPT_LEGACY=false requires PRISMAL_A2A_PROTOCOL_VERSION=1.0."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_memory(self) -> "Settings":
+        """Validate the agentic-memory settings (SPEC-MEM-CFG-001) at load time."""
+        for name in ("memory_recall_budget_tokens", "memory_playbook_budget_tokens"):
+            if getattr(self, name) <= 0:
+                raise ValueError(f"PRISMAL_{name.upper()} must be > 0.")
+        if not 0.0 < self.memory_sufficiency_tau < 1.0:
+            raise ValueError("PRISMAL_MEMORY_SUFFICIENCY_TAU must be in (0, 1).")
+        # Pure syntactic check (no scheduler import at load time): five crontab fields.
+        fields = self.memory_consolidation_cron.split()
+        if len(fields) != 5 or not all(_CRON_FIELD_RE.fullmatch(f) for f in fields):
+            raise ValueError(
+                f"PRISMAL_MEMORY_CONSOLIDATION_CRON={self.memory_consolidation_cron!r} is not "
+                "a valid crontab expression."
+            )
+        types = ("episodic", "semantic", "procedural", "preference")
+        for kind, days in self.memory_retention_days_by_type.items():
+            if kind not in types or days < 0:
+                raise ValueError(
+                    f"PRISMAL_MEMORY_RETENTION_DAYS_BY_TYPE[{kind!r}]={days}: type must be one "
+                    f"of {types} and days >= 0."
+                )
+        if (
+            self.memory_v2_enabled
+            and self.memory_mode == "enforce"
+            and self.memory_write_gate == "decision"
+            and not self.decisions_enabled
+        ):
+            raise ValueError(
+                "PRISMAL_MEMORY_WRITE_GATE=decision in enforce mode requires "
+                "PRISMAL_DECISIONS_ENABLED=true."
             )
         return self
 

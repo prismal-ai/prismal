@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ============================================================
 [project]
 name = "prismal-ai"
-version = "3.17.0"
+version = "3.18.0"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -263,6 +263,11 @@ laya = [
 ]
 jev = [
   "typesafe-sdk>=0.7.2,<0.8",      # TypeSafe Jev SDK (DEC0-02); the HTTP transport needs none
+]
+
+# Agentic memory (Phase MEM) — optional temporal graph; imported only in prismal/memory/v2/graph/
+graph-memory = [
+  "graphiti-core>=0.30.2,<0.31",   # Apache-2.0 (MEM0-03); no [kuzu] — deprecated upstream
 ]
 
 # All optional extras combined

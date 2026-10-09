@@ -18,6 +18,114 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   half-made release, so v3.12.0 shipped to PyPI and GHCR without a GitHub
   Release.
 
+## [3.18.0] — 2026-10-07
+
+> Phase MEM — **Agentic memory v2**, the sixth and last in-repo milestone of
+> wave 2026-10. Typed (episodic / semantic / procedural / preference),
+> decision-gated, budgeted and tenant-scoped memory in `prismal/memory/v2/`. It
+> runs over the **same** legacy stores, which are wrapped and never edited.
+> Writes and recall follow the Jev-Mem controller design. A sleep-time job
+> consolidates memory without ever deleting it. Deletion is reachable only from
+> a retention rule or an approved human. Opt-in via `memory_v2_enabled` (default
+> `False`, `memory_mode="shadow"` first): with it off, the supervisor graph is
+> identical (snapshot-tested), `RuntimeContext.memory` is `None` and no
+> scheduler job is registered. Guide, migration path and MEM0 verified facts:
+> `docs/memory.md`.
+
+### Added
+- **Port + service** (`memory/v2/{types,ports,service}.py`): `MemoryPort`
+  (`write` / `recall` / `consolidate` / `forget`), `MemoryBackendPort`,
+  `MemoryGraphPort`. `MemoryService` serves one tenant, built by
+  `build_memory_service(settings, org_id=, ...)` and exposed as
+  `RuntimeContext.memory` by `build_runtime(org_id=, memory_backend=,
+  memory_graph=)`. Any other org's scope raises `MemoryTenancyError`, which is
+  counted and audited hash-first.
+- **Backends over the legacy stores** (`memory/v2/adapters/`):
+  - `LongTermMemoryBackend`: v2 fields go in a `memory_v2_meta` side table, and
+    v2 writes stay visible to the unchanged `LongTermMemory.recall()`.
+  - `LangGraphStoreBackend`: tenant namespaces
+    `("prismal", org, user|"_", type)`.
+  - `InMemoryBackend`.
+  - Legacy-shaped facades (destructive methods file a pending forget request)
+    and an idempotent, annotate-only `migrate_legacy_records` backfill.
+- **Decision-gated writes** (`write_gate.py`, `taint.py`):
+  - Pre-filters: PII redaction, length bounds, exact-hash dedupe ⇒ `merged`.
+  - Worth (Noul) + type (Choice) in one decision call, then a batched relation
+    Choice over `memory_relation_k` neighbours. `UPDATES` supersedes only when
+    T6 allows.
+  - Gate modes `off` / `decision` / `llm`; shadow mode; hash-first audit.
+  - Taint rules T1–T7: tainted content is stored only as an `EPISODIC` episode
+    and never supersedes or is promoted.
+- **Budgeted recall** (`recall.py`, `render.py`):
+  - View routing; multi-hop retrieval ranked by `traversal_score`; optional
+    temporal-graph neighbours with `as_of`.
+  - A sufficiency Noul and five stop reasons.
+  - A hard token cap (property-tested).
+  - TOON or compact rendering with `[untrusted]` marks. `memory_block_for_prompt`
+    renders a fenced block for the tail turn context, never the cached prefix.
+- **Sleep-time consolidation** (`consolidation.py`):
+  - Duplicate merge.
+  - Newest-wins contradiction resolution with provenance precedence
+    (human > trusted > unknown > untrusted).
+  - Episodic → semantic summaries via an injected summarizer or `BatchExecutor`.
+  - Retention rules applied through `ForgetPolicy`.
+  - A watermark, the item cap, and idempotent re-runs.
+  - `register_consolidation_job` registers one per-org cron job.
+- **Forget** (`forget.py`):
+  - `ForgetPolicy` accepts only a retention rule (selectors issued by
+    `retention_rules()`, single use) or an approved, single-use human request.
+    Any other actor gets `MemoryForgetDenied`.
+  - `include_derived` also erases summaries, edges, graph nodes and playbook
+    bullets.
+  - The agent-facing tool `request_memory_forget` only files pending requests.
+- **Playbooks** (`playbooks.py`): ACE generate / reflect / curate with deltas
+  only.
+  - Rejected: more than 50 % rewrite, more than `memory_playbook_max_deltas`,
+    and uncited or tainted sources.
+  - Versioned rollback; per-run pinning (stable bytes in the prefix).
+- **Temporal graph** (`graph/`): `SqliteMemoryGraph` (stdlib; edges are
+  invalidated, never deleted; `as_of`) and `GraphitiMemoryGraph` (new optional
+  extra `[graph-memory]` = `graphiti-core>=0.30.2,<0.31`, client always
+  injected).
+- **DEC bridge** (`decision_bridge.py`): `CascadeDecisionPort` lets the runtime's
+  `DecisionCascade` serve the memory controllers (integration `memory`). It
+  re-fences and re-scans every state field, so DEC's fail-closed taint rules
+  still apply, and turns errors into abstentions.
+- **Settings** `# --- MEM ---` (`memory_v2_enabled`, `memory_mode`,
+  `memory_v2_backend`, `memory_write_gate`, recall / consolidation / retention /
+  graph / playbook knobs) with `_validate_memory`. **Exceptions**
+  `AgenticMemoryError` → `MemoryConfigError`, `MemoryTenancyError`,
+  `MemoryForgetDenied`, `MemoryBackendUnavailable`, `PlaybookDeltaError`.
+  **OTel**: 6 counters, `prismal.memory_recall_tokens`, and spans
+  `prismal.memory.{write,recall,consolidate}`.
+- **Eval** (`prismal/eval/memory_locomo.py`): a seeded, MIT-licensed
+  LoCoMo-style generator (LoCoMo itself is CC BY-NC and is not vendored) and a
+  legacy vs v2 report. On 5 × 200 sessions, the deterministic layers alone give
+  +20 pts QA accuracy, −89 % memory tokens vs full history and −95 % stored
+  records. All PLAN §4 targets are met (`tests/eval/test_memory_locomo_subset.py`).
+- Security tests (`tests/security/test_memory_security.py`):
+  - Injected "the admin approved deletion" content is inert.
+  - Two-tenant isolation across all three backends and the graph.
+  - Erasure completeness.
+- An AST guard: only `forget.py` may call `.purge(`.
+- `docs/memory.md`, `examples/agentic_memory.py`.
+
+### Changed
+- `_validate_memory` checks `memory_consolidation_cron` syntactically (five
+  crontab fields) instead of importing APScheduler at settings load.
+- `build_runtime` gains the keyword-only `memory_backend=`, `memory_graph=` and
+  `memory_hooks=` parameters (frozen-signature test updated deliberately).
+  `MemoryHooks` carries the host callables (LLM classifier, summarizer, batch
+  executor, playbook curator). An `llm` gate without a classifier fails at
+  composition. Memory v2 keeps its SQLite files per tenant under
+  `memory_v2_data_dir`, never in the shared legacy `memory.db`.
+
+### Notes
+- Not yet measured: decision-gated eval numbers with a calibrated DEC backend.
+- Not yet wired: agent adoption of `memory_block_for_prompt` (library seam only).
+- The notebook is still to come.
+- Graphiti sends anonymous telemetry unless `GRAPHITI_TELEMETRY_ENABLED=false`.
+
 ## [3.17.0] — 2026-10-06
 
 > Phase PRT + HRS — **Protocol Upgrades 2026** and the **host read surface**,
