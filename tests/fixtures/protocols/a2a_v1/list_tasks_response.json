@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "result": {
+    "tasks": [
+      {"id": "task-2", "contextId": "ctx-1", "status": {"state": "TASK_STATE_WORKING", "timestamp": "2026-10-06T10:05:00Z"}},
+      {"id": "task-1", "contextId": "ctx-1", "status": {"state": "TASK_STATE_INPUT_REQUIRED", "timestamp": "2026-10-06T10:00:00Z"}}
+    ],
+    "nextPageToken": "",
+    "pageSize": 50,
+    "totalSize": 2
+  }
+}

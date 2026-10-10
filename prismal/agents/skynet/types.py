@@ -8,9 +8,12 @@ Skynet component round-trips them in unit tests without a backend.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from prismal.budget.types import Usage
+
+if TYPE_CHECKING:
+    from prismal.agents.handoff import HandoffEnvelope
 
 
 @dataclass(frozen=True)
@@ -74,6 +77,9 @@ class WorkerResult:
         usage: Real per-worker token/cost usage (Phase S+; empty by default).
         role: The role that executed this order (Phase S+; ``"worker"`` default).
         remote: ``True`` when the order was delegated over A2A (Phase S+).
+        envelope: Handoff envelope (Phase TKE, SPEC-TKE-HND-001) — bounded
+            summary + artifact ref of ``output`` read by the reducer/evaluator.
+            ``None`` (default) keeps the pre-TKE shape.
     """
 
     order_id: str
@@ -84,6 +90,7 @@ class WorkerResult:
     usage: Usage = field(default_factory=Usage)
     role: str = "worker"
     remote: bool = False
+    envelope: HandoffEnvelope | None = None
 
 
 @dataclass(frozen=True)

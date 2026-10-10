@@ -13,6 +13,9 @@
 | **Architecture** | `specs/loop-hardening/ARCHITECTURE.md` |
 | **TASKS** | `specs/loop-hardening/TASKS.md` |
 
+
+> **Amended by Phase TKE (v3.13.0, 2026-10-05).** `specs/token-efficiency/SPEC.md` § "Delta to Loop Hardening" MODIFIES RF-LH-004 (high/low-water hysteresis), RF-LH-006 / SPEC-LH-GAT-002/003 (`tool_gating_mode="mask"`: phase-independent tool list + execution allow-set) and ADDS `CompactionStrategy.MASK_OBSERVATIONS`. Defaults (`remove`, `truncate`, `high_water=0`) keep this spec's behaviour exactly; the LH suite passes unmodified.
+
 ---
 
 ## Conventions

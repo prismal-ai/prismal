@@ -37,6 +37,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any, cast
 
+from prismal.agents.handoff import handoff_text
 from prismal.agents.skynet.types import SwarmOrder, SwarmPlan, WorkerResult
 from prismal.core.exceptions import SkynetError, SkynetPlanError
 from prismal.core.logging import get_logger
@@ -47,6 +48,7 @@ if TYPE_CHECKING:
     from prismal.agents.skynet.roles import RoleRegistry
     from prismal.budget.meter import CostMeter
     from prismal.core.config import Settings
+    from prismal.routing.fanout import BatchAssignerPort
     from prismal.security.audit import AuditLogger
 
 #: Planner backend: (secure messages) -> SwarmPlan (goal/round normalised by the supervisor).
@@ -111,6 +113,7 @@ class SkynetSupervisor:
         role_registry: RoleRegistry | None = None,
         meter: CostMeter | None = None,
         settings: Settings | None = None,
+        batch_policy: BatchAssignerPort | None = None,
     ) -> None:
         """Initialise the supervisor with its injected collaborators.
 
@@ -123,6 +126,10 @@ class SkynetSupervisor:
                 injects ONE meter into both the supervisor and every worker,
                 ``enforce_token_budget()`` sees the *whole* swarm's tokens.
                 ``None`` builds a private meter (Phase-S behaviour).
+            batch_policy: Phase AMR ``BatchAssignmentPolicy`` — with
+                ``adaptive_routing_enabled`` each round's orders are assigned a
+                model jointly (``order.context["routing_model"]``); ``None`` or
+                routing off keeps ``skynet_worker_model`` (SPEC-AMR-INT-002).
         """
         if settings is None:
             from prismal.core.config import get_settings
@@ -144,6 +151,7 @@ class SkynetSupervisor:
 
             meter = CostMeter(settings=settings)
         self._meter = meter
+        self._batch_policy = batch_policy
 
     async def plan(
         self,
@@ -199,7 +207,7 @@ class SkynetSupervisor:
             orders = self._assign_roles(orders)
             requested = len(orders)
             cap = self._effective_cap()
-            capped, deferred = orders[:cap], orders[cap:]
+            capped, deferred = self._assign_models(orders[:cap]), orders[cap:]
 
             span.set_attribute("prismal.skynet.swarm_size_requested", requested)
             span.set_attribute("prismal.skynet.swarm_size_effective", len(capped))
@@ -224,6 +232,36 @@ class SkynetSupervisor:
                 rationale=rationale,
                 deferred=deferred,
             )
+
+    def _assign_models(self, orders: list[SwarmOrder]) -> list[SwarmOrder]:
+        """Phase AMR: one batch assignment per round (fail-open, never raises)."""
+        from prismal.routing.fanout import assign_fanout, fanout_features
+
+        choices = assign_fanout(
+            [(o.order_id, fanout_features("skynet_worker", o.instruction)) for o in orders],
+            self._batch_policy,
+            self._settings,
+        )
+        if not choices:
+            # A re-planned order must not keep a stale model from an earlier round.
+            stale = ("routing_model", "routing_shadow_model")
+            return [
+                replace(o, context={k: v for k, v in o.context.items() if k not in stale})
+                if any(k in o.context for k in stale)
+                else o
+                for o in orders
+            ]
+        key = (
+            "routing_model" if self._settings.routing_mode == "enforce" else "routing_shadow_model"
+        )
+        out: list[SwarmOrder] = []
+        for order in orders:
+            choice = choices.get(order.order_id)
+            if choice is None:
+                out.append(order)
+                continue
+            out.append(replace(order, context={**order.context, key: choice.model_ref}))
+        return out
 
     @property
     def meter(self) -> CostMeter:
@@ -367,7 +405,8 @@ class SkynetSupervisor:
         parts: list[str] = [f"Goal: {goal}", "", "Worker results:"]
         for result in results:
             status = "ok" if result.success else f"FAILED ({result.error})"
-            parts.append(f"[{result.order_id} / {status}] {result.output}")
+            text = handoff_text(result.output, result.envelope)
+            parts.append(f"[{result.order_id} / {status}] {text}")
         return "\n".join(parts)
 
     async def _default_plan(self, messages: list[dict[str, str]]) -> SwarmPlan:

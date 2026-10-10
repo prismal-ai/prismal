@@ -79,6 +79,44 @@ class RunSummary:
     scores: list[ScoreAnnotation] = field(default_factory=list)
     started_at: float = 0.0
     ended_at: float | None = None
+    # Token Efficiency (Phase TKE — SPEC-TKE-ACC-005): derived from ``usage``.
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    reasoning_tokens: int = 0
+    cache_hit_ratio: float = 0.0
+    # LLM Gateway Providers (Phase GW — SPEC-GW-COST-001): derived from ``usage``.
+    gateway: str = ""
+    served_model: str = ""
+    equivalent_usd: float = 0.0
+
+    def to_usage_wire(self) -> dict[str, Any]:
+        """The 12-key usage wire object (SPEC-PRT-USG-001), in normative order.
+
+        Contract shared with ``prismal-server`` (RH2) and ``prismal-sdk`` (CS2);
+        fixture: ``tests/fixtures/protocols/usage_wire.json``. ``cost_source`` is
+        ``mixed`` when the run's last call was authoritatively priced
+        (gateway/litellm) but an earlier one was estimated.
+        """
+        u = self.usage
+        source = u.cost_source or "none"
+        authoritative = {"gateway", "litellm", "subscription"}
+        if u.estimated and source in authoritative and u.calls > 1:
+            source = "mixed"
+        estimated = u.calls > 0 and (u.estimated or source not in authoritative)
+        return {
+            "prompt_tokens": max(0, int(u.prompt_tokens)),
+            "completion_tokens": max(0, int(u.completion_tokens)),
+            "cache_read_tokens": max(0, int(u.cache_read_tokens)),
+            "cache_write_tokens": max(0, int(u.cache_write_tokens)),
+            "reasoning_tokens": max(0, int(u.reasoning_tokens)),
+            "total_tokens": max(0, int(u.prompt_tokens) + int(u.completion_tokens)),
+            "calls": max(0, int(u.calls)),
+            "cost_usd": round(max(0.0, float(u.cost_usd)), 6),
+            "cost_source": source,
+            "estimated": bool(estimated),
+            "served_model": (self.served_model or u.served_model) or None,
+            "gateway": (self.gateway or u.gateway) or None,
+        }
 
 
 __all__ = [

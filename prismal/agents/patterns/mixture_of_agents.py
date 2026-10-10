@@ -29,6 +29,12 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from prismal.agents.handoff import (
+    HandoffEnvelope,
+    envelope_to_message_text,
+    handoff_scope,
+    maybe_run_envelope,
+)
 from prismal.core.config import get_settings
 from prismal.core.exceptions import MoAError
 from prismal.core.logging import get_logger
@@ -40,6 +46,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from prismal.core.config import Settings
+    from prismal.routing.fanout import BatchAssignerPort
 
 logger = get_logger("prismal.agents.patterns.mixture_of_agents")
 
@@ -68,11 +75,15 @@ class MoAResult:
             subsequent entry is one aggregator pass (single-element list).
         providers_used: Proposer model ids whose calls succeeded. Failed
             proposers are omitted.
+        proposer_envelopes: Handoff envelopes of the proposer outputs (Phase
+            TKE, SPEC-TKE-HND-001), aligned with ``providers_used``; the first
+            aggregator pass reads their summaries. Empty when disabled.
     """
 
     final_answer: str
     layer_outputs: list[list[str]] = field(default_factory=list)
     providers_used: list[str] = field(default_factory=list)
+    proposer_envelopes: list[HandoffEnvelope] = field(default_factory=list)
 
 
 class MixtureOfAgents:
@@ -87,6 +98,9 @@ class MixtureOfAgents:
             previous). Must be ≥ 1.
         settings: Prismal settings. ``None`` resolves via
             :func:`~prismal.core.config.get_settings`.
+        batch_policy: Phase AMR ``BatchAssignmentPolicy`` — with adaptive
+            routing enforced, the proposer slots are assigned jointly; the
+            aggregator always keeps ``aggregator_model`` (SPEC-AMR-INT-002).
     """
 
     def __init__(
@@ -95,6 +109,7 @@ class MixtureOfAgents:
         aggregator_model: str | None = None,
         n_aggregator_layers: int = 1,
         settings: Settings | None = None,
+        batch_policy: BatchAssignerPort | None = None,
     ) -> None:
         if not proposer_models:
             raise ValueError("proposer_models must be non-empty")
@@ -104,6 +119,7 @@ class MixtureOfAgents:
         self._aggregator_model = aggregator_model or proposer_models[0]
         self._n_aggregator_layers = n_aggregator_layers
         self._settings = settings if settings is not None else get_settings()
+        self._batch_policy = batch_policy
 
     async def generate(
         self,
@@ -111,8 +127,10 @@ class MixtureOfAgents:
         state: Any,
         budget_guard_fn: Callable[[dict[str, object]], Awaitable[bool]] | None = None,
     ) -> MoAResult:
-        """Run proposers in parallel, then ``n_aggregator_layers`` refinements."""
-        del state  # reserved for future hooks
+        """Run proposers in parallel, then ``n_aggregator_layers`` refinements.
+
+        ``state`` scopes handoff-envelope artifacts (``session_id`` / ``org_id``).
+        """
         otel = OTelManager()
         with otel.start_span("moa.generate") as span:
             span.set_attribute("prismal.moa.query_len", len(query))
@@ -126,7 +144,12 @@ class MixtureOfAgents:
 
             layer_outputs: list[list[str]] = [list(proposer_outputs)]
             aggregator_llm = registry.get_llm(self._aggregator_model)
-            current = list(proposer_outputs)
+            envelopes = self._envelope_proposals(proposer_outputs, state)
+            current = (
+                [envelope_to_message_text(env) for env in envelopes]
+                if envelopes
+                else list(proposer_outputs)
+            )
             for layer_idx in range(self._n_aggregator_layers):
                 # Budget pre-check before each aggregator refinement layer; a soft
                 # cap stops further layers and returns the current best synthesis.
@@ -156,7 +179,21 @@ class MixtureOfAgents:
                 final_answer=final_answer,
                 layer_outputs=layer_outputs,
                 providers_used=providers_used,
+                proposer_envelopes=envelopes,
             )
+
+    def _envelope_proposals(self, proposals: list[str], state: Any) -> list[HandoffEnvelope]:
+        """Envelope each proposal when enabled (TKE7-03); ``[]`` when disabled."""
+        run_id, tenant = handoff_scope(state)
+        envelopes: list[HandoffEnvelope] = []
+        for proposal in proposals:
+            env = maybe_run_envelope(
+                proposal, settings=self._settings, run_id=run_id, tenant=tenant, pattern="moa"
+            )
+            if env is None:
+                return []
+            envelopes.append(env)
+        return envelopes
 
     async def _run_proposers(
         self, registry: ProviderRegistry, query: str
@@ -171,19 +208,36 @@ class MixtureOfAgents:
             llm = registry.get_llm(model)
             return await self._propose(llm, query)
 
+        models = self._routed_proposers(query)
         results = await asyncio.gather(
-            *(_propose_one(m) for m in self._proposer_models),
+            *(_propose_one(m) for m in models),
             return_exceptions=True,
         )
         outputs: list[str] = []
         providers: list[str] = []
-        for model, result in zip(self._proposer_models, results, strict=True):
+        for model, result in zip(models, results, strict=True):
             if isinstance(result, BaseException):
                 logger.warning("moa_proposer_failed", model=model, error=str(result))
                 continue
             outputs.append(result)
             providers.append(model)
         return outputs, providers
+
+    def _routed_proposers(self, query: str) -> list[str]:
+        """Phase AMR: batch-assigned proposer models when enforced, else configured."""
+        if self._settings.routing_mode != "enforce":
+            return self._proposer_models
+        from prismal.routing.fanout import assign_fanout, fanout_features
+
+        ids = [f"proposer-{i}" for i in range(len(self._proposer_models))]
+        features = fanout_features("mixture_agent", query, needs_tools=False)
+        choices = assign_fanout([(i, features) for i in ids], self._batch_policy, self._settings)
+        if not choices:
+            return self._proposer_models
+        return [
+            choices[i].model_ref if i in choices else default
+            for i, default in zip(ids, self._proposer_models, strict=True)
+        ]
 
     async def _propose(self, llm: Any, query: str) -> str:
         builder = SecurePromptBuilder()

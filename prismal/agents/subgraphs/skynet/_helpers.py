@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
+from prismal.agents.handoff import HandoffEnvelope
 from prismal.agents.skynet.types import SwarmOrder, WorkerResult
 
 _NAMESPACE = "skynet"
@@ -49,9 +50,34 @@ def dicts_to_orders(dicts: list[dict[str, Any]]) -> list[SwarmOrder]:
     return [SwarmOrder(**d) for d in dicts]
 
 
+def result_to_dict(result: WorkerResult) -> dict[str, Any]:
+    """Serialize a result for checkpointed state.
+
+    Without an envelope the dict is exactly the pre-TKE ``asdict`` shape (no
+    ``envelope`` key); with one, the envelope is stored via its JSON-safe
+    :meth:`HandoffEnvelope.to_dict` (SPEC-TKE-HND-001).
+    """
+    envelope = result.envelope
+    data = asdict(result)
+    del data["envelope"]
+    if envelope is not None:
+        data["envelope"] = envelope.to_dict()
+    return data
+
+
 def dicts_to_results(dicts: list[dict[str, Any]]) -> list[WorkerResult]:
-    """Rebuild :class:`WorkerResult` value objects from serialized state."""
-    return [WorkerResult(**d) for d in dicts]
+    """Rebuild :class:`WorkerResult` value objects from serialized state.
+
+    Legacy dicts without an ``envelope`` key load unchanged (envelope ``None``).
+    """
+    results: list[WorkerResult] = []
+    for d in dicts:
+        kwargs: dict[str, Any] = dict(d)
+        envelope = kwargs.get("envelope")
+        if isinstance(envelope, dict):
+            kwargs["envelope"] = HandoffEnvelope.from_dict(envelope)
+        results.append(WorkerResult(**kwargs))
+    return results
 
 
 __all__ = [
@@ -61,4 +87,5 @@ __all__ = [
     "get_skynet",
     "merge_skynet",
     "orders_to_dicts",
+    "result_to_dict",
 ]

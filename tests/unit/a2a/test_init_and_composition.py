@@ -147,3 +147,43 @@ class TestCompositionWiring:
         tools = ctx.tool_provider.get_tools(agent_name="researcher")
         assert any(t.name == "a2a__billing__invoice" for t in tools)
         await ctx.aclose()
+
+
+@pytest.mark.usefixtures("patched_builders")
+class TestCompositionBindsLocalOrg:
+    """The OAuth vault partition comes from the runtime's org, never the remote card."""
+
+    async def test_manager_gets_local_org_and_redirect(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import prismal.a2a.client as a2a_client
+        from prismal.a2a.types import AgentCard, AgentSkill
+
+        seen: dict[str, Any] = {}
+        real = a2a_client.A2AConnectionManager
+
+        class _Spy(real):  # type: ignore[misc, valid-type]
+            def __init__(self, *args: Any, **kwargs: Any) -> None:
+                seen.update(kwargs)
+                super().__init__(*args, **kwargs)
+
+        monkeypatch.setattr(a2a_client, "A2AConnectionManager", _Spy)
+        card = AgentCard(
+            name="billing",
+            description="d",
+            url="https://billing.acme/a2a",
+            version="1.0.0",
+            skills=[AgentSkill(id="invoice", name="Invoice", description="d")],
+        )
+        settings = Settings(
+            a2a_enabled=True,
+            a2a_outbound_enabled=True,
+            a2a_outbound_allowlist=["*.acme"],
+            a2a_oauth_redirect_uri="https://host.acme/cb",
+        )
+        ctx = await build_runtime(settings, org_id="tenant-a", mode="context", a2a_agents=[card])
+        try:
+            assert seen["local_org_id"] == "tenant-a"
+            assert seen["redirect_uri"] == "https://host.acme/cb"
+        finally:
+            await ctx.aclose()

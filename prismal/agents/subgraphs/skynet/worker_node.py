@@ -10,11 +10,11 @@ unit tester).
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
+from prismal.agents.handoff import handoff_scope
 from prismal.agents.skynet.types import SwarmOrder, WorkerResult
-from prismal.agents.subgraphs.skynet._helpers import WORKER_TAG
+from prismal.agents.subgraphs.skynet._helpers import WORKER_TAG, result_to_dict
 from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
@@ -35,7 +35,8 @@ def make_worker_node(
         raw_order: Any = state.get("_order")
         if isinstance(raw_order, dict) and raw_order:
             order = SwarmOrder(**raw_order)
-            result = await worker.execute(order)
+            run_id, tenant = handoff_scope(state)
+            result = await worker.execute(order, run_id=run_id, tenant=tenant)
         else:  # defensive — the dispatcher always injects the order
             logger.warning("skynet_worker_missing_order")
             result = WorkerResult(
@@ -49,7 +50,7 @@ def make_worker_node(
                 {
                     "agent": WORKER_TAG,
                     "order_id": result.order_id,
-                    "result": asdict(result),
+                    "result": result_to_dict(result),
                 }
             ]
         }

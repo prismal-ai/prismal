@@ -1,0 +1,240 @@
+{
+  "name": "moa_proposers",
+  "description": "Mixture-of-Agents: three proposers as sub-agents, then the aggregator's answer.",
+  "context": {
+    "run_id": "run-1",
+    "thread_id": "thread-1",
+    "include_state_deltas": false
+  },
+  "initial_state": null,
+  "input": [
+    [
+      "custom",
+      {
+        "type": "subagent",
+        "phase": "start",
+        "id": "proposer-0",
+        "name": "moa_proposer",
+        "parent_tool_call_id": "call-moa"
+      }
+    ],
+    [
+      "custom",
+      {
+        "type": "subagent",
+        "phase": "start",
+        "id": "proposer-1",
+        "name": "moa_proposer",
+        "parent_tool_call_id": "call-moa"
+      }
+    ],
+    [
+      "custom",
+      {
+        "type": "subagent",
+        "phase": "start",
+        "id": "proposer-2",
+        "name": "moa_proposer",
+        "parent_tool_call_id": "call-moa"
+      }
+    ],
+    [
+      "custom",
+      {
+        "type": "subagent",
+        "phase": "end",
+        "id": "proposer-1",
+        "result": "B"
+      }
+    ],
+    [
+      "custom",
+      {
+        "type": "subagent",
+        "phase": "end",
+        "id": "proposer-0",
+        "result": "A"
+      }
+    ],
+    [
+      "custom",
+      {
+        "type": "subagent",
+        "phase": "end",
+        "id": "proposer-2",
+        "result": "C"
+      }
+    ],
+    [
+      "messages",
+      [
+        {
+          "__class__": "AIMessageChunk",
+          "content": "Synthesis of A, B, C.",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "AIMessageChunk",
+          "id": "msg-agg",
+          "tool_calls": [],
+          "invalid_tool_calls": [],
+          "tool_call_chunks": [],
+          "chunk_position": "last"
+        },
+        {
+          "langgraph_node": "aggregator",
+          "langgraph_step": 1
+        }
+      ]
+    ],
+    [
+      "updates",
+      {
+        "aggregator": {
+          "current_agent": "aggregator"
+        }
+      }
+    ]
+  ],
+  "end": {
+    "kind": "finish",
+    "result": null
+  },
+  "summary_usage_wire": {
+    "prompt_tokens": 10,
+    "completion_tokens": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "reasoning_tokens": 0,
+    "total_tokens": 15,
+    "calls": 4,
+    "cost_usd": 0.0,
+    "cost_source": "none",
+    "estimated": true,
+    "served_model": "openai/x",
+    "gateway": null
+  },
+  "expected": [
+    {
+      "type": "RUN_STARTED",
+      "timestamp": 1760000000000,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "protocolVersion": "1.0"
+    },
+    {
+      "type": "SUBAGENT_STARTED",
+      "timestamp": 1760000000001,
+      "subagentRunId": "proposer-0",
+      "name": "moa_proposer",
+      "parentToolCallId": "call-moa"
+    },
+    {
+      "type": "SUBAGENT_STARTED",
+      "timestamp": 1760000000002,
+      "subagentRunId": "proposer-1",
+      "name": "moa_proposer",
+      "parentToolCallId": "call-moa"
+    },
+    {
+      "type": "SUBAGENT_STARTED",
+      "timestamp": 1760000000003,
+      "subagentRunId": "proposer-2",
+      "name": "moa_proposer",
+      "parentToolCallId": "call-moa"
+    },
+    {
+      "type": "SUBAGENT_FINISHED",
+      "timestamp": 1760000000004,
+      "subagentRunId": "proposer-1",
+      "result": "B",
+      "outcome": {
+        "type": "success"
+      }
+    },
+    {
+      "type": "SUBAGENT_FINISHED",
+      "timestamp": 1760000000005,
+      "subagentRunId": "proposer-0",
+      "result": "A",
+      "outcome": {
+        "type": "success"
+      }
+    },
+    {
+      "type": "SUBAGENT_FINISHED",
+      "timestamp": 1760000000006,
+      "subagentRunId": "proposer-2",
+      "result": "C",
+      "outcome": {
+        "type": "success"
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "timestamp": 1760000000007,
+      "messageId": "msg-agg",
+      "role": "assistant"
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "timestamp": 1760000000008,
+      "messageId": "msg-agg",
+      "delta": "Synthesis of A, B, C."
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "timestamp": 1760000000009,
+      "messageId": "msg-agg"
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000010,
+      "stepName": "aggregator"
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000011,
+      "stepName": "aggregator"
+    },
+    {
+      "type": "CUSTOM",
+      "timestamp": 1760000000012,
+      "name": "prismal.usage",
+      "value": {
+        "prompt_tokens": 10,
+        "completion_tokens": 5,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0,
+        "total_tokens": 15,
+        "calls": 4,
+        "cost_usd": 0.0,
+        "cost_source": "none",
+        "estimated": true,
+        "served_model": "openai/x",
+        "gateway": null
+      }
+    },
+    {
+      "type": "RUN_FINISHED",
+      "timestamp": 1760000000013,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "outcome": {
+        "type": "success"
+      },
+      "usage": [
+        {
+          "provider": "openai",
+          "model": "openai/x",
+          "inputTokens": 10,
+          "outputTokens": 5,
+          "totalTokens": 15,
+          "reasoningTokens": 0,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0
+        }
+      ]
+    }
+  ]
+}

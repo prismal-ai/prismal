@@ -38,6 +38,7 @@ from prismal.agents.subgraphs.skynet.plan_node import make_plan_node
 from prismal.agents.subgraphs.skynet.reduce_node import make_reduce_node
 from prismal.agents.subgraphs.skynet.worker_node import make_worker_node
 from prismal.core.logging import get_logger
+from prismal.routing.fanout import build_batch_policy
 
 if TYPE_CHECKING:
     from prismal.agents.extension.ports import ToolProviderPort
@@ -124,6 +125,7 @@ def build_skynet_subgraph(
             meter=meter,
             audit=audit,
             settings=settings,
+            batch_policy=build_batch_policy(settings),  # Phase AMR; None unless policy=batch
         )
     if worker is None:
         worker = SwarmWorker(

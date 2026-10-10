@@ -1,0 +1,177 @@
+{
+  "name": "run_error",
+  "description": "Run aborted mid-stream: open message and tool call are closed before RUN_ERROR.",
+  "context": {
+    "run_id": "run-1",
+    "thread_id": "thread-1"
+  },
+  "initial_state": {
+    "current_agent": "agent"
+  },
+  "input": [
+    [
+      "messages",
+      [
+        {
+          "__class__": "AIMessageChunk",
+          "content": "Working on it",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "AIMessageChunk",
+          "id": "msg-1",
+          "tool_calls": [],
+          "invalid_tool_calls": [],
+          "tool_call_chunks": []
+        },
+        {
+          "langgraph_node": "agent",
+          "langgraph_step": 1
+        }
+      ]
+    ],
+    [
+      "messages",
+      [
+        {
+          "__class__": "AIMessageChunk",
+          "content": "",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "AIMessageChunk",
+          "id": "msg-1",
+          "tool_calls": [
+            {
+              "name": "python",
+              "args": {
+                "code": "1+"
+              },
+              "id": "call-1",
+              "type": "tool_call"
+            }
+          ],
+          "invalid_tool_calls": [],
+          "tool_call_chunks": [
+            {
+              "name": "python",
+              "args": "{\"code\": \"1+",
+              "id": "call-1",
+              "index": 0,
+              "type": "tool_call_chunk"
+            }
+          ]
+        },
+        {
+          "langgraph_node": "agent",
+          "langgraph_step": 1
+        }
+      ]
+    ]
+  ],
+  "end": {
+    "kind": "error",
+    "code": "budget_exceeded",
+    "message": "Hard budget cap reached"
+  },
+  "summary_usage_wire": {
+    "prompt_tokens": 500,
+    "completion_tokens": 0,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "reasoning_tokens": 0,
+    "total_tokens": 500,
+    "calls": 1,
+    "cost_usd": 0.0,
+    "cost_source": "table",
+    "estimated": true,
+    "served_model": null,
+    "gateway": null
+  },
+  "expected": [
+    {
+      "type": "RUN_STARTED",
+      "timestamp": 1760000000000,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "protocolVersion": "1.0"
+    },
+    {
+      "type": "STATE_SNAPSHOT",
+      "timestamp": 1760000000001,
+      "snapshot": {
+        "current_agent": "agent"
+      }
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "timestamp": 1760000000002,
+      "messageId": "msg-1",
+      "role": "assistant"
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "timestamp": 1760000000003,
+      "messageId": "msg-1",
+      "delta": "Working on it"
+    },
+    {
+      "type": "TOOL_CALL_START",
+      "timestamp": 1760000000004,
+      "toolCallId": "call-1",
+      "toolCallName": "python",
+      "parentMessageId": "msg-1"
+    },
+    {
+      "type": "TOOL_CALL_ARGS",
+      "timestamp": 1760000000005,
+      "toolCallId": "call-1",
+      "delta": "{\"code\": \"1+"
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "timestamp": 1760000000006,
+      "messageId": "msg-1"
+    },
+    {
+      "type": "TOOL_CALL_END",
+      "timestamp": 1760000000007,
+      "toolCallId": "call-1"
+    },
+    {
+      "type": "CUSTOM",
+      "timestamp": 1760000000008,
+      "name": "prismal.usage",
+      "value": {
+        "prompt_tokens": 500,
+        "completion_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0,
+        "total_tokens": 500,
+        "calls": 1,
+        "cost_usd": 0.0,
+        "cost_source": "table",
+        "estimated": true,
+        "served_model": null,
+        "gateway": null
+      }
+    },
+    {
+      "type": "RUN_ERROR",
+      "timestamp": 1760000000009,
+      "message": "Hard budget cap reached",
+      "code": "budget_exceeded",
+      "usage": [
+        {
+          "provider": "unknown",
+          "model": "unknown",
+          "inputTokens": 500,
+          "outputTokens": 0,
+          "totalTokens": 500,
+          "reasoningTokens": 0,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0
+        }
+      ]
+    }
+  ]
+}

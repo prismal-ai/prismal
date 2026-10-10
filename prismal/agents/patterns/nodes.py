@@ -33,6 +33,8 @@ from prismal.agents.patterns.tree_of_thoughts import make_tot_node
 from prismal.core.config import get_settings
 from prismal.core.exceptions import LATSError
 from prismal.core.logging import get_logger
+from prismal.routing.fanout import build_batch_policy
+from prismal.routing.plan_cache import plan_cache_for
 from prismal.security.prompt_builder import SecurePromptBuilder
 
 if TYPE_CHECKING:
@@ -357,7 +359,10 @@ def make_mixture_node(
         agent = moa
         if agent is None:
             models = proposer_models or _default_proposer_models()
-            agent = moa_factory(proposer_models=models)
+            # Phase AMR: batch-assigned proposers when routing_policy="batch" (else None).
+            batch_policy = build_batch_policy(get_settings())
+            extra = {"batch_policy": batch_policy} if batch_policy is not None else {}
+            agent = moa_factory(proposer_models=models, **extra)
         result = await agent.generate(query, state)
         metadata = _merged_metadata(state, "mixture", {"providers_used": result.providers_used})
         return {"messages": [AIMessage(content=result.final_answer)], "metadata": metadata}
@@ -464,14 +469,17 @@ def make_llm_compiler_node(
         pf = plan_fn or _default_compiler_plan(llm, max_subtasks)
         te = tool_executor or _default_compiler_executor(llm)
         jn = joiner or _default_compiler_joiner(llm)
+        # Phase AMR: intent-keyed plan cache; (None, {}) unless enabled + eligible.
+        plan_cache, cache_kwargs = plan_cache_for(state, "llm_compiler", goal=query, tool_names=[])
         compiler = LLMCompiler(
             tools=[],
             plan_fn=pf,
             tool_executor=te,
             joiner=jn,
             max_replanning=max_replanning,
+            plan_cache=plan_cache,
         )
-        result = await compiler.compile_and_run(goal=query, state=state)
+        result = await compiler.compile_and_run(goal=query, state=state, **cache_kwargs)
         metadata = _merged_metadata(
             state,
             "llm_compiler",

@@ -9,7 +9,6 @@ written to ``metadata.skynet`` for the evaluator.
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
 from prismal.agents.skynet.reduce import reduce_results
@@ -18,6 +17,7 @@ from prismal.agents.subgraphs.skynet._helpers import (
     dicts_to_results,
     get_skynet,
     merge_skynet,
+    result_to_dict,
 )
 from prismal.core.logging import get_logger
 
@@ -72,7 +72,7 @@ def make_reduce_node(
         )
         update = merge_skynet(
             state,
-            results=[asdict(r) for r in results],
+            results=[result_to_dict(r) for r in results],
             answer=answer,
         )
         update["current_agent"] = "skynet_reduce"

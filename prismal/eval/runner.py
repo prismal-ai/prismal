@@ -17,6 +17,7 @@ import random
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
+from prismal.eval.metrics_tokens import build_token_report
 from prismal.eval.trajectory import capture_trajectory
 from prismal.eval.types import (
     AssertionResult,
@@ -232,6 +233,7 @@ def _aggregate(suite: str, results: list[CaseResult], *, version: str) -> Scorec
         avg_cost_usd=sum(t.cost_usd for t in trajectories) / n,
         avg_latency_ms=sum(t.latency_ms for t in trajectories) / n,
         cases=results,
+        token_report=build_token_report(results),
     )
 
 

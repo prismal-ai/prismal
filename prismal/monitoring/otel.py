@@ -23,6 +23,19 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+#: Counter keys mirrored into the in-process host-surface recorders (HRS —
+#: ``prismal.monitoring.host_stats``); kept literal so this module never imports it eagerly.
+_HOST_STATS_METRICS: frozenset[str] = frozenset(
+    {
+        "decisions",
+        "llm_calls_avoided",
+        "routing_decisions",
+        "routing_escalations",
+        "plan_cache_hits",
+        "routing_savings_usd",
+    }
+)
+
 
 class _NoOpSpan:
     """No-op span used when OTEL is disabled."""
@@ -76,6 +89,7 @@ class OTelManager:
         self.enabled: bool = False
         self._counters: dict[str, Any] = {}
         self._histograms: dict[str, Any] = {}
+        self._gauges: dict[str, Any] = {}
         self._setup()
 
     def _setup(self) -> None:
@@ -395,6 +409,249 @@ class OTelManager:
             description="Evaluation-dataset exports by format (langsmith|langfuse)",
         )
 
+        self._register_tke_metrics()
+        self._register_gw_metrics()
+        self._register_dec_metrics()
+        self._register_amr_metrics()
+        self._register_prt_metrics()
+        self._register_mem_metrics()
+
+    def _register_tke_metrics(self) -> None:
+        """Token Efficiency (Phase TKE — SPEC-TKE-OTEL-001)."""
+        counters = {
+            "llm_input_tokens": (
+                "prismal.llm_input_tokens_total",
+                "Input tokens by kind (uncached|cache_read|cache_write), agent, model",
+            ),
+            "llm_reasoning_tokens": (
+                "prismal.llm_reasoning_tokens_total",
+                "Reasoning tokens (subset of completion tokens) by agent, model",
+            ),
+            "prompt_cache_breakpoints": (
+                "prismal.prompt_cache_breakpoints_total",
+                "Prompt-cache breakpoints placed (by family)",
+            ),
+            "prompt_cache_layout_fallbacks": (
+                "prismal.prompt_cache_layout_fallbacks_total",
+                "Cache-stable prompt layout fallbacks to legacy",
+            ),
+            "tool_gate_masked_calls": (
+                "prismal.tool_gate_masked_calls_total",
+                "Tool calls blocked by mask-mode gating (by agent, phase)",
+            ),
+            "tool_search_calls": (
+                "prismal.tool_search_calls_total",
+                "search_tools meta-tool invocations (by agent)",
+            ),
+            "tool_deferred_activated": (
+                "prismal.tool_deferred_activated_total",
+                "Deferred tools activated into the exposed list (by agent)",
+            ),
+            "observations_masked": (
+                "prismal.observations_masked_total",
+                "Tool observations replaced by an artifact stub",
+            ),
+            "observations_mask_errors": (
+                "prismal.observations_mask_errors_total",
+                "Observation masks skipped because the artifact write failed",
+            ),
+            "artifacts_stored": (
+                "prismal.artifacts_stored_total",
+                "Artifacts stored (by kind)",
+            ),
+            "artifact_reads": ("prismal.artifact_reads_total", "Artifact reads"),
+            "tool_output_truncated": (
+                "prismal.tool_output_truncated_total",
+                "Tool outputs truncated to their budget (by tool)",
+            ),
+            "toon_encoded": ("prismal.toon_encoded_total", "Payloads encoded as TOON"),
+            "handoff_envelopes": (
+                "prismal.handoff_envelopes_total",
+                "Handoff envelopes built (by pattern)",
+            ),
+            "rag_passages_dropped": (
+                "prismal.rag_passages_dropped_total",
+                "Retrieved passages dropped by the RAG context budget",
+            ),
+        }
+        for key, (name, description) in counters.items():
+            self._counters[key] = self._meter.create_counter(name, description=description)
+        self._histograms["llm_cache_hit_ratio"] = self._meter.create_histogram(
+            "prismal.llm_cache_hit_ratio",
+            description="Per-call prompt-cache hit ratio (cache_read / prompt) by agent",
+        )
+        self._histograms["rag_context_tokens"] = self._meter.create_histogram(
+            "prismal.rag_context_tokens",
+            description="Estimated tokens of RAG context passed to the model",
+        )
+
+    def _register_gw_metrics(self) -> None:
+        """LLM Gateway Providers (Phase GW — SPEC-GW-OTEL-001)."""
+        counters = {
+            "gateway_requests": (
+                "prismal.gateway_requests_total",
+                "Completed gateway calls by gateway, requested_model, served_model",
+            ),
+            "gateway_fallbacks": (
+                "prismal.gateway_fallbacks_total",
+                "Gateway-owned model fallbacks (served model differs from requested)",
+            ),
+            "gateway_policy_denials": (
+                "prismal.gateway_policy_denials_total",
+                "Fail-closed gateway policy/ToS/security denials by gateway, reason",
+            ),
+            "gateway_errors": (
+                "prismal.gateway_errors_total",
+                "Fail-open gateway lookups and 402/429 responses by gateway, kind",
+            ),
+        }
+        for key, (name, description) in counters.items():
+            self._counters[key] = self._meter.create_counter(name, description=description)
+        self._histograms["gateway_cost_drift_usd"] = self._meter.create_histogram(
+            "prismal.gateway_cost_drift_usd",
+            description="|authoritative - reported| gateway cost per reconciled call",
+        )
+        self._gauges = getattr(self, "_gauges", {})
+        self._gauges["gateway_quota_remaining"] = self._meter.create_gauge(
+            "prismal.gateway_quota_remaining",
+            description="Remaining gateway quota by gateway, window",
+        )
+
+    def _register_dec_metrics(self) -> None:
+        """Typed Decision Models (Phase DEC — SPEC-DEC-OTEL-001)."""
+        counters = {
+            "decisions": (
+                "prismal.decisions_total",
+                "Typed decisions by integration, backend, outcome",
+            ),
+            "llm_calls_avoided": (
+                "prismal.llm_calls_avoided_total",
+                "LLM calls replaced by an accepted non-LLM decision, by integration",
+            ),
+            "decision_drift_alarms": (
+                "prismal.decision_drift_alarms_total",
+                "Auto-demotions to shadow after audited agreement fell below the floor",
+            ),
+            "decision_injection_flags": (
+                "prismal.decision_injection_flags_total",
+                "Decision states flagged for authority claims / injection, by integration",
+            ),
+            "decision_shuffle_inconsistent": (
+                "prismal.decision_shuffle_inconsistent_total",
+                "High-stakes Choice decisions whose option-order shuffle disagreed",
+            ),
+            "decision_model_mismatch": (
+                "prismal.decision_model_mismatch_total",
+                "Responses whose model differs from the pinned model, by backend",
+            ),
+        }
+        for key, (name, description) in counters.items():
+            self._counters[key] = self._meter.create_counter(name, description=description)
+        self._histograms["decision_latency_ms"] = self._meter.create_histogram(
+            "prismal.decision_latency_ms",
+            description="Typed decision latency per backend (ms)",
+        )
+        self._gauges = getattr(self, "_gauges", {})
+        self._gauges["decision_shadow_agreement_ratio"] = self._meter.create_gauge(
+            "prismal.decision_shadow_agreement_ratio",
+            description="Shadow-mode agreement with the reference path, by integration, language",
+        )
+
+    def _register_amr_metrics(self) -> None:
+        """Adaptive Model Routing (Phase AMR — SPEC-AMR-OTEL-001)."""
+        counters = {
+            "routing_decisions": (
+                "prismal.routing_decisions_total",
+                "Routing decisions by policy and tier",
+            ),
+            "routing_escalations": (
+                "prismal.routing_escalations_total",
+                "Cascade escalations (and accepted-at-cap) by reason",
+            ),
+            "plan_cache_hits": ("prismal.plan_cache_hits_total", "Plan-cache hits by intent"),
+            "plan_cache_misses": (
+                "prismal.plan_cache_misses_total",
+                "Plan-cache misses by reason",
+            ),
+            "batch_jobs": ("prismal.batch_jobs_total", "Provider batch jobs by final status"),
+            "routing_savings_usd": (
+                "prismal.routing_savings_usd",
+                "Frontier counterfactual cost minus actual cost (micro-USD)",
+            ),
+        }
+        for key, (name, description) in counters.items():
+            self._counters[key] = self._meter.create_counter(name, description=description)
+
+    def _register_prt_metrics(self) -> None:
+        """Protocol Upgrades + Host Read Surface (SPEC-PRT-OTEL-001, SPEC-HRS-SUR-002)."""
+        counters = {
+            "a2a_requests": (
+                "prismal.a2a_requests_total",
+                "A2A requests by protocol_version, direction, method, outcome",
+            ),
+            "a2a_oauth_tokens": ("prismal.a2a_oauth_tokens_total", "A2A OAuth tokens by flow"),
+            "mcp_protocol_negotiations": (
+                "prismal.mcp_protocol_negotiations_total",
+                "MCP adapter selections by mode",
+            ),
+            "mcp_tool_cache_hits": ("prismal.mcp_tool_cache_hits_total", "MCP tool-list hits"),
+            "mcp_tool_cache_misses": (
+                "prismal.mcp_tool_cache_misses_total",
+                "MCP tool-list cache misses",
+            ),
+            "mcp_tool_list_changes": (
+                "prismal.mcp_tool_list_changes_total",
+                "MCP tool lists whose content hash changed, by server",
+            ),
+            "mcp_tasks": ("prismal.mcp_tasks_total", "MCP tasks by final status"),
+            "mcp_input_requests": (
+                "prismal.mcp_input_requests_total",
+                "MCP input requests by kind and action",
+            ),
+            "agui_events": ("prismal.agui_events_total", "AG-UI events emitted by type"),
+            "agui_translation_errors": (
+                "prismal.agui_translation_errors_total",
+                "AG-UI translation errors (chunk dropped)",
+            ),
+            "host_surface_errors": (
+                "prismal.host_surface_errors_total",
+                "Host read-surface methods that fell back, by method",
+            ),
+        }
+        for key, (name, description) in counters.items():
+            self._counters[key] = self._meter.create_counter(name, description=description)
+        self._histograms["mcp_task_wait_s"] = self._meter.create_histogram(
+            "prismal.mcp_task_wait_s", description="MCP task wall-clock wait (s)"
+        )
+
+    def _register_mem_metrics(self) -> None:
+        """Agentic memory (Phase MEM — SPEC-MEM-OTEL-001)."""
+        counters = {
+            "memory_writes": ("prismal.memory_writes_total", "Memory writes by type, outcome"),
+            "memory_recall_stops": (
+                "prismal.memory_recall_stops_total",
+                "Memory recall stop reasons",
+            ),
+            "memory_consolidations": (
+                "prismal.memory_consolidations_total",
+                "Memory consolidation runs by status",
+            ),
+            "memory_forget": ("prismal.memory_forget_total", "Forget attempts by actor, outcome"),
+            "memory_taint_blocks": (
+                "prismal.memory_taint_blocks_total",
+                "Memory operations constrained by a taint rule (T1-T7)",
+            ),
+            "memory_tenancy_violations": (
+                "prismal.memory_tenancy_violations_total",
+                "Records dropped because their org_id did not match the request",
+            ),
+        }
+        for key, (name, description) in counters.items():
+            self._counters[key] = self._meter.create_counter(name, description=description)
+        self._histograms["memory_recall_tokens"] = self._meter.create_histogram(
+            "prismal.memory_recall_tokens", description="Tokens returned per memory recall"
+        )
+
     @contextmanager
     def start_span(
         self,
@@ -440,6 +697,11 @@ class OTelManager:
             value: Amount to increment.
             attributes: Optional OTEL attribute labels.
         """
+        if metric in _HOST_STATS_METRICS:  # HRS: in-process mirror, works with OTel off
+            with suppress(Exception):
+                from prismal.monitoring import host_stats
+
+                host_stats.record_metric(metric, value, attributes)
         counter = self._counters.get(metric)
         if counter is not None:
             with suppress(Exception):
@@ -462,6 +724,18 @@ class OTelManager:
         if histogram is not None:
             with suppress(Exception):
                 histogram.record(value, attributes or {})
+
+    def set_gauge(
+        self,
+        metric: str,
+        value: float,
+        attributes: dict[str, Any] | None = None,
+    ) -> None:
+        """Set a named gauge metric (no-op when unknown or OTEL is disabled)."""
+        gauge = getattr(self, "_gauges", {}).get(metric)
+        if gauge is not None:
+            with suppress(Exception):
+                gauge.set(value, attributes or {})
 
     def shutdown(self) -> None:
         """Flush and shut down all OTEL providers."""

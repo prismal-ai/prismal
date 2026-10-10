@@ -15,6 +15,7 @@ from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
+from prismal.routing.outcome import llm_route_kwargs, track_outcome
 from prismal.security.hardening_run import hardening_react_kwargs
 
 if TYPE_CHECKING:
@@ -157,19 +158,23 @@ async def critic_node(state: AgentState) -> dict[str, object]:
     current_iteration: int = state.get("iteration_count", 0)
 
     registry = ProviderRegistry()
-    llm = registry.get_llm_with_fallback()
+    llm = registry.get_llm_with_fallback(**llm_route_kwargs("critic", state))
     tools = get_tools_for_agent("critic")
     llm_with_tools = llm.bind_tools(tools)
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), *state["messages"]]
-    response = await react_loop(
-        llm_with_tools,
-        tools,
-        messages,
-        agent_name="critic",
-        session_id=str(session_id) if session_id else None,
-        budget_guard=get_budget_guard(state),
-        **hardening_react_kwargs(state),
+    response = await track_outcome(
+        state,
+        "critic",
+        react_loop(
+            llm_with_tools,
+            tools,
+            messages,
+            agent_name="critic",
+            session_id=str(session_id) if session_id else None,
+            budget_guard=get_budget_guard(state),
+            **hardening_react_kwargs(state),
+        ),
     )
 
     logger.info(

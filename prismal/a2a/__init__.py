@@ -16,10 +16,20 @@ sanitized + audited before it touches ``AgentState``.
 
 from __future__ import annotations
 
-from prismal.a2a.card import build_agent_card, clear_agent_card_cache
+from prismal.a2a.card import a2a_route_paths, build_agent_card, clear_agent_card_cache
 from prismal.a2a.client import A2AAgentNode, A2AClient, A2AConnectionManager
+from prismal.a2a.negotiation import negotiate_inbound, select_outbound
+from prismal.a2a.oauth import (
+    AuthorizationPrompter,
+    DeviceCodeFlow,
+    EndpointPolicy,
+    OAuthBinding,
+    PkceAuthorizationCodeFlow,
+    select_oauth_flow,
+)
 from prismal.a2a.provider import A2AToolProvider
 from prismal.a2a.server import A2AServerHandler, AuthContext
+from prismal.a2a.task_store import A2ATaskStorePort, InMemoryA2ATaskStore, TaskRecord
 from prismal.a2a.types import (
     PROTOCOL_VERSION,
     A2AArtifact,
@@ -45,11 +55,23 @@ __all__ = [
     "A2APart",
     "A2AServerHandler",
     "A2ATask",
+    "A2ATaskStorePort",
     "A2AToolProvider",
     "AgentCard",
     "AgentSkill",
     "AuthContext",
+    "AuthorizationPrompter",
+    "DeviceCodeFlow",
+    "EndpointPolicy",
+    "InMemoryA2ATaskStore",
+    "OAuthBinding",
+    "PkceAuthorizationCodeFlow",
+    "TaskRecord",
+    "a2a_route_paths",
     "build_agent_card",
     "clear_agent_card_cache",
     "get_settings",
+    "negotiate_inbound",
+    "select_oauth_flow",
+    "select_outbound",
 ]

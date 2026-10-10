@@ -5,6 +5,7 @@ Loads from environment variables (prefix: PRISMAL_) and optional .env file. All
 configuration is validated at startup.
 """
 
+import re
 from collections.abc import Mapping
 from contextvars import ContextVar
 from functools import lru_cache
@@ -26,6 +27,9 @@ if TYPE_CHECKING:
 _active_source: "ContextVar[ConfigSourcePort | None]" = ContextVar(
     "_prismal_active_config_source", default=None
 )
+
+# One crontab field: numbers, ranges, steps, lists, ``*``/``?`` and 3-letter names.
+_CRON_FIELD_RE = re.compile(r"[\d*?/,\-A-Za-z]+")
 
 
 class _ConfigSourceSettingsSource(EnvSettingsSource):
@@ -768,6 +772,492 @@ class Settings(BaseSettings):
     tool_gating_phase_map_path: str = Field(
         default="config/tool_gating_phases.yaml",
         description="Phase -> capability-override table path.",
+    )
+
+    # --- TKE --- Token Efficiency (Phase TKE — SPEC-TKE-CFG-001) ────────
+    # Every sub-flag is effective only when token_efficiency_enabled=True;
+    # master off ⇒ every pre-TKE behaviour is byte-for-byte unchanged.
+    token_efficiency_enabled: bool = Field(
+        default=False,
+        description="Master opt-in for the token-efficiency layer (Phase TKE).",
+    )
+    prompt_cache_enabled: bool = Field(
+        default=False,
+        description="Apply provider prompt-cache policy (cache_control / prompt_cache_key).",
+    )
+    prompt_cache_ttl: str = Field(default="5m", description="Prompt-cache TTL: 5m | 1h.")
+    prompt_cache_scope: str = Field(
+        default="tenant",
+        description="Prompt-cache prefix scope: tenant (tenant id in prefix hash) | global.",
+    )
+    prompt_cache_policy_path: str = Field(
+        default="config/prompt_cache.yaml",
+        description="Volatile provider cache facts (breakpoints, lookback, min prefix).",
+    )
+    prompt_canary_secret: SecretStr = Field(
+        default=SecretStr(""),
+        description="HMAC secret for the cache-stable prefix canary (never logged/mirrored).",
+    )
+    prompt_layout: str = Field(
+        default="legacy",
+        description="SecurePromptBuilder default layout: legacy | cache_stable.",
+    )
+    tool_gating_mode: str = Field(
+        default="remove",
+        description="LH tool gating mode: remove (LH2 exactly) | mask (cache-safe allow-set).",
+    )
+    tool_defer_enabled: bool = Field(default=False, description="Deferred tool loading.")
+    tool_defer_threshold: int = Field(
+        default=30, ge=1, description="Tool count above which non-core tools are deferred."
+    )
+    tool_defer_core: list[str] = Field(
+        default_factory=list, description="Tool names always exposed when deferring."
+    )
+    context_mask_keep_turns: int = Field(
+        default=10, ge=0, description="Recent human/AI turns whose observations stay unmasked."
+    )
+    context_mask_relevance_keep: float = Field(
+        default=0.8,
+        ge=0.0,
+        le=1.0,
+        description="Observations scoring >= this (relevance_fn) stay unmasked.",
+    )
+    context_compaction_high_water: int = Field(
+        default=0, ge=0, description="Hysteresis high-water token mark (0 = LH trigger)."
+    )
+    context_compaction_low_water: int = Field(
+        default=0, ge=0, description="Hysteresis low-water token mark."
+    )
+    artifact_store_backend: str = Field(
+        default="memory", description="Artifact store backend: memory | sqlite."
+    )
+    artifact_store_path: str = Field(
+        default="data/artifacts.db", description="SQLite artifact store path."
+    )
+    artifact_ttl_s: int = Field(default=86400, ge=0, description="Artifact TTL in seconds.")
+    tool_output_budget_enabled: bool = Field(
+        default=False, description="Cap tool outputs reaching messages (head+tail excerpt)."
+    )
+    tool_output_max_tokens_default: int = Field(
+        default=2000, ge=0, description="Default per-tool output budget (estimated tokens)."
+    )
+    tool_output_max_tokens_by_tool: dict[str, int] = Field(
+        default_factory=dict, description="Per-tool output budget overrides."
+    )
+    tool_output_toon_enabled: bool = Field(
+        default=False, description="Encode uniform tabular tool/RAG results as TOON."
+    )
+    llm_effort_enabled: bool = Field(
+        default=False, description="Per-agent reasoning effort / max_tokens."
+    )
+    llm_effort_profile: str = Field(
+        default="none", description="Effort profile: none | recommended."
+    )
+    llm_effort_by_agent: dict[str, str] = Field(
+        default_factory=dict, description="Agent -> reasoning effort (low|medium|high)."
+    )
+    llm_max_tokens_by_agent: dict[str, int] = Field(
+        default_factory=dict, description="Agent -> max output tokens."
+    )
+    handoff_envelope_enabled: bool = Field(
+        default=False, description="Multi-agent handoff envelopes (summary + artifact refs)."
+    )
+    handoff_summary_max_tokens: int = Field(
+        default=1500, ge=0, description="Envelope summary cap (estimated tokens)."
+    )
+    rag_context_budget_enabled: bool = Field(
+        default=False, description="Fit retrieved RAG context to a token budget."
+    )
+    rag_context_budget_tokens: int = Field(
+        default=3000, ge=0, description="RAG context budget (estimated tokens)."
+    )
+    rag_retrieve_k: int = Field(default=20, ge=1, description="Chunks retrieved before budget.")
+    rag_rerank_enabled: bool = Field(
+        default=False, description="Cross-encoder rerank ([rerank] extra)."
+    )
+    rag_passage_compression_enabled: bool = Field(
+        default=False, description="LLMLingua-2 prose compression ([compression] extra)."
+    )
+    codeact_mcp_code_mode_enabled: bool = Field(
+        default=False, description="Code-mode for MCP chains (TKE10, optional P3)."
+    )
+
+    # --- GW --- LLM Gateway Providers (Phase GW — SPEC-GW-CFG-001) ───────
+    # Every gateway is effective only when llm_gateways_enabled=True plus its own
+    # *_enabled flag; master off ⇒ get_llm() kwargs and the graph equal v3.13.0.
+    llm_gateways_enabled: bool = Field(
+        default=False, description="Master opt-in for LLM gateway providers (Phase GW)."
+    )
+    llm_gateway_agent_map: dict[str, str] = Field(
+        default_factory=dict, description="Agent name → 'gw:<gateway>/<model>' reference."
+    )
+    llm_gateway_openai_compatible: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Generic gateways: name → {base_url, auth_ref?, headers?, "
+        "owns_model_fallback?}.",
+    )
+    llm_gateway_tenant_key_fallback: bool = Field(
+        default=False,
+        description="Allow the global key when a tenant key is missing (bills the operator).",
+    )
+    openrouter_enabled: bool = Field(default=False, description="Enable OpenRouter.")
+    openrouter_api_key: SecretStr = Field(default=SecretStr(""), description="OpenRouter key.")
+    openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1")
+    openrouter_app_url: str = Field(default="", description="HTTP-Referer attribution header.")
+    openrouter_app_title: str = Field(
+        default="prismal", description="X-OpenRouter-Title attribution header."
+    )
+    openrouter_app_categories: list[str] = Field(
+        default_factory=list, description="X-OpenRouter-Categories attribution header."
+    )
+    openrouter_session_stickiness: bool = Field(
+        default=True, description="Send a hashed session_id for sticky provider routing."
+    )
+    openrouter_plugins: list[str] = Field(
+        default_factory=list, description="Allowed: response-healing, context-compression, pdf."
+    )
+    openrouter_auto_allowed_models: list[str] = Field(
+        default_factory=list, description="openrouter/auto model wildcards (e.g. anthropic/*)."
+    )
+    openrouter_auto_tier: str | None = Field(
+        default=None, description="openrouter/auto cost tier: low|medium|high|xhigh|max."
+    )
+    openrouter_require_zdr: bool = Field(
+        default=True, description="provider.data_collection='deny' + provider.zdr=true."
+    )
+    openrouter_provider_sort: str | None = Field(
+        default=None, description="provider.sort: price | throughput | latency."
+    )
+    openrouter_max_price: dict[str, float] = Field(
+        default_factory=dict, description="provider.max_price {prompt, completion} USD/M."
+    )
+    openrouter_only: list[str] = Field(default_factory=list, description="provider.only.")
+    openrouter_ignore: list[str] = Field(default_factory=list, description="provider.ignore.")
+    openrouter_fallback_models: list[str] = Field(
+        default_factory=list, description="Gateway-owned model fallback (extra_body.models)."
+    )
+    openrouter_allowed_variants: list[str] = Field(
+        default_factory=lambda: ["floor", "nitro", "exacto"],
+        description="Allowed ':<variant>' suffixes (free/batch are opt-in).",
+    )
+    openrouter_allow_auto: bool = Field(
+        default=False, description="Allow openrouter/auto (hands model choice to the gateway)."
+    )
+    openrouter_systemone_base_url: str | None = Field(
+        default=None, description="Forward reference for DEC (SystemOne endpoint)."
+    )
+    opencode_zen_enabled: bool = Field(default=False, description="Enable OpenCode Zen.")
+    opencode_go_enabled: bool = Field(default=False, description="Enable OpenCode Go.")
+    opencode_api_key: SecretStr = Field(default=SecretStr(""), description="OpenCode key.")
+    opencode_zen_base_url: str = Field(default="https://opencode.ai/zen/v1")
+    opencode_go_base_url: str = Field(default="https://opencode.ai/zen/go/v1")
+    opencode_model_protocols_path: str = Field(
+        default="config/opencode_models.yaml", description="Per-model wire-protocol map."
+    )
+    opencode_refresh_models: bool = Field(
+        default=False, description="Refresh the protocol map from /v1/models at startup."
+    )
+    opencode_go_allowed_agents: list[str] = Field(
+        default_factory=lambda: ["coder", "codeact_agent", "dev_pipeline", "code_review"],
+        description="Agents allowed on OpenCode Go (ToS: coding agents only).",
+    )
+    opencode_denied_models: list[str] = Field(
+        default_factory=lambda: ["grok*", "muse-spark*", "deepseek-v4-flash*"],
+        description="Retention deny-list (fnmatch, case-insensitive) — VERIFY.md GW0-06.",
+    )
+    opencode_go_monthly_cap_usd: float = Field(
+        default=0.0, ge=0.0, description="Go monthly allowance in USD; 0 disables the ledger."
+    )
+    opencode_go_window_5h_ratio: float = Field(default=0.20, description="5 h window ratio.")
+    opencode_go_window_week_ratio: float = Field(default=0.50, description="Weekly ratio.")
+    opencode_go_quota_action: str = Field(
+        default="refuse", description="On an exhausted window: refuse | downgrade."
+    )
+    opencode_go_downgrade_model: str | None = Field(
+        default=None, description="gw: ref used when the action is downgrade."
+    )
+    omniroute_enabled: bool = Field(default=False, description="Enable OmniRoute.")
+    omniroute_api_key: SecretStr = Field(default=SecretStr(""), description="OmniRoute key.")
+    omniroute_base_url: str = Field(default="http://localhost:20128/v1")
+    omniroute_min_version: str = Field(
+        default="3.8.51", description="CVE-2026-88062 floor (VERIFY.md GW0-07)."
+    )
+    omniroute_allow_unknown_version: bool = Field(
+        default=False, description="Allow an OmniRoute whose version cannot be determined."
+    )
+    omniroute_declared_version: str | None = Field(
+        default=None, description="Operator-declared version when detection finds none."
+    )
+    omniroute_upstream_attestation: str | None = Field(
+        default=None, description="Mandatory: api_keys_only | subscription_oauth."
+    )
+    omniroute_allow_subscription_upstreams: bool = Field(
+        default=False, description="Allow subscription-OAuth upstreams (ToS-violating)."
+    )
+    omniroute_denied_combos: list[str] = Field(
+        default_factory=list, description="Model/combo deny-list (fnmatch)."
+    )
+    gateway_reconcile_enabled: bool = Field(
+        default=False, description="Reconcile reported cost against the generation API."
+    )
+    gateway_reconcile_delay_s: float = Field(default=2.0, ge=0.0)
+    gateway_quota_poll_interval_s: int = Field(default=300, ge=1)
+
+    # --- DEC --- Typed Decision Models (Phase DEC — SPEC-DEC-CFG-001) ────
+    # Every integration is effective only with decisions_enabled=True plus its own
+    # decision_<integration>_enabled flag; enabled without a mode ⇒ shadow.
+    # Volatile vendor facts ([verify]) live here, never in code.
+    decisions_enabled: bool = Field(
+        default=False, description="Master opt-in for typed decision models (Phase DEC)."
+    )
+    decision_routing_enabled: bool = Field(default=False, description="DEC-ROUTE (INT-001).")
+    decision_eval_judge_enabled: bool = Field(default=False, description="DEC-EVAL (INT-002).")
+    decision_hitl_enabled: bool = Field(default=False, description="DEC-HITL (INT-003).")
+    decision_tool_proposal_enabled: bool = Field(default=False, description="DEC-TOOL (INT-004).")
+    decision_rag_relevance_enabled: bool = Field(default=False, description="DEC-RAG (INT-005).")
+    decision_ctx_relevance_enabled: bool = Field(default=False, description="DEC-CTX (INT-006).")
+    decision_swarm_eval_enabled: bool = Field(default=False, description="DEC-SWARM (INT-007).")
+    decision_safety_prescreen_enabled: bool = Field(
+        default=False, description="DEC-SAFE (INT-008)."
+    )
+    decision_backend_order: list[str] = Field(
+        default_factory=lambda: ["rule", "laya", "jev", "llm"],
+        description="Cascade tiers, tried in order (rule | laya | jev | llm).",
+    )
+    decision_modes: dict[str, str] = Field(
+        default_factory=dict,
+        description="Integration → off | shadow | enforce (enabled without entry ⇒ shadow).",
+    )
+    jev_base_url: str = Field(
+        default="https://api.typesafe.ai/v1",
+        description="Jev-compatible base URL: TypeSafe, OpenRouter or laya-serve.",
+    )
+    jev_api_key: SecretStr | None = Field(default=None, description="Jev bearer key.")
+    jev_model: str = Field(default="jev-1.13.0", description="Pinned Jev model (no *latest*).")
+    jev_transport: str = Field(default="http", description="http | sdk.")
+    jev_max_choice_options: int = Field(default=255, ge=2, description="Jev Choice option cap.")
+    jev_max_request_tokens: int = Field(default=64_000, ge=1, description="Jev request limit.")
+    laya_mode: str = Field(default="local", description="local (in-process) | http (laya-serve).")
+    laya_checkpoint: str = Field(default="laya-multilingual", description="Laya checkpoint.")
+    laya_base_url: str | None = Field(default=None, description="laya-serve base URL.")
+    laya_api_key: SecretStr | None = Field(default=None, description="LAYA_API_KEY bearer.")
+    laya_preload: bool = Field(default=False, description="Load Laya at startup (servers).")
+    laya_max_loaded: int = Field(default=2, ge=1, description="Max checkpoints kept loaded.")
+    laya_max_len: int = Field(default=1024, ge=1, description="Laya checkpoint context tokens.")
+    laya_max_choice_options: int = Field(
+        default=20, ge=2, description="Laya quality cap on Choice options."
+    )
+    laya_cuda_amp: str | None = Field(
+        default=None, description="Mirror of the host's LAYA_CUDA_AMP (fp16 required on GPU)."
+    )
+    decision_timeout_ms: int = Field(default=800, ge=1, description="Non-LLM tier budget (ms).")
+    decision_calibration_dir: str = Field(
+        default="config/decision_calibration", description="<decision_id>@<model>.json files."
+    )
+    decision_languages: list[str] = Field(
+        default_factory=lambda: ["en", "es"], description="Languages allowed to enforce."
+    )
+    decision_min_calibration_examples: int = Field(default=300, ge=1)
+    decision_max_ece: float = Field(default=0.05, gt=0.0, le=1.0)
+    decision_tau_overrides: dict[str, float] = Field(
+        default_factory=dict, description="Raise-only τ per risk tier (low|medium|high)."
+    )
+    decision_min_margin: float = Field(default=0.20, ge=0.0, le=1.0)
+    decision_shadow_sample_rate: float = Field(default=1.0, ge=0.0, le=1.0)
+    decision_eval_audit_rate: float = Field(default=0.05, ge=0.0, le=1.0)
+    decision_auto_demote: bool = Field(default=True, description="SHD-002 drift auto-demote.")
+    decision_demote_floor: float = Field(
+        default=0.95, ge=0.0, le=1.0, description="Rolling audited agreement floor (SHD-002)."
+    )
+    decision_llm_fallback_model: str | None = Field(
+        default=None, description="Model for the terminal llm tier (None = provider default)."
+    )
+
+    # --- AMR --- Adaptive Model Routing (Phase AMR — SPEC-AMR-CFG-001) ────
+    # Every sub-feature is effective only with adaptive_routing_enabled=True;
+    # flag off ⇒ get_llm() kwargs and the compiled graph equal 3.15.0.
+    adaptive_routing_enabled: bool = Field(
+        default=False, description="Master opt-in for adaptive model routing (Phase AMR)."
+    )
+    routing_mode: Literal["shadow", "enforce"] = Field(
+        default="shadow",
+        description="shadow computes choices + counterfactual savings but keeps the static model.",
+    )
+    routing_policy: Literal["static", "cascade", "budget_aware", "composite", "batch"] = Field(
+        default="static", description="Top-level routing policy."
+    )
+    routing_tier_models: str = Field(
+        default="config/routing_tiers.yaml",
+        description="YAML with tier → model ref, agent → tier and the risk floor.",
+    )
+    routing_risk_floor: dict[str, str] = Field(
+        default_factory=lambda: {"high": "medium", "critical": "frontier"},
+        description="Minimum tier per risk tier (fail-closed, SPEC-AMR-SEC-001).",
+    )
+    routing_tier_capabilities: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            "nano": [],
+            "small": ["tools", "structured_output"],
+            "medium": ["tools", "structured_output"],
+            "frontier": ["tools", "structured_output"],
+        },
+        description="Capabilities per tier (tools | structured_output) used by the cascade.",
+    )
+    routing_cascade_start_tier: str = Field(default="small", description="Cascade entry tier.")
+    routing_cascade_max_escalations: int = Field(default=2, ge=0, description="Escalation cap.")
+    routing_cascade_tool_error_threshold: int = Field(
+        default=2, ge=1, description="Tool errors in one call before escalating."
+    )
+    routing_adequacy_tau: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Adequacy Noul P(true) threshold."
+    )
+    routing_adequacy_timeout_ms: int = Field(
+        default=800, ge=1, description="Adequacy check budget (ms); timeout ⇒ abstain."
+    )
+    routing_cache_affinity_enabled: bool = Field(
+        default=True, description="Sticky model per (session, agent) after escalation."
+    )
+    routing_batch_alpha: float = Field(
+        default=0.8, description="Mean predicted accuracy floor (alpha)."
+    )
+    routing_model_concurrency: dict[str, int] = Field(
+        default_factory=dict,
+        description="Per-model concurrency cap C_j (missing ⇒ parallel_max_workers).",
+    )
+    routing_batch_max_iter: int = Field(default=200, ge=1, description="Dual iterations.")
+    routing_batch_eps: float = Field(
+        default=0.01, gt=0.0, le=1.0, description="Relative duality-gap stop criterion."
+    )
+    routing_predictor_path: str | None = Field(
+        default=None, description="Versioned predictor table (config/routing_predictor/*.json)."
+    )
+    plan_cache_enabled: bool = Field(default=False, description="Intent-keyed plan cache.")
+    plan_cache_ttl_s: int = Field(default=86_400, ge=1, description="Plan cache TTL (s).")
+    plan_cache_intents: list[str] = Field(
+        default_factory=list, description="Read-only intent allowlist for the plan cache."
+    )
+    plan_cache_backend: Literal["memory", "sqlite"] = Field(
+        default="memory", description="Plan cache backend."
+    )
+    plan_cache_path: str = Field(
+        default="data/plan_cache.sqlite", description="SQLite plan cache file."
+    )
+    plan_cache_max_entries: int = Field(default=1024, ge=1, description="In-memory LRU size.")
+    response_cache_enabled: bool = Field(default=False, description="Exact response cache.")
+    batch_api_enabled: bool = Field(default=False, description="BatchExecutor (provider batches).")
+    batch_poll_initial_s: float = Field(default=10.0, gt=0.0, description="First poll delay (s).")
+    batch_poll_max_s: float = Field(default=300.0, gt=0.0, description="Poll delay cap (s).")
+    batch_price_ratio: float = Field(
+        default=0.5,
+        gt=0.0,
+        le=1.0,
+        description="Batch price / on-demand price (verified in AMR0-03; ADR-WAVE-001 §2.3).",
+    )
+
+    # --- PRT --- Protocol Upgrades 2026 + Host Read Surface (SPEC-PRT-CFG-001, HRS) ──
+    # Defaults keep A2A v0.3, the legacy MCP session path and no AG-UI: the graph,
+    # the v0.3 Agent Card and the MCP request sequence are unchanged (GRD-001).
+    a2a_protocol_version: Literal["0.3", "1.0"] = Field(
+        default="0.3", description="Agent Card version + default inbound A2A stack."
+    )
+    a2a_accept_legacy: bool = Field(
+        default=True, description="Accept v0.3 requests when v1 is the primary stack."
+    )
+    a2a_tasks_list_max_page_size: int = Field(
+        default=200, ge=1, description="Upper bound for v1 tasks/list page size."
+    )
+    a2a_inbound_auth_schemes: list[str] = Field(
+        default_factory=list, description="Security schemes advertised in the v1 Agent Card."
+    )
+    a2a_oauth_redirect_uri: str | None = Field(
+        default=None, description="PKCE redirect URI (host callback); secrets live in the vault."
+    )
+    mcp_protocol_mode: Literal["auto", "legacy", "stateless"] = Field(
+        default="legacy", description="MCP adapter selection (legacy = today's session path)."
+    )
+    mcp_stateless_protocol_version: str = Field(
+        default="2026-07-28", description="Protocol version sent by the stateless MCP adapter."
+    )
+    mcp_tool_cache_enabled: bool = Field(default=False, description="TTL MCP tool-list cache.")
+    mcp_tool_cache_default_ttl_s: int = Field(
+        default=300, ge=1, description="Tool-list TTL when the server sends no ttlMs."
+    )
+    mcp_tool_cache_max_ttl_s: int = Field(default=86_400, ge=1, description="TTL ceiling.")
+    mcp_tool_cache_max_entries: int = Field(default=256, ge=1, description="LRU bound.")
+    mcp_tasks_enabled: bool = Field(default=False, description="MCP tasks extension.")
+    mcp_task_poll_interval_s: float = Field(default=1.0, gt=0.0, description="First poll delay.")
+    mcp_task_poll_max_interval_s: float = Field(
+        default=15.0, gt=0.0, description="Poll delay ceiling."
+    )
+    mcp_task_timeout_s: float = Field(default=900.0, gt=0.0, description="Task wall-clock limit.")
+    agui_events_enabled: bool = Field(
+        default=False, description="Expose the AG-UI event translator to the host."
+    )
+    agui_include_state_deltas: bool = Field(default=True, description="Emit STATE_DELTA.")
+    agui_include_usage: bool = Field(default=True, description="Emit prismal.usage on finish.")
+    agui_include_metadata: bool = Field(
+        default=True, description="Emit prismal.routing / prismal.decision CUSTOM events."
+    )
+    host_surface_stats_retention_h: int = Field(
+        default=168, ge=1, description="Retention of the host-surface report recorders (h)."
+    )
+
+    # --- MEM --- Agentic Memory (Phase MEM — SPEC-MEM-CFG-001) ─────────────
+    # Off ⇒ legacy memory paths, the graph and the scheduler are unchanged (SNP-001).
+    # ``memory_v2_backend`` (not ``memory_backend``: the legacy LongTermMemoryStore owns
+    # that key — MEM0-04).
+    memory_v2_enabled: bool = Field(default=False, description="Master flag for memory v2.")
+    memory_mode: Literal["shadow", "enforce"] = Field(
+        default="shadow", description="shadow logs gate verdicts and stores as gate 'off'."
+    )
+    memory_v2_backend: Literal["legacy_long_term", "langgraph_store", "memory"] = Field(
+        default="legacy_long_term", description="Storage adapter for memory v2."
+    )
+    memory_v2_data_dir: str = Field(
+        default="",
+        description=(
+            "Directory of the per-tenant memory v2 SQLite files (backend + graph); empty = "
+            "<legacy data dir>/memory_v2. Never the legacy memory.db (its expire/clear would "
+            "bypass ForgetPolicy)."
+        ),
+    )
+    memory_write_gate: Literal["off", "decision", "llm"] = Field(
+        default="decision", description="Write gate mode."
+    )
+    memory_write_low_confidence: Literal["skip", "llm"] = Field(
+        default="skip", description="Policy when the write decision abstains or is below tau."
+    )
+    memory_relation_k: int = Field(default=5, ge=1, description="Neighbors for relation typing.")
+    memory_recall_budget_tokens: int = Field(default=1200, description="Hard recall token cap.")
+    memory_recall_max_hops: int = Field(default=3, ge=1, description="Recall hop cap.")
+    memory_sufficiency_tau: float = Field(default=0.8, description="Sufficiency threshold.")
+    memory_consolidation_cron: str = Field(
+        default="0 3 * * *", description="Consolidation schedule (crontab, per org)."
+    )
+    memory_consolidation_use_batch: bool = Field(
+        default=True, description="Summarize through the AMR BatchExecutor when available."
+    )
+    memory_consolidation_max_items: int = Field(
+        default=5000, ge=1, description="Records per consolidation run."
+    )
+    memory_retention_days_by_type: dict[str, int] = Field(
+        default_factory=lambda: {"episodic": 90},
+        description="Rule-based retention per memory type in days (0 = keep).",
+    )
+    memory_superseded_retention_days: int = Field(
+        default=30, ge=0, description="Purge superseded records after N days (0 = keep)."
+    )
+    memory_graph_backend: Literal["none", "sqlite", "graphiti"] = Field(
+        default="none", description="Temporal graph adapter."
+    )
+    memory_playbooks_enabled: bool = Field(default=False, description="Procedural memory.")
+    memory_playbook_budget_tokens: int = Field(default=600, description="Playbook token cap.")
+    memory_playbook_max_deltas: int = Field(default=10, ge=1, description="Deltas per cycle.")
+    memory_playbook_min_stable_runs: int = Field(
+        default=5, ge=1, description="Stable runs before the playbook enters the cached prefix."
+    )
+    memory_playbook_keep_versions: int = Field(
+        default=10, ge=1, description="Playbook versions kept for rollback."
     )
 
     # ── Blind Review Pipeline (Phase BRP — SPEC-BRP-CFG-001) ──────────
@@ -2215,12 +2705,260 @@ class Settings(BaseSettings):
         ``context_compaction_strategy`` so a typo fails fast at load time
         rather than silently disabling a control.
         """
-        valid_strategies = {"truncate", "summarize"}
+        valid_strategies = {"truncate", "summarize", "mask_observations"}  # + TKE MSK-001
         if self.context_compaction_strategy not in valid_strategies:
             raise ValueError(
                 f"PRISMAL_CONTEXT_COMPACTION_STRATEGY={self.context_compaction_strategy!r} "
                 f"is invalid; expected one of {sorted(valid_strategies)}."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_token_efficiency(self) -> "Settings":
+        """Validate the token-efficiency settings (SPEC-TKE-CFG-001).
+
+        Numeric floors are enforced by their Fields; here we reject unknown
+        literals, negative per-tool/per-agent budgets and an inverted
+        hysteresis band so a typo fails fast at load time.
+        """
+        literals: dict[str, set[str]] = {
+            "prompt_cache_ttl": {"5m", "1h"},
+            "prompt_cache_scope": {"tenant", "global"},
+            "prompt_layout": {"legacy", "cache_stable"},
+            "tool_gating_mode": {"remove", "mask"},
+            "artifact_store_backend": {"memory", "sqlite"},
+            "llm_effort_profile": {"none", "recommended"},
+        }
+        for name, allowed in literals.items():
+            value = getattr(self, name)
+            if value not in allowed:
+                raise ValueError(
+                    f"PRISMAL_{name.upper()}={value!r} is invalid; "
+                    f"expected one of {sorted(allowed)}."
+                )
+        bad_effort = {
+            agent: level
+            for agent, level in self.llm_effort_by_agent.items()
+            if level not in {"low", "medium", "high"}
+        }
+        if bad_effort:
+            raise ValueError(
+                f"PRISMAL_LLM_EFFORT_BY_AGENT has invalid levels {bad_effort}; "
+                "expected low | medium | high."
+            )
+        for name in ("tool_output_max_tokens_by_tool", "llm_max_tokens_by_agent"):
+            negative = {k: v for k, v in getattr(self, name).items() if v < 0}
+            if negative:
+                raise ValueError(f"PRISMAL_{name.upper()} has negative values {negative}.")
+        high, low = self.context_compaction_high_water, self.context_compaction_low_water
+        if high > 0 and low >= high:
+            raise ValueError(
+                f"PRISMAL_CONTEXT_COMPACTION_LOW_WATER={low} must be below "
+                f"PRISMAL_CONTEXT_COMPACTION_HIGH_WATER={high}."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_llm_gateways(self) -> "Settings":
+        """Validate the gateway settings (SPEC-GW-CFG-001) so typos fail at load time."""
+        literals: dict[str, set[str | None]] = {
+            "openrouter_provider_sort": {None, "price", "throughput", "latency"},
+            "openrouter_auto_tier": {None, "low", "medium", "high", "xhigh", "max"},
+            "opencode_go_quota_action": {"refuse", "downgrade"},
+            "omniroute_upstream_attestation": {None, "api_keys_only", "subscription_oauth"},
+        }
+        for name, allowed in literals.items():
+            value = getattr(self, name)
+            if value not in allowed:
+                raise ValueError(
+                    f"PRISMAL_{name.upper()}={value!r} is invalid; expected one of "
+                    f"{sorted(a for a in allowed if a is not None)}."
+                )
+        for name in ("opencode_go_window_5h_ratio", "opencode_go_window_week_ratio"):
+            ratio = getattr(self, name)
+            if not 0.0 < ratio <= 1.0:
+                raise ValueError(f"PRISMAL_{name.upper()}={ratio} must be in (0, 1].")
+        if self.opencode_go_quota_action == "downgrade" and not self.opencode_go_downgrade_model:
+            raise ValueError(
+                "PRISMAL_OPENCODE_GO_QUOTA_ACTION=downgrade requires "
+                "PRISMAL_OPENCODE_GO_DOWNGRADE_MODEL."
+            )
+        semver = re.compile(r"^\d+\.\d+\.\d+$")
+        for name in ("omniroute_min_version", "omniroute_declared_version"):
+            version = getattr(self, name)
+            if version is not None and not semver.match(version):
+                raise ValueError(f"PRISMAL_{name.upper()}={version!r} is not MAJOR.MINOR.PATCH.")
+        bad_refs = {a: r for a, r in self.llm_gateway_agent_map.items() if not r.startswith("gw:")}
+        if bad_refs:
+            raise ValueError(f"PRISMAL_LLM_GATEWAY_AGENT_MAP values must be gw: refs: {bad_refs}.")
+        bad_plugins = set(self.openrouter_plugins) - {
+            "response-healing",
+            "context-compression",
+            "pdf",
+        }
+        if bad_plugins:
+            raise ValueError(
+                f"PRISMAL_OPENROUTER_PLUGINS has unsupported ids {sorted(bad_plugins)}."
+            )
+        name_re = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
+        builtin = {"openrouter", "opencode", "opencode-go", "omniroute"}
+        for name, entry in self.llm_gateway_openai_compatible.items():
+            if not name_re.match(name) or name in builtin:
+                raise ValueError(
+                    f"PRISMAL_LLM_GATEWAY_OPENAI_COMPATIBLE name {name!r} is invalid or reserved."
+                )
+            if not isinstance(entry, dict) or not entry.get("base_url"):
+                raise ValueError(
+                    f"PRISMAL_LLM_GATEWAY_OPENAI_COMPATIBLE[{name!r}] needs a base_url."
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_decisions(self) -> "Settings":
+        """Validate the typed-decision settings (SPEC-DEC-CFG-001, CAL-002) at load time."""
+        backends = {"rule", "laya", "jev", "llm"}
+        unknown = [b for b in self.decision_backend_order if b not in backends]
+        if unknown:
+            raise ValueError(f"PRISMAL_DECISION_BACKEND_ORDER has unknown backends {unknown}.")
+        from prismal.decisions.catalog import INTEGRATION_FLAGS
+
+        for integration, mode in self.decision_modes.items():
+            if integration not in INTEGRATION_FLAGS:
+                raise ValueError(
+                    f"PRISMAL_DECISION_MODES key {integration!r} is not one of "
+                    f"{sorted(INTEGRATION_FLAGS)}."
+                )
+            if mode not in {"off", "shadow", "enforce"}:
+                raise ValueError(
+                    f"PRISMAL_DECISION_MODES[{integration!r}]={mode!r}; "
+                    "expected off|shadow|enforce."
+                )
+        if "latest" in self.jev_model.lower() or not re.search(r"\d+\.\d+", self.jev_model):
+            raise ValueError(f"PRISMAL_JEV_MODEL={self.jev_model!r} must be a pinned version.")
+        if self.jev_transport not in {"http", "sdk"}:
+            raise ValueError(f"PRISMAL_JEV_TRANSPORT={self.jev_transport!r}; expected http|sdk.")
+        if self.laya_mode not in {"local", "http"}:
+            raise ValueError(f"PRISMAL_LAYA_MODE={self.laya_mode!r}; expected local|http.")
+        if self.laya_mode == "http" and not self.laya_base_url:
+            raise ValueError("PRISMAL_LAYA_MODE=http requires PRISMAL_LAYA_BASE_URL.")
+        if not self.decision_languages:
+            raise ValueError("PRISMAL_DECISION_LANGUAGES must name at least one language.")
+        tier_defaults = {"low": 0.85, "medium": 0.90, "high": 0.97}
+        for tier, tau in self.decision_tau_overrides.items():
+            if tier not in tier_defaults:
+                raise ValueError(
+                    f"PRISMAL_DECISION_TAU_OVERRIDES key {tier!r} must be low|medium|high "
+                    "(critical is never auto-accepted)."
+                )
+            if not tier_defaults[tier] <= tau <= 1.0:
+                raise ValueError(
+                    f"PRISMAL_DECISION_TAU_OVERRIDES[{tier!r}]={tau} must be in "
+                    f"[{tier_defaults[tier]}, 1.0] (raise-only)."
+                )
+        if self.decisions_enabled:
+            from prismal.decisions.calibration import validate_enforce_calibration
+
+            validate_enforce_calibration(self)
+        return self
+
+    @model_validator(mode="after")
+    def _validate_protocol_upgrades(self) -> "Settings":
+        """Validate the protocol-upgrade settings (SPEC-PRT-CFG-001) at load time."""
+        if self.mcp_tool_cache_default_ttl_s > self.mcp_tool_cache_max_ttl_s:
+            raise ValueError(
+                "PRISMAL_MCP_TOOL_CACHE_DEFAULT_TTL_S must be <= PRISMAL_MCP_TOOL_CACHE_MAX_TTL_S."
+            )
+        if self.mcp_task_poll_interval_s > self.mcp_task_poll_max_interval_s:
+            raise ValueError(
+                "PRISMAL_MCP_TASK_POLL_INTERVAL_S must be <= PRISMAL_MCP_TASK_POLL_MAX_INTERVAL_S."
+            )
+        if self.a2a_protocol_version == "0.3" and not self.a2a_accept_legacy:
+            raise ValueError(
+                "PRISMAL_A2A_ACCEPT_LEGACY=false requires PRISMAL_A2A_PROTOCOL_VERSION=1.0."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_memory(self) -> "Settings":
+        """Validate the agentic-memory settings (SPEC-MEM-CFG-001) at load time."""
+        for name in ("memory_recall_budget_tokens", "memory_playbook_budget_tokens"):
+            if getattr(self, name) <= 0:
+                raise ValueError(f"PRISMAL_{name.upper()} must be > 0.")
+        if not 0.0 < self.memory_sufficiency_tau < 1.0:
+            raise ValueError("PRISMAL_MEMORY_SUFFICIENCY_TAU must be in (0, 1).")
+        # Pure syntactic check (no scheduler import at load time): five crontab fields.
+        fields = self.memory_consolidation_cron.split()
+        if len(fields) != 5 or not all(_CRON_FIELD_RE.fullmatch(f) for f in fields):
+            raise ValueError(
+                f"PRISMAL_MEMORY_CONSOLIDATION_CRON={self.memory_consolidation_cron!r} is not "
+                "a valid crontab expression."
+            )
+        types = ("episodic", "semantic", "procedural", "preference")
+        for kind, days in self.memory_retention_days_by_type.items():
+            if kind not in types or days < 0:
+                raise ValueError(
+                    f"PRISMAL_MEMORY_RETENTION_DAYS_BY_TYPE[{kind!r}]={days}: type must be one "
+                    f"of {types} and days >= 0."
+                )
+        if (
+            self.memory_v2_enabled
+            and self.memory_mode == "enforce"
+            and self.memory_write_gate == "decision"
+            and not self.decisions_enabled
+        ):
+            raise ValueError(
+                "PRISMAL_MEMORY_WRITE_GATE=decision in enforce mode requires "
+                "PRISMAL_DECISIONS_ENABLED=true."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_routing(self) -> "Settings":
+        """Validate the adaptive-routing settings (SPEC-AMR-CFG-001, SEC-001) at load time."""
+        tiers = ("nano", "small", "medium", "frontier")
+        risks = ("low", "medium", "high", "critical")
+        if not 0.0 < self.routing_batch_alpha <= 1.0:
+            raise ValueError(
+                f"PRISMAL_ROUTING_BATCH_ALPHA={self.routing_batch_alpha} must be in (0, 1]."
+            )
+        negative = {m: c for m, c in self.routing_model_concurrency.items() if c < 0}
+        if negative:
+            raise ValueError(f"PRISMAL_ROUTING_MODEL_CONCURRENCY has negative caps {negative}.")
+        if self.routing_cascade_start_tier not in tiers:
+            raise ValueError(
+                f"PRISMAL_ROUTING_CASCADE_START_TIER={self.routing_cascade_start_tier!r}; "
+                f"expected one of {tiers}."
+            )
+        if self.routing_cascade_max_escalations > 3:
+            raise ValueError("PRISMAL_ROUTING_CASCADE_MAX_ESCALATIONS must be <= 3.")
+        for risk, tier in self.routing_risk_floor.items():
+            if risk not in risks or tier not in tiers:
+                raise ValueError(
+                    f"PRISMAL_ROUTING_RISK_FLOOR[{risk!r}]={tier!r}: risk must be one of "
+                    f"{risks} and tier one of {tiers} (auto is never a floor)."
+                )
+        unknown_caps = [t for t in self.routing_tier_capabilities if t not in tiers]
+        if unknown_caps:
+            raise ValueError(f"PRISMAL_ROUTING_TIER_CAPABILITIES has unknown tiers {unknown_caps}.")
+        if self.batch_poll_initial_s > self.batch_poll_max_s:
+            raise ValueError("PRISMAL_BATCH_POLL_INITIAL_S must be <= PRISMAL_BATCH_POLL_MAX_S.")
+        if self.adaptive_routing_enabled:
+            # SEC-001 fail-closed: a usable floor for critical risk is mandatory.
+            if "critical" not in self.routing_risk_floor:
+                raise ValueError(
+                    "PRISMAL_ROUTING_RISK_FLOOR must define a 'critical' floor when "
+                    "adaptive routing is enabled."
+                )
+            if self.routing_policy == "batch" and not self.routing_predictor_path:
+                raise ValueError("routing_policy='batch' requires PRISMAL_ROUTING_PREDICTOR_PATH.")
+            from pathlib import Path
+
+            if Path(self.routing_tier_models).is_file():
+                # SEC-001: an invalid tier map / risk_floor refuses to start (a
+                # missing file is tolerated: tiers fall back to default_model).
+                from prismal.routing.policies.static import load_tier_models
+
+                load_tier_models(self.routing_tier_models)
         return self
 
     @model_validator(mode="after")

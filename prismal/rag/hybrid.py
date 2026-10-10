@@ -34,6 +34,7 @@ from rank_bm25 import BM25Okapi
 from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
+from prismal.rag.context_budget import apply_context_budget, effective_k
 from prismal.rag.crag import RetrievedChunk
 
 if TYPE_CHECKING:
@@ -130,14 +131,17 @@ class HybridSearchEngine:
             span.set_attribute("prismal.alpha", effective_alpha)
             span.set_attribute("prismal.k", k)
 
-            semantic_chunks = self._semantic_search(query, k)
+            # Phase TKE (SPEC-TKE-RAG-001): ``fetch_k`` is ``rag_retrieve_k`` when
+            # the context budget is active, else exactly ``k`` (unchanged path).
+            fetch_k = effective_k(k, self._settings)
+            semantic_chunks = self._semantic_search(query, fetch_k)
             bm25_scores = self._bm25_scores(query) if self._bm25 is not None else {}
 
             # When no BM25 index is built, degrade gracefully to semantic-only.
             if not bm25_scores:
                 logger.info("hybrid_search_semantic_only", reason="no_bm25_index")
                 otel.increment_counter("rag_queries")
-                return semantic_chunks[:k]
+                return apply_context_budget(query, semantic_chunks[:fetch_k], self._settings)
 
             sem_scores_by_key = {(c.source, c.chunk_id): c.relevance_score for c in semantic_chunks}
             chunk_by_key: dict[tuple[str, str], RetrievedChunk] = {
@@ -169,7 +173,7 @@ class HybridSearchEngine:
                 if key not in chunk_by_key:
                     chunk_by_key[key] = self._chunk_from_doc_id(doc_id, bm_norm)
 
-            ordered_keys = sorted(fused, key=lambda kk: fused[kk], reverse=True)[:k]
+            ordered_keys = sorted(fused, key=lambda kk: fused[kk], reverse=True)[:fetch_k]
             results = [
                 RetrievedChunk(
                     source=chunk_by_key[key].source,
@@ -179,6 +183,7 @@ class HybridSearchEngine:
                 )
                 for key in ordered_keys
             ]
+            results = apply_context_budget(query, results, self._settings)
             span.set_attribute("prismal.num_results", len(results))
             otel.increment_counter("rag_queries")
             return results

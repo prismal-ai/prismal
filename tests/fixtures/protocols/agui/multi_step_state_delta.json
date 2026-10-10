@@ -1,0 +1,186 @@
+{
+  "name": "multi_step_state_delta",
+  "description": "Supervisor → planner → coder updates; RFC 6902 STATE_DELTA over the allowlisted view.",
+  "context": {
+    "run_id": "run-1",
+    "thread_id": "thread-1"
+  },
+  "initial_state": {
+    "current_agent": "supervisor",
+    "next_agent": null,
+    "metadata": {}
+  },
+  "input": [
+    [
+      "updates",
+      {
+        "supervisor": {
+          "next_agent": "planner",
+          "metadata": {
+            "security": {
+              "canary": "zzz"
+            },
+            "intent": "code"
+          }
+        }
+      }
+    ],
+    [
+      "updates",
+      {
+        "planner": {
+          "task_plan": [
+            "design",
+            "build"
+          ],
+          "pending_tasks": [
+            "build"
+          ]
+        }
+      }
+    ],
+    [
+      "updates",
+      {
+        "coder": {
+          "completed_tasks": [
+            "design",
+            "build"
+          ],
+          "pending_tasks": [],
+          "next_agent": null,
+          "risk_score": 2.0
+        }
+      }
+    ]
+  ],
+  "end": {
+    "kind": "finish",
+    "result": {
+      "status": "ok"
+    }
+  },
+  "summary_usage_wire": null,
+  "expected": [
+    {
+      "type": "RUN_STARTED",
+      "timestamp": 1760000000000,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "protocolVersion": "1.0"
+    },
+    {
+      "type": "STATE_SNAPSHOT",
+      "timestamp": 1760000000001,
+      "snapshot": {
+        "current_agent": "supervisor",
+        "next_agent": null
+      }
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000002,
+      "stepName": "supervisor"
+    },
+    {
+      "type": "STATE_DELTA",
+      "timestamp": 1760000000003,
+      "delta": [
+        {
+          "op": "add",
+          "path": "/metadata",
+          "value": {
+            "intent": "code"
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/next_agent",
+          "value": "planner"
+        }
+      ]
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000004,
+      "stepName": "supervisor"
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000005,
+      "stepName": "planner"
+    },
+    {
+      "type": "STATE_DELTA",
+      "timestamp": 1760000000006,
+      "delta": [
+        {
+          "op": "add",
+          "path": "/pending_tasks",
+          "value": [
+            "build"
+          ]
+        },
+        {
+          "op": "add",
+          "path": "/task_plan",
+          "value": [
+            "design",
+            "build"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000007,
+      "stepName": "planner"
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000008,
+      "stepName": "coder"
+    },
+    {
+      "type": "STATE_DELTA",
+      "timestamp": 1760000000009,
+      "delta": [
+        {
+          "op": "add",
+          "path": "/completed_tasks",
+          "value": [
+            "design",
+            "build"
+          ]
+        },
+        {
+          "op": "replace",
+          "path": "/next_agent",
+          "value": null
+        },
+        {
+          "op": "replace",
+          "path": "/pending_tasks",
+          "value": []
+        }
+      ]
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000010,
+      "stepName": "coder"
+    },
+    {
+      "type": "RUN_FINISHED",
+      "timestamp": 1760000000011,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "result": {
+        "status": "ok"
+      },
+      "outcome": {
+        "type": "success"
+      }
+    }
+  ]
+}

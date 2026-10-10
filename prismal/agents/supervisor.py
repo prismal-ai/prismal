@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from langchain_core.messages import BaseMessage
 
     from prismal.agents.state import AgentState
+    from prismal.core.config import Settings
 
 logger = get_logger("prismal.agents.supervisor")
 
@@ -490,6 +491,21 @@ def _derive_user_id(state: AgentState) -> str:
     return head or "unknown"
 
 
+def _split_per_request_context(context: str, settings: Settings) -> tuple[str, str]:
+    """Place per-request *context* for prompt caching (Phase TKE — TKE2-08).
+
+    Returns ``(system_suffix, tail_suffix)``. Legacy: the context is appended to
+    the system prompt (unchanged behaviour). Cache-stable layout: the system
+    prompt stays static and the context moves to a ``<turn_context>`` block at
+    the tail of the final instruction, keeping the cached prefix byte-identical.
+    """
+    if not (settings.token_efficiency_enabled and settings.prompt_layout == "cache_stable"):
+        return context, ""
+    if not context:
+        return "", ""
+    return "", f"\n<turn_context>{context.strip()}</turn_context>"
+
+
 async def _recall_memory_context(state: AgentState) -> str:
     """Recall user preferences and format them as a system-prompt suffix.
 
@@ -891,8 +907,53 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
             span.set_attribute("prismal.routing_source", "intent_router")
             return _with_compaction(result, compaction_messages)
 
+        # Typed decisions (Phase DEC — DEC-ROUTE): no-op unless decisions_enabled +
+        # decision_routing_enabled. Enforce may accept a route without the routing
+        # LLM call; shadow only records the LLM route as its reference.
+        from prismal.decisions.integrations.route import maybe_decide_route
+
+        _settings = get_settings()
+        decision_route = await maybe_decide_route(
+            state,
+            effective_valid_routes(
+                _settings.enable_subgraphs,
+                _settings.multimodal_enabled,
+                _settings.kokoro_enabled,
+                _settings.skynet_enabled,
+                _settings.blind_review_pipeline_enabled,
+            ),
+            settings=_settings,
+        )
+
         llm = ProviderRegistry().get_llm_with_fallback()
+        if decision_route.accepted_route is not None:
+            decided = decision_route.accepted_route
+            next_agent_dec = _apply_routing_overrides(
+                None if decided == "END" else decided, state, session_id
+            )
+            span.set_attribute("prismal.routing_decision", next_agent_dec or "END")
+            span.set_attribute("prismal.routing_source", "decision")
+            logger.info(
+                "supervisor_routing_decision",
+                next_agent=next_agent_dec,
+                raw_response="decision",
+                session_id=session_id,
+            )
+            dec_messages: list[AIMessage] = []
+            if next_agent_dec is None:
+                dec_messages = await _build_direct_answer(llm, state, trimmed, session_id)
+                _spawn_memory_extraction(state)
+            return _with_compaction(
+                {
+                    "current_agent": "supervisor",
+                    "next_agent": next_agent_dec,
+                    "messages": dec_messages,
+                },
+                compaction_messages,
+            )
+
         memory_context = await _recall_memory_context(state)
+        system_suffix, tail_suffix = _split_per_request_context(memory_context, get_settings())
         routing_messages = [
             SystemMessage(
                 content=build_system_prompt(
@@ -902,7 +963,7 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
                     get_settings().skynet_enabled,
                     get_settings().blind_review_pipeline_enabled,
                 )
-                + memory_context
+                + system_suffix
             ),
             *trimmed,
             HumanMessage(
@@ -910,12 +971,14 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
                     "Based on the conversation above, which agent should handle "
                     "the next step? Respond with ONLY the agent name or 'END'."
                 )
+                + tail_suffix
             ),
         ]
         response = await llm.ainvoke(routing_messages)
         raw: str = str(response.content).strip()
 
         matched = _match_route(raw, session_id)
+        decision_route.record_reference(matched)
         next_agent: str | None = None if matched == "END" else matched
         next_agent = _apply_routing_overrides(next_agent, state, session_id)
 
@@ -1103,8 +1166,9 @@ async def hierarchical_supervisor_node(
         # the same cross-session preferences as the flat supervisor.
         memory_context = await _recall_memory_context(state)
 
+        system_suffix, tail_suffix = _split_per_request_context(memory_context, get_settings())
         routing_messages = [
-            SystemMessage(content=_HIERARCHICAL_SYSTEM_PROMPT + memory_context),
+            SystemMessage(content=_HIERARCHICAL_SYSTEM_PROMPT + system_suffix),
             *trimmed,
             HumanMessage(
                 content=(
@@ -1112,6 +1176,7 @@ async def hierarchical_supervisor_node(
                     "orchestrator should handle the next step? "
                     "Respond with ONLY the target name or 'END'."
                 )
+                + tail_suffix
             ),
         ]
 

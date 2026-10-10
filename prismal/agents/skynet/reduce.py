@@ -16,6 +16,7 @@ import hashlib
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Literal
 
+from prismal.agents.handoff import handoff_text
 from prismal.core.exceptions import SkynetConfigError
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
@@ -89,7 +90,7 @@ async def reduce_results(
         if strategy == "concat":
             return _concat(successes)
         if strategy == "first_success":
-            return successes[0].output if successes else ""
+            return _text(successes[0]) if successes else ""
         if strategy != "synthesis":
             raise SkynetConfigError(
                 f"Unknown reduce strategy: {strategy!r}. "
@@ -111,9 +112,14 @@ async def reduce_results(
             return _concat(successes)
 
 
+def _text(result: WorkerResult) -> str:
+    """Reducer-facing text: the envelope summary when present, else the raw output."""
+    return handoff_text(result.output, result.envelope)
+
+
 def _concat(successes: list[WorkerResult]) -> str:
     """Deterministically join successful outputs, keyed by order id."""
-    return "\n\n".join(f"[{r.order_id}] {r.output}" for r in successes)
+    return "\n\n".join(f"[{r.order_id}] {_text(r)}" for r in successes)
 
 
 def _make_default_reducer(settings: Settings, *, meter: CostMeter | None = None) -> ReduceFn:
@@ -131,7 +137,7 @@ def _make_default_reducer(settings: Settings, *, meter: CostMeter | None = None)
         from prismal.providers.registry import ProviderRegistry
 
         parts = [f"Goal: {goal}", "", "Worker results:"]
-        parts.extend(f"[{r.order_id}] {r.output}" for r in successes)
+        parts.extend(f"[{r.order_id}] {_text(r)}" for r in successes)
         messages = SecurePromptBuilder().build(system=_REDUCE_SYSTEM, user="\n".join(parts))
 
         model_override = settings.skynet_planner_model or None

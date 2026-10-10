@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Awaitable, Callable
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -45,6 +46,8 @@ from prismal.core.exceptions import RuntimeCompositionError
 from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
     from pathlib import Path
     from types import TracebackType
 
@@ -59,7 +62,21 @@ if TYPE_CHECKING:
         ToolProviderPort,
         VectorStorePort,
     )
+    from prismal.composition.host_surface import (
+        A2ARouteSpec,
+        AuditChainStatus,
+        AuditPageView,
+        BudgetStatusView,
+        DecisionsReportView,
+        QuotaWindowView,
+        RoutingReportView,
+    )
     from prismal.core.config import Settings
+    from prismal.core.config_source import ConfigSourcePort
+    from prismal.decisions.runtime import DecisionRuntime
+    from prismal.memory.v2.ports import MemoryBackendPort, MemoryGraphPort
+    from prismal.memory.v2.service import MemoryHooks, MemoryService
+    from prismal.providers.gateways.router import GatewayRouter
 
 logger = get_logger("prismal.composition")
 
@@ -182,6 +199,14 @@ class RuntimeContext:
     a2a_handler: Any | None = None
     # Observability integration (Phase OBS) — None unless observability_enabled.
     observability: ObservabilityPort | None = None
+    # LLM Gateway Providers (Phase GW) — None unless llm_gateways_enabled.
+    gateways: GatewayRouter | None = None
+    # Typed Decision Models (Phase DEC) — None unless decisions_enabled.
+    decisions: DecisionRuntime | None = None
+    # Agentic memory (Phase MEM) — one tenant's MemoryService; None unless memory_v2_enabled.
+    memory: MemoryService | None = None
+    # Host read surface (HRS) — the runtime's effective settings (None ⇒ process).
+    settings: Settings | None = field(default=None, repr=False)
     _closers: list[Closer] = field(default_factory=list, repr=False)
     _closed: bool = field(default=False, repr=False)
 
@@ -207,6 +232,135 @@ class RuntimeContext:
             org_id=self.org_id,
         )
 
+    # ── Host read surface (HRS — SPEC-HRS-*; read-only, never raise) ─────────
+    # Thin delegates to prismal.composition.host_surface. Each one is scoped to
+    # ``self.org_id``, never mutates engine state, and on any internal failure
+    # returns its documented fallback and increments
+    # ``prismal.host_surface_errors_total{method}`` (SPEC-HRS-SUR-002).
+
+    @contextmanager
+    def bind_org(self) -> Iterator[None]:
+        """Attribute the DEC/AMR report counters emitted in this block to ``self.org_id``.
+
+        Wraps :func:`prismal.monitoring.host_stats.use_org`; a host wraps each
+        graph run with it so :meth:`decisions_report` / :meth:`routing_report` of
+        this tenant see the run. ``org_id=None`` binds "no tenant". Sync, nests,
+        and restores the previous binding on exit (also on error).
+        """
+        from prismal.monitoring.host_stats import use_org
+
+        with use_org(self.org_id):
+            yield
+
+    def budget_status(self, *, thread_id: str | None = None) -> BudgetStatusView:
+        """Budget verdict for the tenant / a thread's run (SPEC-HRS-BUD-001)."""
+        from prismal.composition import host_surface as hs
+
+        try:
+            return hs.budget_status(
+                hs.resolve_settings(self.settings), org_id=self.org_id, thread_id=thread_id
+            )
+        except Exception as exc:
+            _surface_error("budget_status", exc)
+            return hs.BudgetStatusView(
+                enabled=False,
+                scope="turn",
+                status="unknown",
+                breached_dimension=None,
+                soft_ratio=None,
+                hard_cap=None,
+                limits=None,
+                consumed=None,
+                remaining=None,
+            )
+
+    async def quota_windows(self) -> list[QuotaWindowView]:
+        """Gateway quota windows; a failing gateway is omitted (SPEC-HRS-QTA-001)."""
+        from prismal.composition import host_surface as hs
+
+        try:
+            return await hs.quota_windows(self.gateways, on_error=_surface_error)
+        except Exception as exc:
+            _surface_error("quota_windows", exc)
+            return []
+
+    def audit_page(
+        self, *, page: int = 1, page_size: int = 50, since: datetime | None = None
+    ) -> AuditPageView:
+        """Newest-first, tenant-scoped, hash-first audit page (SPEC-HRS-AUD-001)."""
+        from prismal.composition import host_surface as hs
+
+        try:
+            return hs.audit_page(
+                self.audit, org_id=self.org_id, page=page, page_size=page_size, since=since
+            )
+        except Exception as exc:
+            _surface_error("audit_page", exc)
+            return hs.AuditPageView(
+                page=max(1, page), page_size=min(200, max(1, page_size)), total=None, entries=()
+            )
+
+    def verify_audit_chain(self, *, max_records: int = 10_000) -> AuditChainStatus:
+        """Recompute the audit hash chain (SPEC-HRS-AUD-002)."""
+        from prismal.composition import host_surface as hs
+
+        try:
+            return hs.verify_audit_chain(self.audit, max_records=max_records)
+        except Exception as exc:
+            _surface_error("verify_audit_chain", exc)
+            return hs.AuditChainStatus(status="unverified", checked=0, first_broken_seq=None)
+
+    def decisions_report(
+        self, *, since: datetime | None = None, until: datetime | None = None
+    ) -> DecisionsReportView:
+        """DEC shadow agreement + outcome counts per integration (SPEC-HRS-DEC-001)."""
+        from prismal.composition import host_surface as hs
+
+        try:
+            return hs.decisions_report(
+                hs.resolve_settings(self.settings),
+                decisions=self.decisions,
+                org_id=self.org_id,
+                since=since,
+                until=until,
+            )
+        except Exception as exc:
+            _surface_error("decisions_report", exc)
+            return hs.DecisionsReportView(enabled=False, integrations=())
+
+    def routing_report(
+        self, *, since: datetime | None = None, until: datetime | None = None
+    ) -> RoutingReportView:
+        """AMR decisions / escalations / savings per routing policy (SPEC-HRS-RTE-001)."""
+        from prismal.composition import host_surface as hs
+
+        try:
+            return hs.routing_report(
+                hs.resolve_settings(self.settings), org_id=self.org_id, since=since, until=until
+            )
+        except Exception as exc:
+            _surface_error("routing_report", exc)
+            return hs.RoutingReportView(enabled=False, mode="shadow", policies=())
+
+    def a2a_routes(self, *, protocol_version: Literal["0.3", "1.0"] | None = None) -> A2ARouteSpec:
+        """Tenant-scoped A2A route shape matching the advertised card (SPEC-HRS-A2A-001).
+
+        ``settings.a2a_base_url.rstrip("/") + rpc_path`` equals the URL the Agent Card
+        for ``org_id`` advertises; both protocol versions share one dual-stack endpoint.
+        """
+        from prismal.a2a.card import a2a_route_paths
+        from prismal.composition import host_surface as hs
+
+        settings = hs.resolve_settings(self.settings)
+        card_path, rpc_path = a2a_route_paths(
+            settings,
+            org_id=self.org_id,
+            protocol_version=protocol_version or settings.a2a_protocol_version,
+        )
+        return hs.A2ARouteSpec(
+            card_path=card_path, rpc_path=rpc_path, tenant_scoped=bool(self.org_id)
+        )
+
     async def __aenter__(self) -> RuntimeContext:
         """Enter the async context, returning self."""
         return self
@@ -219,6 +373,37 @@ class RuntimeContext:
     ) -> None:
         """Exit the async context, tearing the runtime down."""
         await self.aclose()
+
+
+def _settings_from_source(
+    config_source: ConfigSourcePort, overrides: dict[str, Any] | None
+) -> Settings:
+    """Per-runtime settings from *config_source* chained over the process source.
+
+    Pure: builds through ``build_settings`` (ContextVar-scoped source) and never
+    touches the global source or ``os.environ`` (SPEC-HRS-CMP-001).
+    """
+    from prismal.core.config import build_settings
+    from prismal.core.config_source import (
+        ChainedConfigSource,
+        EnvConfigSource,
+        get_config_source,
+    )
+
+    process = get_config_source() or EnvConfigSource()
+    tenant = build_settings(ChainedConfigSource([config_source, process]))
+    return tenant.model_copy(update=overrides) if overrides else tenant
+
+
+def _surface_error(method: str, exc: BaseException) -> None:
+    """Count + log a host-surface read failure (SPEC-HRS-SUR-002). Never raises."""
+    try:
+        from prismal.monitoring.otel import OTelManager
+
+        OTelManager().increment_counter("host_surface_errors", attributes={"method": method})
+        logger.warning("composition.host_surface_error", method=method, error=type(exc).__name__)
+    except Exception:  # pragma: no cover - observability never breaks a read
+        return
 
 
 # ── Composition root (SPEC-CR-003) ───────────────────────────────────────────
@@ -316,6 +501,7 @@ async def _compose_a2a(
     graph: Any | None,
     a2a_agents: list[Any] | None,
     closers: list[Closer],
+    org_id: str | None = None,
 ) -> tuple[ToolProviderPort, Any | None]:
     """Wire A2A into the runtime (SPEC-A2A-009): outbound tools + inbound handler.
 
@@ -330,8 +516,12 @@ async def _compose_a2a(
         from prismal.a2a.provider import A2AToolProvider
         from prismal.agents.extension.providers import CompositeToolProvider
 
+        # The OAuth vault partition is the local tenant, never a remote-card value.
         manager = A2AConnectionManager(
-            allowlist=list(settings.a2a_outbound_allowlist), strict=settings.a2a_strict
+            allowlist=list(settings.a2a_outbound_allowlist),
+            strict=settings.a2a_strict,
+            local_org_id=org_id,
+            redirect_uri=settings.a2a_oauth_redirect_uri,
         )
         a2a_provider = A2AToolProvider(a2a_agents, manager=manager)
         await a2a_provider.prepare()
@@ -355,12 +545,18 @@ async def build_runtime(
     settings: Settings | None = None,
     *,
     org_id: str | None = None,
+    config_source: ConfigSourcePort | None = None,
     overrides: dict[str, Any] | None = None,
     mode: Literal["global", "context"] | None = None,
     collection_base: str = DEFAULT_COLLECTION_BASE,
     mcp_config_path: Path | None = None,
     graph: Any | None = None,
     a2a_agents: list[Any] | None = None,
+    gateway_vault: Any | None = None,
+    decision_vault: Any | None = None,
+    memory_backend: MemoryBackendPort | None = None,
+    memory_graph: MemoryGraphPort | None = None,
+    memory_hooks: MemoryHooks | None = None,
 ) -> RuntimeContext:
     """Compose every core port in one call (SPEC-CR-003).
 
@@ -371,6 +567,12 @@ async def build_runtime(
     Args:
         settings: Base settings. ``None`` resolves via ``get_settings()``.
         org_id: Tenant id; isolates vector collections (RAG + memory) per tenant.
+        config_source: Per-tenant config source (HRS — SPEC-HRS-CMP-001). When
+            given, this runtime's settings are built from
+            ``ChainedConfigSource([config_source, <process source>])`` (first
+            wins; the process source is the injected global one or the default
+            ``EnvConfigSource``) and *settings* is ignored; neither the global
+            source nor ``os.environ`` is mutated. ``None`` ⇒ unchanged behaviour.
         overrides: Per-tenant settings overrides (applied as a validated copy).
         mode: ``"global"`` injects singletons; ``"context"`` keeps ports in the
             returned context. ``None`` uses ``settings.runtime_mode``.
@@ -381,15 +583,30 @@ async def build_runtime(
             returned context as ``a2a_handler`` (the host mounts its routes).
         a2a_agents: Optional remote A2A agents (Agent Card URLs or ``AgentCard``
             objects) to expose as tools when A2A outbound is enabled.
+        gateway_vault: Credential vault for tenant gateway keys (Phase GW,
+            ``<auth_ref>@<org_id>``). ``None`` uses the identity vault when
+            ``identity_enabled``, else an ``EnvVault`` over the config source.
+        decision_vault: Credential vault for decision backend keys (Phase DEC,
+            ``jev_api_key@<org_id>``). ``None`` falls back to the identity vault,
+            then to the injected settings (no ``os.environ`` reads).
+        memory_backend: Phase MEM — storage adapter for this tenant's
+            ``MemoryService`` (default: selected by ``memory_v2_backend``).
+        memory_graph: Phase MEM — temporal graph; required when
+            ``memory_graph_backend="graphiti"`` (never built implicitly).
+        memory_hooks: Phase MEM — host callables (LLM classifier, summarizer,
+            batch executor, playbook curator); required for the ``llm`` gate.
 
     Returns:
         A :class:`RuntimeContext` with five non-null ports; usable as
         ``async with``.
     """
-    from prismal.core.config import get_settings
+    if config_source is not None:
+        eff = _settings_from_source(config_source, overrides)
+    else:
+        from prismal.core.config import get_settings
 
-    base_settings = settings if settings is not None else get_settings()
-    eff = apply_org_overrides(base_settings, org_id, overrides)
+        base_settings = settings if settings is not None else get_settings()
+        eff = apply_org_overrides(base_settings, org_id, overrides)
     resolved_mode: Literal["global", "context"] = mode if mode is not None else eff.runtime_mode
 
     backend, _ = resolve_vector_store(eff, org_id)
@@ -469,7 +686,12 @@ async def build_runtime(
         if eff.a2a_enabled:
             try:
                 tool_provider, a2a_handler = await _compose_a2a(
-                    eff, tool_provider, graph=graph, a2a_agents=a2a_agents, closers=closers
+                    eff,
+                    tool_provider,
+                    graph=graph,
+                    a2a_agents=a2a_agents,
+                    closers=closers,
+                    org_id=org_id,
                 )
             except Exception as exc:
                 raise RuntimeCompositionError("a2a", str(exc)) from exc
@@ -484,6 +706,68 @@ async def build_runtime(
                 observability = DefaultObservabilityProvider(settings=eff)
             except Exception as exc:
                 raise RuntimeCompositionError("observability", str(exc)) from exc
+
+        # 6d. LLM gateways (Phase GW) — opt-in. Tenant-scoped keys, startup gates
+        #     run before first use (fail-closed), optional cost reconciler.
+        gateways: GatewayRouter | None = None
+        if eff.llm_gateways_enabled:
+            try:
+                gateways = await _compose_gateways(
+                    eff,
+                    org_id=org_id,
+                    vault=gateway_vault or credential_vault,
+                    global_mode=resolved_mode == "global",
+                    closers=closers,
+                )
+            except Exception as exc:
+                raise RuntimeCompositionError("gateways", str(exc)) from exc
+
+        # 6e. Typed decisions (Phase DEC) — opt-in. Cascade tiers from settings,
+        #     tenant-scoped keys; global mode installs the process runtime.
+        decisions: DecisionRuntime | None = None
+        if eff.decisions_enabled:
+            try:
+                decisions = await _compose_decisions(
+                    eff,
+                    org_id=org_id,
+                    vault=decision_vault or credential_vault,
+                    audit=audit,
+                    global_mode=resolved_mode == "global",
+                    closers=closers,
+                )
+            except Exception as exc:
+                raise RuntimeCompositionError("decisions", str(exc)) from exc
+
+        # 6f. Agentic memory (Phase MEM) — opt-in, one MemoryService per tenant
+        #     (SPEC-MEM-TEN-001): requires an org_id (fail-closed); injected
+        #     backend/graph win (the Graphiti graph is never built implicitly).
+        memory: MemoryService | None = None
+        if eff.memory_v2_enabled:
+            try:
+                from prismal.decisions.types import DecisionMode
+                from prismal.memory.v2.decision_bridge import CascadeDecisionPort
+                from prismal.memory.v2.service import build_memory_service
+
+                memory = build_memory_service(
+                    eff,
+                    org_id=org_id,
+                    backend=memory_backend,
+                    graph=memory_graph,
+                    decisions=(
+                        CascadeDecisionPort(
+                            decisions.cascade,
+                            org_id=org_id,
+                            mode=DecisionMode(eff.memory_mode),
+                        )
+                        if decisions is not None
+                        else None
+                    ),
+                    audit=audit,
+                    hooks=memory_hooks,
+                )
+            except Exception as exc:
+                raise RuntimeCompositionError("memory", str(exc)) from exc
+            closers.append(memory.aclose)
 
         # 7. Mode: global injects the singleton; context leaves globals untouched.
         if resolved_mode == "global":
@@ -507,6 +791,10 @@ async def build_runtime(
         policy_engine=policy_engine,
         a2a_handler=a2a_handler,
         observability=observability,
+        gateways=gateways,
+        decisions=decisions,
+        memory=memory,
+        settings=eff,
     )
     ctx._closers = closers
     logger.info(
@@ -517,6 +805,92 @@ async def build_runtime(
         collection=cfg.collection_name,
     )
     return ctx
+
+
+async def _compose_gateways(
+    settings: Settings,
+    *,
+    org_id: str | None,
+    vault: Any | None,
+    global_mode: bool,
+    closers: list[Closer],
+) -> GatewayRouter | None:
+    """Build, start and register the gateway router (SPEC-GW-COMP-001)."""
+    from prismal.identity.vault import EnvVault
+    from prismal.providers.gateways.router import (
+        build_gateway_router,
+        get_gateway_router,
+        set_gateway_router,
+        vault_secret_resolver,
+    )
+
+    resolver = vault_secret_resolver(
+        vault if vault is not None else EnvVault(settings), org_id=org_id, settings=settings
+    )
+    router = build_gateway_router(settings, org_id=org_id, secret_resolver=resolver)
+    if router is None:
+        return None
+    closers.append(router.aclose)
+    await router.astartup()
+    if settings.gateway_reconcile_enabled:
+        from prismal.providers.gateways.reconcile import CostReconciler
+
+        router.reconciler = CostReconciler(router, settings=settings)
+        closers.append(router.reconciler.drain)
+    if router.ledger is not None or any(
+        (gw := router.get(name)) is not None and gw.profile.capabilities.has_quota_api
+        for name in router.names()
+    ):
+        from prismal.providers.gateways.poller import GatewayQuotaPoller
+
+        router.quota_poller = GatewayQuotaPoller(router)
+        router.quota_poller.start()
+        closers.append(router.quota_poller.aclose)
+    if global_mode:
+        set_gateway_router(router)
+
+        def _uninstall() -> None:
+            if get_gateway_router() is router:
+                set_gateway_router(None)
+
+        closers.append(_uninstall)
+    return router
+
+
+async def _compose_decisions(
+    settings: Settings,
+    *,
+    org_id: str | None,
+    vault: Any | None,
+    audit: AuditPort,
+    global_mode: bool,
+    closers: list[Closer],
+) -> DecisionRuntime:
+    """Build the decision cascade + runtime (Phase DEC); warm Laya when preloading."""
+    from prismal.decisions.cascade import DecisionCascade
+    from prismal.decisions.runtime import (
+        DecisionRuntime,
+        get_decision_runtime,
+        set_decision_runtime,
+    )
+
+    cascade = DecisionCascade.from_settings(settings, audit=audit, vault=vault, org_id=org_id)
+    runtime = DecisionRuntime(cascade=cascade, settings=settings)
+    closers.append(runtime.aclose)
+    if settings.laya_preload:
+        for backend in cascade.backends:
+            warmup = getattr(backend, "warmup", None)
+            if warmup is not None:
+                await warmup()
+    if global_mode:
+        set_decision_runtime(runtime)
+
+        def _uninstall() -> None:
+            if get_decision_runtime() is runtime:
+                set_decision_runtime(None)
+
+        closers.append(_uninstall)
+    return runtime
 
 
 # ── Test runtime (SPEC-CR-004) ───────────────────────────────────────────────
@@ -581,6 +955,8 @@ def build_test_runtime(
     observability: ObservabilityPort | None = None,
     org_id: str | None = None,
     collection_base: str = DEFAULT_COLLECTION_BASE,
+    settings: Settings | None = None,
+    memory: MemoryService | None = None,
 ) -> RuntimeContext:
     """Compose a deterministic ``RuntimeContext`` with fakes (SPEC-CR-004).
 
@@ -589,6 +965,8 @@ def build_test_runtime(
     (Z), and in-module embeddings/checkpointer/audit doubles. ``observability``
     defaults to ``None`` (parity with the other opt-in ports); pass a
     ``FakeObservabilityProvider`` to exercise the observability port in tests.
+    ``settings`` (HRS) is exposed as ``ctx.settings`` for the host read methods;
+    ``None`` makes them fall back to the process settings.
     """
     from prismal.agents.extension.providers import FakeToolProvider
     from prismal.rag.vector_store_factory import FakeVectorStore
@@ -618,6 +996,8 @@ def build_test_runtime(
         audit=_FakeAudit(),
         org_id=org_id,
         observability=observability,
+        memory=memory,
+        settings=settings,
     )
 
 

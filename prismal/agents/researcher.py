@@ -24,6 +24,7 @@ from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
+from prismal.routing.outcome import llm_route_kwargs, track_outcome
 from prismal.security.hardening_run import hardening_react_kwargs
 
 if TYPE_CHECKING:
@@ -218,7 +219,7 @@ async def researcher_node(state: AgentState) -> dict[str, object]:
     logger.debug("researcher_node_called", session_id=session_id)
 
     registry = ProviderRegistry()
-    llm = registry.get_llm_with_fallback()
+    llm = registry.get_llm_with_fallback(**llm_route_kwargs("researcher", state))
     active_tools = get_tools_for_agent("researcher")
     llm_with_tools = llm.bind_tools(active_tools)
 
@@ -229,15 +230,19 @@ async def researcher_node(state: AgentState) -> dict[str, object]:
     recent = list(state["messages"])[-_HISTORY_WINDOW:]
     loop_messages = list(_trim_to_last_human(recent))
 
-    response = await react_loop(
-        llm_with_tools,
-        active_tools,
-        system + loop_messages,
-        agent_name="researcher",
-        max_iterations=_MAX_TOOL_ITERATIONS,
-        session_id=str(session_id) if session_id else None,
-        budget_guard=get_budget_guard(state),
-        **hardening_react_kwargs(state),
+    response = await track_outcome(
+        state,
+        "researcher",
+        react_loop(
+            llm_with_tools,
+            active_tools,
+            system + loop_messages,
+            agent_name="researcher",
+            max_iterations=_MAX_TOOL_ITERATIONS,
+            session_id=str(session_id) if session_id else None,
+            budget_guard=get_budget_guard(state),
+            **hardening_react_kwargs(state),
+        ),
     )
 
     logger.info("researcher_complete", session_id=session_id)

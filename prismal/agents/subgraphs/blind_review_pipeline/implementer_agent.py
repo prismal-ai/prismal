@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from prismal.agents.handoff import handoff_scope, maybe_run_envelope
 from prismal.monitoring.otel import OTelManager
 
 if TYPE_CHECKING:
@@ -140,6 +141,19 @@ def make_implementer_agent_node(
             implementation_artifact = await fn(spec_artifact, prior_issues)
 
             br["implementation_artifact"] = implementation_artifact
+            # Phase TKE (SPEC-TKE-HND-001): additive envelope of the role output;
+            # reviewers still receive the full artifact (they must review the
+            # actual implementation — the blindness contract is untouched).
+            run_id, tenant = handoff_scope(state)
+            env = maybe_run_envelope(
+                implementation_artifact,
+                settings=resolved_settings,
+                run_id=run_id,
+                tenant=tenant,
+                pattern="brp",
+            )
+            if env is not None:
+                br["envelopes"] = {**(br.get("envelopes") or {}), "implementer": env.to_dict()}
             logger.info(
                 "blind_review.implementation_written",
                 chars=len(implementation_artifact),

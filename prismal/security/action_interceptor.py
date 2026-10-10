@@ -73,6 +73,18 @@ class ActionInterceptor(BaseCallbackHandler):
         self._identity = identity
         # key: run_id str → (tool_name, input_str, start_time)
         self._runs: dict[str, tuple[str, str, float]] = {}
+        # Phase TKE mask-mode allow-set (None = no restriction).
+        self._allow_set: frozenset[str] | None = None
+        self._allow_phase: str | None = None
+        self._allow_agent: str = ""
+
+    def set_tool_allow_set(
+        self, allow_set: frozenset[str] | None, *, phase: str | None, agent: str
+    ) -> None:
+        """Install the mask-mode phase allow-set (Phase TKE — SPEC-TKE-GAT-001)."""
+        self._allow_set = allow_set
+        self._allow_phase = phase
+        self._allow_agent = agent
 
     async def on_tool_start(
         self,
@@ -90,6 +102,16 @@ class ActionInterceptor(BaseCallbackHandler):
             PermissionDeniedError: If a required permission is not granted.
         """
         tool_name = str(serialized.get("name") or "unknown")
+        if self._allow_set is not None:
+            from prismal.agents.tool_gate import check_tool_call, record_masked_call
+            from prismal.core.exceptions import MaskedToolCallError
+
+            verdict = check_tool_call(tool_name, self._allow_set, self._allow_phase)
+            if not verdict.allowed:
+                record_masked_call(verdict, agent=self._allow_agent, audit_logger=self._audit)
+                raise MaskedToolCallError(
+                    f"tool '{tool_name}' not available in phase {self._allow_phase}"
+                )
         run_id_val = str(kwargs.get("run_id") or uuid.uuid4())
         self._runs[run_id_val] = (tool_name, input_str, time.monotonic())
 

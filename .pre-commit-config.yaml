@@ -273,6 +273,15 @@ repos:
           # prismal usa Chroma embebido (no expone el server) y ahora es backend
           # opcional (Fase Z). Riesgo re-afirmado; próxima revisión 2026-10.
           - --ignore-vuln=CVE-2026-45829
+          # chromadb 1.5.9: CVE-2026-45830/45831/45833 (server RBAC + code injection
+          # del SERVER) sin fix; Chroma embebido, tenencia via collection_for (2026-10-10)
+          - --ignore-vuln=CVE-2026-45830
+          - --ignore-vuln=CVE-2026-45831
+          - --ignore-vuln=CVE-2026-45833
+          # nltk 3.10.3 (via llmlingua, extra [compression]): CVE-2026-81726 sin fix
+          - --ignore-vuln=CVE-2026-81726
+          # accelerate 1.13.0: CVE-2026-69112 sin fix; no cargamos checkpoints no confiables
+          - --ignore-vuln=CVE-2026-69112
           # torch 2.11.0: CVE-2025-3000 (torch.jit.script, local-only) sin fix
           - --ignore-vuln=CVE-2025-3000
           # click: PYSEC-2026-2132 (fix 8.3.3) bloqueado por guardrails-ai 0.10.2
