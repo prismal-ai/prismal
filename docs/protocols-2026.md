@@ -59,7 +59,8 @@ tenant_scoped)`; `a2a_base_url.rstrip("/") + rpc_path` is exactly the URL the ca
   (empty ⇒ deny).
 - The host policy is one frozen value, `EndpointPolicy(allow_insecure_localhost=, allow_private_hosts=,
   allowlist=, strict=)` (defaults = strictest). `A2AClient(policy=...)` applies it to the card's RPC
-  URL **and** to the card's OAuth endpoints; the flows take it as `policy=` plus an
+  URL; the card's OAuth endpoints get only its `allowlist` / `strict` (a remote card can never
+  use the localhost / private-host opt-ins to aim the token exchange at an internal address); the flows take it as `policy=` plus an
   `OAuthBinding(vault=, org_id=, principal=, http_client=, clock=, audit=)` for the local runtime
   binding. Both are exported from `prismal.a2a`.
 - **Residual risk:** outside strict mode and with no allowlist, a *hostname* that resolves to an

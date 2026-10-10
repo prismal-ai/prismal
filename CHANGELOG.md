@@ -135,8 +135,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   instead of the four flat host-policy flags, and the flows take
   `binding=OAuthBinding(...)` instead of `vault` / `org_id` / `principal` /
   `http_client` / `clock` / `audit`. `A2AConnectionManager` keeps its signature.
-  `A2AClient` now forwards the **whole** policy to the card's OAuth endpoints
-  (it used to forward only `allowlist` / `strict`).
+  As before, the card's OAuth endpoints get only the client's `allowlist` /
+  `strict`, never its localhost / private-host opt-ins (regression-tested).
 
 ### Security
 - Dependency refresh (2026-10-10) clearing every pip-audit finding and every

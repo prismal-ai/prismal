@@ -100,8 +100,10 @@ class A2AClient:
         ``principal``) from the local authenticated context — never remote data.
 
         The RPC URL adopted from the remote card is validated before every
-        request (:meth:`_rpc_url`) with ``policy`` — the same
-        :class:`~prismal.a2a.oauth.EndpointPolicy` the card's OAuth endpoints get."""
+        request (:meth:`_rpc_url`) with ``policy``
+        (:class:`~prismal.a2a.oauth.EndpointPolicy`). The card's OAuth endpoints
+        get only its ``allowlist`` / ``strict``, never the localhost / private-host
+        opt-ins."""
         if protocol not in ("auto", "0.3", "1.0"):
             raise ValueError(f"unsupported A2A protocol: {protocol!r}")
         self._protocol: ClientProtocol = protocol
@@ -270,7 +272,10 @@ class A2AClient:
                 principal=self._principal,
                 http_client=self._http(),
             ),
-            policy=self._policy,
+            # Card-supplied OAuth URLs get only the allowlist / strict mode: the
+            # localhost / private-host opt-ins cover the RPC URL, never a token
+            # endpoint chosen by the remote side (SSRF).
+            policy=EndpointPolicy(allowlist=self._policy.allowlist, strict=self._policy.strict),
             agent_url=self._card_url,
         )
         self._oauth_resolved = True

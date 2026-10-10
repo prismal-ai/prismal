@@ -94,7 +94,15 @@ async def test_manager_threads_its_policy_to_clients() -> None:
     await mgr.aclose()
 
 
-def test_client_forwards_the_full_policy_to_card_oauth(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_card_oauth_endpoints_never_inherit_the_insecure_opt_ins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The RPC-URL localhost/private opt-ins must not reach card-supplied OAuth URLs.
+
+    The token / authorize / device URLs come from the remote card, so only the
+    allowlist and strict mode carry over; a card can never point the token
+    exchange at a loopback or private address (SSRF) through the client opt-ins.
+    """
     from prismal.a2a import oauth as oauth_mod
 
     seen: dict[str, object] = {}
@@ -103,12 +111,16 @@ def test_client_forwards_the_full_policy_to_card_oauth(monkeypatch: pytest.Monke
         seen.update(kw)
 
     monkeypatch.setattr(oauth_mod, "select_oauth_flow", _select)
-    policy = EndpointPolicy(allow_insecure_localhost=True, allow_private_hosts=True)
     client = A2AClient(
         "http://localhost:9000/.well-known/agent.json",
-        policy=policy,
+        policy=EndpointPolicy(
+            allow_insecure_localhost=True,
+            allow_private_hosts=True,
+            allowlist=["*.acme"],
+            strict=True,
+        ),
         http_client=httpx.AsyncClient(),
     )
     client._card_v1 = type("Card", (), {"security_requirements": [{"oauth": []}]})()  # type: ignore[assignment]
     client._card_oauth_flow()
-    assert seen["policy"] is policy
+    assert seen["policy"] == EndpointPolicy(allowlist=["*.acme"], strict=True)
