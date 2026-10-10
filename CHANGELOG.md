@@ -154,6 +154,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   optional `[compression]` extra; affected APIs unused).
 
 ### Fixed
+- Release build: `twine` 7.0.0 (+ `packaging` 26.2) in the lock — `twine` 6.2.0
+  rejected the Metadata-Version 2.5 that current `hatchling` writes, failing
+  `twine check` in `release.yml` before anything was published.
 - CI (`release.yml`): the `github-release` job now retries with backoff and
   only trusts a `gh release view` "not found", instead of failing the whole
   release on a transient GitHub 5xx. During the 2026-07-19 GitHub Actions
