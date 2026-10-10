@@ -325,9 +325,13 @@ Changelog = "https://github.com/prismal-ai/prismal/blob/main/CHANGELOG.md"
 # Renamed from 'lightagent' in v3.0.0 (Estrategia B).
 # ============================================================
 [tool.hatch.build.targets.wheel]
+# Core metadata 2.4: pypa/gh-action-pypi-publish (pinned SHA) bundles a twine that rejects 2.5.
+core-metadata-version = "2.4"
 packages = ["prismal"]
 
 [tool.hatch.build.targets.sdist]
+# Core metadata 2.4: pypa/gh-action-pypi-publish (pinned SHA) bundles a twine that rejects 2.5.
+core-metadata-version = "2.4"
 exclude = [
   "/.github",
   "/docs",
