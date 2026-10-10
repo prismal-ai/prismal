@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import random
 import statistics
+import sys
 import time
 
 import pytest
@@ -64,6 +65,14 @@ def _items(seed: int) -> list[BatchItem]:
     ]
 
 
+def _coverage_tracing() -> bool:
+    """True under ``--cov``: tracing inflates wall-clock several-fold (CI runs unit tests so)."""
+    if sys.gettrace() is not None:
+        return True
+    monitoring = getattr(sys, "monitoring", None)
+    return monitoring is not None and monitoring.get_tool(monitoring.COVERAGE_ID) is not None
+
+
 def test_assign_p95_under_50ms() -> None:
     policy = BatchAssignmentPolicy(
         predictor=_Pred(1),  # type: ignore[arg-type]
@@ -85,4 +94,6 @@ def test_assign_p95_under_50ms() -> None:
     assert results[0].feasible
     assert len(results[0].choices) == _N
     assert ModelTier.AUTO not in {c.tier for c in results[0].choices.values()}
+    if _coverage_tracing():
+        pytest.skip(f"latency bound not meaningful under coverage tracing (p95={p95:.1f} ms)")
     assert p95 <= 50.0, f"p95={p95:.1f} ms (median {statistics.median(timings):.1f} ms)"
