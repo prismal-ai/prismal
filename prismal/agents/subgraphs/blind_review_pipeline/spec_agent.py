@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from prismal.agents.handoff import handoff_scope, maybe_run_envelope
 from prismal.monitoring.otel import OTelManager
 
 if TYPE_CHECKING:
@@ -113,6 +114,19 @@ def make_spec_agent_node(
 
             br = dict(state.get("metadata", {}).get("blind_review", {}))
             br["spec_artifact"] = spec_artifact
+            # Phase TKE (SPEC-TKE-HND-001): additive envelope of the role output;
+            # the full ``spec_artifact`` stays the downstream input (blindness
+            # contract + correctness: implementer/reviewers need the full spec).
+            run_id, tenant = handoff_scope(state)
+            env = maybe_run_envelope(
+                spec_artifact,
+                settings=resolved_settings,
+                run_id=run_id,
+                tenant=tenant,
+                pattern="brp",
+            )
+            if env is not None:
+                br["envelopes"] = {**(br.get("envelopes") or {}), "spec_agent": env.to_dict()}
             logger.info("blind_review.spec_written", chars=len(spec_artifact))
 
             return {

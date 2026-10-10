@@ -1,0 +1,162 @@
+{
+  "name": "hitl_interrupt",
+  "description": "HITL gate: interrupt() ⇒ RUN_FINISHED.outcome {type: interrupt} (no INTERRUPT event).",
+  "context": {
+    "run_id": "run-1",
+    "thread_id": "thread-1"
+  },
+  "initial_state": {
+    "current_agent": "supervisor"
+  },
+  "input": [
+    [
+      "updates",
+      {
+        "reviewer": {
+          "current_agent": "reviewer"
+        }
+      }
+    ],
+    [
+      "updates",
+      {
+        "__interrupt__": [
+          {
+            "__class__": "Interrupt",
+            "value": {
+              "artifact_field": "review_result",
+              "artifact": {
+                "diff": "+1 line"
+              },
+              "risk_level": "HIGH",
+              "options": [
+                "approve",
+                "reject",
+                "request_changes"
+              ],
+              "message": "Approval required for: review_result"
+            },
+            "id": "intr-1"
+          }
+        ]
+      }
+    ]
+  ],
+  "end": {
+    "kind": "finish",
+    "result": null
+  },
+  "summary_usage_wire": {
+    "prompt_tokens": 30,
+    "completion_tokens": 3,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "reasoning_tokens": 0,
+    "total_tokens": 33,
+    "calls": 1,
+    "cost_usd": 0.0,
+    "cost_source": "litellm",
+    "estimated": false,
+    "served_model": null,
+    "gateway": null
+  },
+  "expected": [
+    {
+      "type": "RUN_STARTED",
+      "timestamp": 1760000000000,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "protocolVersion": "1.0"
+    },
+    {
+      "type": "STATE_SNAPSHOT",
+      "timestamp": 1760000000001,
+      "snapshot": {
+        "current_agent": "supervisor"
+      }
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000002,
+      "stepName": "reviewer"
+    },
+    {
+      "type": "STATE_DELTA",
+      "timestamp": 1760000000003,
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/current_agent",
+          "value": "reviewer"
+        }
+      ]
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000004,
+      "stepName": "reviewer"
+    },
+    {
+      "type": "CUSTOM",
+      "timestamp": 1760000000005,
+      "name": "prismal.usage",
+      "value": {
+        "prompt_tokens": 30,
+        "completion_tokens": 3,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0,
+        "total_tokens": 33,
+        "calls": 1,
+        "cost_usd": 0.0,
+        "cost_source": "litellm",
+        "estimated": false,
+        "served_model": null,
+        "gateway": null
+      }
+    },
+    {
+      "type": "RUN_FINISHED",
+      "timestamp": 1760000000006,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "outcome": {
+        "type": "interrupt",
+        "interrupts": [
+          {
+            "id": "intr-1",
+            "reason": "human_approval",
+            "message": "Approval required for: review_result",
+            "metadata": {
+              "value": {
+                "artifact_field": "review_result",
+                "artifact": {
+                  "diff": "+1 line"
+                },
+                "risk_level": "HIGH",
+                "options": [
+                  "approve",
+                  "reject",
+                  "request_changes"
+                ],
+                "message": "Approval required for: review_result"
+              }
+            }
+          }
+        ]
+      },
+      "usage": [
+        {
+          "provider": "unknown",
+          "model": "unknown",
+          "inputTokens": 30,
+          "outputTokens": 3,
+          "totalTokens": 33,
+          "reasoningTokens": 0,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0
+        }
+      ]
+    }
+  ]
+}

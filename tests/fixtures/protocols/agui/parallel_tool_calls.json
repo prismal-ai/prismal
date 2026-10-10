@@ -1,0 +1,268 @@
+{
+  "name": "parallel_tool_calls",
+  "description": "Two tool calls streamed in parallel (indices 0/1) and both results.",
+  "context": {
+    "run_id": "run-1",
+    "thread_id": "thread-1",
+    "include_usage": false
+  },
+  "initial_state": null,
+  "input": [
+    [
+      "messages",
+      [
+        {
+          "__class__": "AIMessageChunk",
+          "content": "",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "AIMessageChunk",
+          "id": "msg-1",
+          "tool_calls": [
+            {
+              "name": "get_weather",
+              "args": {},
+              "id": "call-a",
+              "type": "tool_call"
+            },
+            {
+              "name": "get_time",
+              "args": {},
+              "id": "call-b",
+              "type": "tool_call"
+            }
+          ],
+          "invalid_tool_calls": [],
+          "tool_call_chunks": [
+            {
+              "name": "get_weather",
+              "args": "",
+              "id": "call-a",
+              "index": 0,
+              "type": "tool_call_chunk"
+            },
+            {
+              "name": "get_time",
+              "args": "",
+              "id": "call-b",
+              "index": 1,
+              "type": "tool_call_chunk"
+            }
+          ]
+        },
+        {
+          "langgraph_node": "agent",
+          "langgraph_step": 1
+        }
+      ]
+    ],
+    [
+      "messages",
+      [
+        {
+          "__class__": "AIMessageChunk",
+          "content": "",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "AIMessageChunk",
+          "id": "msg-1",
+          "tool_calls": [
+            {
+              "name": "",
+              "args": {
+                "city": "Lima"
+              },
+              "type": "tool_call"
+            }
+          ],
+          "invalid_tool_calls": [],
+          "tool_call_chunks": [
+            {
+              "args": "{\"city\": \"Lima\"}",
+              "index": 0,
+              "type": "tool_call_chunk"
+            }
+          ]
+        },
+        {
+          "langgraph_node": "agent",
+          "langgraph_step": 1
+        }
+      ]
+    ],
+    [
+      "messages",
+      [
+        {
+          "__class__": "AIMessageChunk",
+          "content": "",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "AIMessageChunk",
+          "id": "msg-1",
+          "tool_calls": [
+            {
+              "name": "",
+              "args": {
+                "tz": "UTC"
+              },
+              "type": "tool_call"
+            }
+          ],
+          "invalid_tool_calls": [],
+          "tool_call_chunks": [
+            {
+              "args": "{\"tz\": \"UTC\"}",
+              "index": 1,
+              "type": "tool_call_chunk"
+            }
+          ]
+        },
+        {
+          "langgraph_node": "agent",
+          "langgraph_step": 1
+        }
+      ]
+    ],
+    [
+      "messages",
+      [
+        {
+          "__class__": "ToolMessage",
+          "content": "18C",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "tool",
+          "id": "tool-a",
+          "tool_call_id": "call-a",
+          "status": "success"
+        },
+        {
+          "langgraph_node": "tools",
+          "langgraph_step": 1
+        }
+      ]
+    ],
+    [
+      "messages",
+      [
+        {
+          "__class__": "ToolMessage",
+          "content": "12:00",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "tool",
+          "id": "tool-b",
+          "tool_call_id": "call-b",
+          "status": "success"
+        },
+        {
+          "langgraph_node": "tools",
+          "langgraph_step": 1
+        }
+      ]
+    ],
+    [
+      "updates",
+      {
+        "tools": {
+          "tool_results": [
+            {
+              "n": 2
+            }
+          ]
+        }
+      }
+    ]
+  ],
+  "end": {
+    "kind": "finish",
+    "result": null
+  },
+  "summary_usage_wire": null,
+  "expected": [
+    {
+      "type": "RUN_STARTED",
+      "timestamp": 1760000000000,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "protocolVersion": "1.0"
+    },
+    {
+      "type": "STATE_SNAPSHOT",
+      "timestamp": 1760000000001,
+      "snapshot": {}
+    },
+    {
+      "type": "TOOL_CALL_START",
+      "timestamp": 1760000000002,
+      "toolCallId": "call-a",
+      "toolCallName": "get_weather",
+      "parentMessageId": "msg-1"
+    },
+    {
+      "type": "TOOL_CALL_START",
+      "timestamp": 1760000000003,
+      "toolCallId": "call-b",
+      "toolCallName": "get_time",
+      "parentMessageId": "msg-1"
+    },
+    {
+      "type": "TOOL_CALL_ARGS",
+      "timestamp": 1760000000004,
+      "toolCallId": "call-a",
+      "delta": "{\"city\": \"Lima\"}"
+    },
+    {
+      "type": "TOOL_CALL_ARGS",
+      "timestamp": 1760000000005,
+      "toolCallId": "call-b",
+      "delta": "{\"tz\": \"UTC\"}"
+    },
+    {
+      "type": "TOOL_CALL_END",
+      "timestamp": 1760000000006,
+      "toolCallId": "call-a"
+    },
+    {
+      "type": "TOOL_CALL_RESULT",
+      "timestamp": 1760000000007,
+      "messageId": "tool-a",
+      "toolCallId": "call-a",
+      "content": "18C",
+      "role": "tool"
+    },
+    {
+      "type": "TOOL_CALL_END",
+      "timestamp": 1760000000008,
+      "toolCallId": "call-b"
+    },
+    {
+      "type": "TOOL_CALL_RESULT",
+      "timestamp": 1760000000009,
+      "messageId": "tool-b",
+      "toolCallId": "call-b",
+      "content": "12:00",
+      "role": "tool"
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000010,
+      "stepName": "tools"
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000011,
+      "stepName": "tools"
+    },
+    {
+      "type": "RUN_FINISHED",
+      "timestamp": 1760000000012,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "outcome": {
+        "type": "success"
+      }
+    }
+  ]
+}

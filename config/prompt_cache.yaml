@@ -1,0 +1,13 @@
+# Prompt-cache policy (Phase TKE — SPEC-TKE-CCH-001). Volatile provider facts
+# live here, not in code. Verified 2026-10-05 against litellm 1.86.2 — see
+# specs/token-efficiency/VERIFY.md. Loaded by providers/prompt_cache.py::load_cache_policy.
+ttl: "5m"                 # "5m" | "1h" (Anthropic ephemeral TTL)
+max_breakpoints: 4        # Anthropic: max cache_control blocks per request
+lookback_blocks: 20       # Anthropic: cache hit lookback window (content blocks)
+openai_retention: null    # OpenAI `prompt_cache_retention` (e.g. "24h"); null = provider default
+min_prefix_tokens:        # below this estimated prefix size no breakpoint is placed
+  anthropic_explicit: 1024
+  claude-haiku: 2048
+  openai_auto: 1024
+  gemini_implicit: 1024
+  deepseek_auto: 64

@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any
 
+from prismal.agents.handoff import HandoffEnvelope, maybe_run_envelope
 from prismal.core.config import Settings, get_settings
 from prismal.core.logging import get_logger
 
@@ -35,11 +36,14 @@ class SubAgentSpawner:
                 cached settings are used via ``get_settings()``.
         """
         _settings = settings or get_settings()
+        self._settings = _settings
         self.max_concurrent: int = _settings.max_concurrent_agents
         self.default_timeout: float = float(_settings.agent_timeout_seconds)
         self._semaphore: asyncio.Semaphore = asyncio.Semaphore(self.max_concurrent)
         # Any: tasks have heterogeneous return types depending on the coroutine
         self._active_tasks: dict[str, asyncio.Task[Any]] = {}
+        # Phase TKE (SPEC-TKE-HND-001): envelopes of ``str`` results, by task id.
+        self._envelopes: dict[str, HandoffEnvelope] = {}
 
     @property
     def active_count(self) -> int:
@@ -51,6 +55,8 @@ class SubAgentSpawner:
         coro_factory: Callable[[], Coroutine[Any, Any, Any]],
         task_id: str,
         timeout: float | None = None,
+        run_id: str | None = None,
+        tenant: str = "default",
     ) -> asyncio.Task[Any]:  # Any: return type is determined by the caller's coroutine
         """Launch a coroutine as an async task with concurrency and timeout control.
 
@@ -61,9 +67,14 @@ class SubAgentSpawner:
             coro_factory: Zero-argument callable that returns a coroutine.
             task_id: Unique identifier for this task.
             timeout: Task timeout in seconds. ``None`` uses ``default_timeout``.
+            run_id: Run scope for the handoff-envelope artifact (Phase TKE);
+                ``None`` uses *task_id*.
+            tenant: Tenant scope for the handoff-envelope artifact (Phase TKE).
 
         Returns:
-            The launched :class:`asyncio.Task`.
+            The launched :class:`asyncio.Task`.  Its result is always the raw
+            coroutine result; when handoff envelopes are enabled a ``str``
+            result's envelope is available via :meth:`get_envelope`.
         """
         _timeout = timeout if timeout is not None else self.default_timeout
 
@@ -72,7 +83,18 @@ class SubAgentSpawner:
 
         async def _wrapped() -> object:
             try:
-                return await asyncio.wait_for(coro_factory(), timeout=_timeout)
+                result = await asyncio.wait_for(coro_factory(), timeout=_timeout)
+                if isinstance(result, str):
+                    env = maybe_run_envelope(
+                        result,
+                        settings=self._settings,
+                        run_id=run_id or task_id,
+                        tenant=tenant,
+                        pattern="spawner",
+                    )
+                    if env is not None:
+                        self._envelopes[task_id] = env
+                return result
             except TimeoutError:
                 logger.warning("sub_agent_timeout", task_id=task_id, timeout=_timeout)
                 raise
@@ -90,6 +112,10 @@ class SubAgentSpawner:
         task: asyncio.Task[Any] = asyncio.create_task(_wrapped(), name=task_id)
         self._active_tasks[task_id] = task
         return task
+
+    def get_envelope(self, task_id: str) -> HandoffEnvelope | None:
+        """Return the handoff envelope of *task_id*'s ``str`` result, if any (Phase TKE)."""
+        return self._envelopes.get(task_id)
 
     def cancel_all(self) -> int:
         """Cancel all active tasks.

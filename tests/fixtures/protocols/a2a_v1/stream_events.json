@@ -1,0 +1,7 @@
+[
+  {"jsonrpc": "2.0", "id": "s1", "result": {"task": {"id": "task-3", "contextId": "ctx-3", "status": {"state": "TASK_STATE_SUBMITTED"}}}},
+  {"jsonrpc": "2.0", "id": "s1", "result": {"statusUpdate": {"taskId": "task-3", "contextId": "ctx-3", "status": {"state": "TASK_STATE_WORKING", "timestamp": "2026-10-06T10:00:01Z"}}}},
+  {"jsonrpc": "2.0", "id": "s1", "result": {"artifactUpdate": {"taskId": "task-3", "contextId": "ctx-3", "artifact": {"artifactId": "a1", "parts": [{"text": "partial"}]}, "append": false, "lastChunk": true}}},
+  {"jsonrpc": "2.0", "id": "s1", "result": {"statusUpdate": {"taskId": "task-3", "contextId": "ctx-3", "status": {"state": "TASK_STATE_COMPLETED", "timestamp": "2026-10-06T10:00:02Z"}, "metadata": {"final": true}}}},
+  {"jsonrpc": "2.0", "id": "s1", "result": {"message": {"messageId": "m9", "role": "ROLE_AGENT", "parts": [{"text": "hi"}], "contextId": "ctx-3"}}}
+]

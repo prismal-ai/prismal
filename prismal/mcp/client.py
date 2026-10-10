@@ -12,7 +12,7 @@ References:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
@@ -24,7 +24,11 @@ from prismal.mcp.connection import (
 )
 
 if TYPE_CHECKING:
+    import httpx
     from langchain_core.tools import BaseTool
+
+    from prismal.core.config import Settings
+    from prismal.mcp.input_requests import InputRequestHandler
 
 logger = get_logger("prismal.mcp.client")
 
@@ -51,14 +55,35 @@ class MCPClientManager:
         await manager.close()
     """
 
-    def __init__(self, config_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        config_path: Path | None = None,
+        *,
+        settings: Settings | None = None,
+        input_handler: InputRequestHandler | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
         """Initialise the manager with an optional custom config path.
 
         Args:
             config_path: Path to the YAML config file.  Defaults to
                 ``config/mcp_servers.yaml`` relative to the current working
                 directory when ``None``.
+            settings: Phase PRT — settings whose ``mcp_*`` flags each connection reads
+                (``None`` ⇒ ``get_settings()``; ``mcp_protocol_mode="legacy"`` ⇒ today).
+            input_handler: Phase PRT — answers stateless input requests (default: decline).
+            transport: Phase PRT — ``httpx`` transport for stateless adapters (tests/hosts).
         """
+        # Only forwarded when set, so the default construction stays ``MCPServerConnection(cfg)``.
+        self._connection_options: dict[str, Any] = {
+            k: v
+            for k, v in {
+                "settings": settings,
+                "input_handler": input_handler,
+                "transport": transport,
+            }.items()
+            if v is not None
+        }
         self._config_path: Path = config_path if config_path is not None else _DEFAULT_CONFIG_PATH
         # Keyed by server name — only contains servers that have been connected
         # (or attempted) via ``connect()``.
@@ -176,7 +201,7 @@ class MCPClientManager:
         if name in self._connections:
             await self.disconnect(name)
 
-        conn = MCPServerConnection(server_config)
+        conn = MCPServerConnection(server_config, **self._connection_options)
         self._connections[name] = conn
         # connect() on MCPServerConnection never raises (AC-004-5); it logs
         # internally and marks the connection unavailable on failure.

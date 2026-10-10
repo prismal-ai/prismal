@@ -1,0 +1,62 @@
+# Adaptive Model Routing — tier map (Phase AMR — SPEC-AMR-POL-001).
+#
+# tiers:      tier -> model ref (LiteLLM string or "gw:<gateway>/<model>").
+#             null = settings.default_model, which reproduces 3.15.0 exactly
+#             (parity map: every agent keeps the model it uses today).
+#             Fill in the tiers to let policies trade cost for capability, e.g.
+#               small: anthropic/claude-haiku-4-5
+#               frontier: gw:openrouter/anthropic/claude-opus-4.5
+#             `auto` (a gateway-native auto router) is terminal and never a floor.
+# agents:     graph node -> default tier (unknown agents: legacy model setting or medium).
+# risk_floor: minimum tier per risk tier (fail-closed; combined with PRISMAL_ROUTING_RISK_FLOOR — the stricter wins).
+version: 1
+
+tiers:
+  nano: null
+  small: null
+  medium: null
+  frontier: null
+
+agents:
+  # Supervisor routing and core specialists
+  supervisor: medium
+  researcher: medium
+  coder: frontier
+  codeact: frontier
+  cua: frontier
+  rag_agent: medium
+  planner: frontier
+  critic: medium
+  data_analyst: medium
+  file_manager: small
+  skill_manager: small
+  cron_manager: small
+  dev_pipeline: frontier
+  ml_pipeline: medium
+  financial_analyst: medium
+  parallel_researcher: medium
+  meta_learner: medium
+  skill_creator: medium
+  domain_supervisor: small
+  network_supervisor: small
+  # Advanced reasoning patterns (enable_subgraphs)
+  tot_agent: frontier
+  debate_agent: medium
+  constitutional_filter: medium
+  lats_agent: frontier
+  llm_compiler: medium
+  mixture_agent: medium
+  # Opt-in pipelines
+  customer_service: small
+  document_generation: medium
+  data_etl: small
+  code_review: frontier
+  debate_consensus: medium
+  multimodal_pipeline: medium
+  kokoro: frontier
+  skynet: medium
+  blind_review_pipeline: frontier
+
+risk_floor:
+  high: medium
+  critical: frontier

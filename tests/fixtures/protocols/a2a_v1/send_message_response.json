@@ -1,0 +1,22 @@
+{
+  "jsonrpc": "2.0",
+  "id": "req-1",
+  "result": {
+    "task": {
+      "id": "task-1",
+      "contextId": "ctx-1",
+      "status": {
+        "state": "TASK_STATE_COMPLETED",
+        "message": {"messageId": "msg-2", "role": "ROLE_AGENT", "parts": [{"text": "done"}]},
+        "timestamp": "2026-10-06T10:00:00Z"
+      },
+      "artifacts": [
+        {"artifactId": "art-1", "name": "invoice", "description": "The invoice", "parts": [{"data": {"invoiceId": "INV-42"}}], "metadata": {"x": 1}}
+      ],
+      "history": [
+        {"messageId": "msg-1", "contextId": "ctx-1", "taskId": "task-1", "role": "ROLE_USER", "parts": [{"text": "Bill ACME 100 EUR"}]}
+      ],
+      "metadata": {"cost": 0.01}
+    }
+  }
+}

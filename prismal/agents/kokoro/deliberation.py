@@ -27,6 +27,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from prismal.agents.handoff import HandoffEnvelope, maybe_run_envelope
 from prismal.agents.patterns.debate import DebatePosition, pairwise_jaccard
 from prismal.core.exceptions import DeliberationError, KokoroConfigError
 from prismal.core.logging import get_logger
@@ -54,6 +55,9 @@ class DeliberationResult:
         agreement_score: Agreement over ``final_positions`` content in [0, 1].
         rounds_completed: How many rounds actually ran (early stop included).
         converged: ``True`` when ``agreement_score >= threshold``.
+        final_envelopes: Handoff envelopes of ``final_positions`` (Phase TKE,
+            SPEC-TKE-HND-001), aligned by index; the judge reads their
+            summaries.  Empty when disabled.
     """
 
     positions: list[DebatePosition]
@@ -61,6 +65,7 @@ class DeliberationResult:
     agreement_score: float
     rounds_completed: int
     converged: bool
+    final_envelopes: tuple[HandoffEnvelope, ...] = ()
 
 
 async def deliberate(
@@ -71,6 +76,8 @@ async def deliberate(
     agreement_threshold: float | None = None,
     agreement_fn: AgreementFn | None = None,
     settings: Settings | None = None,
+    run_id: str = "run",
+    tenant: str = "default",
 ) -> DeliberationResult:
     """Run deliberation rounds until convergence or ``max_rounds``.
 
@@ -84,6 +91,8 @@ async def deliberate(
         agreement_fn: Injected agreement metric.  ``None`` uses
             :func:`pairwise_jaccard`.
         settings: Prismal settings; ``None`` resolves via ``get_settings()``.
+        run_id: Run scope for handoff-envelope artifacts (Phase TKE).
+        tenant: Tenant scope for handoff-envelope artifacts (Phase TKE).
 
     Returns:
         A :class:`DeliberationResult` with every position, the final round,
@@ -153,7 +162,23 @@ async def deliberate(
             agreement_score=agreement,
             rounds_completed=rounds_completed,
             converged=converged,
+            final_envelopes=_envelope_positions(last_round, settings, run_id, tenant),
         )
+
+
+def _envelope_positions(
+    positions: list[DebatePosition], settings: Settings, run_id: str, tenant: str
+) -> tuple[HandoffEnvelope, ...]:
+    """Envelope each final soul position when enabled (TKE7-03); ``()`` when off."""
+    envelopes: list[HandoffEnvelope] = []
+    for position in positions:
+        env = maybe_run_envelope(
+            position.content, settings=settings, run_id=run_id, tenant=tenant, pattern="kokoro"
+        )
+        if env is None:
+            return ()
+        envelopes.append(env)
+    return tuple(envelopes)
 
 
 async def _run_round(

@@ -7,6 +7,8 @@ here::
     from prismal.composition import build_runtime, RuntimeContext
 
 See :func:`build_runtime` for the host lifespan contract and ``docs/composition-root.md``.
+The host read surface view types (HRS) are re-exported from
+:mod:`prismal.composition.host_surface` for annotations / ``isinstance``.
 """
 
 from __future__ import annotations
@@ -22,6 +24,20 @@ from prismal.composition.config_sources import (
     resolve_skills_source,
     resolve_vector_store,
 )
+from prismal.composition.host_surface import (
+    A2ARouteSpec,
+    AuditChainStatus,
+    AuditEntryView,
+    AuditPageView,
+    BudgetAmounts,
+    BudgetStatusView,
+    DecisionIntegrationStats,
+    DecisionsReportView,
+    QuotaWindowView,
+    ReportWindow,
+    RoutingPolicyStats,
+    RoutingReportView,
+)
 from prismal.composition.runtime import (
     RuntimeConfig,
     RuntimeContext,
@@ -32,8 +48,20 @@ from prismal.composition.runtime import (
 
 __all__ = [
     "DEFAULT_COLLECTION_BASE",
+    "A2ARouteSpec",
+    "AuditChainStatus",
+    "AuditEntryView",
+    "AuditPageView",
+    "BudgetAmounts",
+    "BudgetStatusView",
+    "DecisionIntegrationStats",
+    "DecisionsReportView",
     "McpConfig",
     "McpServerInfo",
+    "QuotaWindowView",
+    "ReportWindow",
+    "RoutingPolicyStats",
+    "RoutingReportView",
     "RuntimeConfig",
     "RuntimeContext",
     "SkillsSource",

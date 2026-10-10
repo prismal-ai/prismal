@@ -10,6 +10,149 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.18.0] — 2026-10-07
+
+> **Release note (tag `prismal/v3.18.0`, 2026-10-10):** this tag ships the whole wave
+> 2026-10 at once — 3.13.0 (TKE), 3.14.0 (GW), 3.15.0 (DEC), 3.16.0 (AMR),
+> 3.17.0 (PRT + HRS) and 3.18.0 (MEM). The intermediate versions were never
+> tagged or published on their own; their changes are listed in their own
+> sections of `CHANGELOG.md`. Every new layer is opt-in and off by default.
+
+> Phase MEM — **Agentic memory v2**, the sixth and last in-repo milestone of
+> wave 2026-10. Typed (episodic / semantic / procedural / preference),
+> decision-gated, budgeted and tenant-scoped memory in `prismal/memory/v2/`. It
+> runs over the **same** legacy stores, which are wrapped and never edited.
+> Writes and recall follow the Jev-Mem controller design. A sleep-time job
+> consolidates memory without ever deleting it. Deletion is reachable only from
+> a retention rule or an approved human. Opt-in via `memory_v2_enabled` (default
+> `False`, `memory_mode="shadow"` first): with it off, the supervisor graph is
+> identical (snapshot-tested), `RuntimeContext.memory` is `None` and no
+> scheduler job is registered. Guide, migration path and MEM0 verified facts:
+> `docs/memory.md`.
+
+### Added
+- **Port + service** (`memory/v2/{types,ports,service}.py`): `MemoryPort`
+  (`write` / `recall` / `consolidate` / `forget`), `MemoryBackendPort`,
+  `MemoryGraphPort`. `MemoryService` serves one tenant, built by
+  `build_memory_service(settings, org_id=, ...)` and exposed as
+  `RuntimeContext.memory` by `build_runtime(org_id=, memory_backend=,
+  memory_graph=)`. Any other org's scope raises `MemoryTenancyError`, which is
+  counted and audited hash-first.
+- **Backends over the legacy stores** (`memory/v2/adapters/`):
+  - `LongTermMemoryBackend`: v2 fields go in a `memory_v2_meta` side table, and
+    v2 writes stay visible to the unchanged `LongTermMemory.recall()`.
+  - `LangGraphStoreBackend`: tenant namespaces
+    `("prismal", org, user|"_", type)`.
+  - `InMemoryBackend`.
+  - Legacy-shaped facades (destructive methods file a pending forget request)
+    and an idempotent, annotate-only `migrate_legacy_records` backfill.
+- **Decision-gated writes** (`write_gate.py`, `taint.py`):
+  - Pre-filters: PII redaction, length bounds, exact-hash dedupe ⇒ `merged`.
+  - Worth (Noul) + type (Choice) in one decision call, then a batched relation
+    Choice over `memory_relation_k` neighbours. `UPDATES` supersedes only when
+    T6 allows.
+  - Gate modes `off` / `decision` / `llm`; shadow mode; hash-first audit.
+  - Taint rules T1–T7: tainted content is stored only as an `EPISODIC` episode
+    and never supersedes or is promoted.
+- **Budgeted recall** (`recall.py`, `render.py`):
+  - View routing; multi-hop retrieval ranked by `traversal_score`; optional
+    temporal-graph neighbours with `as_of`.
+  - A sufficiency Noul and five stop reasons.
+  - A hard token cap (property-tested).
+  - TOON or compact rendering with `[untrusted]` marks. `memory_block_for_prompt`
+    renders a fenced block for the tail turn context, never the cached prefix.
+- **Sleep-time consolidation** (`consolidation.py`):
+  - Duplicate merge.
+  - Newest-wins contradiction resolution with provenance precedence
+    (human > trusted > unknown > untrusted).
+  - Episodic → semantic summaries via an injected summarizer or `BatchExecutor`.
+  - Retention rules applied through `ForgetPolicy`.
+  - A watermark, the item cap, and idempotent re-runs.
+  - `register_consolidation_job` registers one per-org cron job.
+- **Forget** (`forget.py`):
+  - `ForgetPolicy` accepts only a retention rule (selectors issued by
+    `retention_rules()`, single use) or an approved, single-use human request.
+    Any other actor gets `MemoryForgetDenied`.
+  - `include_derived` also erases summaries, edges, graph nodes and playbook
+    bullets.
+  - The agent-facing tool `request_memory_forget` only files pending requests.
+- **Playbooks** (`playbooks.py`): ACE generate / reflect / curate with deltas
+  only.
+  - Rejected: more than 50 % rewrite, more than `memory_playbook_max_deltas`,
+    and uncited or tainted sources.
+  - Versioned rollback; per-run pinning (stable bytes in the prefix).
+- **Temporal graph** (`graph/`): `SqliteMemoryGraph` (stdlib; edges are
+  invalidated, never deleted; `as_of`) and `GraphitiMemoryGraph` (new optional
+  extra `[graph-memory]` = `graphiti-core>=0.30.2,<0.31`, client always
+  injected).
+- **DEC bridge** (`decision_bridge.py`): `CascadeDecisionPort` lets the runtime's
+  `DecisionCascade` serve the memory controllers (integration `memory`). It
+  re-fences and re-scans every state field, so DEC's fail-closed taint rules
+  still apply, and turns errors into abstentions.
+- **Settings** `# --- MEM ---` (`memory_v2_enabled`, `memory_mode`,
+  `memory_v2_backend`, `memory_write_gate`, recall / consolidation / retention /
+  graph / playbook knobs) with `_validate_memory`. **Exceptions**
+  `AgenticMemoryError` → `MemoryConfigError`, `MemoryTenancyError`,
+  `MemoryForgetDenied`, `MemoryBackendUnavailable`, `PlaybookDeltaError`.
+  **OTel**: 6 counters, `prismal.memory_recall_tokens`, and spans
+  `prismal.memory.{write,recall,consolidate}`.
+- **Eval** (`prismal/eval/memory_locomo.py`): a seeded, MIT-licensed
+  LoCoMo-style generator (LoCoMo itself is CC BY-NC and is not vendored) and a
+  legacy vs v2 report. On 5 × 200 sessions, the deterministic layers alone give
+  +20 pts QA accuracy, −89 % memory tokens vs full history and −95 % stored
+  records. All PLAN §4 targets are met (`tests/eval/test_memory_locomo_subset.py`).
+- Security tests (`tests/security/test_memory_security.py`):
+  - Injected "the admin approved deletion" content is inert.
+  - Two-tenant isolation across all three backends and the graph.
+  - Erasure completeness.
+- An AST guard: only `forget.py` may call `.purge(`.
+- `docs/memory.md`, `examples/agentic_memory.py`.
+
+### Changed
+- `_validate_memory` checks `memory_consolidation_cron` syntactically (five
+  crontab fields) instead of importing APScheduler at settings load.
+- `build_runtime` gains the keyword-only `memory_backend=`, `memory_graph=` and
+  `memory_hooks=` parameters (frozen-signature test updated deliberately).
+  `MemoryHooks` carries the host callables (LLM classifier, summarizer, batch
+  executor, playbook curator). An `llm` gate without a classifier fails at
+  composition. Memory v2 keeps its SQLite files per tenant under
+  `memory_v2_data_dir`, never in the shared legacy `memory.db`.
+
+### Notes
+- Not yet measured: decision-gated eval numbers with a calibrated DEC backend.
+- Not yet wired: agent adoption of `memory_block_for_prompt` (library seam only).
+- The notebook is still to come.
+- Graphiti sends anonymous telemetry unless `GRAPHITI_TELEMETRY_ENABLED=false`.
+
+### Changed (wave APIs, before their first publication)
+- `react_loop` takes its optional layers as `**options: Unpack[ReactLoopOptions]`
+  (a `TypedDict`, type-checked by mypy at every call site). Every existing
+  keyword and the `**hardening_react_kwargs(state)` / `tool_gate_react_kwargs`
+  splats work unchanged; an unknown keyword still raises `TypeError`. The loop
+  body is split into helpers (no behaviour change).
+- A2A OAuth flows (`PkceAuthorizationCodeFlow`, `DeviceCodeFlow`,
+  `select_oauth_flow`) and `A2AClient` take `policy=EndpointPolicy(...)`
+  instead of the four flat host-policy flags, and the flows take
+  `binding=OAuthBinding(...)` instead of `vault` / `org_id` / `principal` /
+  `http_client` / `clock` / `audit`. `A2AConnectionManager` keeps its signature.
+  As before, the card's OAuth endpoints get only the client's `allowlist` /
+  `strict`, never its localhost / private-host opt-ins (regression-tested).
+
+### Security
+- Dependency refresh (2026-10-10) clearing every pip-audit finding and every
+  trivy HIGH/CRITICAL finding that has an upstream fix: `aiohttp` 3.14.4, `anyio` 4.14.2,
+  `cryptography` 50.0.0, `pyjwt` 2.15.1, `litellm` 1.96.2 (+ `langchain-litellm`
+  0.7.1, `langchain-core` 1.6.9), `urllib3` 2.8.0, `pypdf` 6.20.0,
+  `sentence-transformers` 5.6.0, `unstructured` 0.24.0, `pymongo` 4.18.2,
+  `langgraph-checkpoint-sqlite`/`-postgres` 3.1.1, `lightning` 2.6.6, plus
+  transitive and toolchain packages. Direct-dependency floors raised accordingly.
+  GW0-03 (`ChatLiteLLM` hooks) re-verified on `langchain-litellm` 0.7.1.
+- Accepted without an upstream fix (justified in `.trivyignore`, mirrored in
+  `ci.yml` and `.pre-commit-config.yaml`): `chromadb` CVE-2026-45830/45831/45833
+  (Chroma *server* RBAC / code injection; prismal uses Chroma embedded),
+  `nltk` CVE-2026-81726 and `accelerate` CVE-2026-69112 (transitive via the
+  optional `[compression]` extra; affected APIs unused).
+
 ### Fixed
 - CI (`release.yml`): the `github-release` job now retries with backoff and
   only trusts a `gh release view` "not found", instead of failing the whole
@@ -17,6 +160,464 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   incident a 503 on the asset upload made `gh release create` roll back the
   half-made release, so v3.12.0 shipped to PyPI and GHCR without a GitHub
   Release.
+
+## [3.17.0] — 2026-10-06
+
+> Phase PRT + HRS — **Protocol Upgrades 2026** and the **host read surface**,
+> the fifth milestone of wave 2026-10. A2A moves to a **v0.3 + v1.0
+> dual-stack**, MCP gains the **2026-07-28 stateless** wire, a TTL tool-list
+> cache and the **tasks extension** (in-house on `httpx`; the `mcp` SDK stays
+> pinned at 1.28.1), and a pure **AG-UI 1.0** event translator lands in
+> `prismal/events/agui.py`. A shared 12-key **usage wire** and read-only
+> `RuntimeContext` methods give hosts (prismal-server) budget, quota, audit,
+> decision and routing views. Every switch defaults off: the graph, the v0.3
+> Agent Card and the MCP request sequence equal 3.16.0 (snapshot-tested).
+> Wire names are pinned in `docs/adr/ADR-PRT-001-protocol-pins.md`; guide:
+> `docs/protocols-2026.md`.
+
+### Added
+- **A2A v1.0 dual-stack** (`prismal/a2a/`): `v1/{constants,types}.py` (PascalCase
+  methods, `TASK_STATE_*`, `Part` oneof, `supportedInterfaces[]`),
+  `negotiation.py` (`A2A-Version` header ⇒ method family ⇒ header-less 0.3;
+  unsupported ⇒ -32009), `convert.py` (v0.3 ⇄ v1 ⇄ internal codecs),
+  `build_agent_card(..., protocol_version=)`, `a2a_route_paths()`,
+  `task_store.py` (`A2ATaskStorePort`, `InMemoryA2ATaskStore`, `ListTasks`
+  paging max 100), `oauth.py` (PKCE authorization code, device code, client
+  credentials) and `A2AClient(protocol=, tenant=, local_org_id=, ...)` +
+  `list_tasks()`. `A2AServerHandler.handle_rpc/stream_rpc(headers=, org_id=)`;
+  `headers=None` keeps 3.16.0 behaviour.
+- **MCP 2026-07-28** (`prismal/mcp/`): `constants.py`, `protocol.py`
+  (`LegacySessionAdapter`, `StatelessHttpAdapter` — `_meta` + `MCP-Protocol-Version`
+  / `Mcp-Method` / `Mcp-Name` headers, pagination, multi-round-trip input —,
+  `select_adapter` / `negotiate_stateless` with a per-server memo),
+  `tool_cache.py` (`McpToolListCache`: `ttlMs`, `cacheScope`, canonical hash,
+  identity-preserving refresh, LRU), `tasks.py` (`McpTaskPoller`: backoff,
+  timeout ⇒ cancel + `McpTaskTimeout`, run cancellation ⇒ `tasks/cancel`),
+  `input_requests.py` (`InputRequestHandler`, `DeclineAllInputHandler`).
+  `MCPServerConnection` selects the adapter on connect from
+  `mcp_protocol_mode` (`legacy` default | `stateless` | `auto`);
+  `McpToolProvider(settings=, tool_cache=, org_id=, principal=)`.
+- **AG-UI 1.0 translator** (`prismal/events/agui.py`): 31 event types, Pydantic
+  models, `to_sse()`, `AgUiContext`, `start_run` / `to_agui_events` /
+  `finish_run` / `error_run` (never raise); interrupts ⇒
+  `RUN_FINISHED.outcome`, usage ⇒ `CUSTOM prismal.usage` + native
+  `RUN_FINISHED.usage[]`; 12 golden transcripts; `examples/agui_translate.py`.
+- **Usage wire.** `RunSummary.to_usage_wire()` (12 keys) and
+  `prismal.monitoring.get_run_summary(session_id, turn="last"|"all")`;
+  contract fixture `tests/fixtures/protocols/usage_wire.json`.
+- **Host read surface (HRS)** (`prismal/composition/host_surface.py`,
+  `prismal/monitoring/host_stats.py`): `RuntimeContext.budget_status()`,
+  `quota_windows()`, `audit_page()`, `verify_audit_chain()`,
+  `decisions_report()`, `routing_report()`, `a2a_routes()` (route ⇔ card
+  contract), `bind_org()` (tenant attribution for the stats recorders) — fail-open, frozen view types re-exported from
+  `prismal.composition`; in-process 1-minute stats recorders fed by an
+  `OTelManager.increment_counter` tap; `build_runtime(config_source=)` builds a
+  per-runtime `Settings` without touching the global source or `os.environ`.
+- **Settings** (`# --- PRT ---`): `a2a_protocol_version`, `a2a_accept_legacy`,
+  `a2a_tasks_list_max_page_size`, `a2a_inbound_auth_schemes`,
+  `a2a_oauth_redirect_uri`, `mcp_protocol_mode`, `mcp_stateless_protocol_version`,
+  `mcp_tool_cache_*`, `mcp_tasks_enabled`, `mcp_task_poll_*`,
+  `mcp_task_timeout_s`, `agui_events_enabled`, `agui_include_*`,
+  `host_surface_stats_retention_h`; `_validate_protocol_upgrades`.
+- **Exceptions**: `ProtocolUpgradeError`, `A2AVersionError`, `A2AOAuthError`,
+  `McpProtocolError`, `McpDiscoveryError`, `McpTaskError`, `McpTaskTimeout`,
+  `AgUiTranslationError`.
+- **Metrics**: `prismal.a2a_requests_total`, `a2a_oauth_tokens_total`,
+  `mcp_protocol_negotiations_total`, `mcp_tool_cache_{hits,misses}_total`,
+  `mcp_tool_list_changes_total`, `mcp_tasks_total`, `mcp_input_requests_total`,
+  `agui_events_total`, `agui_translation_errors_total`,
+  `host_surface_errors_total`, histogram `mcp_task_wait_s`.
+- **Interop** (opt-in `interop` marker, `PRISMAL_INTEROP=1`): AG-UI 1.0 schema
+  over the golden transcripts, `a2a-tck`, `@modelcontextprotocol/conformance`.
+
+### Security
+- A2A: a `SendMessage` reusing a task id owned by another org or principal
+  answers TaskNotFound (v1 -32001, v0.3 -32004) and is audited
+  (`a2a.inbound.tenant_mismatch`); ownership is reserved under a lock before
+  the graph runs and scoped runs use a per-owner graph thread id, so records are
+  never overwritten across tenants.
+- A2A OAuth: refresh tokens are keyed by token-endpoint origin + agent URL in
+  the **local** org's vault partition (never a remote-card name or tenant),
+  bound to their `token_url`; endpoints must be `https`, literal private /
+  loopback / link-local IPs are rejected, and `a2a_strict` requires the
+  outbound allowlist.
+- MCP: a task result is accepted only when the client declared the tasks
+  extension (else cancelled + `McpTaskError`); stateless mode declines
+  sampling / roots; elicitations default to decline + hash audit.
+
+### Changed
+- `prismal/mcp/connection.py` opens streamable-HTTP with
+  `streamable_http_client(http_client=...)` (the deprecated
+  `streamablehttp_client` wrapper is gone; same client configuration).
+
+### Known limits
+- No component emits the AG-UI `subagent` custom payload yet, so Skynet / MoA
+  runs show `STEP_*` but no `SUBAGENT_*` events.
+- OAuth endpoint checks do not resolve DNS: outside `a2a_strict` with no
+  allowlist, a hostname resolving to an internal address is not caught.
+- The `mcp` 2.x SDK migration and gRPC / HTTP+JSON A2A bindings are out of scope.
+
+## [3.16.0] — 2026-10-06
+
+> Phase AMR — **Adaptive Model Routing**, the fourth phase of wave 2026-10.
+> A `RoutingPolicyPort` picks the model **string** per agent call (ADR-WAVE-001
+> step 1) — static tier map, budget-aware downgrade, cheapest-first cascade with
+> typed adequacy checks — plus an OmniRouter-style batch assigner for fan-outs,
+> an intent-keyed plan cache, an exact response cache and a provider
+> `BatchExecutor`. Prismal picks *which model*; gateways pick *which provider*.
+> Everything is gated by `adaptive_routing_enabled` (default `False`) and starts
+> in `shadow`; with it off, `get_llm()` builds the 3.15.0 `ChatLiteLLM`
+> arguments and the supervisor graph is unchanged (contract + snapshot tests).
+> Guide: `docs/routing.md` (AMR0 verified facts in its `#verified-facts` section).
+
+### Added
+- **Types and ports.** `prismal/routing/types.py` (`ModelTier`, `TIER_ORDER` —
+  `auto` is terminal —, `TaskFeatures`, `ModelChoice`, `RoutingOutcome`) and
+  `routing/ports.py` (`RoutingPolicyPort`, `SuccessPredictorPort`).
+- **Policies** (`routing/policies/`): `StaticTierPolicy` + `load_tier_models`
+  with the shipped **parity map** `config/routing_tiers.yaml` (all tiers
+  `null` ⇒ `default_model`, so 26+ agents keep their 3.15.0 model);
+  `BudgetAwarePolicy` (one-tier downgrade on the soft cap, never below the risk
+  floor, never on a tainted turn; hard caps untouched); `CascadePolicy` +
+  `AdequacyChecker` (start tier, capability filter, escalation on structured
+  failure / inadequate answer / tool errors / high-risk abstention, cap 2;
+  adequacy is a DEC Noul over a `DecisionStateBuilder` state);
+  `CompositePolicy` (`BudgetAware(Cascade(Static))`, inward fallback,
+  first-escalation-wins).
+- **Per-run selection** (`routing/select.py`, `routing/features.py`):
+  deterministic LLM-free features (intent, token estimate, agent risk map,
+  language, turn taint), seeding trio mirroring `budget/resolve.py`, same-turn
+  stickiness + cross-turn **escalation affinity** (no re-descent), fail-open
+  policies (`fallback:<err>`), fail-closed **security floors** (risk floor,
+  no `auto` for critical, tainted never below static), `shadow` mode,
+  `prismal.routing_savings_usd` vs a frontier counterfactual.
+- **Registry.** `ProviderRegistry.get_llm` / `get_llm_with_fallback` gain
+  keyword-only `features=` / `state=` (ADR-WAVE-001 §2.1): explicit `model=`
+  wins; under a cascade a `gw:` call carries no gateway `models[]` and no
+  `settings.fallback_model` (SPEC-AMR-GW-001). The shared registry contract
+  test gained the AMR flag-off, parity, shadow and fail-open cases.
+- **Agents.** `coder`, `researcher`, `data_analyst`, `file_manager`,
+  `cron_manager`, `critic` adopt `llm_route_kwargs()` + `track_outcome()`
+  (`routing/outcome.py`; `react_loop` notes failed tool calls); `rag_agent`,
+  `planner`, `parallel_researcher`, `codeact` adopt the model choice only. All
+  calls are byte-identical with routing off.
+- **Batch assignment** (`routing/policies/batch_assignment.py`,
+  `routing/predictor.py`): `TableSuccessPredictor` (Beta-Binomial per
+  (intent, tier), served-model attribution, output-length table,
+  `load_predictor_table`, `export_predictor_table`, cold-start
+  `config/routing_predictor/v1.json`); `BatchAssignmentPolicy.assign()` —
+  Lagrangian dual with primal recovery, greedy fallback, max-accuracy
+  `feasible=False` path, waves, eligibility masks; deterministic, never raises
+  (N=200, K=8 p95 ≈ 40 ms). `routing/fanout.py` wires it into **Skynet**
+  (`SkynetSupervisor(batch_policy=)`, `order.context["routing_model"]`) and
+  **MoA** (proposers assigned, aggregator static).
+- **Plan cache and response cache** (`routing/plan_cache.py`,
+  `routing/response_cache.py`): canonical intent keys with tenant, tool-scope
+  hash and prompt version; memory LRU and SQLite backends; read-only intent
+  allowlist, no write/exec tools, untainted input; small-tier adaptation via
+  `SecurePromptBuilder` + Kahn DAG re-validation; `LLMCompiler(plan_cache=)`.
+- **BatchExecutor** (`routing/batch.py`, `providers/batch_adapters.py`):
+  Anthropic Message Batches and OpenRouter `:batch` (raw `httpx`), OpenAI
+  Batch (LiteLLM); capped exponential backoff with jitter, deadline, sync
+  fallback; tainted / HITL-gated / data-policy-rejected requests never
+  uploaded. `compute_cost_usd(..., batch=True)` applies `batch_price_ratio`
+  (ADR-WAVE-001 §2.3).
+- **Eval.** `python -m prismal.eval run --routing <policy>` and
+  `routing-gate --static --routed` (−40 % cost / ≤ 1 pt quality target;
+  `prismal/eval/metrics_routing.py`).
+- **Settings** (`core/config.py`, `# --- AMR ---`): `adaptive_routing_enabled`,
+  `routing_*`, `plan_cache_*`, `response_cache_enabled`, `batch_*`,
+  `batch_price_ratio`; `_validate_routing` (refuses to start without a
+  `critical` floor when enabled). Exceptions: `RoutingError`,
+  `RoutingConfigError`, `BatchAssignmentError`, `PlanCacheError`,
+  `BatchExecutorError`. OTel: `prismal.routing_decisions_total`,
+  `routing_escalations_total`, `plan_cache_hits_total` / `misses_total`,
+  `batch_jobs_total`, `routing_savings_usd`; span `prismal.routing.select`.
+- Docs `docs/routing.md`, example `examples/adaptive_routing.py`.
+
+### Security
+- An independent review before release found and fixed (each with a regression
+  test): floors skipped for same-turn sticky choices; a shared process-wide
+  bucket for session-less calls; fan-outs ignoring taint, the YAML floor and
+  gateway data policy; `metadata.routing` hints able to lower risk and forged
+  affinity accepted; the settings floor default silently overriding a stricter
+  YAML floor; OpenRouter batch bodies without privacy defaults; API keys sent
+  to provider-returned `results_url` hosts; routing newly activating the
+  gateway agent map in shadow; transport errors escalating the tier; cascade
+  features colliding across agents; double billing when batch results fail;
+  plans cached before execution and shared across users of one org.
+
+### Notes
+- AMR0 changed two spec assumptions: LiteLLM 1.86.2 cannot create Anthropic
+  batches (raw `httpx` adapter instead) and arXiv 2602.18922 reports APC
+  *cache accuracy* 0–12 %, not a semantic-cache hit rate.
+- Open: the eval-gate measurement on a real eval set and the notebook.
+
+## [3.15.0] — 2026-10-05
+
+> Phase DEC — **Typed Decision Models**, the third phase of wave 2026-10.
+> Closed questions (Choice / Score / Noul) are answered by a cascade of typed
+> decision models — a deterministic rule hook, **Laya** (local, Apache-2.0) and
+> **Jev** (TypeSafe API, OpenRouter or `laya-serve`) — before falling back to
+> today's LLM path. A decision *proposes*; deterministic code *authorizes*.
+> Everything is gated by `decisions_enabled` (default `False`) plus one flag
+> per integration, and every integration starts in `shadow`. With it off, the
+> compiled supervisor graph and node outputs are identical to 3.14.0 (graph
+> snapshot test). Guide: `docs/decisions.md` (verified vendor facts in its
+> `#verified-facts` section).
+
+### Added
+- **Types and port.** `prismal/decisions/`:
+  - `types.py`: `QuestionSpec` (+ `schema_hash`), `Decision` (calibrated
+    `answer_confidence`; vendor confidence kept only as `spread_confidence`),
+    `GatePolicy` (τ low .85 / medium .90 / high .97 / critical never; raise-only overrides).
+  - `ports.py`: `DecisionPort` plus `guarded_decide` (never raises: errors,
+    timeouts and over-limit input become abstentions).
+  - `state.py`: `DecisionStateBuilder` — the decision analogue of
+    `SecurePromptBuilder`: sanitized, fenced, labelled untrusted fields; EN/ES
+    authority-claim and injection flags taint the state.
+  - `validation.py`: registration-time lint for forbidden uses (counting,
+    arithmetic, dates; EN/ES) and `FORBIDDEN_DECISION_USES`.
+  - `gate.py`: `evaluate_gate` and a derangement option shuffle against
+    first-option bias.
+- **Cascade** (`cascade.py`): rule → laya → jev → llm, one shared non-LLM
+  time budget, calibration application, taint corroboration, per-language
+  gating, hash-only `decision.made` audit records, OTel metrics.
+- **Backends** (`decisions/adapters/`): Jev-compatible `/systemone` HTTP
+  (TypeSafe, OpenRouter, laya-serve incl. `/systemone/batch`; model-mismatch
+  abstention; usage metered in `CostMeter` with `cost_source="decision"`),
+  in-process Laya (deferred import, `to_thread`, fp16 warning), Jev SDK shim,
+  LLM fallback (structured output through `SecurePromptBuilder`), fake. New
+  extras `[laya]` and `[jev]`.
+- **Calibration** (`calibration.py`): temperature scaling (Laya) / isotonic
+  map (Jev), ECE, τ fitting, model-pinned `CalibrationStore`. `enforce`
+  without a valid record (or with ECE above `decision_max_ece`) refuses to
+  start. A Spanish slice must pass on its own before `es` traffic enforces.
+- **Shadow mode** (`shadow.py`): `ShadowRunner`, `AgreementReport`,
+  `promotion_ready`, drift auto-demotion to shadow.
+- **Integrations**:
+  - Wired in-graph: supervisor routing after `match_intent()` (DEC-ROUTE),
+    CRAG per-chunk relevance (DEC-RAG), and an escalate-only guardrail
+    pre-screen through `security/decision_bridge.py` (DEC-SAFE).
+  - Library functions: the eval-judge cascade (DEC-EVAL; never for
+    math/code/logic rubrics; 5 % LLM audit), HITL bands (irreversible or
+    critical actions always go to a human), tool proposal, a compaction
+    relevance scorer, and a Skynet text scorer.
+- **Composition**: `build_runtime(..., decision_vault=)` → `RuntimeContext.decisions`
+  (tenant keys `jev_api_key@<org_id>`); `use_decision_runtime()` binds it per
+  request in `context` mode.
+- **CLI**: `python -m prismal.decisions calibrate` (labeled JSONL → calibration
+  file) and `bench` (live, opt-in latency / cost).
+- Settings block `# --- DEC ---` + `_validate_decisions`; `Decision*`
+  exceptions; `_register_dec_metrics()`; example `examples/typed_decisions.py`.
+
+### Security
+- EN/ES injection corpus (seeded with Octomind's "pre-approved" attack)
+  asserts zero forbidden transitions against a fully manipulated backend. Also
+  covered: option-order shuffle, forbidden-use AST and behaviour tests, and a
+  secret-leak test.
+- An independent review found these, all fixed with regression tests:
+  - The terminal LLM tier ignored taint.
+  - HITL could `auto`-approve on an LLM verdict.
+  - Nested fence markers could escape the fence.
+  - `context` mode silently built an unaudited global runtime.
+  - Shadow recording was quadratic.
+  - Non-finite probabilities or calibration values were accepted.
+  - Unsafe MCP tool names were accepted.
+
+## [3.14.0] — 2026-10-05
+
+> Phase GW — **LLM Gateway Providers**, the second phase of wave 2026-10.
+> Agents can route through OpenRouter, OpenCode Zen/Go, OmniRoute or any
+> OpenAI-compatible gateway. LiteLLM stays the only transport. Everything is
+> gated by `llm_gateways_enabled` (default `False`) plus one `*_enabled` flag
+> per gateway. With it off, the compiled supervisor graph and the kwargs of
+> every `ProviderRegistry.get_llm()` call are identical to 3.13.0 (graph
+> snapshot test plus the shared registry contract test
+> `tests/unit/providers/test_registry_contract.py`, created here as ADR-WAVE-001
+> requires). Guide: `docs/gateways.md`. Verified vendor facts:
+> `specs/llm-gateway-providers/VERIFY.md`.
+
+### Added
+- **Gateway port and router.** `prismal/providers/gateways/`:
+  - `base.py` / `policy.py`: value objects, `GatewayPort`, `gw:` reference grammar.
+  - `openai_compatible.py`: the generic adapter, shared by the others.
+  - `router.py`: `GatewayRouter`, `build_gateway_router`, and
+    `get/set/use_gateway_router` (ContextVar first, then the process global).
+- **`GatewayChatLiteLLM`** (`chat_model.py`). The innermost model in the
+  ADR-WAVE-001 stack. It captures served model, generation id, billed cost and
+  cost mode into `response_metadata["prismal_gateway"]`, for sync, async and
+  streaming calls. It maps HTTP 402 to a non-retryable `GatewayPaymentRequired`,
+  runs the quota preflight before any network call, and hides the key in
+  `repr`.
+- **Registry.** `ProviderRegistry(gateway_router=)` and
+  `get_llm(..., session_id=)`. **No double fallback**: a gateway that owns
+  model fallback returns the primary unwrapped with `max_retries=0`, and a
+  same-gateway fallback never retries 402 or policy errors.
+- **OpenRouter** (`openrouter.py`):
+  - Attribution headers.
+  - Privacy defaults `provider.data_collection="deny"` and `provider.zdr=true`.
+  - `require_parameters` when tools are bound.
+  - A hashed sticky `session_id`.
+  - Gateway-owned `models[]` fallback.
+  - Variant allow-list and a gated `openrouter/auto` (`auto-router` plugin).
+  - A plugin allow-list.
+  - `/api/v1/key` quotas and `/api/v1/generation` stats.
+- **OpenCode Zen/Go** (`opencode.py`, `config/opencode_models.yaml`):
+  - A per-model wire-protocol map (`openai/`, `anthropic/`, `openai/responses/`).
+  - `User-Agent` and a hashed `x-opencode-session`.
+  - The Go coding-agent ToS guard and a retention deny-list.
+  - Go meters as `subscription`, with a downgrade target.
+  - `refresh_protocols()` from `/v1/models`.
+- **QuotaLedger** (`quota.py`). Go 5 h / weekly / monthly windows and the
+  OpenRouter `:free` daily request window, scoped per `(org, gateway)`, with a
+  fake-clock-testable store.
+- **OmniRoute** (`omniroute.py`). A fail-closed startup gate (mandatory key,
+  upstream attestation, version floor), a combo deny-list, and a warning for a
+  public plain-HTTP base URL. `resolve()` refuses until the gate passes.
+- **Cost.**
+  - `compute_cost_usd(..., cost_mode=)`: `"subscription"` returns
+    `cost_usd=0` and `CostEstimate.equivalent_usd`.
+  - `CostMeter` reads gateway metadata and tags OTel with `gateway` /
+    `served_model`. It records ledger usage and schedules reconciliation.
+  - `Usage` gains `equivalent_usd`, `gateway` and `served_model`;
+    `RunSummary` gains the same three.
+  - `budget/usage.py::extract_gateway_meta`.
+  - `BudgetGuard.degradation()` returns `reduce` with
+    `reason="gateway_quota:<window>"` after a quota downgrade.
+- **Reconciliation and quotas.** `CostReconciler` (bounded, alert-only drift
+  histogram) and `GatewayQuotaPoller` (`gateway_quota_remaining` gauge).
+- **Composition.**
+  - `build_runtime(..., gateway_vault=)` composes `RuntimeContext.gateways`.
+  - Tenant keys are `<auth_ref>@<org_id>`, with no global fallback unless
+    `llm_gateway_tenant_key_fallback`.
+  - Startup gates run before first use; a failing or crashing gate disables the
+    gateway.
+  - Reconciler and poller lifecycles are managed.
+- **Settings**: the GW block in `core/config.py` with `_validate_llm_gateways`.
+  **Exceptions**: the `GatewayError` tree. **Metrics**: the six
+  `prismal.gateway_*` metrics (`OTelManager.set_gauge` is new).
+- Examples: `examples/gateways_{openrouter,opencode,omniroute}.py` (offline).
+  Opt-in live smoke tests: `tests/live/test_gateways_live.py` (`live_api`).
+
+### Changed
+These facts changed at GW0 verification (`VERIFY.md`):
+- **OmniRoute floor.** CVE-2026-88062 affects OmniRoute ≤ 3.8.50 with no named
+  patch, so the default `omniroute_min_version` is `3.8.51`, not 3.8.49.
+  OmniRoute documents no version endpoint, so `omniroute_declared_version` is
+  new.
+- **OpenCode deny-list.** DeepSeek ZDR on OpenCode ended on 2026-08-31, so
+  `deepseek-v4-flash*` joins the default `opencode_denied_models`.
+
+### Known gaps
+- The prisma-notebooks notebook (GW6-07) lives in another repository and is
+  not part of this change.
+- `config/opencode_models.yaml` is illustrative. Refresh it, or edit it, before
+  production use.
+
+## [3.13.0] — 2026-10-05
+
+> Phase TKE — **Token Efficiency**, the first phase of wave 2026-10
+> (`specs/wave-2026-10-implementation-plan.md`). It measures first and then
+> cuts tokens without changing agent behaviour. Everything is gated by
+> `token_efficiency_enabled` (default `False`), and every sub-flag takes
+> effect only with that master flag on. With it off, the compiled supervisor
+> graph, `get_tools_for_agent()`, `SecurePromptBuilder.build()`, the
+> `ChatLiteLLM` construction and the metered `Usage` numbers are identical to
+> v3.12.0 (snapshot + disabled-contract tests). LLM construction follows
+> `docs/adr/ADR-WAVE-001-llm-construction-contract.md`. Provider facts were
+> verified in `specs/token-efficiency/VERIFY.md`.
+
+### Added
+- **Cache-aware accounting (TKE1).**
+  - `TokenCounts`/`Usage` gain `cache_read_tokens`, `cache_write_tokens`,
+    `reasoning_tokens` and `cost_source`, plus `cache_hit_ratio` and
+    `uncached_prompt_tokens`.
+  - `extract_token_usage()` reads the LangChain token details and raw
+    provider shapes.
+  - `compute_cost_usd(..., cache_read_tokens=, cache_write_tokens=,
+    reported_cost_usd=, response=)` uses gateway → LiteLLM (cache-aware) →
+    table → none precedence.
+  - `CostMeter.record_response(..., reported_cost_usd=)` adds kind-split
+    `prismal.llm_input_tokens_total` and `prismal.llm_reasoning_tokens_total`
+    counters and a `prismal.llm_cache_hit_ratio` histogram.
+  - `RunSummary` gains cache fields.
+  - `eval/metrics_tokens.py`: `TokenReport`, baseline save/load and
+    `check_token_regression`. The token report appears in every scorecard.
+  - New CLI options: `python -m prismal.eval token-gate` and
+    `run --write-token-baseline`.
+- **Prompt caching (TKE2).** `providers/prompt_cache.py` provides
+  `detect_cache_family`, `CachePolicy` (`config/prompt_cache.yaml`),
+  `apply_cache_policy` and `CacheAwareChatModel`.
+  - Anthropic: `cache_control` on the last tool, the system prompt and the
+    last stable message.
+  - OpenAI: `prompt_cache_key`.
+  - Tools are bound sorted by name and serialized with `stable_dumps`.
+  - `ProviderRegistry.get_llm(..., agent=)` and
+    `get_llm_with_fallback(..., agent=)` gain the `agent` argument.
+  - `utils/stable_json.py`.
+- **Cache-stable prompt layout (TKE2).** `SecurePromptBuilder(layout=...)` adds
+  `PromptLayout.CACHE_STABLE`, `TurnContext`, an HMAC `prefix_canary()`,
+  `detect_leak()` and `canaries`. `GuardrailsEngine.validate_output(canary=)`
+  now accepts several canaries. Leak-detection recall on the red-team corpus
+  is the same for both layouts. The supervisor moves recalled memory to the
+  tail turn context.
+- **Cache-safe tool exposure (TKE3, delta to LH2).**
+  - `agents/tool_gate.py` and `CompositeToolProvider(tool_gating_mode="mask")`
+    with `allowed_tool_names()`.
+  - The allow-set is enforced in `react_loop(tool_allow_set=, tool_phase=)` and
+    `ActionInterceptor.set_tool_allow_set()`.
+  - `tool_gate_react_kwargs()` fails closed.
+  - `build_default_tool_provider(settings)` wires the LH phase map and the
+    gating mode when `tool_gating_enabled` is on.
+  - `agents/tool_search.py`: BM25 `ToolSearchIndex`, `search_tools`,
+    append-only `DeferredToolSet`, `plan_deferred_tools`, and native
+    `defer_loading` for the Anthropic family.
+  - `react_loop(deferred_tools=, rebind_llm=)`.
+- **Observation masking + artifact store (TKE4, delta to LH1).**
+  - `agents/artifacts.py`: in-memory and SQLite `ArtifactStorePort` scoped to
+    tenant and run, with TTL and a `read_artifact` tool.
+  - `CompactionStrategy.MASK_OBSERVATIONS`: stubs keep the same id and
+    tool_call_id, and the payload is stored before masking.
+  - Optional `relevance_fn`, and high/low-water hysteresis.
+- **Tool-output budgets + TOON (TKE5).** `agents/tool_output_budget.py`
+  produces a head+tail excerpt plus an artifact ref. It is applied in
+  `react_loop` (replacing the 4 000-char cap when enabled) and in the new
+  `tool_output_budget_middleware`, which runs just outside the hardening
+  middleware. `utils/toon.py`, `utils/token_estimate.py`.
+- **Effort per role (TKE6).** `llm_effort_by_agent`, `llm_max_tokens_by_agent`
+  and the `recommended` profile. `reasoning_effort` is sent only to
+  reasoning-capable models.
+- **Handoff envelopes (TKE7).** `agents/handoff.py`: `HandoffEnvelope`,
+  `build_envelope`, `maybe_envelope` and a per-run artifact store
+  (`get_run_artifact_store` / `clear_run_artifact_store`). Wired into Skynet
+  (`WorkerResult.envelope`; reducer and evaluator read summaries), MoA
+  (`MoAResult.proposer_envelopes`), Kokoro (judge reads summaries), BRP,
+  `parallel_research` and the spawner (`get_envelope`). For BRP and the spawner
+  the envelope is attached but nothing reads it yet, so they save no tokens.
+- **RAG context budget (TKE8).**
+  - `rag/context_budget.py`, `providers/rerank.py` (cross-encoder) and
+    `providers/compression.py` (LLMLingua-2), with new extras `[rerank]` and
+    `[compression]`.
+  - Wired into `RAGEngine`, CRAG, HyDE and Hybrid.
+- Settings: the TKE block in `core/config.py` with `_validate_token_efficiency`.
+  `context_compaction_strategy` now accepts `mask_observations`.
+- Exceptions: `TokenEfficiencyError` hierarchy (`ArtifactNotFound`,
+  `MaskedToolCallError`, …).
+- Metrics: 15 counters and 2 histograms (`SPEC-TKE-OTEL-001`).
+- Docs and examples: `docs/token-efficiency.md`, `examples/token_efficiency.py`,
+  ADR-WAVE-001.
+
+### Fixed
+- `tests/unit/agents/conftest.py` no longer replaces a real, installed
+  `langchain_litellm` with a `MagicMock`. The stub leaked into later test
+  modules depending on run order.
+
+### Known gaps
+- The committed token baseline (TKE1-08) and the eval A/B run (TKE9-04) are
+  pending. Trajectories capture 0 tokens for internal LLM calls, so a live run
+  and/or meter-based capture is needed before the CI token gate can block.
+- TKE10 (code mode for MCP chains, optional P3) is deferred.
 
 ## [3.12.0] — 2026-07-12
 

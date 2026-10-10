@@ -136,6 +136,9 @@ class BudgetGuard:
             return Degradation(terminate=True, reason=f"hard cap on {status.breached_dimension}")
         if status.soft_exceeded:
             return Degradation(reduce=True, reason=f"soft cap on {status.breached_dimension}")
+        window = getattr(self.meter, "gateway_degradation", None)
+        if window:  # Phase GW: a gateway quota forced a model downgrade (GW5-05)
+            return Degradation(reduce=True, reason=f"gateway_quota:{window}")
         return Degradation()
 
     # ── internals ─────────────────────────────────────────────────────────────

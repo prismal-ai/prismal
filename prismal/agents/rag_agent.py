@@ -19,6 +19,7 @@ from prismal.budget.resolve import get_budget_guard
 from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
+from prismal.routing.outcome import llm_route_kwargs
 from prismal.security.hardening_run import hardening_react_kwargs
 
 if TYPE_CHECKING:
@@ -233,7 +234,7 @@ async def rag_agent_node(state: AgentState) -> dict[str, object]:
     logger.debug("rag_agent_node_called", session_id=session_id)
 
     registry = ProviderRegistry()
-    llm = registry.get_llm_with_fallback()
+    llm = registry.get_llm_with_fallback(**llm_route_kwargs("rag_agent", state))
     critique_llm = registry.get_llm_with_fallback()
     tools = get_tools_for_agent("rag_agent")
     llm_with_tools = llm.bind_tools(tools)

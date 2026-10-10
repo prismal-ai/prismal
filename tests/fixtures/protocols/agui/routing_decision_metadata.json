@@ -1,0 +1,140 @@
+{
+  "name": "routing_decision_metadata",
+  "description": "metadata.routing / metadata.decision changes ⇒ CUSTOM prismal.routing / prismal.decision.",
+  "context": {
+    "run_id": "run-1",
+    "thread_id": "thread-1"
+  },
+  "initial_state": {
+    "next_agent": null
+  },
+  "input": [
+    [
+      "updates",
+      {
+        "supervisor": {
+          "next_agent": "coder",
+          "metadata": {
+            "routing": {
+              "tier": "fast",
+              "model": "gpt-mini"
+            },
+            "decision": {
+              "question": "route",
+              "label": "coder",
+              "tier": "rule"
+            }
+          }
+        }
+      }
+    ],
+    [
+      "updates",
+      {
+        "coder": {
+          "metadata": {
+            "routing": {
+              "tier": "fast",
+              "model": "gpt-mini"
+            },
+            "decision": {
+              "question": "route",
+              "label": "END",
+              "tier": "laya"
+            }
+          }
+        }
+      }
+    ]
+  ],
+  "end": {
+    "kind": "finish",
+    "result": null
+  },
+  "summary_usage_wire": null,
+  "expected": [
+    {
+      "type": "RUN_STARTED",
+      "timestamp": 1760000000000,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "protocolVersion": "1.0"
+    },
+    {
+      "type": "STATE_SNAPSHOT",
+      "timestamp": 1760000000001,
+      "snapshot": {
+        "next_agent": null
+      }
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000002,
+      "stepName": "supervisor"
+    },
+    {
+      "type": "STATE_DELTA",
+      "timestamp": 1760000000003,
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/next_agent",
+          "value": "coder"
+        }
+      ]
+    },
+    {
+      "type": "CUSTOM",
+      "timestamp": 1760000000004,
+      "name": "prismal.routing",
+      "value": {
+        "tier": "fast",
+        "model": "gpt-mini"
+      }
+    },
+    {
+      "type": "CUSTOM",
+      "timestamp": 1760000000005,
+      "name": "prismal.decision",
+      "value": {
+        "question": "route",
+        "label": "coder",
+        "tier": "rule"
+      }
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000006,
+      "stepName": "supervisor"
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000007,
+      "stepName": "coder"
+    },
+    {
+      "type": "CUSTOM",
+      "timestamp": 1760000000008,
+      "name": "prismal.decision",
+      "value": {
+        "question": "route",
+        "label": "END",
+        "tier": "laya"
+      }
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000009,
+      "stepName": "coder"
+    },
+    {
+      "type": "RUN_FINISHED",
+      "timestamp": 1760000000010,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "outcome": {
+        "type": "success"
+      }
+    }
+  ]
+}

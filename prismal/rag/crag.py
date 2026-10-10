@@ -36,6 +36,7 @@ from prismal.core.exceptions import RAGError
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
 from prismal.providers.registry import ProviderRegistry
+from prismal.rag.context_budget import apply_context_budget, context_budget_active, effective_k
 from prismal.security.prompt_builder import SecurePromptBuilder
 
 if TYPE_CHECKING:
@@ -141,7 +142,9 @@ class CRAGPipeline:
 
         # ── Step 1: RETRIEVE ──────────────────────────────────────────────────
         with otel.start_span("crag.retrieve") as retrieve_span:
-            raw_results: list[tuple[Document, float]] = self._store.similarity_search(query, k=5)
+            raw_results: list[tuple[Document, float]] = self._store.similarity_search(
+                query, k=effective_k(5, self._settings)
+            )
             retrieve_span.set_attribute("prismal.query_len", len(query))
             retrieve_span.set_attribute("prismal.retrieved_count", len(raw_results))
             logger.info(
@@ -149,20 +152,47 @@ class CRAGPipeline:
                 retrieved_count=len(raw_results),
             )
 
+        candidates = [
+            RetrievedChunk(
+                source=doc.metadata.get("source", "unknown"),
+                chunk_id=doc.metadata.get("chunk_id", str(i)),
+                relevance_score=similarity_score,
+                content=doc.page_content,
+            )
+            for i, (doc, similarity_score) in enumerate(raw_results)
+        ]
+        # Phase TKE (SPEC-TKE-RAG-001): narrow the over-fetched candidates to
+        # the context budget *before* grading, so only budgeted passages cost
+        # a grading call and reach the generator.
+        if context_budget_active(self._settings):
+            candidates = apply_context_budget(query, candidates, self._settings)
+
         # ── Step 2: GRADE ─────────────────────────────────────────────────────
         graded: list[RetrievedChunk] = []
+        # Typed decisions (Phase DEC — DEC-RAG): accepted per-chunk relevance
+        # verdicts skip the LLM grader for that chunk only; off ⇒ no-op.
+        from prismal.decisions.integrations.rag import maybe_grade_candidates
+
+        decided = await maybe_grade_candidates(
+            query, [c.content for c in candidates], self._settings
+        )
         with otel.start_span("crag.grade") as grade_span:
-            for i, (doc, similarity_score) in enumerate(raw_results):
-                score = await self._grade_document(
-                    query=query,
-                    content=doc.page_content,
-                    fallback_score=similarity_score,
-                )
+            for index, candidate in enumerate(candidates):
+                pre_graded = decided.score(index)
+                if pre_graded is not None:
+                    score = pre_graded
+                else:
+                    score = await self._grade_document(
+                        query=query,
+                        content=candidate.content,
+                        fallback_score=candidate.relevance_score,
+                    )
+                    decided.record(index, score >= _RELEVANCE_THRESHOLD)
                 chunk = RetrievedChunk(
-                    source=doc.metadata.get("source", "unknown"),
-                    chunk_id=doc.metadata.get("chunk_id", str(i)),
+                    source=candidate.source,
+                    chunk_id=candidate.chunk_id,
                     relevance_score=score,
-                    content=doc.page_content,
+                    content=candidate.content,
                 )
                 graded.append(chunk)
                 logger.info(

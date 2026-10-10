@@ -11,5 +11,6 @@ outside this package. Always use the abstractions here.
 
 from prismal.monitoring.langfuse_client import LangfuseManager
 from prismal.monitoring.otel import OTelManager
+from prismal.monitoring.run_summary import get_run_summary
 
-__all__ = ["LangfuseManager", "OTelManager"]
+__all__ = ["LangfuseManager", "OTelManager", "get_run_summary"]

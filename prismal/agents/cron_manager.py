@@ -17,6 +17,7 @@ from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
+from prismal.routing.outcome import llm_route_kwargs, track_outcome
 from prismal.security.hardening_run import hardening_react_kwargs
 
 if TYPE_CHECKING:
@@ -174,22 +175,26 @@ async def cron_manager_node(state: AgentState) -> dict[str, object]:
     logger.debug("cron_manager_node_called", session_id=session_id)
 
     registry = ProviderRegistry()
-    llm = registry.get_llm_with_fallback()
+    llm = registry.get_llm_with_fallback(**llm_route_kwargs("cron_manager", state))
     active_tools = get_tools_for_agent("cron_manager")
     llm_with_tools = llm.bind_tools(active_tools)
 
     system: list[BaseMessage] = [SystemMessage(content=_SYSTEM_PROMPT)]
     messages = list(state["messages"])
 
-    response = await react_loop(
-        llm_with_tools,
-        active_tools,
-        system + messages,
-        agent_name="cron_manager",
-        max_iterations=3,
-        session_id=str(session_id) if session_id else None,
-        budget_guard=get_budget_guard(state),
-        **hardening_react_kwargs(state),
+    response = await track_outcome(
+        state,
+        "cron_manager",
+        react_loop(
+            llm_with_tools,
+            active_tools,
+            system + messages,
+            agent_name="cron_manager",
+            max_iterations=3,
+            session_id=str(session_id) if session_id else None,
+            budget_guard=get_budget_guard(state),
+            **hardening_react_kwargs(state),
+        ),
     )
 
     logger.info("cron_manager_complete", session_id=session_id)

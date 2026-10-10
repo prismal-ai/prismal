@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import psutil
 from pydantic import BaseModel, Field, model_validator
@@ -27,6 +27,13 @@ from mcp.client.sse import sse_client
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from prismal.core.exceptions import MCPConnectionError, MCPToolError
 from prismal.core.logging import get_logger
+
+if TYPE_CHECKING:
+    import httpx
+
+    from prismal.core.config import Settings
+    from prismal.mcp.input_requests import InputRequestHandler
+    from prismal.mcp.protocol import ProtocolModeMemo, StatelessHttpAdapter, ToolListPage
 
 
 def resolve_secret(name: str) -> str:
@@ -266,13 +273,41 @@ class MCPServerConnection:
         await conn.disconnect()
     """
 
-    def __init__(self, config: MCPServerConfig) -> None:
+    def __init__(
+        self,
+        config: MCPServerConfig,
+        *,
+        settings: Settings | None = None,
+        input_handler: InputRequestHandler | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
+        metrics: Any = None,
+        memo: ProtocolModeMemo | None = None,
+        org_id: str | None = None,
+    ) -> None:
         """Initialise the connection with the given server config.
 
         Args:
             config: Validated ``MCPServerConfig`` for this server.
+            settings: Settings to read the Phase PRT ``mcp_*`` flags from (``None`` ⇒
+                ``get_settings()``). ``mcp_protocol_mode="legacy"`` (default) keeps today's
+                SDK session path byte-for-byte.
+            input_handler: Answers stateless multi-round-trip input requests (``None`` ⇒
+                :class:`~prismal.mcp.input_requests.DeclineAllInputHandler`).
+            transport: Optional ``httpx`` transport for the stateless adapter (tests / hosts).
+            metrics: Optional metrics sink (``None`` ⇒ ``OTelManager``).
+            memo: Optional ``auto``-probe memo (``None`` ⇒ the process-wide memo).
+            org_id: Tenant passed to the input handler.
         """
         self._config = config
+        self._settings = settings
+        self._input_handler = input_handler
+        self._transport = transport
+        self._metrics = metrics
+        self._memo = memo
+        self._org_id = org_id
+        # Phase PRT: set when the stateless (2026-07-28) adapter serves this server.
+        self._adapter: StatelessHttpAdapter | None = None
+        self._tool_page: ToolListPage | None = None
         self._session: ClientSession | None = None
         self._exit_stack: contextlib.AsyncExitStack | None = None
         self._connected: bool = False
@@ -290,6 +325,11 @@ class MCPServerConnection:
     def connected(self) -> bool:
         """Return ``True`` if the connection is currently active."""
         return self._connected
+
+    @property
+    def tool_list_page(self) -> ToolListPage | None:
+        """Last stateless ``tools/list`` (with ``ttlMs`` / ``cacheScope``); ``None`` on legacy."""
+        return self._tool_page
 
     @property
     def cached_tools(self) -> list[mcp.types.Tool]:
@@ -363,6 +403,16 @@ class MCPServerConnection:
         """
         # Close any previous connection cleanly before re-opening.
         await self._cleanup_stack()
+        await self._close_adapter()
+
+        # Phase PRT: adapter selection (``legacy`` default ⇒ straight to today's path).
+        settings = self._resolved_settings()
+        if settings.mcp_protocol_mode != "legacy":
+            if await self._try_connect_stateless(settings):
+                return
+            self._metrics_sink().increment_counter(
+                "mcp_protocol_negotiations", attributes={"mode": "legacy"}
+            )
 
         stack = contextlib.AsyncExitStack()
         try:
@@ -393,6 +443,103 @@ class MCPServerConnection:
                 server_name=self._config.name,
                 reason=str(exc),
             ) from exc
+
+    # ------------------------------------------------------------------
+    # Phase PRT — stateless (2026-07-28) adapter path (opt-in)
+    # ------------------------------------------------------------------
+
+    def _resolved_settings(self) -> Settings:
+        if self._settings is None:
+            from prismal.core.config import get_settings
+
+            return get_settings()
+        return self._settings
+
+    def _metrics_sink(self) -> Any:
+        if self._metrics is None:
+            from prismal.monitoring.otel import OTelManager
+
+            self._metrics = OTelManager()
+        return self._metrics
+
+    async def _try_connect_stateless(self, settings: Settings) -> bool:
+        """Negotiate; on a stateless server connect through the adapter. ``False`` ⇒ legacy."""
+        from prismal.mcp.protocol import negotiate_stateless
+
+        adapter = await negotiate_stateless(
+            self._config,
+            settings=settings,
+            input_handler=self._input_handler,
+            org_id=self._org_id,
+            transport=self._transport,
+            metrics=self._metrics_sink(),
+            memo=self._memo,
+        )
+        if adapter is None:
+            return False
+        self._adapter = adapter
+        try:
+            await self._refresh_tools()
+        except Exception:
+            await self._close_adapter()
+            raise
+        self._connected = True
+        self._last_error = None
+        logger.info(
+            "mcp_connected",
+            server=self._config.name,
+            transport=self._config.type,
+            protocol=adapter.discovery.protocol_version,
+        )
+        return True
+
+    async def _close_adapter(self) -> None:
+        adapter, self._adapter = self._adapter, None
+        self._tool_page = None
+        if adapter is not None:
+            self._connected = False
+            with contextlib.suppress(Exception):
+                await adapter.aclose()
+
+    async def _call_stateless(
+        self, adapter: StatelessHttpAdapter, name: str, arguments: dict[str, Any]
+    ) -> mcp.types.CallToolResult:
+        """``tools/call`` via the adapter; a task handle is polled (tasks extension)."""
+        from prismal.mcp.tasks import McpTaskPoller
+
+        settings = self._resolved_settings()
+        try:
+            outcome = await asyncio.wait_for(
+                adapter.call_tool(name, arguments, allow_task=settings.mcp_tasks_enabled),
+                timeout=self._config.timeout_seconds,
+            )
+            handle = outcome.task
+            if handle is not None:
+                poller = McpTaskPoller(adapter, settings=settings, metrics=self._metrics_sink())
+                try:
+                    outcome = await poller.wait(handle)
+                except asyncio.CancelledError:
+                    # Run cancelled ⇒ cancel the remote task (best-effort), then propagate.
+                    with contextlib.suppress(Exception):
+                        await asyncio.shield(adapter.cancel_task(handle.task_id))
+                    raise
+            payload = {k: v for k, v in (outcome.result or {}).items() if k != "resultType"}
+            payload.setdefault("content", [])
+            result = mcp.types.CallToolResult.model_validate(payload)
+        except TimeoutError as exc:
+            raise MCPToolError(
+                tool_name=name,
+                server_name=self._config.name,
+                reason=f"timed out after {self._config.timeout_seconds}s",
+            ) from exc
+        except Exception as exc:
+            raise MCPToolError(
+                tool_name=name, server_name=self._config.name, reason=str(exc)
+            ) from exc
+        logger.debug(
+            "mcp_tool_called", server=self._config.name, tool=name, is_error=result.isError
+        )
+        return result
 
     async def _open_transport(
         self,
@@ -517,7 +664,10 @@ class MCPServerConnection:
         Returns:
             A ``(read, write)`` tuple.
         """
-        from mcp.client.streamable_http import streamablehttp_client
+        import httpx
+
+        from mcp.client.streamable_http import streamable_http_client
+        from mcp.shared._httpx_utils import MCP_DEFAULT_SSE_READ_TIMEOUT, create_mcp_http_client
 
         url: str = os.path.expandvars(self._config.url or "")
         headers: dict[str, str] = {}
@@ -530,12 +680,18 @@ class MCPServerConnection:
                     token_env=self._config.auth.token_env,
                 )
             headers["Authorization"] = f"Bearer {token}"
-        read, write, _ = await stack.enter_async_context(
-            streamablehttp_client(
-                url=url,
+        # Same client the SDK-deprecated ``streamablehttp_client`` wrapper built (mcp 1.28.1):
+        # MCP defaults, our headers, request timeout + the SDK's default SSE read timeout.
+        client = await stack.enter_async_context(
+            create_mcp_http_client(
                 headers=headers,
-                timeout=float(self._config.timeout_seconds),
+                timeout=httpx.Timeout(
+                    float(self._config.timeout_seconds), read=MCP_DEFAULT_SSE_READ_TIMEOUT
+                ),
             )
+        )
+        read, write, _ = await stack.enter_async_context(
+            streamable_http_client(url, http_client=client)
         )
         return read, write
 
@@ -588,6 +744,7 @@ class MCPServerConnection:
         and the underlying transport.  Safe to call even if not connected.
         """
         await self._cleanup_stack()
+        await self._close_adapter()
         self._cached_tools = []
         logger.info("mcp_disconnected", server=self._config.name)
 
@@ -606,7 +763,7 @@ class MCPServerConnection:
         Raises:
             MCPConnectionError: If the server is not connected.
         """
-        if not self._connected or self._session is None:
+        if not self._connected or (self._session is None and self._adapter is None):
             raise MCPConnectionError(
                 server_name=self._config.name,
                 reason="Not connected — call connect() first.",
@@ -621,6 +778,19 @@ class MCPServerConnection:
         Raises:
             MCPConnectionError: If the session is missing or the request times out.
         """
+        if self._adapter is not None:
+            try:
+                page = await asyncio.wait_for(
+                    self._adapter.list_tools(), timeout=self._config.timeout_seconds
+                )
+            except TimeoutError as exc:
+                raise MCPConnectionError(
+                    server_name=self._config.name,
+                    reason=f"list_tools timed out after {self._config.timeout_seconds}s",
+                ) from exc
+            self._tool_page = page
+            self._cached_tools = [mcp.types.Tool.model_validate(dict(t)) for t in page.tools]
+            return
         if self._session is None:
             raise MCPConnectionError(
                 server_name=self._config.name,
@@ -661,6 +831,8 @@ class MCPServerConnection:
             MCPConnectionError: If the server is not connected.
             MCPToolError: If the tool call times out or raises an exception.
         """
+        if self._connected and self._adapter is not None:
+            return await self._call_stateless(self._adapter, name, arguments)
         if not self._connected or self._session is None:
             raise MCPConnectionError(
                 server_name=self._config.name,

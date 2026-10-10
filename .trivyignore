@@ -56,6 +56,37 @@ CVE-2026-3219
 # revision programada 2026-10. Triage: `prismal doctor security-check`.
 CVE-2026-45829
 
+# --- chromadb 1.5.9 -> CVE-2026-45830 / 45831 / 45833 (sin fix) ----
+# Añadidas 2026-10-10 (release 3.18.0). Las tres son del SERVER Chroma:
+# 45833 = code injection autenticada via repositorio de modelo malicioso
+# (PYSEC-2026-3814, CRITICAL); 45830 / 45831 = autorizacion multi-tenant del
+# server (SimpleRBACAuthorizationProvider) (PYSEC-2026-3813 / 3815, HIGH).
+# OSV: sin evento `fixed`, 1.5.9 es la ultima version. prismal usa Chroma
+# embebido (`rag/stores/chroma.py` -> `Chroma(persist_directory=...)`, sin
+# HttpClient ni `chroma run`) y la tenencia la aplica `collection_for(base,
+# org_id)`, no el RBAC de Chroma -> ningun vector expuesto. Mismo ignore en
+# pip-audit (ci.yml + .pre-commit-config.yaml).
+# TRIGGER de re-evaluacion: chromadb publica version con fix -> subir y quitar.
+CVE-2026-45830
+CVE-2026-45831
+CVE-2026-45833
+
+# --- nltk 3.10.3 -> CVE-2026-81726 (sin fix upstream) --------
+# Añadida 2026-10-10. Path traversal en APIs de artefactos de modelo
+# (`TransitionParser.train`, ...) con rutas controladas por el llamante
+# (GHSA-8mgp-746c-j5xp / PYSEC-2026-3740). nltk solo entra transitivamente via
+# llmlingua (extra opcional `[compression]`, TKE8); prismal no llama a ninguna
+# API de nltk ni pasa rutas de usuario. Mismo ignore en pip-audit.
+# TRIGGER de re-evaluacion: nltk publica version con fix -> quitar ignore.
+CVE-2026-81726
+
+# --- accelerate 1.13.0 -> CVE-2026-69112 (solo pip-audit) ----
+# PYSEC-2026-3804, path traversal en load_checkpoint_in_model con indices de
+# shards maliciosos; "through 1.14.0", sin fix. No supera el gate HIGH/CRITICAL
+# de trivy (no hace falta listarla aqui); se ignora solo en pip-audit.
+# accelerate entra via llmlingua / extras locales; prismal no carga checkpoints
+# sharded de origen no confiable. TRIGGER: accelerate publica fix.
+
 # --- torch 2.11.0 -> CVE-2025-3000 (sin fix upstream) --------
 # CRITICAL — memory corruption en `torch.jit.script` (first_patched=None:
 # no existe version parcheada). El vector exige compilar/scriptar codigo

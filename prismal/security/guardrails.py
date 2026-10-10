@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import yaml
 
@@ -25,6 +25,9 @@ from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
 from prismal.security.audit import AuditLogger
 from prismal.security.sanitizer import InputSanitizer
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 logger = get_logger("prismal.security.guardrails")
 _audit_logger = AuditLogger()
@@ -134,6 +137,14 @@ class GuardrailsEngine:
             reasons = [f"injection:{cat}" for cat in matched_categories]
             risk_score = self._compute_risk_score(matched_categories)
 
+            # Typed decisions (Phase DEC — DEC-SAFE): escalate-only pre-screen. It can
+            # add a reason, never remove one or relax the verdict; off ⇒ no-op.
+            from prismal.security import decision_bridge
+
+            if await decision_bridge.prescreen_escalates(sanitized, settings):
+                reasons.append("decision:prescreen_escalated")
+                span.set_attribute("prismal.decision_prescreen_escalated", True)
+
             # L3: NeMo Guardrails (optional)
             if self._nemo_layer is not None and self._nemo_layer.available:
                 nemo_blocked, nemo_category = await self._nemo_layer.check_input(sanitized)
@@ -174,12 +185,16 @@ class GuardrailsEngine:
                 sanitized_text=sanitized,
             )
 
-    async def validate_output(self, text: str, canary: str | None = None) -> GuardrailResult:
+    async def validate_output(
+        self, text: str, canary: str | Sequence[str] | None = None
+    ) -> GuardrailResult:
         """Scan LLM output for PII, API key leaks, and canary token leakage.
 
         Args:
             text: LLM output text to validate.
-            canary: Optional canary string to check for leakage in output.
+            canary: Optional canary string — or every canary of a cache-stable
+                prompt (``SecurePromptBuilder.canaries``, Phase TKE) — to check
+                for leakage in output.
 
         Returns:
             GuardrailResult; safe=False if any pattern matched.
@@ -193,7 +208,8 @@ class GuardrailsEngine:
                     if pattern.search(text):
                         reasons.append(f"output:{group}:{name}")
 
-            if canary and canary in text:
+            canaries = (canary,) if isinstance(canary, str) else tuple(canary or ())
+            if any(c and c in text for c in canaries):
                 reasons.append("output:canary_leak")
 
             # L3: NeMo output rails (optional)

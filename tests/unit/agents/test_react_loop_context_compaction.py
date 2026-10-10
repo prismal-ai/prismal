@@ -110,3 +110,37 @@ async def test_compactor_applies_across_tool_iterations() -> None:
     second_call_messages = llm.ainvoke.call_args_list[1][0][0]
     # 20 history + 1 AI response + 1 tool result = 22 > 20 threshold -> compacted.
     assert len(second_call_messages) < 22
+
+
+@pytest.mark.asyncio
+async def test_compactor_receives_session_and_tenant_scope() -> None:
+    """Security review 2026-10-05: masked artifacts are scoped per tenant/session."""
+    llm = _make_llm(_ai_final("hello"))
+    compactor = MagicMock()
+    compactor.compact_list = AsyncMock(side_effect=lambda msgs, **_: list(msgs))
+
+    await react_loop(
+        llm,
+        [],
+        [HumanMessage(content="hi")],
+        agent_name="test",
+        session_id="sess-9",
+        tenant="acme",
+        context_compactor=compactor,
+    )
+
+    kwargs = compactor.compact_list.call_args.kwargs
+    assert kwargs == {"run_id": "sess-9", "tenant": "acme"}
+
+
+@pytest.mark.asyncio
+async def test_compactor_scope_without_session_is_anonymous() -> None:
+    llm = _make_llm(_ai_final("hello"))
+    compactor = MagicMock()
+    compactor.compact_list = AsyncMock(side_effect=lambda msgs, **_: list(msgs))
+
+    await react_loop(
+        llm, [], [HumanMessage(content="hi")], agent_name="test", context_compactor=compactor
+    )
+
+    assert compactor.compact_list.call_args.kwargs["run_id"].startswith("anon-")

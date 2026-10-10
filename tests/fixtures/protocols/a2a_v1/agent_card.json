@@ -1,0 +1,71 @@
+{
+  "name": "Billing Agent",
+  "description": "Creates and reconciles invoices.",
+  "supportedInterfaces": [
+    {"url": "https://billing.acme/a2a/v1", "protocolBinding": "JSONRPC", "protocolVersion": "1.0", "tenant": "acme"},
+    {"url": "https://billing.acme/a2a/rest", "protocolBinding": "HTTP+JSON", "protocolVersion": "1.0"},
+    {"url": "https://billing.acme/a2a/legacy", "protocolBinding": "JSONRPC", "protocolVersion": "0.3"}
+  ],
+  "provider": {"organization": "Acme Corp", "url": "https://acme.example"},
+  "version": "2.4.1",
+  "documentationUrl": "https://billing.acme/docs",
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "extensions": [{"uri": "https://acme.example/ext/audit/v1", "description": "audit trail", "required": false}],
+    "extendedAgentCard": true
+  },
+  "securitySchemes": {
+    "oauth": {
+      "oauth2SecurityScheme": {
+        "description": "Acme IdP",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://idp.acme/authorize",
+            "tokenUrl": "https://idp.acme/token",
+            "refreshUrl": "https://idp.acme/token",
+            "scopes": {"invoices:write": "Create invoices"},
+            "pkceRequired": true
+          }
+        },
+        "oauth2MetadataUrl": "https://idp.acme/.well-known/oauth-authorization-server"
+      }
+    },
+    "device": {
+      "oauth2SecurityScheme": {
+        "flows": {
+          "deviceCode": {
+            "deviceAuthorizationUrl": "https://idp.acme/device",
+            "tokenUrl": "https://idp.acme/token",
+            "scopes": {"invoices:read": "Read invoices"}
+          }
+        }
+      }
+    },
+    "m2m": {
+      "oauth2SecurityScheme": {
+        "flows": {"clientCredentials": {"tokenUrl": "https://idp.acme/token", "scopes": {}}}
+      }
+    },
+    "bearer": {"httpAuthSecurityScheme": {"scheme": "Bearer", "bearerFormat": "JWT"}},
+    "key": {"apiKeySecurityScheme": {"location": "header", "name": "X-API-Key"}},
+    "oidc": {"openIdConnectSecurityScheme": {"openIdConnectUrl": "https://idp.acme/.well-known/openid-configuration"}},
+    "mtls": {"mtlsSecurityScheme": {"description": "client certs"}}
+  },
+  "securityRequirements": [{"schemes": {"oauth": {"list": ["invoices:write"]}}}],
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["text/plain"],
+  "skills": [
+    {
+      "id": "create_invoice",
+      "name": "Create Invoice",
+      "description": "Creates an invoice for a customer.",
+      "tags": ["billing", "invoice"],
+      "examples": ["Bill ACME 100 EUR"],
+      "inputModes": ["text/plain"],
+      "outputModes": ["application/json"],
+      "securityRequirements": [{"schemes": {"oauth": {"list": ["invoices:write"]}}}]
+    }
+  ],
+  "iconUrl": "https://billing.acme/icon.png"
+}

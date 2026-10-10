@@ -1,0 +1,280 @@
+{
+  "name": "skynet_subagents",
+  "description": "Skynet swarm: two workers (subgraph namespace), one succeeds, one fails.",
+  "context": {
+    "run_id": "run-1",
+    "thread_id": "thread-1"
+  },
+  "initial_state": {
+    "current_agent": "supervisor"
+  },
+  "input": [
+    [
+      "updates",
+      {
+        "skynet_plan": {
+          "skynet_orders": [
+            {
+              "id": "o1"
+            },
+            {
+              "id": "o2"
+            }
+          ]
+        }
+      }
+    ],
+    [
+      "custom",
+      {
+        "type": "subagent",
+        "phase": "start",
+        "id": "worker-o1",
+        "name": "skynet_worker",
+        "description": "order o1"
+      }
+    ],
+    [
+      "custom",
+      {
+        "type": "subagent",
+        "phase": "start",
+        "id": "worker-o2",
+        "name": "skynet_worker",
+        "description": "order o2"
+      }
+    ],
+    [
+      [
+        "skynet:worker-o1"
+      ],
+      "messages",
+      [
+        {
+          "__class__": "AIMessageChunk",
+          "content": "partial o1",
+          "additional_kwargs": {},
+          "response_metadata": {},
+          "type": "AIMessageChunk",
+          "id": "w1-msg",
+          "tool_calls": [],
+          "invalid_tool_calls": [],
+          "tool_call_chunks": []
+        },
+        {
+          "langgraph_node": "worker"
+        }
+      ]
+    ],
+    [
+      [
+        "skynet:worker-o1"
+      ],
+      "updates",
+      {
+        "worker": {
+          "parallel_results": [
+            {
+              "o": 1
+            }
+          ]
+        }
+      }
+    ],
+    [
+      "custom",
+      {
+        "type": "subagent",
+        "phase": "end",
+        "id": "worker-o1",
+        "result": {
+          "order": "o1",
+          "ok": true
+        }
+      }
+    ],
+    [
+      "custom",
+      {
+        "type": "subagent",
+        "phase": "error",
+        "id": "worker-o2",
+        "message": "worker timed out",
+        "code": "timeout"
+      }
+    ],
+    [
+      "updates",
+      {
+        "reduce": {
+          "current_agent": "skynet"
+        }
+      }
+    ]
+  ],
+  "end": {
+    "kind": "finish",
+    "result": null
+  },
+  "summary_usage_wire": {
+    "prompt_tokens": 1200,
+    "completion_tokens": 300,
+    "cache_read_tokens": 800,
+    "cache_write_tokens": 0,
+    "reasoning_tokens": 40,
+    "total_tokens": 1500,
+    "calls": 2,
+    "cost_usd": 0.004321,
+    "cost_source": "gateway",
+    "estimated": false,
+    "served_model": "anthropic/claude-sonnet-4.5",
+    "gateway": "openrouter"
+  },
+  "expected": [
+    {
+      "type": "RUN_STARTED",
+      "timestamp": 1760000000000,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "protocolVersion": "1.0"
+    },
+    {
+      "type": "STATE_SNAPSHOT",
+      "timestamp": 1760000000001,
+      "snapshot": {
+        "current_agent": "supervisor"
+      }
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000002,
+      "stepName": "skynet_plan"
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000003,
+      "stepName": "skynet_plan"
+    },
+    {
+      "type": "SUBAGENT_STARTED",
+      "timestamp": 1760000000004,
+      "subagentRunId": "worker-o1",
+      "name": "skynet_worker",
+      "description": "order o1"
+    },
+    {
+      "type": "SUBAGENT_STARTED",
+      "timestamp": 1760000000005,
+      "subagentRunId": "worker-o2",
+      "name": "skynet_worker",
+      "description": "order o2"
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "timestamp": 1760000000006,
+      "messageId": "w1-msg",
+      "role": "assistant"
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "timestamp": 1760000000007,
+      "messageId": "w1-msg",
+      "delta": "partial o1"
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "timestamp": 1760000000008,
+      "messageId": "w1-msg"
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000009,
+      "stepName": "worker"
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000010,
+      "stepName": "worker"
+    },
+    {
+      "type": "SUBAGENT_FINISHED",
+      "timestamp": 1760000000011,
+      "subagentRunId": "worker-o1",
+      "result": {
+        "order": "o1",
+        "ok": true
+      },
+      "outcome": {
+        "type": "success"
+      }
+    },
+    {
+      "type": "SUBAGENT_ERROR",
+      "timestamp": 1760000000012,
+      "subagentRunId": "worker-o2",
+      "message": "worker timed out",
+      "code": "timeout"
+    },
+    {
+      "type": "STEP_STARTED",
+      "timestamp": 1760000000013,
+      "stepName": "reduce"
+    },
+    {
+      "type": "STATE_DELTA",
+      "timestamp": 1760000000014,
+      "delta": [
+        {
+          "op": "replace",
+          "path": "/current_agent",
+          "value": "skynet"
+        }
+      ]
+    },
+    {
+      "type": "STEP_FINISHED",
+      "timestamp": 1760000000015,
+      "stepName": "reduce"
+    },
+    {
+      "type": "CUSTOM",
+      "timestamp": 1760000000016,
+      "name": "prismal.usage",
+      "value": {
+        "prompt_tokens": 1200,
+        "completion_tokens": 300,
+        "cache_read_tokens": 800,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 40,
+        "total_tokens": 1500,
+        "calls": 2,
+        "cost_usd": 0.004321,
+        "cost_source": "gateway",
+        "estimated": false,
+        "served_model": "anthropic/claude-sonnet-4.5",
+        "gateway": "openrouter"
+      }
+    },
+    {
+      "type": "RUN_FINISHED",
+      "timestamp": 1760000000017,
+      "threadId": "thread-1",
+      "runId": "run-1",
+      "outcome": {
+        "type": "success"
+      },
+      "usage": [
+        {
+          "provider": "openrouter",
+          "model": "anthropic/claude-sonnet-4.5",
+          "inputTokens": 1200,
+          "outputTokens": 300,
+          "totalTokens": 1500,
+          "reasoningTokens": 40,
+          "cachedInputTokens": 800,
+          "cacheWriteInputTokens": 0
+        }
+      ]
+    }
+  ]
+}

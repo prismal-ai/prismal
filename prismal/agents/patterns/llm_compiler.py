@@ -58,6 +58,7 @@ from prismal.monitoring.otel import OTelManager
 
 if TYPE_CHECKING:
     from prismal.core.config import Settings
+    from prismal.routing.plan_cache import PlanCache, PlanCacheKey
 
 logger = get_logger("prismal.agents.patterns.llm_compiler")
 
@@ -158,6 +159,12 @@ class LLMCompiler:
             (default 2; must be ≥ 0).
         settings: Prismal settings. ``None`` resolves via
             :func:`~prismal.core.config.get_settings`.
+        plan_cache: Optional intent-keyed plan cache (Phase AMR — SPEC-AMR-PLC-001).
+            Consulted for the first planning attempt only when
+            ``adaptive_routing_enabled`` and ``plan_cache_enabled`` are both on and
+            the caller passes a ``plan_cache_key`` (which it builds only after
+            :meth:`PlanCache.eligible` accepted the turn). Otherwise the planner
+            path is unchanged.
     """
 
     def __init__(
@@ -168,6 +175,7 @@ class LLMCompiler:
         joiner: JoinerFn,
         max_replanning: int = 2,
         settings: Settings | None = None,
+        plan_cache: PlanCache | None = None,
     ) -> None:
         if max_replanning < 0:
             raise ValueError(f"max_replanning must be >= 0; got {max_replanning}")
@@ -177,6 +185,7 @@ class LLMCompiler:
         self._joiner = joiner
         self._max_replanning = max_replanning
         self._settings = settings if settings is not None else get_settings()
+        self._plan_cache = plan_cache
 
     # ── Planning ──────────────────────────────────────────────────────────────
 
@@ -185,12 +194,78 @@ class LLMCompiler:
         goal: str,
         state: Any,
         previous_results: dict[str, Any] | None = None,
+        *,
+        plan_cache_key: PlanCacheKey | None = None,
+        request_summary: str | None = None,
     ) -> CompilerPlan:
-        """Ask the planner for a task list and validate it into a :class:`CompilerPlan`."""
+        """Ask the planner for a task list and validate it into a :class:`CompilerPlan`.
+
+        With the plan cache gated on (see the class docstring) and no
+        ``previous_results`` (replans always call the planner), a cache hit
+        skips the planner; a miss calls it. Storing is left to
+        :meth:`compile_and_run`, which caches a freshly planned DAG only after it
+        executed with zero failed tasks.
+        """
+        plan, _ = await self._plan_with_source(
+            goal,
+            state,
+            previous_results,
+            plan_cache_key=plan_cache_key,
+            request_summary=request_summary,
+        )
+        return plan
+
+    async def _plan_with_source(
+        self,
+        goal: str,
+        state: Any,
+        previous_results: dict[str, Any] | None,
+        *,
+        plan_cache_key: PlanCacheKey | None,
+        request_summary: str | None,
+    ) -> tuple[CompilerPlan, Literal["hit", "miss"] | None]:
+        """Plan and report where it came from (``None`` = plan cache not in use)."""
+        cache = self._plan_cache if previous_results is None else None
+        use_cache = (
+            cache is not None
+            and plan_cache_key is not None
+            and self._settings.adaptive_routing_enabled
+            and self._settings.plan_cache_enabled
+        )
+        if use_cache and cache is not None and plan_cache_key is not None:
+            cached = await cache.lookup(
+                plan_cache_key, request_summary=request_summary if request_summary else goal
+            )
+            if cached is not None:
+                hit = self._plan_from_cache(cached, goal)
+                if hit is not None:
+                    return hit, "hit"
         tasks = list(await self._plan_fn(goal, state, previous_results))
         waves = self.compute_execution_waves(tasks)
         plan = CompilerPlan(tasks=tasks, execution_waves=waves, goal=goal)
         self.validate_dag(plan)
+        return plan, "miss" if use_cache else None
+
+    def _plan_from_cache(self, cached: Any, goal: str) -> CompilerPlan | None:
+        """Rebuild a fresh :class:`CompilerPlan` from a cached JSON DAG (``None`` = unusable)."""
+        try:
+            tasks = [
+                TaskNode(
+                    id=str(t["id"]),
+                    description=str(t.get("description", "")),
+                    tool=str(t["tool"]),
+                    args=dict(t.get("args", {})),
+                    depends_on=[str(d) for d in t.get("depends_on", [])],
+                )
+                for t in cached["tasks"]
+            ]
+            plan = CompilerPlan(
+                tasks=tasks, execution_waves=self.compute_execution_waves(tasks), goal=goal
+            )
+            self.validate_dag(plan)
+        except (CompilerError, KeyError, TypeError, ValueError, AttributeError):
+            logger.warning("llm_compiler_plan_cache_unusable")
+            return None
         return plan
 
     def validate_dag(self, plan: CompilerPlan) -> bool:
@@ -267,8 +342,15 @@ class LLMCompiler:
         self,
         goal: str,
         state: Any,
+        *,
+        plan_cache_key: PlanCacheKey | None = None,
+        request_summary: str | None = None,
     ) -> CompilerResult:
-        """Plan → validate → execute → join (with retries on task failure)."""
+        """Plan → validate → execute → join (with retries on task failure).
+
+        ``plan_cache_key`` / ``request_summary`` opt the first planning attempt
+        into the gated plan cache (Phase AMR); omitted ⇒ legacy behaviour.
+        """
         otel = OTelManager()
         with otel.start_span("llm_compiler.run") as span:
             span.set_attribute("prismal.compiler.goal_len", len(goal))
@@ -277,8 +359,19 @@ class LLMCompiler:
             previous_results: dict[str, Any] | None = None
 
             while True:
-                plan = await self.plan(goal, state, previous_results)
+                if plan_cache_key is None:
+                    plan = await self.plan(goal, state, previous_results)
+                    source: Literal["hit", "miss"] | None = None
+                else:
+                    plan, source = await self._plan_with_source(
+                        goal,
+                        state,
+                        previous_results,
+                        plan_cache_key=plan_cache_key,
+                        request_summary=request_summary,
+                    )
                 outputs, succeeded, failed = await self._run_plan(plan)
+                self._settle_plan_cache(plan, source, plan_cache_key, failed)
 
                 if failed == 0:
                     final = await self._joiner(goal, plan.tasks)
@@ -312,6 +405,22 @@ class LLMCompiler:
                     replanning_count=replanning_count,
                     tasks_failed=failed,
                 )
+
+    def _settle_plan_cache(
+        self,
+        plan: CompilerPlan,
+        source: Literal["hit", "miss"] | None,
+        key: PlanCacheKey | None,
+        failed: int,
+    ) -> None:
+        """Cache a fresh plan only once it ran cleanly; evict a cached plan that failed."""
+        cache = self._plan_cache
+        if cache is None or key is None or source is None:
+            return
+        if source == "miss" and failed == 0:
+            cache.store(key, _plan_to_cache(plan))
+        elif source == "hit" and failed > 0:
+            cache.evict(key)
 
     async def _run_plan(self, plan: CompilerPlan) -> tuple[dict[str, Any], int, int]:
         """Run all waves; return ``(outputs_by_id, succeeded, failed)``."""
@@ -356,6 +465,23 @@ class LLMCompiler:
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
+
+def _plan_to_cache(plan: CompilerPlan) -> dict[str, Any]:
+    """JSON-safe planner output for the plan cache (no outputs / statuses)."""
+    return {
+        "goal": plan.goal,
+        "tasks": [
+            {
+                "id": t.id,
+                "description": t.description,
+                "tool": t.tool,
+                "args": t.args,
+                "depends_on": list(t.depends_on),
+            }
+            for t in plan.tasks
+        ],
+    }
 
 
 def _interpolate_args(args: dict[str, Any], prior_outputs: dict[str, Any]) -> dict[str, Any]:

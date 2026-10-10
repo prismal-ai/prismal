@@ -977,6 +977,163 @@ class StructuredOutputReaskExhausted(StructuredOutputGuardError):  # noqa: N818 
 # ── Loop Hardening (Phase LH) ───────────────────────────────────────────────
 
 
+class TokenEfficiencyError(PrismalError):
+    """Base for errors raised by the token-efficiency layer (Phase TKE)."""
+
+
+class TokenEfficiencyConfigError(TokenEfficiencyError):
+    """Invalid token-efficiency configuration (load time only)."""
+
+
+class PromptCacheError(TokenEfficiencyError):
+    """Internal — never escapes ``apply_cache_policy`` (fail-open)."""
+
+
+class ArtifactStoreError(TokenEfficiencyError):
+    """An artifact store operation failed."""
+
+
+class ArtifactNotFound(ArtifactStoreError):  # noqa: N818 — SPEC-TKE-ERR-001 name
+    """Missing id **or** tenant/run scope mismatch (indistinguishable by design)."""
+
+
+class MaskedToolCallError(TokenEfficiencyError):
+    """Internal — a masked tool call is surfaced as a synthetic ``ToolMessage``."""
+
+
+# ── LLM Gateway Providers (Phase GW — SPEC-GW-ERR-001) ───────────────────────
+
+
+class GatewayError(PrismalError):
+    """Base for errors raised by the LLM gateway layer (Phase GW)."""
+
+
+class GatewayConfigError(GatewayError):
+    """Malformed gateway reference or configuration (load/startup/resolve time)."""
+
+
+class GatewayCredentialError(GatewayError):
+    """A gateway key is missing — carries the ``auth_ref`` name, never the value."""
+
+    def __init__(self, auth_ref: str, *, gateway: str) -> None:
+        self.auth_ref = auth_ref
+        self.gateway = gateway
+        super().__init__(f"gateway {gateway!r}: no credential for {auth_ref!r}")
+
+
+class GatewayPolicyError(GatewayError):
+    """Fail-closed ToS / data-policy / security guard (raised before any network I/O)."""
+
+    def __init__(self, reason: str, *, gateway: str, agent: str | None = None) -> None:
+        self.reason = reason
+        self.gateway = gateway
+        self.agent = agent
+        super().__init__(f"gateway {gateway!r} policy denied: {reason} (agent={agent!r})")
+
+
+class GatewayQuotaExhausted(GatewayError):  # noqa: N818 — SPEC-GW-ERR-001 name
+    """A flat-fee quota window is exhausted (refused before any network call)."""
+
+    def __init__(self, *, gateway: str, window: str) -> None:
+        self.gateway = gateway
+        self.window = window
+        super().__init__(f"gateway {gateway!r} quota window {window!r} exhausted")
+
+
+class GatewayPaymentRequired(GatewayError):  # noqa: N818 — SPEC-GW-ERR-001 name
+    """HTTP 402 from a gateway — non-retryable; ``reason`` mapped from ``limit_source``."""
+
+    def __init__(self, *, gateway: str, reason: str) -> None:
+        self.gateway = gateway
+        self.reason = reason
+        super().__init__(f"gateway {gateway!r} payment required: {reason}")
+
+
+# ── Typed Decision Models (Phase DEC — SPEC-DEC-ERR-001) ─────────────────────
+
+
+class DecisionError(PrismalError):
+    """Base for errors raised by the typed-decision layer (Phase DEC)."""
+
+
+class DecisionConfigError(DecisionError):
+    """Malformed question spec or decision configuration (construction / startup)."""
+
+
+class DecisionCalibrationError(DecisionError, ValueError):
+    """An integration is set to ``enforce`` without a valid calibration record.
+
+    Also a ``ValueError`` so pydantic surfaces it as a ``ValidationError`` when
+    raised from ``Settings._validate_decisions`` (CAL-002 startup refusal).
+    """
+
+
+class ForbiddenDecisionError(DecisionError):
+    """A question spec asks for a forbidden use (SPEC-DEC-SEC-002), raised at registration."""
+
+
+class DecisionBackendError(DecisionError):
+    """Internal — a backend failure; the cascade converts it into an abstention."""
+
+
+# ── Adaptive Model Routing (Phase AMR — SPEC-AMR-ERR-001) ────────────────────
+
+
+class RoutingError(PrismalError):
+    """Base for errors raised by the adaptive-routing layer (Phase AMR)."""
+
+
+class RoutingConfigError(RoutingError, ValueError):
+    """Invalid tier map / risk floor — load time only (fail-closed, SEC-001)."""
+
+
+class BatchAssignmentError(RoutingError):
+    """Internal — ``BatchAssignmentPolicy.assign()`` never raises it outward."""
+
+
+class PlanCacheError(RoutingError):
+    """Plan-cache backend I/O failure; caught, counted and treated as a miss."""
+
+
+class BatchExecutorError(RoutingError):
+    """A batch job failed and ``allow_sync_fallback`` is False."""
+
+
+# ── Protocol Upgrades 2026 (Phase PRT — SPEC-PRT-ERR-001) ────────────────────
+
+
+class ProtocolUpgradeError(PrismalError):
+    """Base for errors raised by the protocol-upgrade layer (Phase PRT)."""
+
+
+class A2AVersionError(ProtocolUpgradeError, A2AError):
+    """Unsupported / mismatched A2A protocol version (e.g. v1-only call to a v0.3 peer)."""
+
+
+class A2AOAuthError(ProtocolUpgradeError, A2AError):
+    """An A2A OAuth grant failed or needs an interactive prompter that is absent."""
+
+
+class McpProtocolError(ProtocolUpgradeError):
+    """Base for MCP protocol-adapter errors."""
+
+
+class McpDiscoveryError(McpProtocolError):
+    """``server/discover`` failed where a stateless server was required."""
+
+
+class McpTaskError(McpProtocolError):
+    """An MCP task failed or was cancelled."""
+
+
+class McpTaskTimeout(McpTaskError):  # noqa: N818 — SPEC-PRT-ERR-001 name
+    """An MCP task exceeded ``mcp_task_timeout_s`` (it was cancelled)."""
+
+
+class AgUiTranslationError(ProtocolUpgradeError):
+    """Internal/tests only — the AG-UI translator itself never raises."""
+
+
 class LoopHardeningError(PrismalError):
     """Base for errors raised by the loop-hardening layer (Phase LH)."""
 
@@ -1009,11 +1166,55 @@ class BlindReviewBlindnessViolationError(BlindReviewPipelineError):
     """
 
 
+# ── Agentic Memory (Phase MEM — SPEC-MEM-ERR-001) ─────────────────────────────
+# The root is not named ``MemoryError``: that would shadow the Python builtin.
+
+
+class AgenticMemoryError(PrismalError):
+    """Base for errors raised by the agentic memory layer (Phase MEM)."""
+
+
+class MemoryConfigError(AgenticMemoryError):
+    """Invalid memory configuration detected at load or composition time."""
+
+
+class MemoryTenancyError(AgenticMemoryError):
+    """Empty or mismatched ``org_id`` on a memory operation (fail-closed)."""
+
+
+class MemoryForgetDenied(AgenticMemoryError):  # noqa: N818 — SPEC-MEM-ERR-001 name
+    """A deletion was attempted by an actor that is not a rule or an approved human."""
+
+
+class MemoryBackendUnavailable(AgenticMemoryError):  # noqa: N818 — SPEC-MEM-ERR-001 name
+    """A memory backend's optional extra is missing or the backend is down at startup."""
+
+
+class MemoryErasureIncomplete(AgenticMemoryError):  # noqa: N818 — SPEC-MEM-ERR-001 name
+    """Records were purged but a derived artifact (graph / playbooks) was not.
+
+    The request is left ``approved`` (a rule selector is re-targeted by the next
+    retention run) so the same execution can be retried; it is never ``executed``
+    while derived data survives.
+    """
+
+
+class MemoryScanLimitError(AgenticMemoryError):
+    """A backend scan hit its configured cap; results would be incomplete (fail-closed)."""
+
+
+class PlaybookDeltaError(AgenticMemoryError):
+    """A playbook curator output violates the delta discipline."""
+
+
 __all__ = [
     "A2AAgentUnavailable",
     "A2AError",
     "AdapterError",
     "AdaptiveRAGError",
+    "AgenticMemoryError",
+    "ArtifactNotFound",
+    "ArtifactStoreError",
     "AudioAgentError",
     "BlindReviewBlindnessViolationError",
     "BlindReviewConfigError",
@@ -1040,6 +1241,12 @@ __all__ = [
     "EvalSetError",
     "ExtensionError",
     "FusionError",
+    "GatewayConfigError",
+    "GatewayCredentialError",
+    "GatewayError",
+    "GatewayPaymentRequired",
+    "GatewayPolicyError",
+    "GatewayQuotaExhausted",
     "GuardrailsModernizationError",
     "HierarchicalRAGError",
     "HyDEError",
@@ -1056,9 +1263,16 @@ __all__ = [
     "MCPConnectionError",
     "MCPError",
     "MCPToolError",
+    "MaskedToolCallError",
     "MediaValidationError",
+    "MemoryBackendUnavailable",
+    "MemoryConfigError",
+    "MemoryErasureIncomplete",
     "MemoryError",
+    "MemoryForgetDenied",
     "MemoryRedactionError",
+    "MemoryScanLimitError",
+    "MemoryTenancyError",
     "MissingDependencyError",
     "MoAError",
     "ModalityRouterError",
@@ -1073,10 +1287,12 @@ __all__ = [
     "NodeTimeoutError",
     "NodeValidationError",
     "PermissionDeniedError",
+    "PlaybookDeltaError",
     "PluginConflictError",
     "PluginLoadError",
     "PolicyDenied",
     "PrismalError",
+    "PromptCacheError",
     "ProviderError",
     "ProviderTimeoutError",
     "RAGError",
@@ -1103,6 +1319,8 @@ __all__ = [
     "SwarmWorkerError",
     "TTSError",
     "ToTError",
+    "TokenEfficiencyConfigError",
+    "TokenEfficiencyError",
     "ToolGatingConfigError",
     "ToolProviderNotConfigured",
     "VectorStoreBackendUnavailable",

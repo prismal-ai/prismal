@@ -1,0 +1,7 @@
+{
+  "version": "v1",
+  "source": {"note": "prior-only cold-start table; regenerate with export_predictor_table"},
+  "prior": {"a": 1.0, "b": 1.0},
+  "model_tiers": {},
+  "cells": []
+}
