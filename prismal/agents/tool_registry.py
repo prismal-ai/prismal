@@ -27,7 +27,8 @@ import asyncio
 import json
 import re
 import warnings
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 
 from prismal.core.logging import get_logger
 
@@ -1029,6 +1030,260 @@ def _with_allowed_tools_hint(
     return [*messages[:-1], new_tail]
 
 
+class ReactLoopOptions(TypedDict, total=False):
+    """Optional ``react_loop`` keywords, grouped so callers can splat helper dicts.
+
+    Each key keeps the meaning documented on :func:`react_loop`; an omitted key
+    leaves that layer off (``tenant`` defaults to ``"default"``). Builders such
+    as ``hardening_react_kwargs`` / ``tool_gate_react_kwargs`` return subsets.
+    """
+
+    budget_guard: BudgetGuard | None
+    injection_detector: IndirectInjectionDetector | None
+    tool_policy: RunToolPolicy | None
+    runaway_guard: RunawayGuard | None
+    context_compactor: ContextCompactor | None
+    tool_allow_set: frozenset[str] | None
+    tool_phase: str | None
+    audit_logger: Any | None
+    deferred_tools: DeferredToolSet | None
+    rebind_llm: Callable[[list[BaseTool]], object] | None
+    tool_output_budget: ToolOutputBudget | None
+    tenant: str
+
+
+def _check_react_options(options: dict[str, object]) -> None:
+    unknown = sorted(set(options) - ReactLoopOptions.__optional_keys__)
+    if unknown:
+        raise TypeError(f"react_loop() got unexpected keyword argument(s): {', '.join(unknown)}")
+
+
+_ALL_TOOLS_FAILED_PROMPT = (
+    "All tool calls in this step failed — the required external "
+    "services may be temporarily unavailable or misconfigured. "
+    "Based on what you already know, please provide your best "
+    "answer and clearly state which information you could not "
+    "retrieve and why."
+)
+
+_ITERATION_CAP_PROMPT = (
+    "You have reached the maximum number of tool call iterations. "
+    "Based on everything you have gathered so far, please provide "
+    "your best final answer to the user's original question. "
+    "If you were unable to retrieve the needed information, say so "
+    "clearly and explain what you found instead."
+)
+
+
+@dataclass
+class _ReactRun:
+    """Resolved state of one ``react_loop`` call, shared by its helpers."""
+
+    agent_name: str
+    session_id: str | None
+    options: ReactLoopOptions
+    tool_map: dict[str, BaseTool]
+    artifact_run_id: str
+    output_budget: ToolOutputBudget | None
+    tenant: str = "default"
+    # Consecutive failure counter per tool name — reset to 0 on success.
+    fail_counts: dict[str, int] = field(default_factory=dict)
+    # Tools rate-limited within THIS iteration (transient — do not count
+    # toward the permanent failure budget; the service is just throttling).
+    rate_limited: set[str] = field(default_factory=set)
+    successes: int = 0
+    masked: int = 0
+
+    def start_iteration(self) -> None:
+        self.rate_limited = set()
+        self.successes = 0
+        self.masked = 0
+
+    async def compact(self, loop_messages: list[object]) -> list[object]:
+        compactor = self.options.get("context_compactor")
+        if compactor is None:
+            return loop_messages
+        return list(
+            await compactor.compact_list(
+                loop_messages,  # type: ignore[arg-type]
+                run_id=self.artifact_run_id,
+                tenant=self.tenant,
+            )
+        )
+
+
+async def _final_llm_turn(
+    run: _ReactRun,
+    llm: object,
+    loop_messages: list[object],
+    prompt: str,
+    *,
+    iteration: int,
+) -> object:
+    """Ask the model for a best-effort final answer after *prompt* (no more tools)."""
+    from langchain_core.messages import HumanMessage
+
+    loop_messages.append(HumanMessage(content=prompt))
+    loop_messages = await run.compact(loop_messages)
+    try:
+        response = await _invoke_llm_with_backoff(
+            llm,
+            loop_messages,
+            agent_name=run.agent_name,
+            session_id=run.session_id,
+            iteration=iteration,
+        )
+    except Exception as llm_exc:
+        return _llm_error_fallback(
+            llm_exc,
+            agent_name=run.agent_name,
+            session_id=run.session_id,
+            iteration=iteration,
+            rate_limit_message=_RATE_LIMIT_MSG,
+        )
+    _meter_response(run.options.get("budget_guard"), response, llm, run.agent_name)
+    return response
+
+
+async def _invoke_tool(run: _ReactRun, tool_fn: BaseTool, tool_name: str, args: Any) -> str:
+    """Call one tool, tracking success / rate-limit / failure budgets."""
+    from prismal.routing.outcome import note_tool_error
+
+    try:
+        result = str(await tool_fn.ainvoke(args))
+        run.fail_counts[tool_name] = 0  # reset on success
+        run.successes += 1
+        # Phase H — screen the untrusted result before re-injection.
+        return await _screen_tool_result(
+            run.options.get("injection_detector"),
+            result,
+            tool_name=tool_name,
+            agent_name=run.agent_name,
+            session_id=run.session_id,
+        )
+    except Exception as exc:
+        if _RATE_LIMIT_RE.search(str(exc)):
+            # Transient rate-limit (429): mark for this iteration only.
+            # Do NOT burn the permanent failure budget so the tool
+            # remains available in the next iteration after the
+            # back-off window resets.
+            run.rate_limited.add(tool_name)
+            logger.warning(
+                "react_loop.tool_rate_limited",
+                agent=run.agent_name,
+                tool_name=tool_name,
+                error=str(exc),
+                backoff_seconds=_RATE_LIMIT_BACKOFF,
+                session_id=run.session_id,
+            )
+            await asyncio.sleep(_RATE_LIMIT_BACKOFF)
+            return (
+                f"Tool '{tool_name}' is temporarily rate-limited "
+                f"(HTTP 429). A {_RATE_LIMIT_BACKOFF}s back-off was "
+                "applied. Please reduce the number of concurrent "
+                "requests to this tool in your next step."
+            )
+        # Permanent-style failure: increment the failure budget.
+        run.fail_counts[tool_name] = run.fail_counts.get(tool_name, 0) + 1
+        note_tool_error()  # Phase AMR: cascade tool_errors trigger
+        logger.warning(
+            "react_loop.tool_error",
+            agent=run.agent_name,
+            tool_name=tool_name,
+            error=str(exc),
+            total_failures=run.fail_counts[tool_name],
+            session_id=run.session_id,
+        )
+        return f"Tool error: {exc}"
+
+
+async def _tool_call_result(run: _ReactRun, tc: dict[str, Any]) -> str:
+    """Result text for one allowed tool call (skips, policy blocks or a real call)."""
+    tool_name: str = tc["name"]
+    tool_fn = run.tool_map.get(tool_name)
+    if tool_fn is None:
+        logger.warning(
+            "react_loop.tool_not_found",
+            agent=run.agent_name,
+            tool_name=tool_name,
+            available_tools=sorted(run.tool_map.keys()),
+            session_id=run.session_id,
+        )
+        return f"Tool '{tool_name}' not found."
+    if run.fail_counts.get(tool_name, 0) >= _MAX_TOOL_FAILURES:
+        # Tool exhausted its permanent failure budget — skip without calling.
+        logger.warning(
+            "react_loop.tool_skipped_unavailable",
+            agent=run.agent_name,
+            tool_name=tool_name,
+            failures=run.fail_counts[tool_name],
+            session_id=run.session_id,
+        )
+        return (
+            f"Tool '{tool_name}' is currently unavailable "
+            f"(failed on {run.fail_counts[tool_name]} previous attempts). "
+            "Please use a different approach or inform the user that this "
+            "service cannot be reached right now."
+        )
+    if tool_name in run.rate_limited:
+        # Already hit the rate limit for this tool in this iteration.
+        # Skip without an API call so we don't keep hammering the quota.
+        logger.debug(
+            "react_loop.tool_skipped_rate_limited",
+            agent=run.agent_name,
+            tool_name=tool_name,
+            session_id=run.session_id,
+        )
+        return (
+            f"Tool '{tool_name}' was rate-limited earlier in this step "
+            "and has been skipped to avoid exceeding the API quota. "
+            "Please space out search calls or use fewer concurrent queries."
+        )
+    policy_block = _tool_policy_block_message(
+        run.options.get("tool_policy"),
+        agent_name=run.agent_name,
+        tool_name=tool_name,
+        args=tc.get("args", {}) or {},
+    )
+    if policy_block is not None:
+        # Phase H — tool denied or gated by declarative policy.
+        return policy_block
+    return await _invoke_tool(run, tool_fn, tool_name, tc.get("args", {}))
+
+
+async def _tool_call_message(run: _ReactRun, tc: dict[str, Any]) -> object:
+    """``ToolMessage`` answering one model tool call (mask gate, call, output budget)."""
+    from langchain_core.messages import ToolMessage
+
+    tool_name: str = tc["name"]
+    allow_set = run.options.get("tool_allow_set")
+    if allow_set is not None and tool_name not in allow_set:
+        # Phase TKE mask mode — fail-closed: never execute (SPEC-TKE-GAT-001).
+        from prismal.agents.tool_gate import (
+            check_tool_call,
+            masked_tool_message,
+            record_masked_call,
+        )
+
+        verdict = check_tool_call(tool_name, allow_set, run.options.get("tool_phase"))
+        record_masked_call(
+            verdict, agent=run.agent_name, audit_logger=run.options.get("audit_logger")
+        )
+        run.masked += 1
+        return masked_tool_message(tc, verdict)
+
+    result = await _tool_call_result(run, tc)
+    if run.output_budget is not None and run.output_budget.enabled:
+        # Phase TKE — budget after the Phase H screen (SPEC-TKE-OUT-001).
+        result = run.output_budget.apply(
+            tool_name, result, run_id=run.artifact_run_id, tenant=run.tenant
+        ).content
+    elif len(result) > 4_000:
+        # Cap individual tool results to avoid token explosion.
+        result = result[:4_000] + "\n…[truncated]"
+    return ToolMessage(content=result, tool_call_id=tc["id"])
+
+
 async def react_loop(
     llm: object,
     tools: list[BaseTool],
@@ -1037,18 +1292,7 @@ async def react_loop(
     agent_name: str = "agent",
     max_iterations: int = _MAX_REACT_ITERATIONS,
     session_id: str | None = None,
-    budget_guard: BudgetGuard | None = None,
-    injection_detector: IndirectInjectionDetector | None = None,
-    tool_policy: RunToolPolicy | None = None,
-    runaway_guard: RunawayGuard | None = None,
-    context_compactor: ContextCompactor | None = None,
-    tool_allow_set: frozenset[str] | None = None,
-    tool_phase: str | None = None,
-    audit_logger: Any | None = None,
-    deferred_tools: DeferredToolSet | None = None,
-    rebind_llm: Callable[[list[BaseTool]], object] | None = None,
-    tool_output_budget: ToolOutputBudget | None = None,
-    tenant: str = "default",
+    **options: Unpack[ReactLoopOptions],
 ) -> object:
     """Execute a ReAct (Reason + Act) tool loop until the LLM returns a final answer.
 
@@ -1109,24 +1353,33 @@ async def react_loop(
         the LLM (either because it had no tool calls, because all tools
         failed, or because the iteration cap was reached).
     """
-    from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+    from langchain_core.messages import AIMessage
 
     from prismal.agents.artifacts import anonymous_run_id
-    from prismal.routing.outcome import note_tool_error
 
-    tool_map: dict[str, BaseTool] = {t.name: t for t in tools}
-    loop_messages: list[object] = list(messages)
-    # One artifact scope per loop: never a shared constant across sessions/tenants.
-    artifact_run_id = session_id or anonymous_run_id()
-    output_budget = (
-        tool_output_budget if tool_output_budget is not None else _default_tool_output_budget()
+    _check_react_options(dict(options))
+    budget_guard = options.get("budget_guard")
+    tool_allow_set = options.get("tool_allow_set")
+    deferred_tools = options.get("deferred_tools")
+    explicit_budget = options.get("tool_output_budget")
+    run = _ReactRun(
+        agent_name=agent_name,
+        session_id=session_id,
+        options=options,
+        tool_map={t.name: t for t in tools},
+        # One artifact scope per loop: never a shared constant across sessions/tenants.
+        artifact_run_id=session_id or anonymous_run_id(),
+        output_budget=(
+            explicit_budget if explicit_budget is not None else _default_tool_output_budget()
+        ),
+        tenant=options.get("tenant", "default"),
     )
+    loop_messages: list[object] = list(messages)
     if tool_allow_set is not None:
-        loop_messages = _with_allowed_tools_hint(loop_messages, tool_allow_set, tool_phase)
+        loop_messages = _with_allowed_tools_hint(
+            loop_messages, tool_allow_set, options.get("tool_phase")
+        )
     response = AIMessage(content="")
-
-    # Consecutive failure counter per tool name — reset to 0 on success.
-    _tool_fail_counts: dict[str, int] = {}
 
     for iteration in range(max_iterations):
         partial = _budget_partial_or_none(
@@ -1134,14 +1387,7 @@ async def react_loop(
         )
         if partial is not None:
             return partial
-        if context_compactor is not None:
-            loop_messages = list(
-                await context_compactor.compact_list(
-                    loop_messages,  # type: ignore[arg-type]
-                    run_id=artifact_run_id,
-                    tenant=tenant,
-                )
-            )
+        loop_messages = await run.compact(loop_messages)
         try:
             response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
                 llm,
@@ -1167,7 +1413,11 @@ async def react_loop(
 
         # Phase H — runaway guard tick (step cap + stagnation) before acting.
         runaway_partial = _runaway_partial_or_none(
-            runaway_guard, response, tool_calls, agent_name=agent_name, session_id=session_id
+            options.get("runaway_guard"),
+            response,
+            tool_calls,
+            agent_name=agent_name,
+            session_id=session_id,
         )
         if runaway_partial is not None:
             return runaway_partial
@@ -1181,144 +1431,12 @@ async def react_loop(
         )
 
         loop_messages.append(response)
-        successful_calls = 0
-
-        # Tools rate-limited within THIS iteration (transient — do not count
-        # toward the permanent failure budget; the service is just throttling).
-        _rate_limited_this_iter: set[str] = set()
-        masked_this_iter = 0
-
+        run.start_iteration()
         for tc in tool_calls:
-            tool_name: str = tc["name"]
-            tool_fn = tool_map.get(tool_name)
-
-            if tool_allow_set is not None and tool_name not in tool_allow_set:
-                # Phase TKE mask mode — fail-closed: never execute (SPEC-TKE-GAT-001).
-                from prismal.agents.tool_gate import (
-                    check_tool_call,
-                    masked_tool_message,
-                    record_masked_call,
-                )
-
-                verdict = check_tool_call(tool_name, tool_allow_set, tool_phase)
-                record_masked_call(verdict, agent=agent_name, audit_logger=audit_logger)
-                loop_messages.append(masked_tool_message(tc, verdict))
-                masked_this_iter += 1
-                continue
-
-            if tool_fn is None:
-                logger.warning(
-                    "react_loop.tool_not_found",
-                    agent=agent_name,
-                    tool_name=tool_name,
-                    available_tools=sorted(tool_map.keys()),
-                    session_id=session_id,
-                )
-                result = f"Tool '{tool_name}' not found."
-
-            elif _tool_fail_counts.get(tool_name, 0) >= _MAX_TOOL_FAILURES:
-                # Tool exhausted its permanent failure budget — skip without calling.
-                logger.warning(
-                    "react_loop.tool_skipped_unavailable",
-                    agent=agent_name,
-                    tool_name=tool_name,
-                    failures=_tool_fail_counts[tool_name],
-                    session_id=session_id,
-                )
-                result = (
-                    f"Tool '{tool_name}' is currently unavailable "
-                    f"(failed on {_tool_fail_counts[tool_name]} previous attempts). "
-                    "Please use a different approach or inform the user that this "
-                    "service cannot be reached right now."
-                )
-
-            elif tool_name in _rate_limited_this_iter:
-                # Already hit the rate limit for this tool in this iteration.
-                # Skip without an API call so we don't keep hammering the quota.
-                logger.debug(
-                    "react_loop.tool_skipped_rate_limited",
-                    agent=agent_name,
-                    tool_name=tool_name,
-                    session_id=session_id,
-                )
-                result = (
-                    f"Tool '{tool_name}' was rate-limited earlier in this step "
-                    "and has been skipped to avoid exceeding the API quota. "
-                    "Please space out search calls or use fewer concurrent queries."
-                )
-
-            elif (
-                _policy_block := _tool_policy_block_message(
-                    tool_policy,
-                    agent_name=agent_name,
-                    tool_name=tool_name,
-                    args=tc.get("args", {}) or {},
-                )
-            ) is not None:
-                # Phase H — tool denied or gated by declarative policy.
-                result = _policy_block
-
-            else:
-                try:
-                    result = str(await tool_fn.ainvoke(tc.get("args", {})))
-                    _tool_fail_counts[tool_name] = 0  # reset on success
-                    successful_calls += 1
-                    # Phase H — screen the untrusted result before re-injection.
-                    result = await _screen_tool_result(
-                        injection_detector,
-                        result,
-                        tool_name=tool_name,
-                        agent_name=agent_name,
-                        session_id=session_id,
-                    )
-                except Exception as exc:
-                    if _RATE_LIMIT_RE.search(str(exc)):
-                        # Transient rate-limit (429): mark for this iteration only.
-                        # Do NOT burn the permanent failure budget so the tool
-                        # remains available in the next iteration after the
-                        # back-off window resets.
-                        _rate_limited_this_iter.add(tool_name)
-                        logger.warning(
-                            "react_loop.tool_rate_limited",
-                            agent=agent_name,
-                            tool_name=tool_name,
-                            error=str(exc),
-                            backoff_seconds=_RATE_LIMIT_BACKOFF,
-                            session_id=session_id,
-                        )
-                        await asyncio.sleep(_RATE_LIMIT_BACKOFF)
-                        result = (
-                            f"Tool '{tool_name}' is temporarily rate-limited "
-                            f"(HTTP 429). A {_RATE_LIMIT_BACKOFF}s back-off was "
-                            "applied. Please reduce the number of concurrent "
-                            "requests to this tool in your next step."
-                        )
-                    else:
-                        # Permanent-style failure: increment the failure budget.
-                        _tool_fail_counts[tool_name] = _tool_fail_counts.get(tool_name, 0) + 1
-                        note_tool_error()  # Phase AMR: cascade tool_errors trigger
-                        logger.warning(
-                            "react_loop.tool_error",
-                            agent=agent_name,
-                            tool_name=tool_name,
-                            error=str(exc),
-                            total_failures=_tool_fail_counts[tool_name],
-                            session_id=session_id,
-                        )
-                        result = f"Tool error: {exc}"
-
-            if output_budget is not None and output_budget.enabled:
-                # Phase TKE — budget after the Phase H screen (SPEC-TKE-OUT-001).
-                result = output_budget.apply(
-                    tool_name, result, run_id=artifact_run_id, tenant=tenant
-                ).content
-            elif len(result) > 4_000:
-                # Cap individual tool results to avoid token explosion.
-                result = result[:4_000] + "\n…[truncated]"
-            loop_messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
+            loop_messages.append(await _tool_call_message(run, tc))
 
         if deferred_tools is not None:
-            llm = _sync_deferred_tools(deferred_tools, tool_map, llm, rebind_llm)
+            llm = _sync_deferred_tools(deferred_tools, run.tool_map, llm, options.get("rebind_llm"))
 
         # ── All-tools-failed early exit ───────────────────────────────────
         # Fire only when every call in this iteration had a *permanent* error
@@ -1326,49 +1444,16 @@ async def react_loop(
         # transient — the service is reachable, just throttling — so they do
         # not count as a permanent failure and the loop must continue to the
         # next iteration where the back-off window has likely reset.
-        if successful_calls == 0 and not _rate_limited_this_iter and not masked_this_iter:
+        if run.successes == 0 and not run.rate_limited and not run.masked:
             logger.warning(
                 "react_loop.all_tools_failed",
                 agent=agent_name,
                 iteration=iteration,
                 session_id=session_id,
             )
-            loop_messages.append(
-                HumanMessage(
-                    content=(
-                        "All tool calls in this step failed — the required external "
-                        "services may be temporarily unavailable or misconfigured. "
-                        "Based on what you already know, please provide your best "
-                        "answer and clearly state which information you could not "
-                        "retrieve and why."
-                    )
-                )
+            response = await _final_llm_turn(  # type: ignore[assignment]
+                run, llm, loop_messages, _ALL_TOOLS_FAILED_PROMPT, iteration=iteration
             )
-            if context_compactor is not None:
-                loop_messages = list(
-                    await context_compactor.compact_list(
-                        loop_messages,  # type: ignore[arg-type]
-                        run_id=artifact_run_id,
-                        tenant=tenant,
-                    )
-                )
-            try:
-                response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
-                    llm,
-                    loop_messages,
-                    agent_name=agent_name,
-                    session_id=session_id,
-                    iteration=iteration,
-                )
-            except Exception as llm_exc:
-                return _llm_error_fallback(
-                    llm_exc,
-                    agent_name=agent_name,
-                    session_id=session_id,
-                    iteration=iteration,
-                    rate_limit_message=_RATE_LIMIT_MSG,
-                )
-            _meter_response(budget_guard, response, llm, agent_name)
             break
 
     else:
@@ -1382,42 +1467,9 @@ async def react_loop(
         # Append the last tool results already in loop_messages and ask the LLM
         # to synthesise a final answer from everything gathered so far.
         loop_messages.append(response)
-        loop_messages.append(
-            HumanMessage(
-                content=(
-                    "You have reached the maximum number of tool call iterations. "
-                    "Based on everything you have gathered so far, please provide "
-                    "your best final answer to the user's original question. "
-                    "If you were unable to retrieve the needed information, say so "
-                    "clearly and explain what you found instead."
-                )
-            )
+        response = await _final_llm_turn(  # type: ignore[assignment]
+            run, llm, loop_messages, _ITERATION_CAP_PROMPT, iteration=max_iterations
         )
-        if context_compactor is not None:
-            loop_messages = list(
-                await context_compactor.compact_list(
-                    loop_messages,  # type: ignore[arg-type]
-                    run_id=artifact_run_id,
-                    tenant=tenant,
-                )
-            )
-        try:
-            response = await _invoke_llm_with_backoff(  # type: ignore[assignment]
-                llm,
-                loop_messages,
-                agent_name=agent_name,
-                session_id=session_id,
-                iteration=max_iterations,
-            )
-        except Exception as llm_exc:
-            return _llm_error_fallback(
-                llm_exc,
-                agent_name=agent_name,
-                session_id=session_id,
-                iteration=max_iterations,
-                rate_limit_message=_RATE_LIMIT_MSG,
-            )
-        _meter_response(budget_guard, response, llm, agent_name)
 
     return _sanitise_final_response(response)
 
@@ -1433,6 +1485,7 @@ def load_phase_capability_map(path: str | None = None) -> dict[str, dict[str, li
 
 __all__ = [
     "DEFAULT_CAPABILITY_MAP",
+    "ReactLoopOptions",
     "get_mcp_tools",
     "get_recommended_capabilities",
     "get_skill_tools",

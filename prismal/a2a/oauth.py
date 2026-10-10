@@ -30,6 +30,7 @@ import ipaddress
 import json
 import secrets
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from urllib.parse import parse_qs, urlencode, urlparse
 
@@ -162,6 +163,54 @@ def read_bound_refresh(value: SecretStr) -> tuple[str, str] | None:
     return None
 
 
+@dataclass(frozen=True)
+class EndpointPolicy:
+    """Host policy for remote endpoints (OAuth token / authorize / device, A2A RPC URL).
+
+    See :func:`_require_https`: HTTPS only, ``http://localhost`` only with
+    ``allow_insecure_localhost``, literal private IPs only with
+    ``allow_private_hosts``, and the host must match ``allowlist`` when one is
+    set (always under ``strict``, where an empty allowlist denies everything).
+    The defaults are the strictest setting.
+    """
+
+    allow_insecure_localhost: bool = False
+    allow_private_hosts: bool = False
+    allowlist: Sequence[str] | None = None
+    strict: bool = False
+
+    def __post_init__(self) -> None:
+        # Frozen + hashable: an empty allowlist is "no allowlist" (as before).
+        object.__setattr__(self, "allowlist", tuple(self.allowlist) if self.allowlist else None)
+
+    def check(self, url: str) -> None:
+        """Raise :class:`A2AOAuthError` when *url* violates this policy."""
+        _require_https(
+            url,
+            allow_insecure_localhost=self.allow_insecure_localhost,
+            allow_private_hosts=self.allow_private_hosts,
+            allowlist=self.allowlist,
+            strict=self.strict,
+        )
+
+
+@dataclass(frozen=True)
+class OAuthBinding:
+    """Local runtime binding of an OAuth flow.
+
+    The vault partition is ``org_id`` (+ ``principal``) from the local
+    authenticated context — never anything the remote side sent.
+    ``http_client`` / ``clock`` / ``audit`` are injectable for hosts and tests.
+    """
+
+    vault: CredentialVaultPort | None = None
+    org_id: str | None = None
+    principal: str | None = None
+    http_client: httpx.AsyncClient | None = None
+    clock: Callable[[], float] | None = None
+    audit: Any | None = None
+
+
 def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()[:12]
 
@@ -178,38 +227,26 @@ class _OAuthFlow:
         client_id: str,
         scopes: Sequence[str],
         vault_key: str,
-        prompter: AuthorizationPrompter | None,
-        vault: CredentialVaultPort | None,
-        org_id: str | None,
-        http_client: httpx.AsyncClient | None,
-        clock: Callable[[], float] | None,
-        audit: Any | None,
-        allow_insecure_localhost: bool = False,
-        allow_private_hosts: bool = False,
-        allowlist: Sequence[str] | None = None,
-        strict: bool = False,
-        principal: str | None = None,
+        prompter: AuthorizationPrompter | None = None,
+        binding: OAuthBinding | None = None,
+        policy: EndpointPolicy | None = None,
     ) -> None:
-        self._policy: dict[str, Any] = {
-            "allow_insecure_localhost": allow_insecure_localhost,
-            "allow_private_hosts": allow_private_hosts,
-            "allowlist": list(allowlist) if allowlist else None,
-            "strict": strict,
-        }
-        _require_https(token_url, **self._policy)
+        binding = binding or OAuthBinding()
+        self._policy = policy or EndpointPolicy()
+        self._policy.check(token_url)
         self._token_url = token_url
         self._client_id = client_id
         self._scopes = list(scopes)
         # Partition = the LOCAL org (+ principal), never anything the remote side sent.
-        partition = org_id or _DEFAULT_PARTITION
-        if principal:
-            partition = f"{partition}/{principal}"
+        partition = binding.org_id or _DEFAULT_PARTITION
+        if binding.principal:
+            partition = f"{partition}/{binding.principal}"
         self._vault_ref = f"{vault_key}@{partition}"
         self._prompter = prompter
-        self._vault = vault
-        self._http_client = http_client
-        self._clock = clock or time.monotonic
-        self._audit = audit
+        self._vault = binding.vault
+        self._http_client = binding.http_client
+        self._clock = binding.clock or time.monotonic
+        self._audit = binding.audit
         self._access: SecretStr | None = None
         self._expires_at = 0.0
         self._lock = asyncio.Lock()
@@ -338,17 +375,9 @@ class PkceAuthorizationCodeFlow(_OAuthFlow):
         scopes: Sequence[str],
         vault_key: str,
         prompter: AuthorizationPrompter | None = None,
-        vault: CredentialVaultPort | None = None,
-        org_id: str | None = None,
-        http_client: httpx.AsyncClient | None = None,
-        clock: Callable[[], float] | None = None,
-        audit: Any | None = None,
+        binding: OAuthBinding | None = None,
+        policy: EndpointPolicy | None = None,
         code_challenge_method: str = "S256",
-        allow_insecure_localhost: bool = False,
-        allow_private_hosts: bool = False,
-        allowlist: Sequence[str] | None = None,
-        strict: bool = False,
-        principal: str | None = None,
     ) -> None:
         if code_challenge_method != "S256":
             raise A2AOAuthError("only the S256 PKCE method is supported")
@@ -358,18 +387,10 @@ class PkceAuthorizationCodeFlow(_OAuthFlow):
             scopes=scopes,
             vault_key=vault_key,
             prompter=prompter,
-            vault=vault,
-            org_id=org_id,
-            http_client=http_client,
-            clock=clock,
-            audit=audit,
-            allow_insecure_localhost=allow_insecure_localhost,
-            allow_private_hosts=allow_private_hosts,
-            allowlist=allowlist,
-            strict=strict,
-            principal=principal,
+            binding=binding,
+            policy=policy,
         )
-        _require_https(authorize_url, **self._policy)
+        self._policy.check(authorize_url)
         self._authorize_url = authorize_url
         self._redirect_uri = redirect_uri
 
@@ -428,17 +449,9 @@ class DeviceCodeFlow(_OAuthFlow):
         vault_key: str,
         prompter: AuthorizationPrompter | None = None,
         max_wait_s: int = 600,
-        vault: CredentialVaultPort | None = None,
-        org_id: str | None = None,
-        http_client: httpx.AsyncClient | None = None,
-        clock: Callable[[], float] | None = None,
+        binding: OAuthBinding | None = None,
+        policy: EndpointPolicy | None = None,
         sleep: Callable[[float], Awaitable[None]] | None = None,
-        audit: Any | None = None,
-        allow_insecure_localhost: bool = False,
-        allow_private_hosts: bool = False,
-        allowlist: Sequence[str] | None = None,
-        strict: bool = False,
-        principal: str | None = None,
     ) -> None:
         super().__init__(
             token_url=token_url,
@@ -446,18 +459,10 @@ class DeviceCodeFlow(_OAuthFlow):
             scopes=scopes,
             vault_key=vault_key,
             prompter=prompter,
-            vault=vault,
-            org_id=org_id,
-            http_client=http_client,
-            clock=clock,
-            audit=audit,
-            allow_insecure_localhost=allow_insecure_localhost,
-            allow_private_hosts=allow_private_hosts,
-            allowlist=allowlist,
-            strict=strict,
-            principal=principal,
+            binding=binding,
+            policy=policy,
         )
-        _require_https(device_authorization_url, **self._policy)
+        self._policy.check(device_authorization_url)
         self._device_url = device_authorization_url
         self._max_wait_s = max_wait_s
         self._sleep = sleep or asyncio.sleep
@@ -521,16 +526,10 @@ def select_oauth_flow(
     auth: A2AAuth,
     prompter: AuthorizationPrompter | None,
     redirect_uri: str | None = None,
-    vault: CredentialVaultPort | None = None,
-    org_id: str | None = None,
-    http_client: httpx.AsyncClient | None = None,
+    binding: OAuthBinding | None = None,
+    policy: EndpointPolicy | None = None,
     vault_key: str | None = None,
     agent_url: str | None = None,
-    allowlist: Sequence[str] | None = None,
-    allow_insecure_localhost: bool = False,
-    allow_private_hosts: bool = False,
-    strict: bool = False,
-    principal: str | None = None,
 ) -> PkceAuthorizationCodeFlow | DeviceCodeFlow | None:
     """Card-driven interactive flow selection (PKCE when a redirect URI exists, else device).
 
@@ -550,13 +549,6 @@ def select_oauth_flow(
         raise A2AOAuthError("remote agent requires interactive OAuth but no prompter is injected")
     base = agent_url or (card.supported_interfaces[0].url if card.supported_interfaces else "")
     client_id = auth.client_id or ""
-    policy: dict[str, Any] = {
-        "allowlist": allowlist,
-        "allow_insecure_localhost": allow_insecure_localhost,
-        "allow_private_hosts": allow_private_hosts,
-        "strict": strict,
-        "principal": principal,
-    }
     for flow in flows:
         ac = flow.authorization_code
         if ac is not None and redirect_uri:
@@ -568,10 +560,8 @@ def select_oauth_flow(
                 scopes=list(ac.scopes),
                 vault_key=vault_key or default_vault_key(ac.token_url, base),
                 prompter=prompter,
-                vault=vault,
-                org_id=org_id,
-                http_client=http_client,
-                **policy,
+                binding=binding,
+                policy=policy,
             )
     for flow in flows:
         dc = flow.device_code
@@ -583,10 +573,8 @@ def select_oauth_flow(
                 scopes=list(dc.scopes),
                 vault_key=vault_key or default_vault_key(dc.token_url, base),
                 prompter=prompter,
-                vault=vault,
-                org_id=org_id,
-                http_client=http_client,
-                **policy,
+                binding=binding,
+                policy=policy,
             )
     raise A2AOAuthError("authorization-code flow needs a redirect URI (a2a_oauth_redirect_uri)")
 
@@ -594,6 +582,8 @@ def select_oauth_flow(
 __all__ = [
     "AuthorizationPrompter",
     "DeviceCodeFlow",
+    "EndpointPolicy",
+    "OAuthBinding",
     "PkceAuthorizationCodeFlow",
     "bind_refresh_token",
     "default_vault_key",

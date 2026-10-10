@@ -13,6 +13,7 @@ from typing import Any
 import httpx
 import pytest
 from pydantic import SecretStr
+from tests.unit.a2a._grouped_kwargs import grouped
 
 from prismal.a2a.client import A2AClient, A2AConnectionManager
 from prismal.a2a.types import A2AAuth, A2AMessage, A2APart
@@ -84,7 +85,11 @@ def _bearer() -> A2AAuth:
 
 
 def _client(rec: _Recorder, base: str = BASE, **kw: Any) -> A2AClient:
-    return A2AClient(base, http_client=httpx.AsyncClient(transport=httpx.MockTransport(rec)), **kw)
+    return A2AClient(
+        base,
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(rec)),
+        **grouped(kw, binding=False),
+    )
 
 
 async def _send(client: A2AClient) -> None:

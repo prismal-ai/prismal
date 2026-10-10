@@ -124,6 +124,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The notebook is still to come.
 - Graphiti sends anonymous telemetry unless `GRAPHITI_TELEMETRY_ENABLED=false`.
 
+### Changed (wave APIs, before their first publication)
+- `react_loop` takes its optional layers as `**options: Unpack[ReactLoopOptions]`
+  (a `TypedDict`, type-checked by mypy at every call site). Every existing
+  keyword and the `**hardening_react_kwargs(state)` / `tool_gate_react_kwargs`
+  splats work unchanged; an unknown keyword still raises `TypeError`. The loop
+  body is split into helpers (no behaviour change).
+- A2A OAuth flows (`PkceAuthorizationCodeFlow`, `DeviceCodeFlow`,
+  `select_oauth_flow`) and `A2AClient` take `policy=EndpointPolicy(...)`
+  instead of the four flat host-policy flags, and the flows take
+  `binding=OAuthBinding(...)` instead of `vault` / `org_id` / `principal` /
+  `http_client` / `clock` / `audit`. `A2AConnectionManager` keeps its signature.
+  `A2AClient` now forwards the **whole** policy to the card's OAuth endpoints
+  (it used to forward only `allowlist` / `strict`).
+
 ### Security
 - Dependency refresh (2026-10-10) clearing every pip-audit finding and every
   trivy HIGH/CRITICAL finding that has an upstream fix: `aiohttp` 3.14.4, `anyio` 4.14.2,

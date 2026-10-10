@@ -38,6 +38,7 @@ from urllib.parse import urlparse
 
 from prismal.a2a import convert
 from prismal.a2a.negotiation import count_a2a_request, select_interface_url, select_outbound
+from prismal.a2a.oauth import EndpointPolicy, OAuthBinding
 from prismal.a2a.types import A2AArtifact, A2AAuth, A2AMessage, A2APart, AgentCard
 from prismal.a2a.v1 import constants as v1c
 from prismal.a2a.v1.types import AgentCardV1, ListTasksResult, StreamResponse
@@ -45,7 +46,7 @@ from prismal.core.exceptions import A2AAgentUnavailable, A2AVersionError
 from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Sequence
+    from collections.abc import AsyncIterator
 
     from langchain_core.messages import BaseMessage
 
@@ -89,21 +90,18 @@ class A2AClient:
         prompter: AuthorizationPrompter | None = None,
         vault: CredentialVaultPort | None = None,
         redirect_uri: str | None = None,
-        allowlist: Sequence[str] | None = None,
-        strict: bool = False,
         local_org_id: str | None = None,
         principal: str | None = None,
         http_client: Any | None = None,
-        allow_insecure_localhost: bool = False,
-        allow_private_hosts: bool = False,
+        policy: EndpointPolicy | None = None,
     ) -> None:
         """``tenant`` / the card's interface tenant only fill the outbound A2A
         ``tenant`` param; the OAuth vault partition is ``local_org_id`` (+
         ``principal``) from the local authenticated context — never remote data.
 
         The RPC URL adopted from the remote card is validated before every
-        request (:meth:`_rpc_url`); ``allow_insecure_localhost`` /
-        ``allow_private_hosts`` are the same opt-ins as the OAuth endpoint policy."""
+        request (:meth:`_rpc_url`) with ``policy`` — the same
+        :class:`~prismal.a2a.oauth.EndpointPolicy` the card's OAuth endpoints get."""
         if protocol not in ("auto", "0.3", "1.0"):
             raise ValueError(f"unsupported A2A protocol: {protocol!r}")
         self._protocol: ClientProtocol = protocol
@@ -111,12 +109,9 @@ class A2AClient:
         self._prompter = prompter
         self._vault = vault
         self._redirect_uri = redirect_uri
-        self._allowlist = list(allowlist) if allowlist else None
-        self._strict = strict
+        self._policy = policy or EndpointPolicy()
         self._local_org_id = local_org_id
         self._principal = principal
-        self._allow_insecure_localhost = allow_insecure_localhost
-        self._allow_private_hosts = allow_private_hosts
         self._version: v1c.A2AProtocolVersion | None = None
         self._card_v1: AgentCardV1 | None = None
         self._card_tenant: str | None = None
@@ -221,21 +216,15 @@ class A2AClient:
         of the URL the card was discovered at, so a token issued for host A is
         never replayed to host B. No auth + no allowlist ⇒ unchanged behaviour.
         """
-        from prismal.a2a.oauth import _origin, _require_https
+        from prismal.a2a.oauth import _origin
         from prismal.core.exceptions import A2AOAuthError
 
         url = card.url
         with_creds = self._sends_credentials()
-        if not (with_creds or self._allowlist or self._strict):
+        if not (with_creds or self._policy.allowlist or self._policy.strict):
             return url
         try:
-            _require_https(
-                url,
-                allow_insecure_localhost=self._allow_insecure_localhost,
-                allow_private_hosts=self._allow_private_hosts,
-                allowlist=self._allowlist,
-                strict=self._strict,
-            )
+            self._policy.check(url)
         except A2AOAuthError as exc:
             reason = str(exc).replace("OAuth endpoint", "A2A RPC URL")
             logger.warning("a2a.rpc_url_denied", host=_host_of(url))
@@ -275,13 +264,14 @@ class A2AClient:
             auth=self._auth,
             prompter=self._prompter,
             redirect_uri=self._redirect_uri,
-            vault=self._vault,
-            org_id=self._local_org_id,
-            principal=self._principal,
-            http_client=self._http(),
+            binding=OAuthBinding(
+                vault=self._vault,
+                org_id=self._local_org_id,
+                principal=self._principal,
+                http_client=self._http(),
+            ),
+            policy=self._policy,
             agent_url=self._card_url,
-            allowlist=self._allowlist,
-            strict=self._strict,
         )
         self._oauth_resolved = True
         return self._oauth_flow
@@ -546,8 +536,7 @@ class A2AConnectionManager:
             client = A2AClient(
                 card_url,
                 auth=self._auth,
-                allowlist=self._allowlist,
-                strict=self._strict,
+                policy=EndpointPolicy(allowlist=self._allowlist, strict=self._strict),
                 local_org_id=self._local_org_id,
                 principal=self._principal,
                 prompter=self._prompter,

@@ -22,6 +22,8 @@ from prismal.a2a.negotiation import negotiate_inbound, select_outbound
 from prismal.a2a.oauth import (
     AuthorizationPrompter,
     DeviceCodeFlow,
+    EndpointPolicy,
+    OAuthBinding,
     PkceAuthorizationCodeFlow,
     select_oauth_flow,
 )
@@ -60,7 +62,9 @@ __all__ = [
     "AuthContext",
     "AuthorizationPrompter",
     "DeviceCodeFlow",
+    "EndpointPolicy",
     "InMemoryA2ATaskStore",
+    "OAuthBinding",
     "PkceAuthorizationCodeFlow",
     "TaskRecord",
     "a2a_route_paths",

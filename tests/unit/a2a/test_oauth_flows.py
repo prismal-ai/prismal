@@ -10,11 +10,14 @@ from urllib.parse import parse_qs, urlencode, urlparse
 import httpx
 import pytest
 from pydantic import SecretStr
+from tests.unit.a2a._grouped_kwargs import grouped
 
 from prismal.a2a import oauth as oauth_mod
 from prismal.a2a.oauth import (
     AuthorizationPrompter,
     DeviceCodeFlow,
+    EndpointPolicy,
+    OAuthBinding,
     PkceAuthorizationCodeFlow,
     bind_refresh_token,
     default_vault_key,
@@ -134,7 +137,7 @@ def _pkce(idp: _IdP, **kw: Any) -> PkceAuthorizationCodeFlow:
         "clock": clock,
     }
     params.update(kw)
-    return PkceAuthorizationCodeFlow(**params)
+    return PkceAuthorizationCodeFlow(**grouped(params))
 
 
 def test_prompter_protocol_is_runtime_checkable() -> None:
@@ -266,7 +269,7 @@ def _device(idp: _IdP, clock: _Clock, **kw: Any) -> DeviceCodeFlow:
         "sleep": clock.sleep,
     }
     params.update(kw)
-    return DeviceCodeFlow(**params)
+    return DeviceCodeFlow(**grouped(params))
 
 
 class TestDeviceCode:
@@ -398,9 +401,7 @@ class TestEndpointHardening:
             auth=A2AAuth(client_id="cid"),
             prompter=prompter,
             redirect_uri=REDIRECT,
-            vault=vault,
-            org_id="acme",
-            http_client=legit.client(),
+            binding=OAuthBinding(vault=vault, org_id="acme", http_client=legit.client()),
             agent_url="https://billing.acme/a2a",
         )
         assert good is not None
@@ -415,9 +416,7 @@ class TestEndpointHardening:
             auth=A2AAuth(client_id="cid"),
             prompter=prompter,
             redirect_uri=REDIRECT,
-            vault=vault,
-            org_id="acme",
-            http_client=evil.client(),
+            binding=OAuthBinding(vault=vault, org_id="acme", http_client=evil.client()),
             agent_url="https://billing.acme/a2a",
         )
         assert spoof is not None
@@ -511,7 +510,7 @@ class TestEndpointHardening:
                 auth=A2AAuth(client_id="cid"),
                 prompter=_Prompter(),
                 redirect_uri=REDIRECT,
-                allowlist=["*.trusted"],
+                policy=EndpointPolicy(allowlist=["*.trusted"]),
             )
 
     async def test_legitimate_refresh_still_works(self) -> None:
@@ -532,7 +531,7 @@ class TestStrictAndPartition:
                 auth=A2AAuth(client_id="cid"),
                 prompter=_Prompter(),
                 redirect_uri=REDIRECT,
-                strict=True,
+                policy=EndpointPolicy(strict=True),
             )
 
     def test_strict_requires_match(self) -> None:

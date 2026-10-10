@@ -12,6 +12,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from prismal.a2a import client as client_mod
 from prismal.a2a.client import A2AAgentNode, A2AClient
+from prismal.a2a.oauth import EndpointPolicy
 from prismal.a2a.provider import A2AToolProvider
 from prismal.a2a.types import A2AAuth, A2AMessage, A2APart, AgentCard
 from prismal.a2a.v1.types import ListTasksRequest, ListTasksResult
@@ -500,7 +501,7 @@ class TestLocalVaultPartition:
     async def test_strict_empty_allowlist_rejects_card_token_url(self) -> None:
         respx.get(CARD_URL).mock(return_value=httpx.Response(200, json=_device_card("t")))
         rpc = respx.post(V1_RPC).mock(return_value=_stream(DONE_EV))
-        client = A2AClient(CARD_URL, prompter=_Prompter(), strict=True)
+        client = A2AClient(CARD_URL, prompter=_Prompter(), policy=EndpointPolicy(strict=True))
         # Strict + empty allowlist: the card's RPC URL is now denied first
         # (A2AAgentUnavailable) — before any OAuth endpoint is even contacted.
         with pytest.raises(A2AError):
@@ -524,7 +525,6 @@ class TestManagerThreading:
         client = await mgr.get_client(CARD_URL)
         assert client._local_org_id == "acme"
         assert client._principal == "alice"
-        assert client._strict is True
-        assert client._allowlist == ["*.acme"]
+        assert client._policy == EndpointPolicy(allowlist=["*.acme"], strict=True)
         assert client._prompter is prompter
         await mgr.aclose()

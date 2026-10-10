@@ -57,6 +57,11 @@ tenant_scoped)`; `a2a_base_url.rstrip("/") + rpc_path` is exactly the URL the ca
 - Token / authorization / device URLs must be `https`; literal private, loopback and link-local
   IPs are rejected. Under `a2a_strict=True` their hosts must also match `a2a_outbound_allowlist`
   (empty ⇒ deny).
+- The host policy is one frozen value, `EndpointPolicy(allow_insecure_localhost=, allow_private_hosts=,
+  allowlist=, strict=)` (defaults = strictest). `A2AClient(policy=...)` applies it to the card's RPC
+  URL **and** to the card's OAuth endpoints; the flows take it as `policy=` plus an
+  `OAuthBinding(vault=, org_id=, principal=, http_client=, clock=, audit=)` for the local runtime
+  binding. Both are exported from `prismal.a2a`.
 - **Residual risk:** outside strict mode and with no allowlist, a *hostname* that resolves to an
   internal address is not caught (no DNS resolution / IP pinning). Production hosts should run
   with `a2a_strict=True` and an allowlist.
