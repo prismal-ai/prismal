@@ -124,6 +124,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The notebook is still to come.
 - Graphiti sends anonymous telemetry unless `GRAPHITI_TELEMETRY_ENABLED=false`.
 
+### Security
+- Dependency refresh (2026-10-10) clearing every pip-audit finding and every
+  trivy HIGH/CRITICAL finding that has an upstream fix: `aiohttp` 3.14.4, `anyio` 4.14.2,
+  `cryptography` 50.0.0, `pyjwt` 2.15.1, `litellm` 1.96.2 (+ `langchain-litellm`
+  0.7.1, `langchain-core` 1.6.9), `urllib3` 2.8.0, `pypdf` 6.20.0,
+  `sentence-transformers` 5.6.0, `unstructured` 0.24.0, `pymongo` 4.18.2,
+  `langgraph-checkpoint-sqlite`/`-postgres` 3.1.1, `lightning` 2.6.6, plus
+  transitive and toolchain packages. Direct-dependency floors raised accordingly.
+  GW0-03 (`ChatLiteLLM` hooks) re-verified on `langchain-litellm` 0.7.1.
+- Accepted without an upstream fix (justified in `.trivyignore`, mirrored in
+  `ci.yml` and `.pre-commit-config.yaml`): `chromadb` CVE-2026-45830/45831/45833
+  (Chroma *server* RBAC / code injection; prismal uses Chroma embedded),
+  `nltk` CVE-2026-81726 and `accelerate` CVE-2026-69112 (transitive via the
+  optional `[compression]` extra; affected APIs unused).
+
 ### Fixed
 - CI (`release.yml`): the `github-release` job now retries with backoff and
   only trusts a `gh release view` "not found", instead of failing the whole
