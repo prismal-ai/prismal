@@ -149,11 +149,11 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`.
 
 ## 6. Definition of Done
 
-- [ ] All MUST requirements implemented and traced (§8); GRF-001 (SHOULD) implemented or deferred with a note.
-- [ ] MEM0 verification closed; **[verify]** markers resolved or retained with dated notes.
-- [ ] Legacy APIs unchanged; flags off ⇒ snapshot identical; facades and backfill documented.
-- [ ] Taint T1–T7, tenancy and forget actor matrix proven by tests; no non-rule/non-human deletion path exists.
-- [ ] Eval subset meets PLAN §4 targets; docs, example and notebook published.
+- [x] All MUST requirements implemented and traced (§8); GRF-001 (SHOULD) implemented or deferred with a note.
+- [x] MEM0 verification closed; **[verify]** markers resolved or retained with dated notes.
+- [x] Legacy APIs unchanged; flags off ⇒ snapshot identical; facades and backfill documented.
+- [x] Taint T1–T7, tenancy and forget actor matrix proven by tests; no non-rule/non-human deletion path exists.
+- [ ] Eval subset meets PLAN §4 targets; docs, example and notebook published. _(2026-10-10: eval targets met and recorded in `docs/memory.md`; docs + example done; notebook pending in `prisma-notebooks`.)_
 
 ## 7. Effort Summary
 

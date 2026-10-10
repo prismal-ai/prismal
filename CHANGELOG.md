@@ -10,15 +10,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Fixed
-- CI (`release.yml`): the `github-release` job now retries with backoff and
-  only trusts a `gh release view` "not found", instead of failing the whole
-  release on a transient GitHub 5xx. During the 2026-07-19 GitHub Actions
-  incident a 503 on the asset upload made `gh release create` roll back the
-  half-made release, so v3.12.0 shipped to PyPI and GHCR without a GitHub
-  Release.
-
 ## [3.18.0] — 2026-10-07
+
+> **Release note (tag `prismal/v3.18.0`, 2026-10-10):** this tag ships the whole wave
+> 2026-10 at once — 3.13.0 (TKE), 3.14.0 (GW), 3.15.0 (DEC), 3.16.0 (AMR),
+> 3.17.0 (PRT + HRS) and 3.18.0 (MEM). The intermediate versions were never
+> tagged or published on their own; their changes are listed in their own
+> sections of `CHANGELOG.md`. Every new layer is opt-in and off by default.
 
 > Phase MEM — **Agentic memory v2**, the sixth and last in-repo milestone of
 > wave 2026-10. Typed (episodic / semantic / procedural / preference),
@@ -125,6 +123,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Not yet wired: agent adoption of `memory_block_for_prompt` (library seam only).
 - The notebook is still to come.
 - Graphiti sends anonymous telemetry unless `GRAPHITI_TELEMETRY_ENABLED=false`.
+
+### Fixed
+- CI (`release.yml`): the `github-release` job now retries with backoff and
+  only trusts a `gh release view` "not found", instead of failing the whole
+  release on a transient GitHub 5xx. During the 2026-07-19 GitHub Actions
+  incident a 503 on the asset upload made `gh release create` roll back the
+  half-made release, so v3.12.0 shipped to PyPI and GHCR without a GitHub
+  Release.
 
 ## [3.17.0] — 2026-10-06
 

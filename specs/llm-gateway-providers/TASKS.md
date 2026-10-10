@@ -156,10 +156,10 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. Implemented 2026-10-05 fo
 
 ## 6. Definition of Done (feature)
 
-- [ ] All MUST requirements implemented and tested; SHOULD (REC-001, OTEL-001) implemented; every GW0 task `DONE` and `VERIFY.md` committed.
-- [ ] Flag off ⇒ graph snapshot and `get_llm()` kwargs unchanged; no double fallback; privacy defaults on every OpenRouter request; ToS/compliance guards fail closed with zero requests.
-- [ ] No secret in `os.environ`, logs, exceptions or URLs; provider-import AST guard and `test_no_env_reads.py` pass.
-- [ ] `ruff`, `mypy --strict` and `bandit` clean; unit suite green; `docs/gateways.md` published.
+- [x] All MUST requirements implemented and tested; SHOULD (REC-001, OTEL-001) implemented; every GW0 task `DONE` and `VERIFY.md` committed.
+- [x] Flag off ⇒ graph snapshot and `get_llm()` kwargs unchanged; no double fallback; privacy defaults on every OpenRouter request; ToS/compliance guards fail closed with zero requests.
+- [x] No secret in `os.environ`, logs, exceptions or URLs; provider-import AST guard and `test_no_env_reads.py` pass.
+- [x] `ruff`, `mypy --strict` and `bandit` clean; unit suite green; `docs/gateways.md` published.
 
 ## 7. Effort Summary
 | Phase | Focus | Est. |

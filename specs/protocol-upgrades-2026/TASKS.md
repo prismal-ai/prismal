@@ -162,10 +162,10 @@ coverage ≥ 80 % on new modules; snapshot (PRT6-03) green.
 | OAuth flows untestable without an IdP / multi-worker task store | Fake IdP + fake clock; port allows a SQLite task-store adapter later |
 
 ## 6. Definition of Done (feature)
-- [ ] ADR-PRT-001 merged; all verify rows closed; every MUST requirement has ≥ 1 task and test (§8).
-- [ ] Defaults ⇒ v0.3 A2A, legacy MCP and graph unchanged (snapshot + existing suites).
-- [ ] Usage wire fixture published and referenced by `prismal-server` RH2 and `prismal-sdk` CS2.
-- [ ] `prismal/events/**` HTTP-free; import guards pass; ruff/`mypy --strict`/bandit clean; coverage ≥ 80 %.
+- [x] ADR-PRT-001 merged; all verify rows closed; every MUST requirement has ≥ 1 task and test (§8).
+- [x] Defaults ⇒ v0.3 A2A, legacy MCP and graph unchanged (snapshot + existing suites).
+- [x] Usage wire fixture published and referenced by `prismal-server` RH2 and `prismal-sdk` CS2.
+- [x] `prismal/events/**` HTTP-free; import guards pass; ruff/`mypy --strict`/bandit clean; coverage ≥ 80 %.
 
 ## 7. Effort Summary
 

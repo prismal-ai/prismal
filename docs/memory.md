@@ -48,6 +48,8 @@ A runnable walk-through is in `examples/agentic_memory.py`.
 - **Untrusted text reaches decisions only as state.** Candidate, neighbour and recalled content goes through `DecisionStateBuilder.add_untrusted` (sanitized, fenced, scanned). Question texts are developer constants. This is how the SPEC's "via SecurePromptBuilder" is implemented for typed decisions. Recall rendering into an LLM prompt (`memory_block_for_prompt`) and the playbook curator use `SecurePromptBuilder`.
 - **Deletion.** An AST test (`tests/unit/memory/v2/test_import_guards.py`) allows `.purge(` calls only in `memory/v2/forget.py`. Agents, decision models, LLMs and consolidation get `MemoryForgetDenied`.
 - **Audit.** Writes, forgets and tenancy violations are logged hash-first: content and selector hashes, never content.
+- **Erasure of superseded records (intended).** With `include_derived`, forget also erases records that were superseded by a contradiction when they derive from the erased source. A superseded record is still personal data derived from that source, so the right to erasure covers it (decision 2026-10-10).
+- **Provenance is a host contract.** `origin="human"` ranks highest in provenance precedence (it wins contradictions and may supersede other records). Memory v2 trusts the `origin` it receives. A host must set `origin` from its own authenticated context and **never forward a caller-controlled `origin`** (for example from a request body or an A2A message) into `MemoryCandidate.origin` (`MemoryService.write`, the facades).
 
 ## Configuration
 

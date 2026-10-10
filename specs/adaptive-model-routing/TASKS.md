@@ -155,7 +155,7 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`.
 - [x] All AMR0 verification tasks closed; **[verify]** markers resolved or retained with dated notes.
 - [x] Flags off ⇒ snapshot identical; shadow mode ⇒ outputs identical, savings counter populated.
 - [x] Solver matches brute force on fixtures; deterministic; benchmark met.
-- [ ] Docs, example, notebook published; README/CHANGELOG marked planned until ship.
+- [ ] Docs, example, notebook published; README/CHANGELOG marked planned until ship. _(2026-10-10: `docs/routing.md`, example, README and CHANGELOG done; notebook pending in `prisma-notebooks`.)_
 
 ## 7. Effort Summary
 

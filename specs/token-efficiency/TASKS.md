@@ -160,10 +160,10 @@ Ten phases (TKE0 verify → TKE9 integration) plus the **optional P3** TKE10, ea
 | Masking loses data; envelopes break checkpoints | Mask only after successful artifact write (TKE4-06); optional fields + legacy round-trip (TKE7-04) |
 | Eval noise trips the gate; TKE10 scope creep | Fixed seeds/fakes, report-only until two green runs; TKE10 separately flagged, P3, last |
 ## 6. Definition of Done (feature)
-- [ ] All MUST requirements implemented and tested (§8); SHOULD implemented; TKE10 optional.
-- [ ] All flags off ⇒ graph snapshot + disabled contract tests prove zero behavior change; LH suite passes unmodified; LH delta documented (MODIFIED/ADDED).
-- [ ] Canary leak-detection parity proven on the H red-team corpus; eval gate green; PLAN §4 targets recorded in `docs/token-efficiency.md`.
-- [ ] `ruff` + `mypy --strict` + `bandit` clean; coverage ≥ 80 % on new modules; AST guards pass.
+- [ ] All MUST requirements implemented and tested (§8); SHOULD implemented; TKE10 optional. _(2026-10-10: open — ACC-005 baseline capture TKE1-08 is WIP; TKE10 deferred.)_
+- [x] All flags off ⇒ graph snapshot + disabled contract tests prove zero behavior change; LH suite passes unmodified; LH delta documented (MODIFIED/ADDED).
+- [ ] Canary leak-detection parity proven on the H red-team corpus; eval gate green; PLAN §4 targets recorded in `docs/token-efficiency.md`. _(2026-10-10: leak parity proven by `test_canary_leak_cache_stable.py`; PLAN §4 targets not measured — blocked on TKE1-08 / TKE9-04.)_
+- [x] `ruff` + `mypy --strict` + `bandit` clean; coverage ≥ 80 % on new modules; AST guards pass.
 ## 7. Effort Summary
 | TKE0 | TKE1 | TKE2 | TKE3 | TKE4 | TKE5 | TKE6 | TKE7 | TKE8 | TKE9 | **Core total** | TKE10 (optional P3) |
 |---|---|---|---|---|---|---|---|---|---|---|---|

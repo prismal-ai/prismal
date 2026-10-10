@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| **Last updated** | 2026-10-06 |
-| **Package version** | 3.17.0 |
+| **Last updated** | 2026-10-10 |
+| **Package version** | 3.18.0 |
 | **Author** | Ernesto Crespo |
 | **Latest spec** | `token-efficiency/` (TKE) · `llm-gateway-providers/` (GW) · `typed-decision-models/` (DEC) · `adaptive-model-routing/` (AMR) · `protocol-upgrades-2026/` (PRT) · `agentic-memory/` (MEM) — 2026-10-04 |
-| **Latest shipped** | `protocol-upgrades-2026/` (Phase PRT) + host read surface (HRS) — v3.17.0, 2026-10-06 (not yet tagged); AMR v3.16.0; DEC v3.15.0; GW v3.14.0; TKE v3.13.0 |
+| **Latest shipped** | `agentic-memory/` (Phase MEM) — v3.18.0, 2026-10-07; PRT + HRS v3.17.0; AMR v3.16.0; DEC v3.15.0; GW v3.14.0; TKE v3.13.0 — wave 2026-10 released together under tag `prismal/v3.18.0` |
 
 Living index of every SDD under `specs/`: what has shipped, what is pending,
 and in which order the pending work fits together. Statuses are verified
@@ -50,16 +50,15 @@ Status legend: ✅ `IMPLEMENTED` · 📋 `READY` (full SDD, not implemented).
 | [`adaptive-model-routing/`](./adaptive-model-routing/) | AMR | ✅ | `routing/`: `RoutingPolicyPort` + static parity tier map, budget-aware soft-cap downgrade, cascade with DEC adequacy check + cache affinity, OmniRouter-style batch assignment (Lagrangian dual + greedy, Skynet/MoA), Beta-Binomial predictor, intent-keyed plan cache (`LLMCompiler`), response cache, `BatchExecutor` (Anthropic / OpenAI / OpenRouter `:batch`); fail-closed risk floors; `get_llm(features=, state=)`; eval `routing-gate`. Opt-in `adaptive_routing_enabled` (shadow first). Docs: `docs/routing.md` · **v3.16.0** |
 | [`protocol-upgrades-2026/`](./protocol-upgrades-2026/) | PRT | ✅ | A2A v0.3 + v1.0 dual-stack (`a2a/v1/`, header/method negotiation, codecs, per-version Agent Card, task store + `ListTasks`, PKCE/device-code OAuth, cross-tenant task guard), MCP 2026-07-28 stateless adapter (`legacy`/`stateless`/`auto`, in-house on `httpx`, `mcp` 1.28.1 kept) + `ttlMs` tool-list cache + tasks extension + input requests, AG-UI 1.0 translator (`events/agui.py`), 12-key usage wire; `interop` conformance marker. Wire pins: ADR-PRT-001. Docs: `docs/protocols-2026.md` · **v3.17.0** |
 | [`composition-root/` HRS delta](./composition-root/DELTA-2026-10-host-read-surface.md) | HRS | ✅ | `RuntimeContext` read methods (`budget_status`, `quota_windows`, `audit_page`, `verify_audit_chain`, `decisions_report`, `routing_report`, `a2a_routes`), frozen view types, in-process stats recorders, `build_runtime(config_source=)`. Docs: `docs/composition-root.md` §8 · **v3.17.0** |
+| [`agentic-memory/`](./agentic-memory/) | MEM | ✅ | `memory/v2/`: `MemoryPort` over the legacy stores (wrapped, never edited) with one-tenant `MemoryService`, decision-gated typed writes + taint T1–T7, budgeted recall (sufficiency/stop, prompt tail block), sleep-time consolidation (supersedes, never deletes), ACE playbooks, SQLite temporal graph + optional Graphiti (`[graph-memory]`), rule/HITL-only forget (AST-guarded `purge`), `CascadeDecisionPort`, synthetic LoCoMo-style eval. Opt-in `memory_v2_enabled` (shadow first). Docs: `docs/memory.md` · **v3.18.0** |
 
 ## 📋 Ready to implement (full SDD: PLAN + SPEC + ARCHITECTURE + TASKS)
 
 Sourced from the 2026-10-04 gap analysis
-(`docs/gap-analysis-gateways-tokens-decisions-2026-10.md`); none started yet. Each spec opens with a
+(`docs/gap-analysis-gateways-tokens-decisions-2026-10.md`); all six (TKE, GW, DEC, AMR, PRT + HRS, MEM) are now implemented; no full in-repo SDD is pending. Each spec opens with a
 **Phase 0 "verify before build"** for facts marked **[verify]** (post-mid-2026, single-source or vendor-published).
 
-| Spec | Phase | What it adds | Depends on | Effort |
-|---|---|---|---|---|
-| [`agentic-memory/`](./agentic-memory/) | MEM | `MemoryPort` over existing stores (no breaking change), typed + decision-gated writes (Jev-Mem), budgeted recall with sufficiency/stop, sleep-time consolidation, ACE playbooks (procedural), optional temporal-graph adapter; deletion rule-based / HITL only | DEC, TKE, R, AMR5 (optional) | ~20.9 d |
+_None — every in-repo SDD is implemented (see the table above). Open follow-ups are tracked in each spec's `TASKS.md`._
 
 Satellite repos received matching specs on the same date: `prismal-server/specs/host-v0.2-usage-gateways-agui/` (RH2, 0.2.0),
 `prismal-sdk/specs/client-v0.2-usage-agui/` (CS2, 0.2.0), `prismal-dashboard/specs/usage-and-gateway-console/` (DSH2, 0.2.0)
@@ -67,7 +66,7 @@ and `DELTA-2026-10-usage-agui.md` in the webchat / tui / chatbot bootstrap specs
 
 ### Target package versions (strict SemVer — minor per phase)
 
-Current: **`3.17.0`** (PRT + HRS implemented; AMR `3.16.0`; DEC `3.15.0`; GW `3.14.0`; TKE `3.13.0`; all phases through S+ shipped; LH `3.7.0`, NTS `3.8.0`, OBS `3.9.0`, ID8 `3.10.0`, BRP `3.11.0`, S+ `3.12.0`).
+Current: **`3.18.0`** (MEM implemented; PRT + HRS `3.17.0`; AMR `3.16.0`; DEC `3.15.0`; GW `3.14.0`; TKE `3.13.0`; all phases through S+ shipped; LH `3.7.0`, NTS `3.8.0`, OBS `3.9.0`, ID8 `3.10.0`, BRP `3.11.0`, S+ `3.12.0`).
 
 | Order | Phase | Spec | Target version |
 |---|---|---|---|
@@ -76,7 +75,7 @@ Current: **`3.17.0`** (PRT + HRS implemented; AMR `3.16.0`; DEC `3.15.0`; GW `3.
 | ✅ 3 | DEC | [`typed-decision-models/`](./typed-decision-models/) | **`3.15.0`** (implemented 2026-10-05) |
 | ✅ 4 | AMR | [`adaptive-model-routing/`](./adaptive-model-routing/) | **`3.16.0`** (implemented 2026-10-06) |
 | ✅ 5 | PRT + HRS | [`protocol-upgrades-2026/`](./protocol-upgrades-2026/) + host read surface delta | **`3.17.0`** (implemented 2026-10-06) |
-| 📋 6 | MEM | [`agentic-memory/`](./agentic-memory/) | `3.18.0` |
+| ✅ 6 | MEM | [`agentic-memory/`](./agentic-memory/) | **`3.18.0`** (implemented 2026-10-07) |
 
 > A2A v0.3 removal (PRT) is the first planned breaking change → `4.0.0`, not before all hosts speak v1.0.
 

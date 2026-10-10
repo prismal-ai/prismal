@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `READY` |
+| **Status** | `IMPLEMENTED` (2026-10-07, v3.18.0) |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | MEM |
@@ -367,7 +367,7 @@ def render_playbook(playbook: Playbook, *, budget_tokens: int) -> str: ...
 
 ## SPEC-MEM-GRF-001: Optional temporal graph (`memory/v2/graph/`) — SHOULD
 
-- `SqliteMemoryGraph` (no extra) and `GraphitiMemoryGraph` (`[graph-memory]`, deferred import, API **[verify]**) implement `MemoryGraphPort` with `valid_from`/`valid_to` edges and `as_of` queries. Absent extra ⇒ `MemoryBackendUnavailable` at startup only when `memory_graph_backend="graphiti"`.
+- `SqliteMemoryGraph` (no extra) and `GraphitiMemoryGraph` (`[graph-memory]`, deferred import, API **[verify]** — verified 2026-10-06, see `docs/memory.md#verified-facts`) implement `MemoryGraphPort` with `valid_from`/`valid_to` edges and `as_of` queries. Absent extra ⇒ `MemoryBackendUnavailable` at startup only when `memory_graph_backend="graphiti"`.
 
 ## SPEC-MEM-CFG-001: Settings (`core/config.py`)
 
@@ -413,7 +413,7 @@ class PlaybookDeltaError(AgenticMemoryError): ...         # curator output viola
 
 ## SPEC-MEM-EVL-001: Evaluation
 
-- THE SYSTEM SHALL ship a LoCoMo-style eval subset (dataset licence **[verify]**) runnable through the eval harness, reporting QA accuracy, memory tokens per turn, stored-record count, recall p95 and stop-reason distribution for legacy vs. v2.
+- THE SYSTEM SHALL ship a LoCoMo-style eval subset (dataset licence **[verify]** — verified 2026-10-06: LoCoMo is CC BY-NC, never committed; see `docs/memory.md#verified-facts`) runnable through the eval harness, reporting QA accuracy, memory tokens per turn, stored-record count, recall p95 and stop-reason distribution for legacy vs. v2.
 
 ## Acceptance Criteria Index
 
