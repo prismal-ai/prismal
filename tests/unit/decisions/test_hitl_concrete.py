@@ -463,3 +463,27 @@ class TestRuleKeywordCoverage:
     def test_benign_camel_case_name_not_flagged(self) -> None:
         a = GatedAction(name="readReport", summary="Summarise the weekly report")
         assert rule_flags(a, _state(a)) == frozenset()
+
+
+class TestCascadeRuleTierCannotClear:
+    """A host-wide cascade rule hook answering "no" must never clear human review."""
+
+    @staticmethod
+    def _always_no(_: Any, q: Any) -> Decision:
+        return Decision.from_probabilities(q, {"true": 0.0}, backend="rule", model="host_rules")
+
+    async def test_rule_hook_negatives_do_not_auto_approve(self, tmp_path: Path) -> None:
+        cascade = DecisionCascade(
+            [], rule_hook=self._always_no, calibration=CalibrationStore(tmp_path)
+        )
+        assert await hitl_band(SAFE, cascade=cascade) != "auto"
+
+    async def test_rule_hook_negatives_still_reach_the_calibrated_models(
+        self, tmp_path: Path
+    ) -> None:
+        backend = PerQuestion(0.05, {"hitl.health_safety": 0.9})
+        cascade = DecisionCascade(
+            [backend], rule_hook=self._always_no, calibration=_store(tmp_path, backend.model)
+        )
+        assert await hitl_band(SAFE, cascade=cascade) == "human"
+        assert backend.calls  # the host hook did not short-circuit the model tier

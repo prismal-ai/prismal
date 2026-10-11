@@ -53,7 +53,16 @@ HITL_DECISION_ID = "hitl.band"
 Band = Literal["auto", "confirm", "human"]
 
 #: Backends whose negatives never clear review alone (uncalibrated / fast screener).
-_NON_CLEARING_BACKENDS: Final[frozenset[str]] = frozenset({"llm", "ollama:fast"})
+#: Tiers whose "no" never clears review alone: uncalibrated LLM, the fast screener, and the
+#: cascade's own rule tier (HITL's deterministic tier is ``rule_flags``; a host-wide hook
+#: answering "no" must not short-circuit the calibrated models).
+_NON_CLEARING_BACKENDS: Final[frozenset[str]] = frozenset({"llm", "ollama:fast", "rule"})
+
+
+def _no_rule_hook(_state: Mapping[str, str], _question: QuestionSpec) -> None:
+    """Disable a host cascade rule hook for HITL calls (``rule_flags`` is HITL's rule tier)."""
+
+
 _DEFAULT_RAISE_THRESHOLD: Final[float] = 0.5
 
 _DESTRUCTIVE_RE: Final[re.Pattern[str]] = re.compile(
@@ -264,5 +273,6 @@ async def hitl_band(
         policy=gate,
         integration=INTEGRATION,
         observe=observed.append,
+        rule_hook=_no_rule_hook,
     )
     return _derive_band(decisions, gate, settings, tuple(questions), observed)

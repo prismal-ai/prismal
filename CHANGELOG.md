@@ -52,6 +52,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   money keywords, trusted `GatedAction.amount` vs the limit). Models may raise review — stickily,
   across tiers — but never clear it alone: `ollama:fast` / `llm` negatives give at most `confirm`
   (OLL-012/014). New optional `GatedAction.amount`; `HITL_DECISION_ID` is a deprecated alias.
+  A host-wide cascade `rule_hook` never answers HITL questions, and a `rule`-tier "no" can
+  never clear review (found by the post-commit security review).
 - `decision_backend_order` default is now `["rule","ollama","jev","llm"]` (`laya` stays valid).
 - A non-loopback Ollama is refused unless `decision_ollama_allow_remote=true`: an explicit
   `decision_ollama_base_url` fails `Settings` load; any other route (LLM URL fallback, tenant

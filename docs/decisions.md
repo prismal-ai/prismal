@@ -147,7 +147,8 @@ and derives review deterministically:
   `decision_hitl_raise_threshold`) raises review — sticky, even when a later tier accepts a "no" (the
   cascade's `observe=` hook reports every raw tier answer). Clearing needs all five accepted "no"
   answers from a calibrated tier other than `ollama:fast` / `llm` (those give at most `confirm`);
-  any abstention ⇒ `human`.
+  any abstention ⇒ `human`. A host-wide cascade `rule_hook` is disabled for HITL calls and a
+  `rule`-tier "no" never clears (HITL's deterministic tier is `rule_flags`).
 - **Limitation.** A *persuaded* "no" on every question from a calibrated tier, on a state with no
   rule-tier signal, still clears to `auto` — calibration (with adversarial Spanish cases in the
   DEC3-07 safety slice) is the defence there.
