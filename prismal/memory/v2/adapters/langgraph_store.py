@@ -33,6 +33,7 @@ from prismal.memory.v2.types import ForgetActor, MemoryRecord, MemoryScope, Memo
 from prismal.security.pii_sanitizer import PIISanitizer
 
 if TYPE_CHECKING:
+    import builtins
     from collections.abc import Iterable, Sequence
 
     from langgraph.store.base import BaseStore
@@ -126,7 +127,9 @@ class LangGraphStoreBackend:
             expires_at=value.get("expires_at"),
         )
 
-    async def _items(self, prefixes: Iterable[tuple[str, ...]]) -> list[tuple[Address, Any]]:
+    async def _items(
+        self, prefixes: Iterable[tuple[str, ...]]
+    ) -> builtins.list[tuple[Address, Any]]:
         out: list[tuple[Address, Any]] = []
         for prefix in prefixes:
             offset = 0
@@ -142,7 +145,7 @@ class LangGraphStoreBackend:
                     break
         return out
 
-    async def _visible(self, scope: MemoryScope) -> list[MemoryRecord]:
+    async def _visible(self, scope: MemoryScope) -> builtins.list[MemoryRecord]:
         out: list[MemoryRecord] = []
         for addr, value in await self._items(((_ROOT, scope.org_id), *self._legacy_ns)):
             rec = self._to_record(addr[0], addr[1], value)

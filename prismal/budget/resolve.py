@@ -127,7 +127,7 @@ def maybe_seed_budget_run(
     seed_budget_run(state, settings, org_id=org_id, cost_tracker=cost_tracker, audit=audit)
 
 
-def get_budget_guard(state: AgentState) -> BudgetGuard | None:
+def get_budget_guard(state: Mapping[str, Any]) -> BudgetGuard | None:
     """Return the per-run :class:`BudgetGuard`, or None when disabled/unseeded."""
     bucket = _RUN_ENGINES.get(_run_key(state))
     if not bucket:
