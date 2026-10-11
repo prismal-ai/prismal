@@ -544,6 +544,18 @@ class OTelManager:
                 "prismal.decision_model_mismatch_total",
                 "Responses whose model differs from the pinned model, by backend",
             ),
+            "decision_calibration_stale": (
+                "prismal.decision_calibration_stale_total",
+                "Decisions whose calibration was fitted on another model digest (OLL-003)",
+            ),
+            "decision_ollama_preflight_refused": (
+                "prismal.decision_ollama_preflight_refused_total",
+                "Ollama decision models refused by the preflight, by tier, reason (OLL-002)",
+            ),
+            "decision_hitl_raised": (
+                "prismal.decision_hitl_raised_total",
+                "Concrete human-review questions that raised review, by question (OLL-014)",
+            ),
         }
         for key, (name, description) in counters.items():
             self._counters[key] = self._meter.create_counter(name, description=description)

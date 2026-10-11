@@ -2,8 +2,8 @@
 
 | Field | Value |
 |---|---|
-| **Last updated** | 2026-10-10 |
-| **Package version** | 3.18.0 |
+| **Last updated** | 2026-10-11 |
+| **Package version** | 3.19.0 |
 | **Author** | Ernesto Crespo |
 | **Latest spec** | `token-efficiency/` (TKE) · `llm-gateway-providers/` (GW) · `typed-decision-models/` (DEC) · `adaptive-model-routing/` (AMR) · `protocol-upgrades-2026/` (PRT) · `agentic-memory/` (MEM) — 2026-10-04 |
 | **Latest shipped** | `agentic-memory/` (Phase MEM) — v3.18.0, 2026-10-07; PRT + HRS v3.17.0; AMR v3.16.0; DEC v3.15.0; GW v3.14.0; TKE v3.13.0 — wave 2026-10 released together under tag `prismal/v3.18.0` |
@@ -66,7 +66,7 @@ and `DELTA-2026-10-usage-agui.md` in the webchat / tui / chatbot bootstrap specs
 
 ### Target package versions (strict SemVer — minor per phase)
 
-Current: **`3.18.0`** (MEM implemented; PRT + HRS `3.17.0`; AMR `3.16.0`; DEC `3.15.0`; GW `3.14.0`; TKE `3.13.0`; all phases through S+ shipped; LH `3.7.0`, NTS `3.8.0`, OBS `3.9.0`, ID8 `3.10.0`, BRP `3.11.0`, S+ `3.12.0`).
+Current: **`3.19.0`** (DEC Ollama delta; MEM `3.18.0`; PRT + HRS `3.17.0`; AMR `3.16.0`; DEC `3.15.0`; GW `3.14.0`; TKE `3.13.0`; all phases through S+ shipped; LH `3.7.0`, NTS `3.8.0`, OBS `3.9.0`, ID8 `3.10.0`, BRP `3.11.0`, S+ `3.12.0`).
 
 | Order | Phase | Spec | Target version |
 |---|---|---|---|

@@ -21,6 +21,9 @@ _DEC_COUNTERS = {
     "decision_injection_flags": "prismal.decision_injection_flags_total",
     "decision_shuffle_inconsistent": "prismal.decision_shuffle_inconsistent_total",
     "decision_model_mismatch": "prismal.decision_model_mismatch_total",
+    "decision_calibration_stale": "prismal.decision_calibration_stale_total",
+    "decision_ollama_preflight_refused": "prismal.decision_ollama_preflight_refused_total",
+    "decision_hitl_raised": "prismal.decision_hitl_raised_total",
 }
 
 
