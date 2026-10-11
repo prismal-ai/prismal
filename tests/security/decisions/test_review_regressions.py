@@ -14,7 +14,7 @@ from prismal.core.config import Settings
 from prismal.decisions.adapters.fake import FakeDecisionAdapter
 from prismal.decisions.calibration import CalibrationRecord, CalibrationStore
 from prismal.decisions.cascade import DecisionCascade
-from prismal.decisions.integrations.hitl import GatedAction, hitl_band
+from prismal.decisions.integrations.hitl import GatedAction, build_hitl_questions, hitl_band
 from prismal.decisions.integrations.safety import SAFETY_QUESTION, safety_prescreen
 from prismal.decisions.integrations.tool import build_tool_question
 from prismal.decisions.runtime import (
@@ -90,8 +90,12 @@ class TestLlmTier:
         assert llm.calls == []
 
     async def test_hitl_llm_acceptance_is_at_most_confirm(self) -> None:
-        q = QuestionSpec(id="hitl.band", kind=DecisionKind.NOUL, instructions="x")
-        llm = FakeDecisionAdapter({"hitl.band": _yes(q, "llm")}, name="llm", model="gpt")
+        # Concrete questions (OLL-014): accepted LLM "no" answers never clear review alone.
+        no = {
+            qid: Decision.from_probabilities(q, {"true": 0.0}, backend="llm", model="gpt")
+            for qid, q in build_hitl_questions(RiskTier.MEDIUM).items()
+        }
+        llm = FakeDecisionAdapter(no, name="llm", model="gpt")
         band = await hitl_band(
             GatedAction(name="merge", summary="merge the docs PR"), cascade=DecisionCascade([llm])
         )

@@ -30,7 +30,7 @@ import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 import httpx
 
@@ -151,9 +151,15 @@ def _as_int(value: object) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else 0
 
 
+def _mapping(value: object) -> Mapping[str, Any] | None:
+    """*value* as a JSON-object mapping (string keys), or None when it is not one."""
+    return cast("Mapping[str, Any]", value) if isinstance(value, Mapping) else None
+
+
 def _get(obj: object, key: str) -> Any:
-    if isinstance(obj, Mapping):
-        return obj.get(key)
+    mapping = _mapping(obj)
+    if mapping is not None:
+        return mapping.get(key)
     return getattr(obj, key, None)
 
 
@@ -163,8 +169,8 @@ def _text_of(content: object) -> str | None:
     if isinstance(content, list):
         parts = [
             str(block.get("text", ""))
-            for block in content
-            if isinstance(block, Mapping) and block.get("type", "text") == "text"
+            for block in map(_mapping, content)
+            if block is not None and block.get("type", "text") == "text"
         ]
         return "".join(parts)
     return None
@@ -176,48 +182,47 @@ def _usage(prompt: int, completion: int) -> Usage:
 
 def _parse_line(item: object) -> BatchResult | None:
     """Parse one result line (Anthropic- or OpenAI-shaped); None if unusable."""
-    if not isinstance(item, Mapping):
+    line = _mapping(item)
+    if line is None:
         return None
-    cid = item.get("custom_id")
+    cid = line.get("custom_id")
     if not isinstance(cid, str):
         return None
-    result = item.get("result")
-    if isinstance(result, Mapping):  # Anthropic shape
+    result = _mapping(line.get("result"))
+    if result is not None:  # Anthropic shape
         kind = result.get("type")
         if kind != "succeeded":
             return BatchResult(custom_id=cid, content=None, error=str(kind or "unknown"))
-        message = result.get("message")
-        message = message if isinstance(message, Mapping) else {}
-        usage = message.get("usage")
-        usage = usage if isinstance(usage, Mapping) else {}
+        message = _mapping(result.get("message")) or {}
+        usage = _mapping(message.get("usage")) or {}
         return BatchResult(
             custom_id=cid,
             content=_text_of(message.get("content")),
             usage=_usage(_as_int(usage.get("input_tokens")), _as_int(usage.get("output_tokens"))),
         )
-    error = item.get("error")
+    error = line.get("error")
     if error:
-        if isinstance(error, Mapping):
-            reason = error.get("code") or error.get("message") or "error"
+        error_map = _mapping(error)
+        if error_map is not None:
+            reason = error_map.get("code") or error_map.get("message") or "error"
         else:
             reason = error
         return BatchResult(custom_id=cid, content=None, error=str(reason))
-    response = item.get("response")
-    if not isinstance(response, Mapping):
+    response = _mapping(line.get("response"))
+    if response is None:
         return BatchResult(custom_id=cid, content=None, error="missing_response")
     status_code = response.get("status_code")
     if isinstance(status_code, int) and status_code >= 400:
         return BatchResult(custom_id=cid, content=None, error=f"http_{status_code}")
-    body = response.get("body")
-    body = body if isinstance(body, Mapping) else {}
+    body = _mapping(response.get("body")) or {}
     choices = body.get("choices")
     content: str | None = None
-    if isinstance(choices, list) and choices and isinstance(choices[0], Mapping):
-        msg = choices[0].get("message")
-        if isinstance(msg, Mapping):
+    if isinstance(choices, list) and choices:
+        first = _mapping(choices[0])
+        msg = _mapping(first.get("message")) if first is not None else None
+        if msg is not None:
             content = _text_of(msg.get("content"))
-    usage = body.get("usage")
-    usage = usage if isinstance(usage, Mapping) else {}
+    usage = _mapping(body.get("usage")) or {}
     return BatchResult(
         custom_id=cid,
         content=content,

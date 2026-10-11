@@ -47,6 +47,26 @@ class DecisionRuntime:
     async def aclose(self) -> None:
         await self.cascade.aclose()
 
+    async def warmup(self) -> None:
+        """Warm the Ollama sub-tiers at runtime start (SPEC-DEC-OLL-006); never raises.
+
+        A no-op unless ``decision_ollama_warmup``. ``build_runtime`` calls it; hosts
+        that compose a runtime themselves ``await runtime.warmup()`` once at startup
+        so the ~6 s cold load never lands on a user turn.
+        """
+        if not self.settings.decision_ollama_warmup:
+            return
+        for backend in self.cascade.backends:
+            warm = getattr(backend, "warmup", None)
+            if not backend.name.startswith("ollama:") or warm is None:
+                continue
+            try:
+                await warm()
+            except Exception as exc:  # warm-up is best-effort
+                logger.warning(
+                    "decision_warmup_failed", backend=backend.name, error_type=type(exc).__name__
+                )
+
 
 _RUNTIME: DecisionRuntime | None = None
 _BOUND: ContextVar[DecisionRuntime | None] = ContextVar("prismal_decision_runtime", default=None)

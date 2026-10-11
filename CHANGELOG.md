@@ -10,6 +10,63 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.19.0] — 2026-10-11
+
+> Typed decisions on a **local Ollama** backend (DEC delta
+> `specs/typed-decision-models/DELTA-2026-10-ollama-backend.md`, PHASE DEC7) and a **one-way
+> human-review gate** built from concrete questions. Everything stays opt-in behind
+> `decisions_enabled` (default `False`): with it off the supervisor graph is unchanged.
+> Guide: `docs/decisions.md` (Ollama backend, Human-review gate, Behaviour changes).
+
+### Added
+- `decisions/adapters/ollama.py`: Ollama `/v1/systemone` backend as two sub-tiers, `ollama:fast`
+  (default `tev1:4b`) then `ollama:accurate` (default `nimble:9b-q4_K_M`) (OLL-001, CAS-001).
+  Lazy per-process preflight (`/api/version` ≥ `decision_ollama_min_version`, `decision`
+  capability, served `num_ctx`, local digest; refusals escalate, transport errors retry after
+  30 s, successful preflights re-checked every 60 s); `Decision.model = "<name>@<digest12>"`;
+  `keep_alive` on every request and an opt-in warm-up (`DecisionRuntime.warmup()`, called by
+  `build_runtime`). Limits before sending (options/levels 2–26, ≤ 64 questions, ≤ 64 KiB, tokens
+  ≤ 90 % of `num_ctx`; never truncates); HTTP 400 / timeout abstain without retry. Tier routing
+  by integration (per-turn ⇒ `fast`; `eval_judge`/`hitl`/`swarm` ⇒ `accurate`; oversize per-turn
+  ⇒ `accurate` only under its rolling-p95 limit). One question per request on `fast`, batches of
+  ≤ `decision_ollama_max_batch` on `accurate` with auto-disable from a batch-accuracy record.
+- Settings: `decision_ollama_base_url`, `decision_ollama_models`, `decision_ollama_keep_alive`,
+  `decision_ollama_warmup`, `decision_ollama_allow_remote`, `decision_ollama_accurate_max_p95_ms`,
+  `decision_ollama_max_batch`, `decision_ollama_min_version`, `decision_ollama_timeout_ms` (own
+  per-sub-tier budget, not charged to `decision_timeout_ms`), `decision_hitl_raise_threshold`,
+  `decision_hitl_raise_thresholds`, `decision_hitl_money_limit`; `core.config.is_loopback_url`.
+- `DecisionCascade.decide(observe=...)`: receives every raw, non-abstained tier answer.
+- Calibration keyed by local digest (`<decision_id>@<name>@<digest12>.json`): a stale digest runs
+  uncalibrated (escalates) and counts `prismal.decision_calibration_stale_total`; `enforce`
+  startup accepts a valid record for any digest of each configured Ollama model.
+- Metrics `prismal.decision_calibration_stale_total`,
+  `prismal.decision_ollama_preflight_refused_total{tier,reason}`,
+  `prismal.decision_hitl_raised_total{question}`.
+- Opt-in live contract test `tests/live/decisions/test_ollama_contract.py` (marker `ollama`,
+  `PRISMAL_OLLAMA_CONTRACT=1`).
+
+### Changed
+- **DEC-HITL** (`hitl_band`) no longer asks the abstract "approve without a human?" question
+  (every Ollama model was persuaded by injection text on it). It asks five one-fact questions and
+  derives review as a deterministic OR with a rule tier (injection/taint, EN/ES destructive and
+  money keywords, trusted `GatedAction.amount` vs the limit). Models may raise review — stickily,
+  across tiers — but never clear it alone: `ollama:fast` / `llm` negatives give at most `confirm`
+  (OLL-012/014). New optional `GatedAction.amount`; `HITL_DECISION_ID` is a deprecated alias.
+  A host-wide cascade `rule_hook` never answers HITL questions, and a `rule`-tier "no" can
+  never clear review (found by the post-commit security review).
+- `decision_backend_order` default is now `["rule","ollama","jev","llm"]` (`laya` stays valid).
+- A non-loopback Ollama is refused unless `decision_ollama_allow_remote=true`: an explicit
+  `decision_ollama_base_url` fails `Settings` load; any other route (LLM URL fallback, tenant
+  override) builds no Ollama tier.
+- Calibration file names encode `/` and `\` in model names (they can no longer leave the directory).
+- CI: `complexity-radon` and `ty` are green (`solve_dual` split; 62 → 0 `ty` diagnostics via real
+  type fixes, no suppressions); `specs/*/bench` excluded from ruff.
+
+### Behaviour changes (DEC users only)
+- Deployments relying on the old default order must set `decision_backend_order` to keep Laya.
+- `hitl` in `enforce` needs calibration records for the five concrete question ids.
+- Laya's `laya_preload` warm-up no longer warms Ollama.
+
 ## [3.18.0] — 2026-10-07
 
 > **Release note (tag `prismal/v3.18.0`, 2026-10-10):** this tag ships the whole wave

@@ -1,0 +1,60 @@
+[
+  {
+    "model": "tev1:4b",
+    "cold_ms": 4322.9,
+    "cold_error": null,
+    "modes": [
+      {
+        "mode": "single",
+        "requests_per_run": 8,
+        "questions_per_request": 1.0,
+        "request_p50_ms": 324.9,
+        "request_p95_ms": 1211.4,
+        "per_decision_p50_ms": 324.9,
+        "per_decision_p95_ms": 1211.4,
+        "total_ms_per_run": 4704.1,
+        "mean_input_tokens_per_request": 162.5,
+        "answered": 40,
+        "accuracy": 1.0,
+        "mean_top_probability": 0.8344,
+        "calibration_gap": -0.1656,
+        "errors": {},
+        "misses": [],
+        "per_question": [
+          {
+            "question": "¿Es urgente?",
+            "type": "noul",
+            "options": 0,
+            "p50_ms": 759.1,
+            "p95_ms": 1028.2,
+            "mean_input_tokens": 132.0
+          },
+          {
+            "question": "¿Qué equipo atiende el ticket?",
+            "type": "choice",
+            "options": 3,
+            "p50_ms": 324.9,
+            "p95_ms": 1149.8,
+            "mean_input_tokens": 166.3
+          },
+          {
+            "question": "¿Qué agente debe atender la solicitud?",
+            "type": "choice",
+            "options": 4,
+            "p50_ms": 323.1,
+            "p95_ms": 1308.8,
+            "mean_input_tokens": 197.5
+          },
+          {
+            "question": "¿El texto pide una acción destructiva?",
+            "type": "noul",
+            "options": 0,
+            "p50_ms": 301.8,
+            "p95_ms": 950.1,
+            "mean_input_tokens": 142.0
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -17,6 +17,7 @@ from prismal.decisions.adapters.fake import FakeDecisionAdapter
 from prismal.decisions.adapters.jev_sdk import JevSdkDecisionAdapter
 from prismal.decisions.adapters.laya_local import LayaLocalDecisionAdapter
 from prismal.decisions.adapters.llm_fallback import LlmFallbackDecisionAdapter
+from prismal.decisions.adapters.ollama import OllamaDecisionAdapter, clear_preflight_cache
 from prismal.decisions.adapters.systemone_http import SystemOneHttpDecisionAdapter
 from prismal.decisions.ports import DecisionPort
 from prismal.decisions.types import Decision, GatePolicy
@@ -181,6 +182,34 @@ CASES: list[ContractCase] = [
 ]
 
 CASES.append(_llm_case())
+
+
+def _ollama(mode: str) -> OllamaDecisionAdapter:
+    """``ollama:fast`` against an in-process fake Ollama (preflight + /v1/systemone)."""
+    from tests.unit.decisions.adapters._ollama_fake import FAST, FakeOllama
+
+    clear_preflight_cache()
+    server = FakeOllama(
+        systemone_status=500 if mode == "failing" else 200,
+        systemone_delay_s=1.0 if mode == "slow" else 0.0,
+    )
+    return OllamaDecisionAdapter(
+        base_url="http://127.0.0.1:11434",
+        model_name=FAST,
+        tier="fast",
+        transport=server.transport(),
+    )
+
+
+CASES.append(
+    ContractCase(
+        name="ollama",
+        ok=lambda: _ollama("ok"),
+        failing=lambda: _ollama("failing"),
+        slow=lambda: _ollama("slow"),
+        max_choice_options=26,
+    )
+)
 
 POLICY = GatePolicy(timeout_ms=100)
 

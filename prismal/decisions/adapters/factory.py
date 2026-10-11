@@ -104,6 +104,18 @@ def build_backend(
             cuda_amp=settings.laya_cuda_amp,
             settings=settings,
         )
+    if name == "ollama":
+        # Single-backend view of the expanded tier (callers that want both use build_backends).
+        from prismal.decisions.adapters.ollama import OllamaDecisionAdapter, OllamaTierGroup
+
+        backends = build_backends(name, settings, vault=vault, org_id=org_id, cost_meter=cost_meter)
+        if not backends:
+            return None
+        backend = backends[0]
+        if isinstance(backend, OllamaDecisionAdapter):
+            # Alone in a cascade: its sibling is in none, so never defer to it.
+            OllamaTierGroup.link(**{backend.tier: backend})
+        return backend
     if name == "llm":
         from prismal.decisions.adapters.llm_fallback import LlmFallbackDecisionAdapter
 
@@ -111,3 +123,25 @@ def build_backend(
             model=settings.decision_llm_fallback_model, settings=settings, cost_meter=cost_meter
         )
     return None
+
+
+def build_backends(
+    name: str,
+    settings: Settings,
+    *,
+    vault: CredentialVaultPort | None = None,
+    org_id: str | None = None,
+    cost_meter: CostMeter | None = None,
+) -> list[DecisionPort]:
+    """Backends for tier ``name`` in cascade order (SPEC-DEC-CAS-001).
+
+    ``"ollama"`` expands into ``ollama:fast`` then ``ollama:accurate`` (the
+    tiers present in ``decision_ollama_models``, SPEC-DEC-OLL-001); every other
+    name yields :func:`build_backend`'s backend, if any.
+    """
+    if name == "ollama":
+        from prismal.decisions.adapters.ollama import build_ollama_backends
+
+        return list(build_ollama_backends(settings, cost_meter=cost_meter))
+    backend = build_backend(name, settings, vault=vault, org_id=org_id, cost_meter=cost_meter)
+    return [backend] if backend is not None else []

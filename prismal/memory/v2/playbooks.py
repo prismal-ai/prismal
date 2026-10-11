@@ -37,7 +37,7 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any, Literal, get_args
+from typing import TYPE_CHECKING, Any, Literal, TypeIs, cast, get_args
 
 from prismal.core.exceptions import AgenticMemoryError, PlaybookDeltaError
 from prismal.core.logging import get_logger
@@ -59,6 +59,12 @@ DeltaOp = Literal["add", "modify", "deprecate", "vote"]
 Placement = Literal["prefix", "tail"]
 
 _OPS: frozenset[str] = frozenset(get_args(DeltaOp))
+
+
+def _is_delta_op(value: object) -> TypeIs[DeltaOp]:
+    return value in _OPS
+
+
 _MAX_REFLECTIONS = 20
 _MAX_BULLET_CHARS = 500
 _MAX_REWRITE_RATIO = 0.5
@@ -322,11 +328,15 @@ class PlaybookCurator:
         return " ".join(self._sanitizer.sanitize(text, max_chars=_MAX_BULLET_CHARS).split())
 
     def _parse_delta(self, item: object) -> PlaybookDelta | None:
-        if not isinstance(item, dict) or item.get("op") not in _OPS:
+        if not isinstance(item, dict):
             return None
-        bullet_id, section = item.get("bullet_id"), item.get("section", _DEFAULT_SECTION)
-        text, rationale = item.get("text"), item.get("rationale", "")
-        sources = item.get("source_record_ids", [])
+        fields = cast("dict[str, object]", item)  # a parsed JSON object ⇒ string keys
+        op = fields.get("op")
+        if not _is_delta_op(op):
+            return None
+        bullet_id, section = fields.get("bullet_id"), fields.get("section", _DEFAULT_SECTION)
+        text, rationale = fields.get("text"), fields.get("rationale", "")
+        sources = fields.get("source_record_ids", [])
         if (
             (bullet_id is not None and not isinstance(bullet_id, str))
             or not isinstance(section, str)
@@ -337,12 +347,12 @@ class PlaybookCurator:
         ):
             return None
         return PlaybookDelta(
-            op=item["op"],
+            op=op,
             bullet_id=bullet_id,
             section=self._clean(section) or _DEFAULT_SECTION,
             text=text,
             rationale=rationale,
-            source_record_ids=tuple(sources),
+            source_record_ids=tuple(str(s) for s in sources),  # all str (checked above)
         )
 
     @staticmethod

@@ -80,6 +80,7 @@ class DecisionCascade:
         self._settings = settings
         self._llm_timeout_ms = llm_timeout_ms
         self._validated: set[tuple[str, str, str]] = set()
+        self._stale_warned: set[tuple[str, str]] = set()
 
     @property
     def tier_names(self) -> tuple[str, ...]:
@@ -108,12 +109,16 @@ class DecisionCascade:
         context: Mapping[str, str | None] | None = None,
         rule_hook: RuleHook | None = None,
         allow_llm: bool = True,
+        observe: Callable[[Decision], None] | None = None,
     ) -> dict[str, Decision]:
         """Resolve every question; never raises for backend failures.
 
         ``rule_hook`` overrides the default hook for this call (only when the
         cascade has a rule tier). ``allow_llm=False`` skips the terminal LLM tier
-        (hot paths such as the safety pre-screen).
+        (hot paths such as the safety pre-screen). ``observe`` receives every
+        non-abstained raw answer of every tier, in order, before gating — even
+        when a later tier decides (one-way gates such as HITL need them); an
+        observer error is logged and ignored.
         """
         self._validate(questions, integration)
         pending = {qid: _Pending(q, []) for qid, q in questions.items()}
@@ -124,8 +129,10 @@ class DecisionCascade:
             self._finish_all(pending, resolved, reason="unsupported")
         else:
             self._skip_over_limit(state, pending)
-            self._rule_tier(state, pending, resolved, rule_hook or self._rule_hook)
-            await self._model_tiers(state, pending, resolved, policy, corroborate, allow_llm)
+            self._rule_tier(state, pending, resolved, rule_hook or self._rule_hook, observe)
+            await self._model_tiers(
+                state, pending, resolved, policy, corroborate, allow_llm, observe
+            )
             self._finish_all(pending, resolved, reason=None)
 
         tenant = (context or {}).get("org_id") or None
@@ -151,15 +158,14 @@ class DecisionCascade:
         org_id: str | None = None,
     ) -> DecisionCascade:
         """Build the tiers in ``decision_backend_order`` from settings (adapters deferred)."""
-        from prismal.decisions.adapters.factory import build_backend
+        from prismal.decisions.adapters.factory import build_backends
 
         backends: list[DecisionPort] = []
         for name in settings.decision_backend_order:
             if name == RULE_TIER:
                 continue
-            backend = build_backend(name, settings, vault=vault, org_id=org_id)
-            if backend is not None:
-                backends.append(backend)
+            # "ollama" expands into ollama:fast, ollama:accurate (SPEC-DEC-OLL-001).
+            backends.extend(build_backends(name, settings, vault=vault, org_id=org_id))
         has_rule = RULE_TIER in settings.decision_backend_order
         return cls(
             backends,
@@ -199,6 +205,7 @@ class DecisionCascade:
         pending: dict[str, _Pending],
         resolved: dict[str, Decision],
         hook: RuleHook | None,
+        observe: Callable[[Decision], None] | None = None,
     ) -> None:
         if not self._rule_enabled or hook is None:
             return
@@ -216,6 +223,7 @@ class DecisionCascade:
                 resolved[qid] = replace(
                     d, backend=RULE_TIER, outcome=Outcome.ACCEPTED, escalated_from=()
                 )
+                _observe(observe, resolved[qid])
                 del pending[qid]
             else:
                 p.tried.append(RULE_TIER)
@@ -228,6 +236,7 @@ class DecisionCascade:
         policy: GatePolicy,
         corroborate: Callable[[Decision], bool] | None,
         allow_llm: bool = True,
+        observe: Callable[[Decision], None] | None = None,
     ) -> None:
         deadline = time.perf_counter() + policy.timeout_ms / 1000.0
         for backend in self._backends:
@@ -235,7 +244,9 @@ class DecisionCascade:
                 return
             if backend.name == LLM_TIER:
                 if allow_llm:
-                    await self._llm_tier(backend, state, pending, resolved, policy, corroborate)
+                    await self._llm_tier(
+                        backend, state, pending, resolved, policy, corroborate, observe
+                    )
                 continue
             eligible = {
                 qid: p.question
@@ -250,7 +261,9 @@ class DecisionCascade:
                     )
             if not eligible:
                 continue
-            remaining_ms = int((deadline - time.perf_counter()) * 1000)
+            own_ms = _own_budget_ms(backend)
+            tier_start = time.perf_counter()
+            remaining_ms = own_ms or int((deadline - tier_start) * 1000)
             if remaining_ms <= 0:
                 for qid in eligible:
                     p = pending[qid]
@@ -260,14 +273,16 @@ class DecisionCascade:
                     )
                 continue
             tier_policy = replace(policy, timeout_ms=remaining_ms)
+            tier_deadline = tier_start + remaining_ms / 1000.0 if own_ms else deadline
             answers = await backend.decide(state.fields, eligible, policy=tier_policy)
             for qid, q in eligible.items():
                 p = pending[qid]
                 raw = answers.get(qid) or Decision.abstain(
                     q, backend=backend.name, model=backend.model, reason="backend_error"
                 )
+                _observe(observe, raw)
                 accepted, d = await self._gate(
-                    backend, raw, p, state, tier_policy, corroborate, deadline
+                    backend, raw, p, state, tier_policy, corroborate, tier_deadline
                 )
                 if accepted:
                     resolved[qid] = replace(
@@ -277,6 +292,9 @@ class DecisionCascade:
                 else:
                     p.tried.append(backend.name)
                     p.last = d
+            if own_ms:
+                # An own-budget tier (local Ollama) never consumes the shared budget.
+                deadline += time.perf_counter() - tier_start
 
     async def _gate(
         self,
@@ -290,6 +308,8 @@ class DecisionCascade:
     ) -> tuple[bool, Decision]:
         q = p.question
         record = None if raw.abstained else self._record(q.id, backend.model)
+        if record is None and not raw.abstained:
+            self._note_stale(q.id, backend)
         try:
             d = apply_calibration(raw, record, q) if record is not None else raw
         except Exception:
@@ -356,6 +376,7 @@ class DecisionCascade:
         resolved: dict[str, Decision],
         policy: GatePolicy,
         corroborate: Callable[[Decision], bool] | None,
+        observe: Callable[[Decision], None] | None = None,
     ) -> None:
         """Terminal tier: pre-DEC semantics, but never over over-limit or uncorroborated
         tainted ≥ MEDIUM states (SEC-003 applies to every tier)."""
@@ -368,6 +389,8 @@ class DecisionCascade:
         for qid in list(eligible):
             p = pending[qid]
             d = answers.get(qid)
+            if d is not None:
+                _observe(observe, d)
             if (
                 d is not None
                 and not d.abstained
@@ -396,6 +419,32 @@ class DecisionCascade:
             return self._calibration.get(decision_id, model)
         except Exception:
             return None
+
+    def _note_stale(self, decision_id: str, backend: DecisionPort) -> None:
+        """OLL-003: report an Ollama digest change that left ``decision_id`` uncalibrated.
+
+        Reporting only — the decision stays uncalibrated, so the gate never accepts
+        it (shadow-only behaviour: it escalates to the next tier). Counted on every
+        occurrence; warned once per ``(decision_id, model)`` per cascade.
+        """
+        if self._calibration is None:
+            return
+        try:
+            stale = self._calibration.stale(decision_id, backend.model)
+        except Exception:
+            return
+        if not stale:
+            return
+        inc("decision_calibration_stale", {"decision_id": decision_id, "backend": backend.name})
+        key = (decision_id, backend.model)
+        if key not in self._stale_warned:
+            self._stale_warned.add(key)
+            logger.warning(
+                "decision_calibration_stale",
+                decision_id=decision_id,
+                backend=backend.name,
+                model=backend.model,
+            )
 
     def _slice_ok(self, record: Any, language: str) -> bool:
         min_examples = (
@@ -475,6 +524,16 @@ class DecisionCascade:
             audit_decision(self._audit, record)
 
 
+def _observe(observe: Callable[[Decision], None] | None, d: Decision) -> None:
+    """Hand a raw, non-abstained answer to the observer (fail-open)."""
+    if observe is None or d.abstained or d.value is None:
+        return
+    try:
+        observe(d)
+    except Exception as exc:
+        logger.warning("decision_observer_failed", error_type=type(exc).__name__)
+
+
 def _corroborated(corroborate: Callable[[Decision], bool] | None, d: Decision) -> bool:
     """Deterministic corroborator verdict; a missing or crashing one counts as ``False``."""
     if corroborate is None:
@@ -483,6 +542,12 @@ def _corroborated(corroborate: Callable[[Decision], bool] | None, d: Decision) -
         return bool(corroborate(d))
     except Exception:
         return False
+
+
+def _own_budget_ms(backend: DecisionPort) -> int:
+    """A backend's own time budget (``budget_ms``, e.g. Ollama sub-tiers), else ``0``."""
+    value = getattr(backend, "budget_ms", None)
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
 
 
 def _blocked(p: _Pending) -> bool:

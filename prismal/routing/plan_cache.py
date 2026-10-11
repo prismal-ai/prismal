@@ -19,7 +19,7 @@ from collections import OrderedDict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 from prismal.core.exceptions import PlanCacheError
 from prismal.core.logging import get_logger
@@ -354,16 +354,17 @@ def _task_list(plan: Mapping[str, object]) -> list[Mapping[str, object]] | None:
     for task in tasks:
         if not isinstance(task, dict):
             return None
-        deps = task.get("depends_on", [])
+        fields = cast("dict[str, object]", task)  # a parsed JSON object ⇒ string keys
+        deps = fields.get("depends_on", [])
         if (
-            not isinstance(task.get("id"), str)
-            or not isinstance(task.get("tool"), str)
-            or not isinstance(task.get("args", {}), dict)
+            not isinstance(fields.get("id"), str)
+            or not isinstance(fields.get("tool"), str)
+            or not isinstance(fields.get("args", {}), dict)
             or not isinstance(deps, list)
             or not all(isinstance(d, str) for d in deps)
         ):
             return None
-        out.append(task)
+        out.append(fields)
     return out
 
 

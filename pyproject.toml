@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # ============================================================
 [project]
 name = "prismal-ai"
-version = "3.18.0"
+version = "3.19.0"
 description = "Prism-inspired multi-agent orchestration framework built on LangGraph. Security-first, provider-agnostic, composable."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -349,6 +349,8 @@ exclude = [
 target-version = "py313"
 line-length = 100
 src = ["prismal", "tests"]
+# Spec benchmark tools are standalone scripts kept as authored (not package code).
+extend-exclude = ["specs/*/bench"]
 
 [tool.ruff.lint]
 select = [
@@ -465,6 +467,7 @@ markers = [
   "eval: Agent evaluation-harness suites (Phase V; deterministic with fakes)",
   "redteam: Adversarial / red-team containment suites (Phase V)",
   "interop: Official protocol conformance suites (PRT6-06; opt-in via PRISMAL_INTEROP=1)",
+  "ollama: live contract tests against a local Ollama (opt-in)",
 ]
 filterwarnings = [
   "error",

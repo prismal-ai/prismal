@@ -29,7 +29,7 @@ import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from prismal.core.exceptions import RoutingConfigError
 from prismal.core.logging import get_logger
@@ -193,14 +193,15 @@ def _parse_cell(raw: object, idx: int) -> tuple[tuple[str, ModelTier], Predictor
     where = f"cells[{idx}]"
     if not isinstance(raw, dict):
         raise RoutingConfigError(f"{where}: expected an object")
-    intent = raw.get("intent")
+    cell = cast("dict[str, Any]", raw)  # a parsed JSON/YAML object ⇒ string keys
+    intent = cell.get("intent")
     if not isinstance(intent, str) or not intent:
         raise RoutingConfigError(f"{where}: missing intent")
-    tier = _parse_tier(raw.get("tier"), where)
+    tier = _parse_tier(cell.get("tier"), where)
     try:
-        s = int(raw.get("successes", 0))
-        n = int(raw["trials"])
-        med = int(raw.get("median_output_tokens", 0))
+        s = int(cell.get("successes", 0))
+        n = int(cell["trials"])
+        med = int(cell.get("median_output_tokens", 0))
     except (KeyError, TypeError, ValueError):
         raise RoutingConfigError(f"{where}: successes/trials must be integers") from None
     if n < 0 or s < 0 or s > n or med < 0:

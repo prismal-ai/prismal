@@ -310,7 +310,7 @@ def select_model(
     if not settings.adaptive_routing_enabled:
         return ModelChoice(model_ref=settings.default_model, tier=ModelTier.MEDIUM, reason="static")
     maybe_seed_routing_run(state, settings)
-    bucket = _bucket(state)
+    bucket: dict[str, Any] | None = _bucket(state)
     if bucket is None:
         # No session id: stateless selection, nothing stored or shared across callers.
         bucket = {

@@ -37,6 +37,7 @@ from prismal.memory.v2.migration import (
 from prismal.memory.v2.types import ForgetActor, MemoryRecord, MemoryScope, MemoryType
 
 if TYPE_CHECKING:
+    import builtins
     from collections.abc import Sequence
     from pathlib import Path
 
@@ -188,7 +189,7 @@ class LongTermMemoryBackend:
         self._index(record.id, content, record)
         return record.id
 
-    def _scan(self, scope: MemoryScope) -> list[MemoryRecord]:
+    def _scan(self, scope: MemoryScope) -> builtins.list[MemoryRecord]:
         with closing(self._connect()) as conn:
             rows = conn.execute(
                 _SELECT + _TENANT_WHERE + _ORDER,

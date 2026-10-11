@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import itertools
 import math
 import random
@@ -248,6 +249,31 @@ def test_solvers_are_deterministic() -> None:
             *args, max_iter=100, eta0=1.0, eps=0.01, eligible=elig
         )
         assert solve_greedy(*args, eligible=elig) == solve_greedy(*args, eligible=elig)
+
+
+# Exact (x, iterations, gap) of ``solve_dual`` over seeded instances and solver settings,
+# recorded before ``solve_dual`` was split into helpers (radon E → ≤ D). Any numerical
+# drift — a reordered float operation, a changed tie-break, a shifted repair schedule —
+# changes the digest. Update it only for an intentional algorithm change.
+_SOLVE_DUAL_GOLDEN_DIGEST = "2f4a29ec63bc46a117134a338497d6b6b0643e1a24beb2de1e8ffb69d6495209"
+
+
+def test_solve_dual_characterization_digest() -> None:
+    rng = random.Random(20261010)
+    digest = hashlib.sha256()
+    for _ in range(300):
+        cost, acc, caps, alpha, elig = _random_instance(rng)
+        for max_iter, eta0, eps in (
+            (1, 1.0, 0.01),
+            (7, 0.5, 0.0),
+            (200, 1.0, 0.01),
+            (60, 2.0, 0.0),
+        ):
+            result = solve_dual(
+                cost, acc, caps, alpha, max_iter=max_iter, eta0=eta0, eps=eps, eligible=elig
+            )
+            digest.update(repr(result).encode())
+    assert digest.hexdigest() == _SOLVE_DUAL_GOLDEN_DIGEST
 
 
 # -- policy -------------------------------------------------------------------------

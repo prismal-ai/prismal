@@ -331,6 +331,105 @@ def _multiplier_scale(rows: list[Row]) -> float:
     return max(ratios[len(ratios) // 2], 1e-6)
 
 
+@dataclass
+class _Iterate:
+    """One Lagrangian subproblem solution: per-item argmin of the reduced cost."""
+
+    x: list[int]
+    counts: list[int]
+    total_a: float
+    total_c: float
+    dual: float
+
+
+def _lagrangian_iterate(
+    rows: list[Row], caps: Sequence[int], need: float, lam: float, mu: Sequence[float]
+) -> _Iterate:
+    """Solve the separable Lagrangian subproblem at ``(λ, μ)`` and its dual value."""
+    x: list[int] = []
+    counts = [0] * len(caps)
+    total_a = total_c = dual = 0.0
+    for row in rows:
+        values = [c - lam * a + mu[j] for c, j, a in row]
+        bv = min(values)
+        bc, bj, ba = row[values.index(bv)]  # first minimum ⇒ ties go to (cost, model_ref)
+        x.append(bj)
+        counts[bj] += 1
+        total_a += ba
+        total_c += bc
+        dual += bv
+    dual += lam * need - sum(m * cp for m, cp in zip(mu, caps, strict=True))
+    return _Iterate(x, counts, total_a, total_c, dual)
+
+
+def _is_slack_optimal(
+    it: _Iterate, caps: Sequence[int], need: float, lam: float, mu: Sequence[float]
+) -> bool:
+    """Complementary slackness holds for a feasible iterate ⇒ it is optimal."""
+    return abs(lam * (it.total_a - need)) <= _TOL and all(
+        abs(m * (cp - cnt)) <= _TOL for m, cp, cnt in zip(mu, caps, it.counts, strict=True)
+    )
+
+
+def _subgradient(
+    it: _Iterate, caps: Sequence[int], need: float, n: int, lam: float, mu: Sequence[float]
+) -> tuple[float, list[float], float]:
+    """Projected subgradient ``(g_λ, g_μ, ‖g‖∞)``; zero multipliers pushed below 0 are inactive."""
+    g_lam = (need - it.total_a) / n
+    if lam <= 0.0 and g_lam < 0.0:
+        g_lam = 0.0
+    g_mu = [
+        0.0 if m <= 0.0 and cnt < cp else (cnt - cp) / n
+        for m, cnt, cp in zip(mu, it.counts, caps, strict=True)
+    ]
+    norm = max(abs(g_lam), max(abs(g) for g in g_mu))
+    return g_lam, g_mu, norm
+
+
+@dataclass
+class _DualSearch:
+    """Mutable state of the subgradient search: multipliers, bounds and step control."""
+
+    lam: float
+    mu: list[float]
+    best_x: list[int] | None = None
+    best_cost: float = math.inf
+    max_d: float = -math.inf
+    stall: int = 0
+    shrink: float = 1.0  # halved whenever the dual value oscillates
+    next_repair: int = 1  # repair schedule t = 1, 2, 4, 8, …
+
+    def repair_due(self, t: int) -> bool:
+        if t == self.next_repair:
+            self.next_repair *= 2
+            return True
+        return t % _REPAIR_PERIOD == 0
+
+    def track_dual(self, dual: float) -> None:
+        if dual > self.max_d + 1e-12:
+            self.max_d = dual
+            self.stall = 0
+        else:  # the dual value oscillates ⇒ halve η0
+            self.stall += 1
+            if self.stall >= _OSCILLATION_WINDOW:
+                self.shrink /= 2.0
+                self.stall = 0
+
+    def offer(self, x: list[int], total_c: float) -> None:
+        if total_c < self.best_cost - 1e-12:
+            self.best_cost, self.best_x = total_c, x
+
+    def converged(self, eps: float) -> bool:
+        return (
+            self.best_x is not None
+            and (self.best_cost - self.max_d) / max(self.best_cost, 1e-9) <= eps
+        )
+
+    def step(self, eta: float, g_lam: float, g_mu: Sequence[float]) -> None:
+        self.lam = max(0.0, self.lam + eta * g_lam)
+        self.mu = [max(0.0, m + eta * g) for m, g in zip(self.mu, g_mu, strict=True)]
+
+
 def solve_dual(
     cost: Matrix,
     acc: Matrix,
@@ -354,84 +453,39 @@ def solve_dual(
     if any(not row for row in rows):
         return [], 0, math.inf
     need = n * alpha
-    lam = 0.0
-    mu = [0.0] * k
-    best_x: list[int] | None = None
-    best_cost = math.inf
-    max_d = -math.inf
-    stall = 0
+    s = _DualSearch(lam=0.0, mu=[0.0] * k)
     scale = _multiplier_scale(rows)
-    shrink = 1.0  # halved whenever the dual value oscillates
     t = 0
-    next_repair = 1  # repair schedule t = 1, 2, 4, 8, …
     while t < max_iter:
-        x: list[int] = []
-        counts = [0] * k
-        total_a = total_c = dual = 0.0
-        for row in rows:
-            values = [c - lam * a + mu[j] for c, j, a in row]
-            bv = min(values)
-            bc, bj, ba = row[values.index(bv)]  # first minimum ⇒ ties go to (cost, model_ref)
-            x.append(bj)
-            counts[bj] += 1
-            total_a += ba
-            total_c += bc
-            dual += bv
-        dual += lam * need - sum(m * cp for m, cp in zip(mu, caps, strict=True))
+        it = _lagrangian_iterate(rows, caps, need, s.lam, s.mu)
         t += 1
-        if t == next_repair:
-            next_repair *= 2
-            due = True
-        else:
-            due = t % _REPAIR_PERIOD == 0
-        if dual > max_d + 1e-12:
-            max_d = dual
-            stall = 0
-        else:  # the dual value oscillates ⇒ halve η0
-            stall += 1
-            if stall >= _OSCILLATION_WINDOW:
-                shrink /= 2.0
-                stall = 0
-        cap_ok = all(cnt <= cp for cnt, cp in zip(counts, caps, strict=True))
-        if cap_ok and total_a >= need - _TOL:
-            if total_c < best_cost - 1e-12:
-                best_cost, best_x = total_c, x
-            if abs(lam * (total_a - need)) <= _TOL and all(
-                abs(m * (cp - cnt)) <= _TOL for m, cp, cnt in zip(mu, caps, counts, strict=True)
-            ):  # complementary slackness ⇒ x is optimal
-                max_d = max(max_d, best_cost)
+        due = s.repair_due(t)
+        s.track_dual(it.dual)
+        cap_ok = all(cnt <= cp for cnt, cp in zip(it.counts, caps, strict=True))
+        if cap_ok and it.total_a >= need - _TOL:
+            s.offer(it.x, it.total_c)
+            if _is_slack_optimal(it, caps, need, s.lam, s.mu):
+                s.max_d = max(s.max_d, s.best_cost)
                 break
-        elif due and total_c < best_cost - 1e-12:
+        elif due and it.total_c < s.best_cost - 1e-12:
             # Repair infeasible iterates on a 1, 2, 4, … plus every-_REPAIR_PERIOD schedule
             # when their Lagrangian cost could still beat the incumbent.
-            repaired = _repair(x, rows, cost, acc, caps, need, lam, mu)
+            repaired = _repair(it.x, rows, cost, acc, caps, need, s.lam, s.mu)
             if repaired is not None:
-                rc = _assignment_cost(repaired, cost)
-                if rc < best_cost - 1e-12:
-                    best_cost, best_x = rc, repaired
-        if best_x is not None and (best_cost - max_d) / max(best_cost, 1e-9) <= eps:
+                s.offer(repaired, _assignment_cost(repaired, cost))
+        if s.converged(eps):
             break
-        # Projected subgradient: components pushing a zero multiplier below 0 are inactive.
-        g_lam = (need - total_a) / n
-        if lam <= 0.0 and g_lam < 0.0:
-            g_lam = 0.0
-        g_mu = [
-            0.0 if m <= 0.0 and cnt < cp else (cnt - cp) / n
-            for m, cnt, cp in zip(mu, counts, caps, strict=True)
-        ]
-        norm = max(abs(g_lam), max(abs(g) for g in g_mu))
+        g_lam, g_mu, norm = _subgradient(it, caps, need, n, s.lam, s.mu)
         if norm <= 1e-15:
             break
         # η_t = η0/sqrt(t+1) on the ∞-normalized active subgradient, in λ units (``scale``):
         # with normalized costs a raw η0 = 1 over/undershoots λ* by orders of magnitude.
-        eta = eta0 * shrink * scale / math.sqrt(t + 1) / norm
-        lam = max(0.0, lam + eta * g_lam)
-        mu = [max(0.0, m + eta * g) for m, g in zip(mu, g_mu, strict=True)]
-    if best_x is None:
+        s.step(eta0 * s.shrink * scale / math.sqrt(t + 1) / norm, g_lam, g_mu)
+    if s.best_x is None:
         return [], t, math.inf
-    polished = _polish(list(best_x), rows, caps, need)
+    polished = _polish(list(s.best_x), rows, caps, need)
     final_cost = _assignment_cost(polished, cost)
-    gap = max(0.0, (final_cost - max_d) / max(final_cost, 1e-9))
+    gap = max(0.0, (final_cost - s.max_d) / max(final_cost, 1e-9))
     return polished, t, gap
 
 
