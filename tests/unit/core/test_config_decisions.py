@@ -28,7 +28,7 @@ def test_decision_defaults_match_spec() -> None:
     assert s.decisions_enabled is False
     for flag in _INTEGRATION_FLAGS:
         assert getattr(s, flag) is False, flag
-    assert s.decision_backend_order == ["rule", "laya", "jev", "llm"]
+    assert s.decision_backend_order == ["rule", "ollama", "jev", "llm"]
     assert s.decision_modes == {}
     assert s.jev_api_key is None
     assert s.jev_model == "jev-1.13.0"
@@ -169,5 +169,7 @@ def test_enforce_needs_calibration_for_every_model_in_order(tmp_path: Path) -> N
             decisions_enabled=True,
             decision_routing_enabled=True,
             decision_modes={"route": "enforce"},
+            # Ollama (default order) is covered by test_calibration_digest.py.
+            decision_backend_order=["rule", "laya", "jev", "llm"],
             decision_calibration_dir=str(tmp_path),
         )

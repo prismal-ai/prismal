@@ -24,10 +24,13 @@ from prismal.providers.batch_adapters import (
     BatchStatus,
     OpenAIBatchAdapter,
     OpenRouterBatchAdapter,
+    _get,
+    _parse_line,
     default_adapters,
     family_of,
     provider_model,
 )
+from prismal.providers.batch_adapters import _usage as _parse_usage
 
 KEY = "sk-test-SECRET-123"
 
@@ -690,3 +693,108 @@ def test_default_adapters_without_resolver_uses_settings_keys() -> None:
         openrouter_api_key=SecretStr(KEY),
     )
     assert sorted(default_adapters(s, key_resolver=None)) == ["openrouter"]
+
+
+# -- result-line parsing edges (characterization; pins behaviour across typing refactors) --
+
+
+@pytest.mark.parametrize(
+    ("item", "expected"),
+    [
+        ("not-a-mapping", None),
+        ({"custom_id": 7}, None),
+        (
+            {"custom_id": "a", "result": {"type": "errored"}},
+            BatchResult(custom_id="a", content=None, error="errored"),
+        ),
+        (
+            {"custom_id": "a", "result": {"type": None}},
+            BatchResult(custom_id="a", content=None, error="unknown"),
+        ),
+        (
+            {"custom_id": "a", "result": {"type": "succeeded", "message": "x", "usage": 3}},
+            BatchResult(custom_id="a", content=None, usage=_parse_usage(0, 0)),
+        ),
+        (
+            {"custom_id": "a", "error": "boom"},
+            BatchResult(custom_id="a", content=None, error="boom"),
+        ),
+        (
+            {"custom_id": "a", "error": {"message": "bad"}},
+            BatchResult(custom_id="a", content=None, error="bad"),
+        ),
+        (
+            {"custom_id": "a", "error": {}},
+            BatchResult(custom_id="a", content=None, error="missing_response"),
+        ),
+        (
+            {"custom_id": "a", "error": {"x": 1}},
+            BatchResult(custom_id="a", content=None, error="error"),
+        ),
+        (
+            {"custom_id": "a", "response": "nope"},
+            BatchResult(custom_id="a", content=None, error="missing_response"),
+        ),
+        (
+            {"custom_id": "a", "response": {"status_code": 429}},
+            BatchResult(custom_id="a", content=None, error="http_429"),
+        ),
+        (
+            {"custom_id": "a", "response": {"body": {"choices": ["x"]}}},
+            BatchResult(custom_id="a", content=None, usage=_parse_usage(0, 0)),
+        ),
+        (
+            {"custom_id": "a", "response": {"body": {"choices": [{"message": 5}]}}},
+            BatchResult(custom_id="a", content=None, usage=_parse_usage(0, 0)),
+        ),
+        (
+            {
+                "custom_id": "a",
+                "response": {
+                    "body": {
+                        "choices": [{"message": {"content": 42}}],
+                        "usage": {"prompt_tokens": True, "completion_tokens": 4},
+                    }
+                },
+            },
+            BatchResult(custom_id="a", content=None, usage=_parse_usage(0, 4)),
+        ),
+        (
+            {
+                "custom_id": "a",
+                "response": {
+                    "body": {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": [
+                                        {"type": "text", "text": "he"},
+                                        {"text": "llo"},
+                                        {"type": "image", "text": "zz"},
+                                        "raw",
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                },
+            },
+            BatchResult(custom_id="a", content="hello", usage=_parse_usage(0, 0)),
+        ),
+    ],
+)
+def test_parse_line_edges(item: object, expected: BatchResult | None) -> None:
+    assert _parse_line(item) == expected
+
+
+@pytest.mark.parametrize(
+    ("obj", "key", "expected"),
+    [
+        ({"id": "x"}, "id", "x"),
+        ({}, "id", None),
+        (SimpleNamespace(id="y"), "id", "y"),
+        (object(), "id", None),
+    ],
+)
+def test_get_reads_mappings_and_attributes(obj: object, key: str, expected: object) -> None:
+    assert _get(obj, key) == expected

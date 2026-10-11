@@ -115,6 +115,20 @@ class MaintenanceSettings(BaseSettings):
     )
 
 
+def is_loopback_url(url: str) -> bool:
+    """True when *url*'s host is ``localhost`` or a loopback IP literal (no DNS lookup)."""
+    import ipaddress
+    from urllib.parse import urlparse
+
+    host = (urlparse(url).hostname or "").lower()
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 class Settings(BaseSettings):
     """
     Prismal application settings.
@@ -1021,8 +1035,8 @@ class Settings(BaseSettings):
         default=False, description="DEC-SAFE (INT-008)."
     )
     decision_backend_order: list[str] = Field(
-        default_factory=lambda: ["rule", "laya", "jev", "llm"],
-        description="Cascade tiers, tried in order (rule | laya | jev | llm).",
+        default_factory=lambda: ["rule", "ollama", "jev", "llm"],
+        description="Cascade tiers, tried in order (rule | ollama | laya | jev | llm).",
     )
     decision_modes: dict[str, str] = Field(
         default_factory=dict,
@@ -1071,6 +1085,45 @@ class Settings(BaseSettings):
     )
     decision_llm_fallback_model: str | None = Field(
         default=None, description="Model for the terminal llm tier (None = provider default)."
+    )
+    # Ollama /v1/systemone backend (DEC delta — SPEC-DEC-OLL-001..011, CFG-001).
+    decision_ollama_base_url: str | None = Field(
+        default=None, description="Ollama base URL (None ⇒ ollama_base_url)."
+    )
+    decision_ollama_models: dict[str, str] = Field(
+        default_factory=lambda: {"fast": "tev1:4b", "accurate": "nimble:9b-q4_K_M"},
+        description="Sub-tier → Ollama decision model (fast | accurate; either may be omitted).",
+    )
+    decision_ollama_keep_alive: str = Field(
+        default="30m", description="keep_alive sent on every request (OLL-006)."
+    )
+    decision_ollama_warmup: bool = Field(
+        default=False, description="One warm-up request per model at runtime start (OLL-006)."
+    )
+    decision_ollama_allow_remote: bool = Field(
+        default=False, description="Allow a non-loopback Ollama (no auth on Ollama, OLL-010)."
+    )
+    decision_ollama_accurate_max_p95_ms: int = Field(
+        default=1000, ge=1, description="Per-turn use of the accurate tier above this p95: never."
+    )
+    decision_ollama_timeout_ms: int = Field(
+        default=2000, ge=1, description="Own per-sub-tier budget (not part of decision_timeout_ms)."
+    )
+    decision_ollama_max_batch: int = Field(
+        default=4, ge=1, le=64, description="Max questions per request on the accurate tier."
+    )
+    decision_ollama_min_version: str = Field(
+        default="0.35.0", description="Minimum Ollama version serving /v1/systemone (OLL-002)."
+    )
+    # Concrete human-review questions (DEC delta — SPEC-DEC-OLL-012/014).
+    decision_hitl_raise_threshold: float = Field(
+        default=0.5, gt=0.0, le=1.0, description="P(true) at which a concrete question raises."
+    )
+    decision_hitl_raise_thresholds: dict[str, float] = Field(
+        default_factory=dict, description="Per-question raise threshold (question id → P)."
+    )
+    decision_hitl_money_limit: float = Field(
+        default=0.0, ge=0.0, description="Money moved above this needs review (0 ⇒ any amount)."
     )
 
     # --- AMR --- Adaptive Model Routing (Phase AMR — SPEC-AMR-CFG-001) ────
@@ -2816,7 +2869,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _validate_decisions(self) -> "Settings":
         """Validate the typed-decision settings (SPEC-DEC-CFG-001, CAL-002) at load time."""
-        backends = {"rule", "laya", "jev", "llm"}
+        backends = {"rule", "ollama", "laya", "jev", "llm"}
         unknown = [b for b in self.decision_backend_order if b not in backends]
         if unknown:
             raise ValueError(f"PRISMAL_DECISION_BACKEND_ORDER has unknown backends {unknown}.")
@@ -2843,6 +2896,7 @@ class Settings(BaseSettings):
             raise ValueError("PRISMAL_LAYA_MODE=http requires PRISMAL_LAYA_BASE_URL.")
         if not self.decision_languages:
             raise ValueError("PRISMAL_DECISION_LANGUAGES must name at least one language.")
+        self._validate_decision_ollama()
         tier_defaults = {"low": 0.85, "medium": 0.90, "high": 0.97}
         for tier, tau in self.decision_tau_overrides.items():
             if tier not in tier_defaults:
@@ -2860,6 +2914,44 @@ class Settings(BaseSettings):
 
             validate_enforce_calibration(self)
         return self
+
+    def _validate_decision_ollama(self) -> None:
+        """Ollama tier models, remote guard (OLL-010) and concrete HITL thresholds."""
+        for tier, model in self.decision_ollama_models.items():
+            if tier not in {"fast", "accurate"} or not model.strip():
+                raise ValueError(
+                    f"PRISMAL_DECISION_OLLAMA_MODELS[{tier!r}]={model!r}; expected "
+                    "fast|accurate → a non-empty model name."
+                )
+        from prismal.decisions.catalog import HITL_QUESTION_IDS
+
+        for qid, threshold in self.decision_hitl_raise_thresholds.items():
+            if qid not in HITL_QUESTION_IDS:
+                raise ValueError(
+                    f"PRISMAL_DECISION_HITL_RAISE_THRESHOLDS key {qid!r} is not one of "
+                    f"{list(HITL_QUESTION_IDS)}."
+                )
+            if not 0.0 < threshold <= 1.0:
+                raise ValueError(
+                    f"PRISMAL_DECISION_HITL_RAISE_THRESHOLDS[{qid!r}]={threshold} "
+                    "must be in (0, 1]."
+                )
+        # Only an explicit decision URL is checked at load: an unset one falls back to the
+        # LLM's ``ollama_base_url`` (possibly remote for existing users) and the factory
+        # then refuses to build the tier instead (no startup break, no SSRF).
+        url = self.decision_ollama_base_url
+        if (
+            not self.decisions_enabled
+            or url is None
+            or "ollama" not in self.decision_backend_order
+            or self.decision_ollama_allow_remote
+        ):
+            return
+        if not is_loopback_url(url):
+            raise ValueError(
+                f"Ollama decision backend at {url!r} is not loopback; Ollama has no "
+                "authentication, so set PRISMAL_DECISION_OLLAMA_ALLOW_REMOTE=true to accept it."
+            )
 
     @model_validator(mode="after")
     def _validate_protocol_upgrades(self) -> "Settings":

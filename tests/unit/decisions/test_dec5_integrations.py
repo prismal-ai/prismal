@@ -13,8 +13,9 @@ from prismal.core.config import Settings
 from prismal.decisions.adapters.fake import FakeDecisionAdapter
 from prismal.decisions.calibration import CalibrationRecord, CalibrationStore
 from prismal.decisions.cascade import DecisionCascade
+from prismal.decisions.catalog import HITL_QUESTION_IDS
 from prismal.decisions.integrations.ctx import CTX_DECISION_ID, make_relevance_scorer
-from prismal.decisions.integrations.hitl import HITL_DECISION_ID, GatedAction, hitl_band
+from prismal.decisions.integrations.hitl import GatedAction, hitl_band
 from prismal.decisions.integrations.rag import RAG_DECISION_ID, grade_chunks
 from prismal.decisions.integrations.safety import SAFETY_DECISION_ID, safety_prescreen
 from prismal.decisions.integrations.swarm import SWARM_DECISION_ID, score_worker_output
@@ -95,20 +96,22 @@ class TestHitl:
     )
 
     def _cascade(self, tmp_path: Path, p: float) -> DecisionCascade:
-        return DecisionCascade([ScriptedNoul(p)], calibration=_store(tmp_path, HITL_DECISION_ID))
+        return DecisionCascade([ScriptedNoul(p)], calibration=_store(tmp_path, *HITL_QUESTION_IDS))
 
     async def test_enforce_bands(self, tmp_path: Path) -> None:
+        # Concrete questions (OLL-014): a confident calibrated "no" on every fact ⇒ auto,
+        # an unaccepted lean-no ⇒ confirm, any raised fact ⇒ human (OLL-012).
         s = _settings("hitl", "decision_hitl_enabled", "enforce")
         assert (
-            await hitl_band(self.ACTION, cascade=self._cascade(tmp_path, 0.97), settings=s)
+            await hitl_band(self.ACTION, cascade=self._cascade(tmp_path, 0.03), settings=s)
             == "auto"
         )
         assert (
-            await hitl_band(self.ACTION, cascade=self._cascade(tmp_path, 0.7), settings=s)
+            await hitl_band(self.ACTION, cascade=self._cascade(tmp_path, 0.3), settings=s)
             == "confirm"
         )
         assert (
-            await hitl_band(self.ACTION, cascade=self._cascade(tmp_path, 0.3), settings=s)
+            await hitl_band(self.ACTION, cascade=self._cascade(tmp_path, 0.97), settings=s)
             == "human"
         )
 
@@ -330,7 +333,9 @@ class TestSafety:
 
 
 async def test_shadow_runner_used_when_given(tmp_path: Path) -> None:
-    cascade = DecisionCascade([ScriptedNoul(0.99)], calibration=_store(tmp_path, HITL_DECISION_ID))
+    cascade = DecisionCascade(
+        [ScriptedNoul(0.99)], calibration=_store(tmp_path, *HITL_QUESTION_IDS)
+    )
     runner = ShadowRunner(cascade)
     s = _settings("hitl", "decision_hitl_enabled", "shadow")
     band = await hitl_band(TestHitl.ACTION, cascade=cascade, settings=s, shadow=runner)

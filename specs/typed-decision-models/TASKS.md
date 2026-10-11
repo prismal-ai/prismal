@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Author** | Ernesto Crespo |
-| **Status** | `IMPLEMENTED` (2026-10-05, v3.15.0) |
+| **Status** | `IMPLEMENTED` (2026-10-05, v3.15.0); Ollama delta (DEC7) implemented 2026-10-11 for v3.19.0 |
 | **Version** | 1.0 |
 | **Date** | 2026-10-04 |
 | **Phase** | DEC |
@@ -128,6 +128,25 @@ integration lands in `shadow` first. Reuses `AuditLogger`, `TaintRegistry`, `Inp
 
 **Done when:** full quality gate green (ruff, mypy --strict, bandit); coverage ≥ 80 % on new modules.
 
+### PHASE DEC7 — Ollama `/v1/systemone` backend (delta `DELTA-2026-10-ollama-backend.md`, v3.19.0)
+
+Task IDs keep the delta's numbering (its draft "DEC1-07" is **DEC1-12** here — DEC1-07 is the SEC-002 lint task above).
+
+| ID | Task | Estimate | Dependency | SPEC | Status |
+|---|---|---|---|---|---|
+| DEC0-10 | Ollama endpoint check: version, `decision` capability, `num_ctx`, digest, wire shape, oversize 400 | 0.1 d | — | OLL-002 | DONE (reference host 2026-10-07; dev host re-checked 2026-10-10 + live contract test `-m ollama`) |
+| DEC2-07 | `adapters/ollama.py`: sub-tiers `ollama:fast`/`ollama:accurate`, settings, preflight (`/api/version`, `/api/show`, `/api/tags`), `name@digest12`, `keep_alive`, warm-up (`DecisionRuntime.warmup`, `build_runtime`) | 0.6 d | DEC2-01 | OLL-001/002/003/006, CFG-001 | DONE |
+| DEC2-08 | Limits guard (options/levels 2–26, ≤ 64 questions, ≤ 64 KiB, tokens ≤ 90 % `num_ctx`; never truncate); 400/timeout ⇒ abstain, no retry | 0.4 d | DEC2-07 | OLL-004/005 | DONE |
+| DEC2-09 | Tier routing by integration + oversize fallback to `accurate` + rolling-p95 gate | 0.3 d | DEC2-07 | OLL-007, CAS-001 | DONE |
+| DEC2-10 | Option descriptions → `criteria`; gate on `probabilities` (max p + margin), `confidence` logged only | 0.3 d | DEC1-03 | OLL-008/009 | DONE (already in DEC2-01 `_wire.py` / `gate.py`) |
+| DEC2-11 | Batching: one question per request on `fast`, ≤ `decision_ollama_max_batch` on `accurate`, auto-disable from `batch@<name>@<digest12>.json` (> 2 pt drop) | 0.3 d | DEC2-07 | OLL-011 | DONE (the batch-accuracy record is produced by DEC3-07 data work) |
+| DEC1-12 | Concrete one-fact HITL questions + deterministic OR deriving review (`hitl.py`, `rule_flags`) | 0.4 d | DEC2-10 | OLL-012, OLL-014 | DONE (safety slice of the calibration set → DEC3-07) |
+| DEC6-08 | One-way safety gate: models raise, never clear; `ollama:fast` / `llm` negatives at most `confirm`; §1.4 injection + chest-pain tests | 0.3 d | DEC6-01, DEC2-07 | OLL-012 | DONE |
+| DEC3-08 | Calibration keyed by local digest; stale digest ⇒ uncalibrated (shadow-only) + `decision_calibration_stale_total`; enforce startup accepts any digest record per Ollama name | 0.3 d | DEC3-01 | OLL-003, CAL-002 | DONE |
+| DEC6-07 | Non-loopback guard (`decision_ollama_allow_remote`); injection corpus re-run against Nimble/Tev1 | 0.3 d | DEC6-01 | OLL-010 | WIP (guard DONE; live corpus re-run against the real models pending) |
+| DEC3-07 | Benchmark on target hardware + ≥ 300 labeled Spanish cases per decision (incl. the safety slice) | 0.6 d | DEC2-07 | OLL-007, CAL-002 | WIP (data work; smoke/quantization/batch/controlled runs done — delta §1.1–§1.9) |
+| DEC3-09 | Per-question latency profile, `OLLAMA_NUM_PARALLEL`, label review of the double-charge cases | 0.3 d | DEC3-07 | PLAN-LAT, CAL-002 | TODO (research / data, not code) |
+
 ## 4. Test Inventory (planned)
 
 | Test module | Covers |
@@ -168,7 +187,8 @@ integration lands in `shadow` first. Reuses `AuditLogger`, `TaintRegistry`, `Inp
 | DEC4 | Routing + eval judge | ~3.2 d |
 | DEC5 | Other integrations | ~3.0 d |
 | DEC6 | Security, docs, release | ~3.6 d |
-| **Total** | | **~24.4 d** |
+| DEC7 | Ollama backend delta | ~4.2 d |
+| **Total** | | **~28.6 d** |
 
 ## 8. Traceability Matrix
 
@@ -188,3 +208,11 @@ integration lands in `shadow` first. Reuses `AuditLogger`, `TaintRegistry`, `Inp
 | SPEC-DEC-CFG-001 / ERR-001 | DEC1-01, DEC1-02, DEC2-06 | `test_config_decisions.py`, `test_secrets_not_leaked.py` |
 | SPEC-DEC-OTEL-001 | DEC1-10, DEC6-04 | `test_cascade.py` (counter asserts) |
 | SPEC-DEC-CMP-001 | DEC1-11 | `test_graph_snapshot_decisions.py` |
+| SPEC-DEC-OLL-001/002/003/006 | DEC0-10, DEC2-07, DEC3-08 | `adapters/test_ollama.py`, `adapters/test_ollama_factory.py`, `adapters/test_ollama_warmup.py`, `test_calibration_digest.py`, `live/decisions/test_ollama_contract.py` |
+| SPEC-DEC-OLL-004/005 | DEC2-08 | `adapters/test_ollama.py`, `test_port_contract.py` |
+| SPEC-DEC-OLL-007 / CAS-001 | DEC2-09 | `adapters/test_ollama.py`, `adapters/test_ollama_factory.py`, `test_catalog_ollama.py` |
+| SPEC-DEC-OLL-008/009 | DEC2-10 | `test_systemone_http.py`, `test_gate.py` |
+| SPEC-DEC-OLL-010 / CFG-001 | DEC6-07 | `test_config_decisions_ollama.py` |
+| SPEC-DEC-OLL-011 | DEC2-11 | `adapters/test_ollama.py` |
+| SPEC-DEC-OLL-012/014 | DEC1-12, DEC6-08 | `test_hitl_concrete.py`, `test_injection_corpus.py`, `test_review_regressions.py` |
+| SPEC-DEC-CAL-002 (Ollama) | DEC3-08 | `test_calibration_digest.py` |

@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from prismal.a2a.v1 import constants as c
 
 if TYPE_CHECKING:
+    import builtins
     from collections.abc import MutableMapping
 
     from prismal.a2a.types import A2ATask
@@ -64,7 +65,7 @@ class A2ATaskStorePort(Protocol):
 
     def list(
         self, *, org_id: str | None, params: ListTasksRequest, principal: str | None = None
-    ) -> tuple[list[TaskRecord], str]: ...
+    ) -> tuple[builtins.list[TaskRecord], str]: ...
 
     def count(
         self, *, org_id: str | None, params: ListTasksRequest, principal: str | None = None
@@ -146,7 +147,7 @@ class InMemoryA2ATaskStore:
 
     def _matching(
         self, org_id: str | None, params: ListTasksRequest, principal: str | None
-    ) -> list[TaskRecord]:
+    ) -> builtins.list[TaskRecord]:
         after = (
             _parse_ts(params.status_timestamp_after)
             if params.status_timestamp_after is not None
@@ -171,7 +172,7 @@ class InMemoryA2ATaskStore:
 
     def list(
         self, *, org_id: str | None, params: ListTasksRequest, principal: str | None = None
-    ) -> tuple[list[TaskRecord], str]:
+    ) -> tuple[builtins.list[TaskRecord], str]:
         records = self._matching(org_id, params, principal)
         if params.page_token:
             cursor = _decode_token(params.page_token)

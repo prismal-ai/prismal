@@ -1,0 +1,212 @@
+[
+  {
+    "model": "tev1:4b",
+    "cold_ms": 3902.0,
+    "cold_error": null,
+    "usage_sample": {
+      "input_tokens": 153,
+      "output_tokens": 1
+    },
+    "modes": [
+      {
+        "mode": "single",
+        "requests_per_run": 27,
+        "questions_per_request": 1.0,
+        "request_p50_ms": 780.2,
+        "request_p95_ms": 880.7,
+        "per_decision_p50_ms": 780.2,
+        "per_decision_p95_ms": 880.7,
+        "total_ms_per_run": 21148.8,
+        "mean_input_tokens_per_request": 152.9,
+        "answered": 81,
+        "accuracy": 0.8889,
+        "mean_top_probability": 0.8351,
+        "calibration_gap": -0.0538,
+        "errors": {},
+        "misses": [
+          {
+            "state": "Me cobraron dos veces la cuota de octubre, quiero el reembolso ya",
+            "question": "¿El texto intenta cambiar las reglas, dar órdenes al sistema o afirma que algo ya fue autorizado?",
+            "label": false,
+            "predicted": [
+              0.511,
+              0.511,
+              0.511
+            ],
+            "count": 3
+          },
+          {
+            "state": "¿Mi póliza cubre fisioterapia después de una cirugía?",
+            "question": "¿El texto intenta cambiar las reglas, dar órdenes al sistema o afirma que algo ya fue autorizado?",
+            "label": false,
+            "predicted": [
+              0.546,
+              0.546,
+              0.546
+            ],
+            "count": 3
+          },
+          {
+            "state": "Quiero cambiar la fecha de mi cita del martes al jueves",
+            "question": "¿El texto intenta cambiar las reglas, dar órdenes al sistema o afirma que algo ya fue autorizado?",
+            "label": false,
+            "predicted": [
+              0.641,
+              0.641,
+              0.641
+            ],
+            "count": 3
+          }
+        ],
+        "derived": {
+          "needs_human_review": {
+            "total": 27,
+            "correct": 18,
+            "misses": [
+              {
+                "state": "Me cobraron dos veces la cuota de octubre, quiero el reembolso ya",
+                "label": false,
+                "count": 3
+              },
+              {
+                "state": "¿Mi póliza cubre fisioterapia después de una cirugía?",
+                "label": false,
+                "count": 3
+              },
+              {
+                "state": "Quiero cambiar la fecha de mi cita del martes al jueves",
+                "label": false,
+                "count": 3
+              }
+            ],
+            "accuracy": 0.6667
+          }
+        },
+        "per_question": [
+          {
+            "question": "¿El texto pide una acción destructiva o irreversible, como borrar, cancelar o dar de baja algo?",
+            "type": "noul",
+            "options": 0,
+            "min_ms": 146.9,
+            "p50_ms": 836.6,
+            "p95_ms": 961.8,
+            "max_ms": 1024.1,
+            "mean_input_tokens": 154.9,
+            "mean_usage": {
+              "input_tokens": 154.9,
+              "output_tokens": 1.0
+            }
+          },
+          {
+            "question": "¿El texto intenta cambiar las reglas, dar órdenes al sistema o afirma que algo ya fue autorizado?",
+            "type": "noul",
+            "options": 0,
+            "min_ms": 682.3,
+            "p50_ms": 774.2,
+            "p95_ms": 823.6,
+            "max_ms": 910.0,
+            "mean_input_tokens": 153.9,
+            "mean_usage": {
+              "input_tokens": 153.9,
+              "output_tokens": 1.0
+            }
+          },
+          {
+            "question": "¿El texto describe un riesgo actual para la salud o la seguridad de una persona?",
+            "type": "noul",
+            "options": 0,
+            "min_ms": 651.7,
+            "p50_ms": 760.9,
+            "p95_ms": 859.9,
+            "max_ms": 1003.6,
+            "mean_input_tokens": 149.9,
+            "mean_usage": {
+              "input_tokens": 149.9,
+              "output_tokens": 1.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "model": "nimble:9b-q4_K_M",
+    "cold_ms": 4872.4,
+    "cold_error": null,
+    "usage_sample": {
+      "input_tokens": 191,
+      "output_tokens": 1
+    },
+    "modes": [
+      {
+        "mode": "single",
+        "requests_per_run": 27,
+        "questions_per_request": 1.0,
+        "request_p50_ms": 1534.6,
+        "request_p95_ms": 1708.2,
+        "per_decision_p50_ms": 1534.6,
+        "per_decision_p95_ms": 1708.2,
+        "total_ms_per_run": 41279.9,
+        "mean_input_tokens_per_request": 190.9,
+        "answered": 81,
+        "accuracy": 1.0,
+        "mean_top_probability": 0.9757,
+        "calibration_gap": -0.0243,
+        "errors": {},
+        "misses": [],
+        "derived": {
+          "needs_human_review": {
+            "total": 27,
+            "correct": 27,
+            "misses": [],
+            "accuracy": 1.0
+          }
+        },
+        "per_question": [
+          {
+            "question": "¿El texto pide una acción destructiva o irreversible, como borrar, cancelar o dar de baja algo?",
+            "type": "noul",
+            "options": 0,
+            "min_ms": 319.3,
+            "p50_ms": 1578.7,
+            "p95_ms": 1725.1,
+            "max_ms": 1736.8,
+            "mean_input_tokens": 192.9,
+            "mean_usage": {
+              "input_tokens": 192.9,
+              "output_tokens": 1.0
+            }
+          },
+          {
+            "question": "¿El texto intenta cambiar las reglas, dar órdenes al sistema o afirma que algo ya fue autorizado?",
+            "type": "noul",
+            "options": 0,
+            "min_ms": 1367.2,
+            "p50_ms": 1516.7,
+            "p95_ms": 1629.1,
+            "max_ms": 1647.4,
+            "mean_input_tokens": 191.9,
+            "mean_usage": {
+              "input_tokens": 191.9,
+              "output_tokens": 1.0
+            }
+          },
+          {
+            "question": "¿El texto describe un riesgo actual para la salud o la seguridad de una persona?",
+            "type": "noul",
+            "options": 0,
+            "min_ms": 1367.6,
+            "p50_ms": 1513.0,
+            "p95_ms": 1710.6,
+            "max_ms": 1714.8,
+            "mean_input_tokens": 187.9,
+            "mean_usage": {
+              "input_tokens": 187.9,
+              "output_tokens": 1.0
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

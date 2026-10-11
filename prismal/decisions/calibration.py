@@ -3,12 +3,21 @@
 Files ``<decision_calibration_dir>/<decision_id>@<model>.json`` are versioned,
 code-reviewed artifacts (DD-DEC-006). A record is model-pinned: when the pinned
 model changes, the old file simply no longer matches and enforce is refused.
+
+Key format (SPEC-DEC-OLL-003): Laya / Jev models are plain pinned names
+(``route.supervisor@jev-1.13.0.json``). Ollama sub-tier backends report
+``model = "<name>@<digest12>"`` (first 12 hex chars of the ``/api/tags`` digest),
+so their records are ``<decision_id>@<name>@<digest12>.json``. When the local
+model is re-pulled its digest changes, the exact key no longer matches and the
+decision runs uncalibrated (shadow-only: never accepted, it escalates); the
+cascade reports that as *stale* (``decision_calibration_stale``).
 """
 
 from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -18,7 +27,7 @@ from prismal.core.logging import get_logger
 from prismal.decisions.catalog import (
     INTEGRATION_DECISION_IDS,
     INTEGRATION_FLAGS,
-    backend_model,
+    backend_models,
     configured_mode,
 )
 from prismal.decisions.types import Decision
@@ -30,6 +39,17 @@ if TYPE_CHECKING:
     from prismal.decisions.types import QuestionSpec
 
 logger = get_logger(__name__)
+
+#: ``<name>@<digest12>`` — an Ollama model pinned by its local digest (OLL-003).
+_DIGEST_MODEL = re.compile(r"^(?P<name>.+)@(?P<digest>[0-9a-f]{12})$")
+#: Suffix of an :func:`enforce_requirements` model meaning "any digest of this name".
+ANY_DIGEST = "@*"
+
+
+def split_digest(model: str) -> tuple[str, str] | None:
+    """``(name, digest12)`` for a digest-pinned model, ``None`` for a plain name."""
+    match = _DIGEST_MODEL.match(model)
+    return (match["name"], match["digest"]) if match else None
 
 
 @dataclass(frozen=True)
@@ -90,19 +110,28 @@ class CalibrationRecord:
         )
 
 
+def _segment(text: str) -> str:
+    """File-name-safe key segment: path separators can never leave the directory (L1)."""
+    return text.replace("/", "__").replace("\\", "__")
+
+
 class CalibrationStore:
-    """Directory of calibration records keyed by ``<decision_id>@<model>.json``."""
+    """Directory of calibration records keyed by ``<decision_id>@<model>.json``.
+
+    ``model`` is a plain pinned name (Laya / Jev) or ``<name>@<digest12>`` (Ollama).
+    """
 
     def __init__(self, directory: str | Path) -> None:
         self._dir = Path(directory)
         self._cache: dict[tuple[str, str], CalibrationRecord | None] = {}
+        self._stale: dict[tuple[str, str], bool] = {}
 
     @property
     def directory(self) -> Path:
         return self._dir
 
     def _path(self, decision_id: str, model: str) -> Path:
-        return self._dir / f"{decision_id}@{model}.json"
+        return self._dir / f"{_segment(decision_id)}@{_segment(model)}.json"
 
     def get(self, decision_id: str, model: str) -> CalibrationRecord | None:
         """Return the record, or ``None`` when absent, unreadable or for another model."""
@@ -122,12 +151,56 @@ class CalibrationStore:
         self._cache[key] = record
         return record
 
+    def records_for_name(self, decision_id: str, name: str) -> list[CalibrationRecord]:
+        """Valid records for any digest of Ollama model ``name``, newest first.
+
+        Only ``<decision_id>@<name>@<digest12>.json`` files whose content matches
+        their key (as :meth:`get` checks) count; unreadable files are skipped.
+        """
+        prefix = f"{_segment(decision_id)}@{_segment(name)}@"
+        out: list[CalibrationRecord] = []
+        try:
+            paths = sorted(self._dir.glob("*.json")) if self._dir.is_dir() else []
+        except OSError:
+            paths = []
+        for path in paths:
+            stem = path.name[: -len(".json")]
+            if not stem.startswith(prefix):
+                continue
+            model = f"{name}@{stem[len(prefix) :]}"
+            parsed = split_digest(model)
+            if parsed is None or parsed[0] != name:
+                continue
+            record = self.get(decision_id, model)
+            if record is not None:
+                out.append(record)
+        out.sort(key=lambda r: (r.created_at, r.model), reverse=True)
+        return out
+
+    def stale(self, decision_id: str, model: str) -> bool:
+        """True when a digest-pinned ``model`` lost its calibration to a re-pull (OLL-003).
+
+        Stale ⇔ ``model`` is ``<name>@<digest12>``, there is no valid record for
+        exactly that key, but one exists for the same ``decision_id`` and ``name``
+        under another digest. Plain model names (Laya / Jev) are never stale.
+        """
+        key = (decision_id, model)
+        if key not in self._stale:
+            parsed = split_digest(model)
+            self._stale[key] = (
+                parsed is not None
+                and self.get(decision_id, model) is None
+                and bool(self.records_for_name(decision_id, parsed[0]))
+            )
+        return self._stale[key]
+
     def save(self, record: CalibrationRecord) -> Path:
         """Write ``record`` to ``<dir>/<decision_id>@<model>.json`` and return the path."""
         self._dir.mkdir(parents=True, exist_ok=True)
         path = self._path(record.decision_id, record.model)
         path.write_text(json.dumps(record.to_dict(), indent=2, sort_keys=True) + "\n", "utf-8")
         self._cache[(record.decision_id, record.model)] = record
+        self._stale.clear()
         return path
 
     def validate_for_enforce(
@@ -161,6 +234,43 @@ class CalibrationStore:
                 f"calibration {decision_id!r}@{model!r} lacks a valid slice for {missing} (CAL-003)"
             )
 
+    def validate_for_enforce_any_digest(
+        self,
+        decision_id: str,
+        name: str,
+        languages: Sequence[str] = (),
+        *,
+        max_ece: float = 0.05,
+        min_examples: int = 300,
+    ) -> None:
+        """CAL-002 for Ollama: some ``<decision_id>@<name>@<digest12>`` record must pass.
+
+        The digest is unknown at settings load (it comes from the runtime
+        preflight), so any digest of ``name`` satisfies the startup gate; a digest
+        mismatch at request time is handled as *stale* (shadow-only).
+        """
+        records = self.records_for_name(decision_id, name)
+        if not records:
+            raise DecisionCalibrationError(
+                f"no calibration for decision {decision_id!r} on any digest of Ollama model "
+                f"{name!r} in {self._dir} — enforce refused (CAL-002)"
+            )
+        errors: list[DecisionCalibrationError] = []
+        for record in records:
+            try:
+                self.validate_for_enforce(
+                    decision_id,
+                    record.model,
+                    languages,
+                    max_ece=max_ece,
+                    min_examples=min_examples,
+                )
+            except DecisionCalibrationError as exc:
+                errors.append(exc)
+            else:
+                return
+        raise errors[0]  # newest record's reason (records is non-empty)
+
 
 def language_enforceable(record: CalibrationRecord, language: str, *, min_examples: int) -> bool:
     """CAL-003: a language slice may enforce only with enough examples at target precision."""
@@ -170,19 +280,22 @@ def language_enforceable(record: CalibrationRecord, language: str, *, min_exampl
 
 
 def enforce_requirements(settings: Settings) -> list[tuple[str, str, str]]:
-    """``(integration, decision_id, model)`` triples that need a record to enforce."""
+    """``(integration, decision_id, model)`` triples that need a record to enforce.
+
+    Laya / Jev models are exact keys. Ollama models are ``<name>@*`` (see
+    :data:`ANY_DIGEST`): any ``<name>@<digest12>`` record may satisfy them.
+    """
     out: list[tuple[str, str, str]] = []
     for integration in INTEGRATION_FLAGS:
         if configured_mode(settings, integration) != "enforce":
             continue
         for backend in settings.decision_backend_order:
-            model = backend_model(settings, backend)
-            if model is None:
-                continue
-            out.extend(
-                (integration, decision_id, model)
-                for decision_id in INTEGRATION_DECISION_IDS[integration]
-            )
+            suffix = ANY_DIGEST if backend == "ollama" else ""
+            for model in backend_models(settings, backend):
+                out.extend(
+                    (integration, decision_id, f"{model}{suffix}")
+                    for decision_id in INTEGRATION_DECISION_IDS[integration]
+                )
     return out
 
 
@@ -197,7 +310,12 @@ def validate_enforce_calibration(settings: Settings) -> None:
         return
     store = CalibrationStore(settings.decision_calibration_dir)
     for _integration, decision_id, model in requirements:
-        store.validate_for_enforce(decision_id, model, max_ece=settings.decision_max_ece)
+        if model.endswith(ANY_DIGEST):
+            store.validate_for_enforce_any_digest(
+                decision_id, model[: -len(ANY_DIGEST)], max_ece=settings.decision_max_ece
+            )
+        else:
+            store.validate_for_enforce(decision_id, model, max_ece=settings.decision_max_ece)
 
 
 def _interp(x: float, xs: Sequence[float], ys: Sequence[float]) -> float:

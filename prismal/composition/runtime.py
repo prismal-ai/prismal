@@ -880,8 +880,9 @@ async def _compose_decisions(
     if settings.laya_preload:
         for backend in cascade.backends:
             warmup = getattr(backend, "warmup", None)
-            if warmup is not None:
+            if warmup is not None and not backend.name.startswith("ollama:"):
                 await warmup()
+    await runtime.warmup()  # Ollama sub-tiers (OLL-006): flag-gated, fail-open
     if global_mode:
         set_decision_runtime(runtime)
 

@@ -403,7 +403,9 @@ class StatelessHttpAdapter:
             protocol_version=self._version if stateless else (supported[0] if supported else ""),
             stateless=stateless,
             capabilities=dict(caps) if isinstance(caps, Mapping) else {},
-            extensions=frozenset(extensions) if isinstance(extensions, Mapping) else frozenset(),
+            extensions=frozenset(str(k) for k in extensions)
+            if isinstance(extensions, Mapping)
+            else frozenset(),
             server_name=str(info.get("name", "")),
             server_version=str(info.get("version", "")),
             supported_versions=supported,

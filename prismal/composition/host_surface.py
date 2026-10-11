@@ -242,7 +242,7 @@ def _thread_guard(thread_id: str | None, org_id: str | None) -> BudgetGuard | No
         return None
     from prismal.budget.resolve import get_budget_guard
 
-    guard = get_budget_guard({"session_id": thread_id})  # type: ignore[typeddict-item]
+    guard = get_budget_guard({"session_id": thread_id})
     if guard is None:
         return None
     if org_id is not None and getattr(guard.meter, "_tenant", None) != org_id:
