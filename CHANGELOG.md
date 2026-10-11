@@ -10,6 +10,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- `mako` 1.3.12 → 1.4.3 (lock; transitive via `alembic` / `prefect`) — fixes
+  CVE-2026-102991 (GHSA-5639-2j2p-m4mx, `TemplateLookup` path traversal).
+- `accelerate` 1.13.0 → 1.15.0 and floor `accelerate>=1.15.0` in
+  `[local-embeddings]` — fixes CVE-2026-69112 (GHSA-4j2p-28q2-5m79, sharded
+  checkpoint path traversal); its pip-audit ignore is removed.
+- `chromadb` 1.5.9 (CVE-2026-45829/45830/45831/45833) and `nltk` 3.10.3
+  (CVE-2026-81726) re-verified on OSV 2026-10-11: still no upstream fix, both
+  are the latest releases. The ignores stay because prismal is not exposed:
+  Chroma runs embedded only (no HTTP server/RBAC) and nothing imports `nltk`,
+  which arrives only through `llmlingua` in the optional `[compression]` extra.
+  Next review: 2027-01.
+
 ## [3.19.0] — 2026-10-11
 
 > Typed decisions on a **local Ollama** backend (DEC delta

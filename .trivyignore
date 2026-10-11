@@ -53,7 +53,8 @@ CVE-2026-3219
 # (.pre-commit-config.yaml + ci.yml).
 # Spec: specs/dependency-security-remediation/SPEC.md (SEC-A02, alerta #15).
 # TRIGGER de re-evaluacion: chromadb publica first_patched_version, o proxima
-# revision programada 2026-10. Triage: `prismal doctor security-check`.
+# revision programada 2027-01 (re-verificado 2026-10-11 en OSV: sin fix).
+# Triage: `prismal doctor security-check`.
 CVE-2026-45829
 
 # --- chromadb 1.5.9 -> CVE-2026-45830 / 45831 / 45833 (sin fix) ----
@@ -66,6 +67,7 @@ CVE-2026-45829
 # HttpClient ni `chroma run`) y la tenencia la aplica `collection_for(base,
 # org_id)`, no el RBAC de Chroma -> ningun vector expuesto. Mismo ignore en
 # pip-audit (ci.yml + .pre-commit-config.yaml).
+# Re-verificado 2026-10-11 en OSV (last_affected 1.5.9, sin fix).
 # TRIGGER de re-evaluacion: chromadb publica version con fix -> subir y quitar.
 CVE-2026-45830
 CVE-2026-45831
@@ -77,15 +79,9 @@ CVE-2026-45833
 # (GHSA-8mgp-746c-j5xp / PYSEC-2026-3740). nltk solo entra transitivamente via
 # llmlingua (extra opcional `[compression]`, TKE8); prismal no llama a ninguna
 # API de nltk ni pasa rutas de usuario. Mismo ignore en pip-audit.
+# Re-verificado 2026-10-11 en OSV (last_affected 3.10.3, sin fix).
 # TRIGGER de re-evaluacion: nltk publica version con fix -> quitar ignore.
 CVE-2026-81726
-
-# --- accelerate 1.13.0 -> CVE-2026-69112 (solo pip-audit) ----
-# PYSEC-2026-3804, path traversal en load_checkpoint_in_model con indices de
-# shards maliciosos; "through 1.14.0", sin fix. No supera el gate HIGH/CRITICAL
-# de trivy (no hace falta listarla aqui); se ignora solo en pip-audit.
-# accelerate entra via llmlingua / extras locales; prismal no carga checkpoints
-# sharded de origen no confiable. TRIGGER: accelerate publica fix.
 
 # --- torch 2.11.0 -> CVE-2025-3000 (sin fix upstream) --------
 # CRITICAL — memory corruption en `torch.jit.script` (first_patched=None:
