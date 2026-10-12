@@ -106,6 +106,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Chroma runs embedded only (no HTTP server/RBAC) and nothing imports `nltk`,
   which arrives only through `llmlingua` in the optional `[compression]` extra.
   Next review: 2027-01.
+- Those two surface claims are now enforced by
+  `tests/unit/security/test_vulnerable_dependency_surface.py`. It is an AST
+  guard over `prismal/**` that fails on any Chroma `HttpClient` /
+  `AsyncHttpClient` / `CloudClient`, any `chromadb.server|app|cli` import, a
+  `chroma run` subprocess or a `Chroma(client=/host=)` call. It also fails on
+  any use of nltk's pathsec-bypassing model APIs (`TransitionParser`,
+  `AveragedPerceptron`, `PerceptronTagger`, `save_maxent_params`). A runtime
+  check pins the Chroma adapter to an embedded persistent store. Alerts
+  #49/#50/#51/#101 are dismissed as tolerable risk on that basis.
 
 ## [3.19.0] — 2026-10-11
 
