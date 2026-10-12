@@ -66,6 +66,7 @@ class CompositePolicy:
         return self._static
 
     def select(self, features: TaskFeatures, *, budget: BudgetStatus | None = None) -> ModelChoice:
+        """First successful choice, innermost policy outward; static fallback if all fail."""
         last: BaseException | None = None
         for policy in reversed(self.chain):
             try:
@@ -79,6 +80,7 @@ class CompositePolicy:
         return fallback_choice(self._fallback_static(), features, last)
 
     def on_outcome(self, choice: ModelChoice, outcome: RoutingOutcome) -> ModelChoice | None:
+        """First escalation proposed along the chain (failing policies skipped)."""
         for policy in self.chain:
             try:
                 escalated = policy.on_outcome(choice, outcome)

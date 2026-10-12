@@ -111,11 +111,17 @@ class CachedPlan:
 class PlanCacheBackend(Protocol):
     """Storage port for cached plans (memory, SQLite, or a pluggable semantic store)."""
 
-    def get(self, key: PlanCacheKey) -> CachedPlan | None: ...
+    def get(self, key: PlanCacheKey) -> CachedPlan | None:
+        """The live cached plan for *key*, or ``None`` (miss or expired)."""
+        ...
 
-    def put(self, plan: CachedPlan, *, ttl_s: int) -> None: ...
+    def put(self, plan: CachedPlan, *, ttl_s: int) -> None:
+        """Store *plan* under its key for *ttl_s* seconds."""
+        ...
 
-    def evict(self, key: PlanCacheKey) -> bool: ...
+    def evict(self, key: PlanCacheKey) -> bool:
+        """Remove the entry for *key*; True when one existed."""
+        ...
 
     def invalidate(
         self,
@@ -123,7 +129,9 @@ class PlanCacheBackend(Protocol):
         org_id: str | None = None,
         tool_scope_hash: str | None = None,
         prompt_version: str | None = None,
-    ) -> int: ...
+    ) -> int:
+        """Drop every entry matching all given filters (``None`` = any); returns the count."""
+        ...
 
 
 def _matches(
@@ -161,6 +169,7 @@ class InMemoryPlanCacheBackend:
         self._data: OrderedDict[PlanCacheKey, tuple[CachedPlan, float]] = OrderedDict()
 
     def get(self, key: PlanCacheKey) -> CachedPlan | None:
+        """The cached plan for *key* (LRU-touched, ``hits`` + 1), or ``None`` if missing/expired."""
         with self._lock:
             entry = self._data.get(key)
             if entry is None:
@@ -175,6 +184,7 @@ class InMemoryPlanCacheBackend:
             return cached
 
     def put(self, plan: CachedPlan, *, ttl_s: int) -> None:
+        """Store *plan* with a *ttl_s* expiry, evicting least-recently-used overflow."""
         with self._lock:
             self._data[plan.key] = (plan, self._now() + ttl_s)
             self._data.move_to_end(plan.key)
@@ -182,6 +192,7 @@ class InMemoryPlanCacheBackend:
                 self._data.popitem(last=False)
 
     def evict(self, key: PlanCacheKey) -> bool:
+        """Remove the entry for *key*; True when one existed."""
         with self._lock:
             return self._data.pop(key, None) is not None
 
@@ -192,6 +203,7 @@ class InMemoryPlanCacheBackend:
         tool_scope_hash: str | None = None,
         prompt_version: str | None = None,
     ) -> int:
+        """Drop every entry matching all given filters (``None`` = any); returns the count."""
         with self._lock:
             doomed = [k for k in self._data if _matches(k, org_id, tool_scope_hash, prompt_version)]
             for k in doomed:
@@ -263,6 +275,10 @@ class SqlitePlanCacheBackend:
             conn.close()
 
     def get(self, key: PlanCacheKey) -> CachedPlan | None:
+        """The cached plan for *key* (``hits`` + 1), or ``None``; expired rows are deleted.
+
+        Raises :class:`PlanCacheError` on any SQLite / decoding failure.
+        """
         params = _key_params(key)
         try:
             with self._connect() as conn:
@@ -286,6 +302,7 @@ class SqlitePlanCacheBackend:
         return CachedPlan(key=key, plan=plan, created_at=float(row[1]), hits=hits)
 
     def put(self, plan: CachedPlan, *, ttl_s: int) -> None:
+        """Upsert *plan* (JSON-encoded) with a *ttl_s* expiry; raises :class:`PlanCacheError`."""
         try:
             payload = json.dumps(plan.plan, sort_keys=True)
             with self._connect() as conn:
@@ -305,6 +322,7 @@ class SqlitePlanCacheBackend:
             raise PlanCacheError(f"plan cache sqlite put failed: {type(exc).__name__}") from exc
 
     def evict(self, key: PlanCacheKey) -> bool:
+        """Delete the row for *key*; True when one existed. Raises :class:`PlanCacheError`."""
         try:
             with self._connect() as conn:
                 cur = conn.execute(
@@ -322,6 +340,10 @@ class SqlitePlanCacheBackend:
         tool_scope_hash: str | None = None,
         prompt_version: str | None = None,
     ) -> int:
+        """Delete rows matching all given filters (``None`` = any); returns the count.
+
+        Raises :class:`PlanCacheError` on SQLite failure.
+        """
         clauses: list[str] = []
         params: list[str] = []
         for column, value in (

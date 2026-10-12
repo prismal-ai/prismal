@@ -128,6 +128,7 @@ class CalibrationStore:
 
     @property
     def directory(self) -> Path:
+        """Directory holding the calibration records."""
         return self._dir
 
     def _path(self, decision_id: str, model: str) -> Path:

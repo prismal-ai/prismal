@@ -46,6 +46,10 @@ class BudgetAwarePolicy:
         )
 
     def select(self, features: TaskFeatures, *, budget: BudgetStatus | None = None) -> ModelChoice:
+        """The inner choice, downgraded one tier while over the soft cap.
+
+        No downgrade on a hard cap, a tainted turn, ``AUTO`` or below the risk floor.
+        """
         choice = self.inner.select(features, budget=budget)
         if budget is None or budget.hard_exceeded or not budget.soft_exceeded:
             return choice
@@ -64,4 +68,5 @@ class BudgetAwarePolicy:
         )
 
     def on_outcome(self, choice: ModelChoice, outcome: RoutingOutcome) -> ModelChoice | None:
+        """Delegate escalation to the inner policy."""
         return self.inner.on_outcome(choice, outcome)

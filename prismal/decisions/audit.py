@@ -95,6 +95,11 @@ def build_audit_record(
     shadow_agree: bool | None = None,
     context: Mapping[str, str | None] | None = None,
 ) -> DecisionAuditRecord:
+    """Build the hash-only ``decision.made`` record for one decision.
+
+    Only hashes, labels, probabilities and gate metadata are recorded, never the
+    state text; *context* supplies session/run/org/agent ids.
+    """
     ctx = context or {}
     return DecisionAuditRecord(
         event="decision.made",

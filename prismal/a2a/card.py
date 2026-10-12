@@ -220,7 +220,8 @@ def build_agent_card(
     org_id: str | None = ...,
     did: str | None = ...,
     protocol_version: Literal["0.3"],
-) -> AgentCard: ...
+) -> AgentCard:
+    """Typed overload: ``protocol_version="0.3"`` returns a v0.3 :class:`AgentCard`."""
 
 
 @overload
@@ -231,7 +232,8 @@ def build_agent_card(
     org_id: str | None = ...,
     did: str | None = ...,
     protocol_version: Literal["1.0"],
-) -> AgentCardV1: ...
+) -> AgentCardV1:
+    """Typed overload: ``protocol_version="1.0"`` returns an :class:`AgentCardV1`."""
 
 
 @overload
@@ -242,7 +244,8 @@ def build_agent_card(
     org_id: str | None = ...,
     did: str | None = ...,
     protocol_version: None = ...,
-) -> AgentCard | AgentCardV1: ...
+) -> AgentCard | AgentCardV1:
+    """Typed overload: no explicit version, the ``a2a_protocol_version`` setting decides."""
 
 
 def build_agent_card(

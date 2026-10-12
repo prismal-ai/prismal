@@ -45,6 +45,7 @@ class DecisionRuntime:
             )
 
     async def aclose(self) -> None:
+        """Close the cascade and its backends."""
         await self.cascade.aclose()
 
     async def warmup(self) -> None:

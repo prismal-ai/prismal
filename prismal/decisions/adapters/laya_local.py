@@ -59,6 +59,7 @@ class LayaLocalDecisionAdapter:
         self._loaded: OrderedDict[str, Any] = OrderedDict()
 
     def supports(self, question: QuestionSpec, *, language: str) -> bool:
+        """False for non-English on English-only checkpoints or too many Choice options."""
         if language != "en" and self.model in _ENGLISH_ONLY:
             return False
         return not (
@@ -95,6 +96,7 @@ class LayaLocalDecisionAdapter:
         *,
         policy: GatePolicy,
     ) -> Mapping[str, Decision]:
+        """Run the local Laya router in a worker thread and parse its answers."""
         return await guarded_decide(self, questions, policy, lambda qs: self._decide(state, qs))
 
     async def _decide(
@@ -115,4 +117,5 @@ class LayaLocalDecisionAdapter:
         return router.predict(state, questions, model=self.model, max_len=self._max_len)
 
     async def aclose(self) -> None:
+        """Drop the loaded checkpoints."""
         self._loaded.clear()

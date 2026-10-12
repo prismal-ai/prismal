@@ -10,6 +10,7 @@ from typing import Any
 
 
 def inc(metric: str, attributes: dict[str, Any] | None = None) -> None:
+    """Increment an OTel counter; never raises."""
     with suppress(Exception):
         from prismal.monitoring.otel import OTelManager
 
@@ -17,6 +18,7 @@ def inc(metric: str, attributes: dict[str, Any] | None = None) -> None:
 
 
 def hist(metric: str, value: float, attributes: dict[str, Any] | None = None) -> None:
+    """Record an OTel histogram value; never raises."""
     with suppress(Exception):
         from prismal.monitoring.otel import OTelManager
 
@@ -24,6 +26,7 @@ def hist(metric: str, value: float, attributes: dict[str, Any] | None = None) ->
 
 
 def gauge(metric: str, value: float, attributes: dict[str, Any] | None = None) -> None:
+    """Set an OTel gauge value; never raises."""
     with suppress(Exception):
         from prismal.monitoring.otel import OTelManager
 

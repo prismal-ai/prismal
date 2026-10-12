@@ -43,6 +43,7 @@ class FakeDecisionAdapter:
         self.closed = False
 
     def supports(self, question: QuestionSpec, *, language: str) -> bool:
+        """False for a disallowed language or a Choice with too many options."""
         if self._languages is not None and language not in self._languages:
             return False
         return not (
@@ -58,6 +59,7 @@ class FakeDecisionAdapter:
         policy: GatePolicy,
         language: str = "en",
     ) -> Mapping[str, Decision]:
+        """Answer from the scripted decisions (unscripted ⇒ abstain), via ``guarded_decide``."""
         return await guarded_decide(
             self, questions, policy, lambda qs: self._answer(state, qs), language=language
         )
@@ -83,4 +85,5 @@ class FakeDecisionAdapter:
         return out
 
     async def aclose(self) -> None:
+        """Mark the adapter closed."""
         self.closed = True
