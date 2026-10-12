@@ -24,6 +24,7 @@ when ``settings.tool_provider_strict`` is True).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import re
 import warnings
@@ -33,7 +34,7 @@ from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Iterator, Sequence
     from pathlib import Path
 
     from langchain_core.runnables import RunnableConfig
@@ -275,6 +276,23 @@ def set_tool_provider(provider: ToolProviderPort) -> None:
 def get_tool_provider() -> ToolProviderPort | None:
     """Return the injected global provider, or ``None`` when not configured."""
     return _provider
+
+
+@contextlib.contextmanager
+def use_tool_provider(provider: ToolProviderPort) -> Iterator[ToolProviderPort]:
+    """Install *provider* globally for the block, then restore the previous one.
+
+    Unlike :func:`set_tool_provider` this restores the prior state exactly,
+    including "no provider" (``None``). Used by the eval runner to give a case
+    its own toolkit; not for concurrent runs sharing the process.
+    """
+    global _provider  # module-level injection point (variante A)
+    previous = _provider
+    _provider = provider
+    try:
+        yield provider
+    finally:
+        _provider = previous
 
 
 def _get_default_stub_provider() -> StubToolProvider:

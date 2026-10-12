@@ -74,7 +74,8 @@ class EvalRunner:
         try:
             graph = await self._make_graph(runtime)
             config = {"configurable": {"thread_id": f"eval-{case.id}"}}
-            trajectory = await capture_trajectory(graph, case, config=config)
+            with _case_tools(case, runtime):
+                trajectory = await capture_trajectory(graph, case, config=config)
             assertion_results = await self._evaluate(trajectory, case, runtime)
         except Exception as exc:  # a runner failure is a failed case, never a raise
             return CaseResult(
@@ -171,14 +172,38 @@ def _package_version() -> str:
 def _runtime_kwargs(setup: dict[str, Any]) -> dict[str, Any]:
     """Translate a case ``setup`` block into ``build_test_runtime`` kwargs.
 
-    For V2 only the ``org_id`` passthrough is honoured; ``tool_provider`` /
-    ``vector_store`` ``"fake"`` markers map to the default fakes. Per-case
-    setting ``flags`` are consumed by later phases (red-team).
+    ``org_id`` passes through. ``tool_provider`` / ``vector_store`` ``"fake"``
+    markers map to the default fakes; ``tool_provider: eval_toolkit`` gives
+    every agent the deterministic order ledger (TKE9-04 long-loop set); any
+    other marker is rejected. Per-case setting ``flags`` are consumed by later
+    phases (red-team).
     """
     kwargs: dict[str, Any] = {}
     if "org_id" in setup:
         kwargs["org_id"] = setup["org_id"]
+    marker = setup.get("tool_provider")
+    if marker == "eval_toolkit":
+        from prismal.agents.extension.providers import FakeToolProvider
+        from prismal.eval.toolkit import eval_toolkit_tools
+
+        kwargs["tool_provider"] = FakeToolProvider(default=eval_toolkit_tools())
+    elif marker not in (None, "", "fake"):
+        raise ValueError(f"unknown eval setup tool_provider {marker!r}")
     return kwargs
+
+
+def _case_tools(case: EvalCase, runtime: Any) -> contextlib.AbstractContextManager[Any]:
+    """Install the case's own toolkit as the global tool provider for the run.
+
+    Built-in agents resolve tools through the global provider, and
+    ``get_async_compiled_graph(tool_provider=...)`` only binds one in
+    ``context`` mode. Cases that keep the default fakes are left untouched.
+    """
+    if case.setup.get("tool_provider") != "eval_toolkit":
+        return contextlib.nullcontext()
+    from prismal.agents.extension import use_tool_provider
+
+    return use_tool_provider(runtime.tool_provider)
 
 
 async def _aclose(runtime: Any) -> None:

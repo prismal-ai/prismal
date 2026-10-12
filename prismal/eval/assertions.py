@@ -209,6 +209,7 @@ def _used_names(traj: Trajectory) -> set[str]:
     """All agent/node and tool names exercised in the trajectory."""
     names = set(traj.visited_nodes)
     names.update(s.tool_name for s in traj.steps if s.tool_name)
+    names.update(traj.observed_tool_names)
     return names
 
 

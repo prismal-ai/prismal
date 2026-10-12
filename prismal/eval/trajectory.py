@@ -89,6 +89,9 @@ async def capture_trajectory(
     if llm_usage.input.llm_calls:
         usage_source = "callbacks"
         tokens, cost_usd, input_usage = llm_usage.tokens, llm_usage.cost_usd, llm_usage.input
+    # The callback also sees tool calls run inside a node; never double-count.
+    tool_calls = max(tool_calls, len(llm_usage.tool_names))
+    tool_errors = max(tool_errors, llm_usage.tool_errors)
     return Trajectory(
         case_id=case.id,
         final_answer=final_answer,
@@ -106,6 +109,7 @@ async def capture_trajectory(
         llm_calls=input_usage.llm_calls,
         input_cost_usd=input_usage.input_cost_usd,
         usage_source=usage_source,
+        observed_tool_names=list(llm_usage.tool_names),
     )
 
 
@@ -133,6 +137,8 @@ class _LlmUsageCallback(BaseCallbackHandler):
         self.tokens = 0
         self.cost_usd = 0.0
         self.input = _InputUsage()
+        self.tool_names: list[str] = []
+        self.tool_errors = 0
 
     def on_llm_end(self, response: LLMResult, **_: Any) -> None:
         """Count the generation messages of one finished LLM call."""
@@ -145,6 +151,19 @@ class _LlmUsageCallback(BaseCallbackHandler):
                 self.tokens += tokens
                 self.cost_usd += cost
                 self.input.add(message)
+
+    def on_tool_start(
+        self, serialized: dict[str, Any] | None, input_str: str, **kwargs: Any
+    ) -> None:
+        """Record one tool call (including calls made inside a ReAct loop)."""
+        del input_str
+        name = (serialized or {}).get("name") or kwargs.get("name") or "unknown"
+        self.tool_names.append(str(name))
+
+    def on_tool_error(self, error: BaseException, **_: Any) -> None:
+        """Count one failed tool call."""
+        del error
+        self.tool_errors += 1
 
 
 def _initial_state(case: EvalCase) -> AgentState:

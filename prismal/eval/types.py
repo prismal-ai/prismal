@@ -96,6 +96,10 @@ class Trajectory:
     # Where the token/cost figures came from: ``callbacks`` (every LLM call of the
     # run, incl. internal routing calls) or ``messages`` (usage on streamed messages).
     usage_source: str = "messages"
+    # Tool names the run's callback observed, including calls made inside an
+    # agent's ReAct loop (absent from the ``updates`` stream). Read by
+    # ``tool_usage`` assertions; ``steps`` is unchanged.
+    observed_tool_names: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
