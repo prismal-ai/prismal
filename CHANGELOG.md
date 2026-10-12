@@ -105,7 +105,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   are the latest releases. The ignores stay because prismal is not exposed:
   Chroma runs embedded only (no HTTP server/RBAC) and nothing imports `nltk`,
   which arrives only through `llmlingua` in the optional `[compression]` extra.
-  Next review: 2027-01.
+  Next review: 2027-01. That justification is now enforced by
+  `tests/unit/security/test_unpatched_dependency_surface.py` (AST guard: no
+  `nltk` import, no Chroma HTTP/cloud client or server settings, the adapter
+  persists to a local directory), and Dependabot alerts #49/#50/#51/#101 are
+  dismissed as tolerable risk.
 
 ## [3.19.0] — 2026-10-11
 
