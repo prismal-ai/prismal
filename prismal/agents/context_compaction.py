@@ -32,7 +32,7 @@ from __future__ import annotations
 from contextlib import suppress
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, ToolMessage
 
@@ -572,7 +572,13 @@ def clear_context_compaction_run(state: AgentState) -> None:
     _RUN_ENGINES.pop(_run_key(state), None)
 
 
-def context_compaction_react_kwargs(state: AgentState) -> dict[str, ContextCompactor]:
+class CompactionReactKwargs(TypedDict, total=False):
+    """The ``react_loop`` keyword :func:`context_compaction_react_kwargs` may supply."""
+
+    context_compactor: ContextCompactor
+
+
+def context_compaction_react_kwargs(state: AgentState) -> CompactionReactKwargs:
     """Return the ``react_loop`` kwargs for *state* (mirrors ``hardening_react_kwargs``).
 
     Returns an **empty dict** when disabled/unseeded, so splatting this into
