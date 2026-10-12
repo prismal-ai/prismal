@@ -11,6 +11,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `prismal.events.subagent.emit_subagent()`: Skynet workers and MoA proposers
+  now emit the AG-UI `subagent` custom payload, so live runs streamed with
+  `custom` show `SUBAGENT_STARTED` / `SUBAGENT_FINISHED` / `SUBAGENT_ERROR`
+  (ids, names and error kinds only; no-op when `custom` is not streamed).
 - `CronExecutor.add_callable(job_id, func, *, cron, timezone=None,
   max_instances=1, coalesce=True)`: the public way to schedule a coroutine
   function on a crontab (scheduler timezone by default; nothing persisted).
