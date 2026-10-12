@@ -72,6 +72,55 @@ def _get_order(order_id: str) -> str:
     return json.dumps(_record(order_id), indent=1)
 
 
+# Chained ledger (``tool_provider: eval_toolkit_chain``): each record names the
+# next order of its chain, so lookups cannot be batched — one loop turn per hop.
+_LINKS: dict[str, str | None] = {
+    "ORD-001": "ORD-005",
+    "ORD-005": "ORD-009",
+    "ORD-009": "ORD-002",
+    "ORD-002": "ORD-011",
+    "ORD-011": None,
+    "ORD-003": "ORD-008",
+    "ORD-008": "ORD-012",
+    "ORD-012": "ORD-006",
+    "ORD-006": None,
+    "ORD-004": "ORD-010",
+    "ORD-010": "ORD-007",
+    "ORD-007": None,
+}
+CHAIN_STARTS: tuple[str, ...] = ("ORD-001", "ORD-003", "ORD-004")
+
+
+def chain_from(start: str) -> list[str]:
+    """The order ids of the chain beginning at *start*, in hop order."""
+    chain: list[str] = []
+    current: str | None = start
+    while current is not None:
+        chain.append(current)
+        current = _LINKS[current]
+    return chain
+
+
+def _get_linked_order(order_id: str) -> str:
+    if order_id not in _LINKS:
+        return f"unknown order {order_id!r}; follow linked_order from a known order"
+    return json.dumps({**_record(order_id), "linked_order": _LINKS[order_id]}, indent=1)
+
+
+def eval_toolkit_chain_tools() -> list[BaseTool]:
+    """A fresh ``get_linked_order`` tool (no state, no I/O)."""
+    return [
+        StructuredTool.from_function(
+            _get_linked_order,
+            name="get_linked_order",
+            description=(
+                "Get one order's full record by id. The record's linked_order field "
+                "names the next order of its chain (null at the end)."
+            ),
+        )
+    ]
+
+
 def eval_toolkit_tools() -> list[BaseTool]:
     """Fresh ``list_orders`` / ``get_order`` tools (no state, no I/O)."""
     return [

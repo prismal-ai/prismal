@@ -178,7 +178,8 @@ def _runtime_kwargs(setup: dict[str, Any]) -> dict[str, Any]:
 
     ``org_id`` passes through. ``tool_provider`` / ``vector_store`` ``"fake"``
     markers map to the default fakes; ``tool_provider: eval_toolkit`` gives
-    every agent the deterministic order ledger (TKE9-04 long-loop set); any
+    every agent the deterministic order ledger (TKE9-04 long-loop set) and
+    ``eval_toolkit_chain`` its chained variant (sequential set); any
     other marker is rejected. Per-case setting ``flags`` are consumed by later
     phases (red-team).
     """
@@ -191,6 +192,11 @@ def _runtime_kwargs(setup: dict[str, Any]) -> dict[str, Any]:
         from prismal.eval.toolkit import eval_toolkit_tools
 
         kwargs["tool_provider"] = FakeToolProvider(default=eval_toolkit_tools())
+    elif marker == "eval_toolkit_chain":
+        from prismal.agents.extension.providers import FakeToolProvider
+        from prismal.eval.toolkit import eval_toolkit_chain_tools
+
+        kwargs["tool_provider"] = FakeToolProvider(default=eval_toolkit_chain_tools())
     elif marker not in (None, "", "fake"):
         raise ValueError(f"unknown eval setup tool_provider {marker!r}")
     return kwargs
@@ -203,7 +209,7 @@ def _case_tools(case: EvalCase, runtime: Any) -> contextlib.AbstractContextManag
     ``get_async_compiled_graph(tool_provider=...)`` only binds one in
     ``context`` mode. Cases that keep the default fakes are left untouched.
     """
-    if case.setup.get("tool_provider") != "eval_toolkit":
+    if case.setup.get("tool_provider") not in ("eval_toolkit", "eval_toolkit_chain"):
         return contextlib.nullcontext()
     from prismal.agents.extension import use_tool_provider
 
