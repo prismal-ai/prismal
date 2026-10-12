@@ -126,6 +126,12 @@ class _Record:
     expires_at: float | None
 
 
+#: Minimum seconds between opportunistic purges of expired artifacts on ``put``.
+_PURGE_INTERVAL_S = 60.0
+#: Upper bound on records kept by the in-memory backend.
+_MAX_IN_MEMORY_RECORDS = 10_000
+
+
 class _BaseArtifactStore:
     """Shared put/get/scope/TTL logic; subclasses supply persistence."""
 
@@ -138,6 +144,7 @@ class _BaseArtifactStore:
     ) -> None:
         self._settings = settings if settings is not None else get_settings()
         self._clock = clock
+        self._last_purge = clock()
         self._audit = audit
 
     # -- persistence hooks -------------------------------------------------
@@ -175,6 +182,11 @@ class _BaseArtifactStore:
         if ttl < 0:
             raise ValueError("ttl_s must be >= 0")
         now = self._clock()
+        if now - self._last_purge >= _PURGE_INTERVAL_S:
+            # The shared store lives for the whole process: drop expired
+            # artifacts as we go instead of letting them accumulate.
+            self._last_purge = now
+            self._delete_expired(now)
         ref = ArtifactRef(
             id=secrets.token_urlsafe(16),
             run_id=run_id,
@@ -235,7 +247,11 @@ class _BaseArtifactStore:
 
 
 class InMemoryArtifactStore(_BaseArtifactStore):
-    """Process-local artifact store (default backend)."""
+    """Process-local artifact store (default backend).
+
+    Bounded: beyond ``max_records`` the oldest artifacts are evicted (a later
+    read of an evicted id fails closed with ``ArtifactNotFound``).
+    """
 
     def __init__(
         self,
@@ -243,14 +259,18 @@ class InMemoryArtifactStore(_BaseArtifactStore):
         settings: Settings | None = None,
         clock: Callable[[], float] = time.time,
         audit: Any | None = None,
+        max_records: int = _MAX_IN_MEMORY_RECORDS,
     ) -> None:
         super().__init__(settings=settings, clock=clock, audit=audit)
         self._records: dict[str, _Record] = {}
         self._lock = threading.Lock()
+        self.max_records = max_records
 
     def _save(self, record: _Record) -> None:
         with self._lock:
             self._records[record.ref.id] = record
+            while len(self._records) > self.max_records:
+                del self._records[next(iter(self._records))]  # insertion order = oldest
 
     def _load(self, artifact_id: str) -> _Record | None:
         with self._lock:
