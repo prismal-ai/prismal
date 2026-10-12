@@ -3,7 +3,8 @@
 # observation masking, tool-output budgets and handoff envelopes target.
 # Live only (the fakes never call tools):
 #   python -m prismal.eval run --suite tests/eval/sets/long_loop.yaml --live-api --json out.json
-# Expected totals: prismal.eval.toolkit.order_total(<id>).
+# Expected values come from prismal.eval.toolkit.order_total(<id>); the
+# `contains` assertions are pinned to it by tests/unit/eval/test_eval_toolkit.py.
 
 suite: long_loop
 cases:
@@ -17,6 +18,8 @@ cases:
       - type: tool_usage
         must_call: [get_order]
         max_steps: 24
+      - type: contains
+        must_contain: ['2798']
 
   - id: loop-002
     input: >-
@@ -28,6 +31,8 @@ cases:
       - type: tool_usage
         must_call: [list_orders, get_order]
         max_steps: 24
+      - type: contains
+        must_contain: [ORD-002, '735']
 
   - id: loop-003
     input: >-
@@ -39,3 +44,5 @@ cases:
       - type: tool_usage
         must_call: [get_order]
         max_steps: 24
+      - type: contains
+        must_contain: ['655', '719', '702']

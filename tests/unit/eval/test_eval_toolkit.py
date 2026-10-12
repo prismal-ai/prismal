@@ -116,3 +116,30 @@ def test_a_default_case_leaves_the_global_provider_alone(monkeypatch: pytest.Mon
     monkeypatch.setattr(tool_registry, "_provider", None)
     graph, _ = _run({"tool_provider": "fake"})
     assert graph.seen is None
+
+
+def _expected_long_loop_values() -> dict[str, set[str]]:
+    """What a correct answer to each long-loop case must contain."""
+    totals = {oid: order_total(oid) for oid in ORDER_IDS}
+    first_five = list(ORDER_IDS[:5])
+    best = max(first_five, key=totals.__getitem__)
+    return {
+        "loop-001": {str(sum(totals[f"ORD-00{n}"] for n in range(1, 5)))},
+        "loop-002": {best, str(totals[best])},
+        "loop-003": {str(totals[f"ORD-00{n}"]) for n in (7, 8, 9)},
+    }
+
+
+def test_long_loop_cases_check_the_answer_against_the_toolkit() -> None:
+    """Each long-loop case asserts the toolkit's true values, so a fabricated
+    answer fails the solve rate instead of passing on ``must_call`` alone."""
+    from pathlib import Path
+
+    from prismal.eval.types import AssertionType, EvalSet
+
+    suite = Path(__file__).resolve().parents[3] / "tests/eval/sets/long_loop.yaml"
+    expected = _expected_long_loop_values()
+    for case in EvalSet.from_yaml(suite).cases:
+        contains = [a for a in case.assertions if a.type is AssertionType.CONTAINS]
+        assert len(contains) == 1, case.id
+        assert set(contains[0].must_contain) == expected[case.id], case.id

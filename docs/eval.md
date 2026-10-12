@@ -64,13 +64,14 @@ cases:
 | Type | Checks | Needs |
 |---|---|---|
 | `exact` | final answer equals `expected` (trimmed) | — |
+| `contains` | every `must_contain` value appears in the final answer (case-insensitive; digit grouping such as `2,712` ignored) | — |
 | `semantic` | cosine(answer, `expected`) ≥ `min_score` | embeddings port |
 | `tool_usage` | `must_call` / `never_call` names + `max_steps` | — |
 | `llm_judge` | judge rubric score ≥ `min_score` | judge (LLM) |
 | `groundedness` | answer grounded in retrieved (tool) context ≥ `min_score` | judge (LLM) |
 | `security` | adversarial **containment** (see below) | — |
 
-`exact` / `tool_usage` / `security` are pure and run in CI with fakes. `semantic`
+`exact` / `contains` / `tool_usage` / `security` are pure and run in CI with fakes. `semantic`
 uses the embeddings port (the test runtime supplies a fake). `llm_judge` /
 `groundedness` call the LLM-as-judge — inject a deterministic `Judge(judge_fn=...)`
 in tests, or run them under `live_api`.

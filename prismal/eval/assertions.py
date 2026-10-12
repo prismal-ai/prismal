@@ -10,6 +10,7 @@ they call the LLM-as-judge.
 from __future__ import annotations
 
 import math
+import re
 from typing import TYPE_CHECKING, Any
 
 from prismal.eval.types import AssertionResult, AssertionType, Trajectory
@@ -33,6 +34,27 @@ def assert_exact(traj: Trajectory, a: Assertion) -> AssertionResult:
         passed=passed,
         score=1.0 if passed else 0.0,
         detail="" if passed else f"expected {expected!r}, got {actual!r}",
+    )
+
+
+_DIGIT_GROUPING = re.compile(r"(?<=\d),(?=\d)")
+
+
+def assert_contains(traj: Trajectory, a: Assertion) -> AssertionResult:
+    """Pass iff every ``a.must_contain`` value appears in the final answer.
+
+    Case-insensitive; thousands separators between digits are ignored, so
+    ``"2,712"`` in the answer matches ``"2712"``. Score = fraction found.
+    """
+    answer = _DIGIT_GROUPING.sub("", traj.final_answer).casefold()
+    missing = [v for v in a.must_contain if v.casefold() not in answer]
+    total = len(a.must_contain)
+    score = (total - len(missing)) / total if total else 0.0
+    return AssertionResult(
+        assertion=a,
+        passed=total > 0 and not missing,
+        score=score,
+        detail=f"missing: {missing}" if missing else "",
     )
 
 
@@ -191,6 +213,8 @@ async def dispatch_assertions(
             results.append(assert_exact(traj, a))
         elif a.type is AssertionType.TOOL_USAGE:
             results.append(assert_tool_usage(traj, a))
+        elif a.type is AssertionType.CONTAINS:
+            results.append(assert_contains(traj, a))
         elif a.type is AssertionType.SEMANTIC:
             results.append(await assert_semantic(traj, a, embeddings=embeddings))
         elif a.type is AssertionType.LLM_JUDGE:
@@ -231,6 +255,7 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 
 __all__ = [
+    "assert_contains",
     "assert_exact",
     "assert_groundedness",
     "assert_llm_judge",
