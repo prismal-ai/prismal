@@ -11,6 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Shared tenant quota counters: with `budget_scope="tenant"` the guard checks
+  the tenant's total over a UTC calendar window (`budget_tenant_window`:
+  `month` | `day`). Totals are kept in a SQLite file shared by every worker
+  (`budget_tenant_store_path`; atomic upserts, WAL) or in process memory.
+  New `prismal.budget.tenant_quota` (`TenantCostMeter`,
+  `SqliteTenantQuotaStore`, `TenantQuotaStorePort`). Store failures fall back
+  to local counting.
 - Recalled memory in agent prompts (Phase MEM follow-up): the `researcher`
   node appends one tail `<turn_context>` message built by
   `memory_block_for_prompt` (`prismal.memory.v2.agent_prompt.memory_turn_message`),

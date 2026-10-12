@@ -11,11 +11,13 @@ it back at the enforcement sites; ``clear_budget_run`` releases it.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from prismal.budget.guard import BudgetGuard
 from prismal.budget.meter import CostMeter
 from prismal.budget.types import Budget, BudgetScope
+from prismal.core.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -24,6 +26,8 @@ if TYPE_CHECKING:
     from prismal.core.config import Settings
     from prismal.monitoring.cost_tracker import CostTracker
     from prismal.security.audit import AuditLogger
+
+logger = get_logger(__name__)
 
 # session_id -> {"meter": CostMeter, "guard": BudgetGuard}. In-process only.
 _RUN_ENGINES: dict[str, dict[str, Any]] = {}
@@ -68,6 +72,39 @@ def resolve_budget(settings: Settings, *, org_id: str | None = None) -> Budget: 
     )
 
 
+def _build_meter(
+    settings: Settings,
+    *,
+    org_id: str | None,
+    cost_tracker: CostTracker | None,
+    session_id: str | None,
+) -> CostMeter:
+    """A per-run meter, or the shared tenant meter for ``budget_scope="tenant"`` (TQ-001)."""
+    if settings.budget_scope == BudgetScope.TENANT.value:
+        from prismal.monitoring.host_stats import current_org
+
+        tenant = org_id or current_org.get()
+        if tenant:
+            from prismal.budget.tenant_quota import (
+                TenantCostMeter,
+                get_tenant_quota_store,
+                window_key,
+            )
+
+            return TenantCostMeter(
+                store=get_tenant_quota_store(settings),
+                org_id=tenant,
+                window=window_key(datetime.now(UTC), settings.budget_tenant_window),
+                settings=settings,
+                cost_tracker=cost_tracker,
+                session_id=session_id,
+            )
+        logger.warning("budget_tenant_scope_without_org")  # TQ-006
+    return CostMeter(
+        settings=settings, cost_tracker=cost_tracker, session_id=session_id, tenant=org_id
+    )
+
+
 def seed_budget_run(
     state: AgentState,
     settings: Settings,
@@ -87,11 +124,11 @@ def seed_budget_run(
     if not settings.budget_enabled:
         return
     key = session_id or _run_key(state)
-    meter = CostMeter(
-        settings=settings,
+    meter = _build_meter(
+        settings,
+        org_id=org_id,
         cost_tracker=cost_tracker,
         session_id=None if key == _DEFAULT_KEY else key,
-        tenant=org_id,
     )
     guard = BudgetGuard(
         resolve_budget(settings, org_id=org_id),

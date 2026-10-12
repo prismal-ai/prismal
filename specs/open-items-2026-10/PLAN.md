@@ -117,6 +117,10 @@ Order is by how much each item unblocks.
   so write a short DELTA spec (`specs/cost-budget-governance/DELTA-…`) before any code.
 - **Est.** spec 0.5 d, then to be decided.
 
+> **As built (2026-10-12).** Store = SQLite (user decision). Spec:
+> `specs/cost-budget-governance/DELTA-2026-10-shared-tenant-quota.md` (TQ-001…TQ-009);
+> code: `prismal/budget/tenant_quota.py` plus `budget/resolve.py::_build_meter`.
+
 ### 2.6 NTS.1 — migrate the remaining specialist nodes to I/O models — P3, spec first
 
 - Migrate node by node, owner-driven (`specs/node-io-typesafety/ARCHITECTURE.md` §489).

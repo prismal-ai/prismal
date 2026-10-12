@@ -4,7 +4,7 @@
 
 Every field of `prismal.core.config.Settings` (env prefix `PRISMAL_`) and
 `MaintenanceSettings` (env prefix `PRISMAL_MAINTENANCE_`), in source order.
-`Settings` declares **486** fields; `MaintenanceSettings` declares
+`Settings` declares **488** fields; `MaintenanceSettings` declares
 **6**. Values are resolved through the injected
 `ConfigSourcePort` — see [configuration.md](./configuration.md) for how
 sources are composed (env, `.env`, secrets managers, per-tenant).
@@ -22,7 +22,7 @@ Secret fields never show a default. Regenerate this page and
 - [Souls / Kokoro (Fase K, opt-in — SPEC-KOK-CFG-001)](#souls--kokoro-fase-k-opt-in--spec-kok-cfg-001) (8)
 - [Skynet swarm supervisor (Fase S, opt-in — SPEC-SKY-CFG-001)](#skynet-swarm-supervisor-fase-s-opt-in--spec-sky-cfg-001) (8)
 - [Skynet S+ (Fase S+, opt-in — SPEC-SP-CFG-001)](#skynet-s-fase-s-opt-in--spec-sp-cfg-001) (4)
-- [Cost & Budget Governance (Phase C — SPEC-CST-CFG-001)](#cost--budget-governance-phase-c--spec-cst-cfg-001) (9)
+- [Cost & Budget Governance (Phase C — SPEC-CST-CFG-001)](#cost--budget-governance-phase-c--spec-cst-cfg-001) (11)
 - [Evaluation harness (Phase V — SPEC-EVL-CFG-001)](#evaluation-harness-phase-v--spec-evl-cfg-001) (5)
 - [Runtime Hardening (Phase H — SPEC-HRD-CFG-001)](#runtime-hardening-phase-h--spec-hrd-cfg-001) (11)
 - [Node I/O Type-Safety (Phase NTS — SPEC-NTS-CFG-001)](#node-io-type-safety-phase-nts--spec-nts-cfg-001) (2)
@@ -159,6 +159,8 @@ Secret fields never show a default. Regenerate this page and
 | `PRISMAL_BUDGET_SCOPE` | `str` | `turn` | Budget accounting scope: turn \| session \| tenant. |
 | `PRISMAL_BUDGET_SOFT_RATIO` | `float` | `0.8` | Fraction of a limit at which a soft cap (degrade) fires. |
 | `PRISMAL_BUDGET_HARD_CAP` | `bool` | `true` | True = abort (raise) on a hard cap; False = soft-only (warn). |
+| `PRISMAL_BUDGET_TENANT_WINDOW` | `str` | `month` | UTC calendar window of a tenant-scoped budget (budget_scope=tenant): month \| day. |
+| `PRISMAL_BUDGET_TENANT_STORE_PATH` | `str` | — | SQLite file shared by every process for tenant quota totals (budget_scope=tenant); "" keeps the totals in process memory. |
 | `PRISMAL_BUDGET_PRICING` | `dict[str, dict[str, float]]` | `{}` | Fallback per-model pricing for models LiteLLM cannot price: {"model": {"input": usd_per_1k, "output": usd_per_1k}}. |
 
 ## Evaluation harness (Phase V — SPEC-EVL-CFG-001)

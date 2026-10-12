@@ -491,6 +491,19 @@ class Settings(BaseSettings):
         default=True,
         description="True = abort (raise) on a hard cap; False = soft-only (warn).",
     )
+    budget_tenant_window: str = Field(
+        default="month",
+        description=(
+            "UTC calendar window of a tenant-scoped budget (budget_scope=tenant): month | day."
+        ),
+    )
+    budget_tenant_store_path: str = Field(
+        default="",
+        description=(
+            "SQLite file shared by every process for tenant quota totals "
+            '(budget_scope=tenant); "" keeps the totals in process memory.'
+        ),
+    )
     budget_pricing: dict[str, dict[str, float]] = Field(
         default_factory=dict,
         description=(
@@ -2652,6 +2665,12 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"PRISMAL_BUDGET_SCOPE={self.budget_scope!r} is invalid; "
                 f"expected one of {sorted(valid_scopes)}."
+            )
+        valid_windows = {"month", "day"}
+        if self.budget_tenant_window not in valid_windows:
+            raise ValueError(
+                f"PRISMAL_BUDGET_TENANT_WINDOW={self.budget_tenant_window!r} is invalid; "
+                f"expected one of {sorted(valid_windows)}."
             )
         return self
 
