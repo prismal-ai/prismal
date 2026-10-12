@@ -57,6 +57,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   extra name in the vector-store docs.
 
 ### Fixed
+- `python -m prismal.eval run --live-api` never exited after writing its
+  results. The async graph's SQLite checkpointer (`aiosqlite`, whose worker
+  thread is non-daemon) was never closed. The new
+  `prismal.agents.graph.aclose_async_compiled_graph()` closes every
+  checkpointer `build_checkpointer()` opened and resets the singleton, and the
+  eval CLI calls it after a run. Hosts should call it at shutdown.
 - Supervisor with reasoning models (qwen3 via Ollama, extended thinking): the
   routing reply arrived as content blocks (`thinking` + `text`) and was
   stringified whole, so every turn logged `supervisor_invalid_routing` and fell

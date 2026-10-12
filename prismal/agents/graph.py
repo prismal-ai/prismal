@@ -120,6 +120,35 @@ _DEFAULT_CHECKPOINT_PATH: Path = Path("data/db/checkpoints.db")
 # are async context managers; if we drop the CM the connection closes and
 # subsequent checkpoint operations would raise.
 _checkpointer_cms: list[Any] = []
+# aiosqlite connections opened by ``build_checkpointer()``; their worker thread
+# is non-daemon, so a connection kept alive (e.g. by the async graph singleton)
+# must be closed for the process to exit. Weak references: tracking must never
+# extend a connection's life (a collected connection stops its own thread).
+_checkpointer_conns: weakref.WeakSet[Any] = weakref.WeakSet()
+
+
+async def aclose_async_compiled_graph() -> None:
+    """Close every checkpointer ``build_checkpointer()`` opened and reset the async graph.
+
+    Call it once at process shutdown (CLIs, workers, test teardown). Idempotent;
+    a failing close is logged and the rest are still closed.
+    """
+    global _async_graph
+    _async_graph = None
+    for conn in list(_checkpointer_conns):
+        _checkpointer_conns.discard(conn)
+        try:
+            await conn.close()
+        except Exception as exc:
+            logger.warning("checkpointer_close_failed", backend="sqlite", error=type(exc).__name__)
+    while _checkpointer_cms:
+        cm = _checkpointer_cms.pop()
+        try:
+            await cm.__aexit__(None, None, None)
+        except Exception as exc:
+            logger.warning(
+                "checkpointer_close_failed", backend="postgresql", error=type(exc).__name__
+            )
 
 
 def _extract_sqlite_path(db_url: str) -> str:
@@ -192,6 +221,7 @@ async def build_checkpointer(db_url: str | None = None) -> Any:
         Path(sqlite_path).parent.mkdir(parents=True, exist_ok=True)
 
     conn = await aiosqlite.connect(sqlite_path)
+    _checkpointer_conns.add(conn)
     saver = AsyncSqliteSaver(conn)
     await saver.setup()
     logger.info("checkpointer_built", backend="sqlite", path=sqlite_path)
@@ -916,6 +946,7 @@ __all__ = [
     "_build_advanced_nodes",
     "_build_hierarchical_graph",
     "_hierarchical_router",
+    "aclose_async_compiled_graph",
     "build_checkpointer",
     "build_supervisor_graph",
     "get_async_compiled_graph",

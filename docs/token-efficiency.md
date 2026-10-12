@@ -78,9 +78,7 @@ regression. The cause is run-to-run variance, not a code change: qwen3 is a
 reasoning model, and at temperature 0.7 the length of its thinking varies.
 Before the gate can block, either pin generation (temperature 0 or a
 non-reasoning model for eval), or baseline on the mean of several runs and size
-the tolerance to the measured spread. Also, a live `prismal.eval run` does not
-exit by itself after writing its results (a LiteLLM coroutine is left pending).
-Wrap it in `timeout` until that is fixed.
+the tolerance to the measured spread.
 
 ## TKE2 — Prompt caching and a cache-stable layout
 
