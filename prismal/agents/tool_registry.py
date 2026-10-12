@@ -523,6 +523,56 @@ def get_recommended_capabilities(node_name: str) -> list[str] | None:
 # ---------------------------------------------------------------------------
 
 
+#: Characters one ``read_artifact`` call returns inside ``react_loop``.
+_READ_ARTIFACT_MAX_CHARS = 8_000
+_READ_ARTIFACT_MARKER = "prismal_read_artifact_placeholder"
+
+
+def _artifacts_active(settings: Any) -> bool:
+    """True when TKE can leave ``artifact=<id>`` pointers in the loop's messages."""
+    if not settings.token_efficiency_enabled:
+        return False
+    masking = (
+        settings.context_compaction_enabled
+        and settings.context_compaction_strategy == "mask_observations"
+    )
+    return bool(settings.tool_output_budget_enabled or masking)
+
+
+def _read_artifact_placeholder() -> BaseTool:
+    """The ``read_artifact`` schema bound to the LLM; ``react_loop`` runs it scoped."""
+    from langchain_core.tools import StructuredTool
+
+    def read_artifact(artifact_id: str, start: int = 0, end: int | None = None) -> str:
+        """Read a character window [start, end) of a stored artifact by id."""
+        del artifact_id, start, end
+        return "read_artifact is only available inside an agent tool loop."
+
+    return StructuredTool.from_function(
+        func=read_artifact,
+        name="read_artifact",
+        description=(
+            "Read part of a stored artifact (a truncated or elided tool output) by "
+            "its id. Use start/end character offsets to page through long content."
+        ),
+        metadata={_READ_ARTIFACT_MARKER: True},
+    )
+
+
+def _with_read_artifact(tools: list[BaseTool]) -> list[BaseTool]:
+    """Append ``read_artifact`` when TKE can produce artifacts (never duplicated)."""
+    try:
+        from prismal.core.config import get_settings
+
+        if not _artifacts_active(get_settings()):
+            return tools
+    except Exception:
+        return tools
+    if any(t.name == "read_artifact" for t in tools):
+        return tools
+    return [*tools, _read_artifact_placeholder()]
+
+
 def get_tools_for_agent(
     agent_name: str,
     required_capabilities: list[str] | None = None,
@@ -560,8 +610,12 @@ def get_tools_for_agent(
 
             raise ToolProviderNotConfigured(agent_name)
         logger.warning("tool_registry.no_provider", agent=agent_name)
-        return _observed_get_tools(_get_default_stub_provider(), agent_name, None, fallback=True)
-    return _observed_get_tools(provider, agent_name, required_capabilities, phase=phase)
+        return _with_read_artifact(
+            _observed_get_tools(_get_default_stub_provider(), agent_name, None, fallback=True)
+        )
+    return _with_read_artifact(
+        _observed_get_tools(provider, agent_name, required_capabilities, phase=phase)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -618,7 +672,9 @@ def get_tools_for_agent_ctx(
         provider = config.get("configurable", {}).get("tool_provider")
     if provider is None:
         return get_tools_for_agent(agent_name, required_capabilities, phase=phase)
-    return _observed_get_tools(provider, agent_name, required_capabilities, phase=phase)
+    return _with_read_artifact(
+        _observed_get_tools(provider, agent_name, required_capabilities, phase=phase)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1104,6 +1160,8 @@ class _ReactRun:
     artifact_run_id: str
     output_budget: ToolOutputBudget | None
     tenant: str = "default"
+    # True once the read_artifact placeholder is bound to this loop's scope.
+    scoped_read_artifact: bool = False
     # Consecutive failure counter per tool name — reset to 0 on success.
     fail_counts: dict[str, int] = field(default_factory=dict)
     # Tools rate-limited within THIS iteration (transient — do not count
@@ -1269,6 +1327,27 @@ async def _tool_call_result(run: _ReactRun, tc: dict[str, Any]) -> str:
     return await _invoke_tool(run, tool_fn, tool_name, tc.get("args", {}))
 
 
+def _scope_read_artifact(run: _ReactRun) -> None:
+    """Swap the ``read_artifact`` placeholder for one bound to this loop's scope.
+
+    The (tenant, run_id) scope comes from the loop, never from the model; the
+    store is the process-wide one the budget and the compactor write to.
+    """
+    placeholder = run.tool_map.get("read_artifact")
+    if placeholder is None or not (placeholder.metadata or {}).get(_READ_ARTIFACT_MARKER):
+        return
+    from prismal.agents.artifacts import make_read_artifact_tool, shared_artifact_store
+    from prismal.core.config import get_settings
+
+    run.tool_map["read_artifact"] = make_read_artifact_tool(
+        shared_artifact_store(get_settings()),
+        run_id=run.artifact_run_id,
+        tenant=run.tenant,
+        max_chars=_READ_ARTIFACT_MAX_CHARS,
+    )
+    run.scoped_read_artifact = True
+
+
 async def _tool_call_message(run: _ReactRun, tc: dict[str, Any]) -> object:
     """``ToolMessage`` answering one model tool call (mask gate, call, output budget)."""
     from langchain_core.messages import ToolMessage
@@ -1291,6 +1370,10 @@ async def _tool_call_message(run: _ReactRun, tc: dict[str, Any]) -> object:
         return masked_tool_message(tc, verdict)
 
     result = await _tool_call_result(run, tc)
+    if tool_name == "read_artifact" and run.scoped_read_artifact:
+        # Already windowed (_READ_ARTIFACT_MAX_CHARS); re-budgeting would spill
+        # the read back into a new artifact.
+        return ToolMessage(content=result, tool_call_id=tc["id"])
     if run.output_budget is not None and run.output_budget.enabled:
         # Phase TKE — budget after the Phase H screen (SPEC-TKE-OUT-001).
         result = run.output_budget.apply(
@@ -1392,6 +1475,7 @@ async def react_loop(
         ),
         tenant=options.get("tenant", "default"),
     )
+    _scope_read_artifact(run)
     loop_messages: list[object] = list(messages)
     if tool_allow_set is not None:
         loop_messages = _with_allowed_tools_hint(
