@@ -57,6 +57,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   extra name in the vector-store docs.
 
 ### Fixed
+- Supervisor with reasoning models (qwen3 via Ollama, extended thinking): the
+  routing reply arrived as content blocks (`thinking` + `text`) and was
+  stringified whole, so every turn logged `supervisor_invalid_routing` and fell
+  back to `END`, and direct answers could leak the reasoning. Only `text`
+  blocks (and text outside inline `<think>…</think>`) are used now.
 - Eval trajectories recorded 0 tokens on live runs: the supervisor's internal
   routing calls and rebuilt answers carry no usage in the update stream.
   `capture_trajectory` now counts every LLM call of the run through a LangChain

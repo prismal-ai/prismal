@@ -23,6 +23,7 @@ Example::
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from typing import TYPE_CHECKING, Literal
 
@@ -694,6 +695,29 @@ def _intent_short_circuit(
     }
 
 
+_THINK_TAG_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL | re.IGNORECASE)
+
+
+def _response_text(content: object) -> str:
+    """The model's answer text from an LLM ``content`` (string or content blocks).
+
+    Reasoning models return a list of blocks (``thinking`` / ``reasoning`` /
+    ``redacted_thinking`` plus ``text``) or inline ``<think>…</think>``; only the
+    text is the answer. Stringifying the block list broke routing (every reply
+    became ``supervisor_invalid_routing`` → ``END``) and leaked the reasoning.
+    """
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and block.get("type") == "text":
+                parts.append(str(block.get("text", "")))
+        return "".join(parts)
+    text = str(content)
+    return _THINK_TAG_RE.sub("", text) if "<think>" in text.lower() else text
+
+
 def _match_route(raw: str, session_id: str) -> str:
     """Normalise the LLM routing response to a valid route name.
 
@@ -779,7 +803,11 @@ def _extract_answer_content(answer_resp: object, session_id: str) -> str:
                 session_id=session_id,
             )
 
-    content = "\n".join(tool_results) if tool_results else str(getattr(answer_resp, "content", ""))
+    content = (
+        "\n".join(tool_results)
+        if tool_results
+        else _response_text(getattr(answer_resp, "content", ""))
+    )
     unwrapped = _unwrap_synthetic_tool_call(content)
     return unwrapped if unwrapped is not None else content
 
@@ -975,7 +1003,7 @@ async def supervisor_node(state: AgentState) -> dict[str, object]:
             ),
         ]
         response = await llm.ainvoke(routing_messages)
-        raw: str = str(response.content).strip()
+        raw: str = _response_text(response.content).strip()
 
         matched = _match_route(raw, session_id)
         decision_route.record_reference(matched)
@@ -1181,7 +1209,7 @@ async def hierarchical_supervisor_node(
         ]
 
         response = await llm.ainvoke(routing_messages)
-        raw: str = str(response.content).strip()
+        raw: str = _response_text(response.content).strip()
         normalised = raw.strip("\"' \t\n").upper()
 
         matched: str | None = None
@@ -1219,7 +1247,7 @@ async def hierarchical_supervisor_node(
                 profile = ProfileManager()
                 answer_system = profile.load_system_prompt() or _ANSWER_SYSTEM_PROMPT
                 answer_resp = await llm.ainvoke([SystemMessage(content=answer_system), *trimmed])
-                answer_content = str(answer_resp.content)
+                answer_content = _response_text(answer_resp.content)
                 # Same Ollama / open-model JSON-wrap defense as in the flat
                 # supervisor — small talk must never leak the synthetic blob.
                 from prismal.agents.tool_registry import (
