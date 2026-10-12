@@ -84,7 +84,15 @@ builder.add_node("classify", classify_fn, input_model=ClassifyInput, output_mode
    shape), `planner` (`task_plan` / `pending_tasks` / `completed_tasks` must be
    lists of strings, plus `metadata`) and `critic` (`iteration_count >= 0` on
    the way in and out, so a corrupted reflection counter is caught before the
-   LLM call).
+   LLM call). **NTS.1 batch 2** adds `codeact` and `cua` (same
+   `{current_agent, messages}` shape), `rag_agent` (types its own
+   `metadata.rag_agent` block — reflection score in [0, 1], iterations >= 0 —
+   and lets other agents' metadata keys through) and the parallel-research trio:
+   the worker must append **exactly one** entry to `parallel_results` (an
+   `operator.add` channel, so returning the accumulated list would duplicate
+   every finding) and the aggregator reads typed entries. The worker declares
+   no input model: its input is a `Send` payload carrying `_task`, which is not
+   an `AgentState` key.
 3. Turn the feature on in **`warn`** and observe
    `prismal.node_io_validation_failures_total{node,direction}` for a period.
 4. Promote individual nodes to **`enforce`** only after a clean `warn` window.
@@ -111,9 +119,9 @@ convention of `NodeExecutionError`.
 - `AgentState` itself is **unchanged** — the models are boundary projections, not
   the graph's state schema (LangGraph's reducer machinery stays on the
   `TypedDict`). See `specs/node-io-typesafety/ARCHITECTURE.md` DD-NTS-003.
-- Annotated so far: the three pilots and NTS.1 batch 1 (`coder`, `researcher`,
-  `data_analyst`, `planner`, `critic`). The remaining specialists (`rag_agent`,
-  `parallel_research`, `codeact`, `cua`) are a later batch.
+- Annotated so far: the three pilots, NTS.1 batch 1 (`coder`, `researcher`,
+  `data_analyst`, `planner`, `critic`) and batch 2 (`rag_agent`,
+  `parallel_researcher` + worker + `research_aggregator`, `codeact`, `cua`).
 - Built-in nodes adopt contracts with `propagate_errors=True`, so their
   failures still reach the graph exactly as before: the default
   `error_mapping` would turn them into an error update that replaces the whole

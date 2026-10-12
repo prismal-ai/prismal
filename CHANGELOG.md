@@ -15,6 +15,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `planner` and `critic` (`<Node>Input` / `<Node>Output`, checked only with
   `node_typesafety_enabled`; adopt in `warn` first). `planner` lists must be
   strings; `critic.iteration_count >= 0` in and out.
+- NTS.1 batch 2: I/O contracts on `rag_agent` (typed `metadata.rag_agent`),
+  `parallel_researcher`, `parallel_researcher_worker` (exactly one
+  `parallel_results` entry per worker — the channel is `operator.add`),
+  `research_aggregator`, `codeact` and `cua`.
 - `@prismal_node(propagate_errors=True)` re-raises a node's own exception
   unchanged. Built-in nodes use it, so adopting a contract never changes their
   error semantics.

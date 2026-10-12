@@ -139,4 +139,13 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **IMPLEMENTED 2026-07-05 
 | NTS.1-04 | `critic`: `iteration_count >= 0` on input and output | DONE |
 | NTS.1-05 | Drift guard extended (`test_node_io_schema_field_names.py`); `enforce` end-to-end test on the real nodes (`test_nts1_batch1_enforce.py`) | DONE |
 
-Next batch: `rag_agent` (types part of `metadata`), `parallel_research` (`parallel_results` is an `operator.add` channel), `codeact`, `cua`.
+## NTS.1 — batch 2 (2026-10-12, DONE)
+
+| ID | Task | Status |
+|---|---|---|
+| NTS.1-06 | `rag_agent`: `{messages, session_id}` → `{current_agent, messages, metadata}` with a typed `metadata.rag_agent` block (`reflection_score ∈ [0, 1]`, `reflection_iterations >= 0`; other keys pass through) | DONE |
+| NTS.1-07 | `parallel_research`: anchor `{pending_tasks}` → `{current_agent}`; worker → exactly one `ParallelResult` in `parallel_results` (no input model: `Send` payload with `_task`); aggregator reads typed `parallel_results` | DONE |
+| NTS.1-08 | `codeact`, `cua`: `{messages, session_id}` → `{current_agent, messages}` (HITL `interrupt()` in `cua` passes through unchanged) | DONE |
+| NTS.1-09 | Drift guard extended; `enforce` end-to-end test on the real nodes (`test_nts1_batch2_enforce.py`) | DONE |
+
+Every built-in specialist route now declares a contract. Promotion to `enforce` stays per node, after a clean `warn` window.
