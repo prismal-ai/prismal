@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from apscheduler.jobstores.base import JobLookupError as APJobLookupError
@@ -30,10 +31,18 @@ from prismal.scheduler.cron_manager import CronJob, CronManager
 from prismal.scheduler.datetime_service import DateTimeService
 from prismal.scheduler.notifier import CronNotifier
 
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
 logger = structlog.get_logger("prismal.scheduler.executor")
 
 # Module-level singleton tracking the currently running executor instance.
 _running_executor: CronExecutor | None = None
+
+
+def _crontab_trigger(expr: str, tz: Any) -> Any:
+    """Build an APScheduler crontab trigger (module seam for tests)."""
+    return CronTrigger.from_crontab(expr, timezone=tz)
 
 
 class SoftFailureError(RuntimeError):
@@ -253,6 +262,51 @@ class CronExecutor:
             logger.info("cron_executor_job_resumed", name=name)
         except APJobLookupError:
             logger.warning("cron_executor_resume_job_not_found", name=name)
+
+    def add_callable(
+        self,
+        job_id: str,
+        func: Callable[[], Awaitable[Any]],
+        *,
+        cron: str,
+        timezone: str | None = None,
+        max_instances: int = 1,
+        coalesce: bool = True,
+    ) -> str:
+        """Schedule a Python coroutine function on a crontab expression.
+
+        The public counterpart of the persisted agent-graph jobs: nothing is
+        written to the :class:`CronManager`, and a job with the same *job_id*
+        is replaced. The timezone resolves like a job's own (explicit → system
+        chain), so APScheduler never inherits the OS locale.
+
+        Args:
+            job_id: APScheduler job id (also used to pause/resume/remove).
+            func: Zero-argument coroutine function run on each tick.
+            cron: Five-field crontab expression (``"15 2 * * *"``).
+            timezone: IANA timezone; defaults to the scheduler timezone.
+            max_instances: Concurrent runs allowed (``1`` = no overlap).
+            coalesce: Collapse missed runs into one.
+
+        Returns:
+            The job id.
+
+        Raises:
+            ValueError: *cron* is not a five-field crontab expression.
+        """
+        if len(cron.split()) != 5:
+            raise ValueError(f"not a five-field crontab expression: {cron!r}")
+        tz = self._dts.resolve_timezone(timezone) if timezone else self._dts.get_scheduler_tz()
+        self._scheduler.add_job(
+            func,
+            _crontab_trigger(cron, tz),
+            id=job_id,
+            replace_existing=True,
+            max_instances=max_instances,
+            coalesce=coalesce,
+        )
+        logger.debug("cron_executor_callable_registered", name=job_id, schedule=cron)
+        return job_id
 
     def schedule_coroutine(self, coro: object) -> None:
         """Submit a coroutine to the executor's event loop from any thread.

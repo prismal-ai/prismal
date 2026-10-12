@@ -43,6 +43,7 @@ _DEMOTED: set[str] = set()
 
 
 def is_demoted(integration: str) -> bool:
+    """True when *integration* was demoted to shadow in this process."""
     return integration in _DEMOTED
 
 
@@ -232,6 +233,7 @@ class ShadowRunner:
         return agree
 
     def report(self, integration: str | None = None) -> AgreementReport:
+        """Agreement report for *integration* (or all integrations when ``None``)."""
         if integration is None:
             obs = [o for items in self._observations.values() for o in items]
             started = min(self._started.values(), default=time.time())
@@ -268,6 +270,7 @@ class ShadowRunner:
             inc("decision_drift_alarms", {"integration": integration})
 
     def rolling_agreement(self, integration: str) -> float:
+        """Agreement ratio of the audited window (1.0 when empty)."""
         window = self._audited.get(integration)
         return sum(window) / len(window) if window else 1.0
 

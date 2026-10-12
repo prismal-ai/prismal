@@ -10,6 +10,78 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Shared tenant quota counters: with `budget_scope="tenant"` the guard checks
+  the tenant's total over a UTC calendar window (`budget_tenant_window`:
+  `month` | `day`). Totals are kept in a SQLite file shared by every worker
+  (`budget_tenant_store_path`; atomic upserts, WAL) or in process memory.
+  New `prismal.budget.tenant_quota` (`TenantCostMeter`,
+  `SqliteTenantQuotaStore`, `TenantQuotaStorePort`). Store failures fall back
+  to local counting.
+- Recalled memory in agent prompts (Phase MEM follow-up): the `researcher`
+  node appends one tail `<turn_context>` message built by
+  `memory_block_for_prompt` (`prismal.memory.v2.agent_prompt.memory_turn_message`),
+  never touching the cached prefix. Only with memory v2 in `enforce` mode and
+  the cache-stable layout; `RuntimeContext.bind_org()` now also binds
+  `ctx.memory` (`use_memory_service` / `set_memory_service` for other hosts).
+  Fail-closed: no recall without a user identity, untrusted records dropped,
+  and a run bound to `None` never falls back to the process-wide service.
+- `prismal.events.subagent.emit_subagent()`: Skynet workers and MoA proposers
+  now emit the AG-UI `subagent` custom payload, so live runs streamed with
+  `custom` show `SUBAGENT_STARTED` / `SUBAGENT_FINISHED` / `SUBAGENT_ERROR`
+  (ids, names and error kinds only; no-op when `custom` is not streamed).
+- `CronExecutor.add_callable(job_id, func, *, cron, timezone=None,
+  max_instances=1, coalesce=True)`: the public way to schedule a coroutine
+  function on a crontab (scheduler timezone by default; nothing persisted).
+  Memory v2 `register_consolidation_job` now uses it instead of reaching into
+  `executor._scheduler`; an AST guard forbids private scheduler access outside
+  `prismal/scheduler/`.
+- `scripts/gen_settings_docs.py` generates `env.example` and the new
+  `docs/settings-reference.md` from `Settings` / `MaintenanceSettings` (486 + 6
+  fields, grouped by the config.py sections; secrets never show a default).
+  `tests/unit/core/test_settings_docs_sync.py` fails when either file drifts.
+- Descriptions for the 11 `Settings` fields that had none (gateway base URLs,
+  reconcile/poll intervals, DEC calibration/margin/sampling knobs).
+- Docstrings for every public symbol in `events/`, `a2a/`, `routing/`,
+  `providers/` and `decisions/` (199 added; no behaviour change).
+
+### Documentation
+- New guides: `docs/agents.md`, `rag.md`, `patterns.md`, `subgraphs.md`,
+  `providers.md`, `mcp.md`, `skills.md`, `sandbox.md`, `scheduler.md`,
+  `events.md`, `data-utilities.md`, plus the `docs/README.md` index.
+- README / CLAUDE.md counts corrected against the code: 30 supervisor routes
+  (15 core + 15 opt-in; `meta_learner`, `skill_creator`, `network_supervisor`,
+  `spawner` are helpers, not routes), 11 RAG engines, 15 subgraph packages;
+  package tree, roadmap statuses (Phase Y and LH implemented, wave 2026-10),
+  release procedure (automated by `release.yml`), sandbox isolation scope,
+  `events/` description, STT backend, state reducers and graph caching.
+- `assets/prismal_architecture.svg` and `docs/prismal-ai-architecture.excalidraw`
+  redrawn for v3.19.0 (wave 2026-10 layers, all ports, 30 routes).
+- `examples/README.md` and `examples.md` cover every example (incl. the eight
+  wave 2026-10 ones); `CONTRIBUTING.md`, `CLASIFICACION_AGENTES.md` and
+  `docs/competitive-analysis.md` refreshed; `PLAN_MIGRACION.md` moved to
+  `docs/history/`; fixed the broken CHANGELOG link and the `prismal-ai[...]`
+  extra name in the vector-store docs.
+
+### Fixed
+- `python -m prismal.eval run --live-api` never exited after writing its
+  results. The async graph's SQLite checkpointer (`aiosqlite`, whose worker
+  thread is non-daemon) was never closed. The new
+  `prismal.agents.graph.aclose_async_compiled_graph()` closes every
+  checkpointer `build_checkpointer()` opened and resets the singleton, and the
+  eval CLI calls it after a run. Hosts should call it at shutdown.
+- Supervisor with reasoning models (qwen3 via Ollama, extended thinking): the
+  routing reply arrived as content blocks (`thinking` + `text`) and was
+  stringified whole, so every turn logged `supervisor_invalid_routing` and fell
+  back to `END`, and direct answers could leak the reasoning. Only `text`
+  blocks (and text outside inline `<think>…</think>`) are used now.
+- Eval trajectories recorded 0 tokens on live runs: the supervisor's internal
+  routing calls and rebuilt answers carry no usage in the update stream.
+  `capture_trajectory` now counts every LLM call of the run through a LangChain
+  callback (`Trajectory.usage_source`), and the token baseline
+  `tests/eval/baselines/tokens.json` is committed (TKE1-08; smoke suite, local
+  Ollama `qwen3:14b`). TKE9-04 (A/B with the TKE flags on) is unblocked.
+
 ### Security
 - `mako` 1.3.12 → 1.4.3 (lock; transitive via `alembic` / `prefect`) — fixes
   CVE-2026-102991 (GHSA-5639-2j2p-m4mx, `TemplateLookup` path traversal).
@@ -190,7 +262,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Notes
 - Not yet measured: decision-gated eval numbers with a calibrated DEC backend.
-- Not yet wired: agent adoption of `memory_block_for_prompt` (library seam only).
+- Not yet wired: agent adoption of `memory_block_for_prompt` (library seam only). *(Wired for the `researcher` in [Unreleased].)*
 - The notebook is still to come.
 - Graphiti sends anonymous telemetry unless `GRAPHITI_TELEMETRY_ENABLED=false`.
 
@@ -1776,7 +1848,7 @@ English-language pass over the documentation.
 ## [3.0.0] — 2026-05-22
 
 Rebrand of the framework from **LightAgent** to **Prismal**
-(`lightagent-agents` → `prismal`). See `propuesta.md` and `PLAN_MIGRACION.md`.
+(`lightagent-agents` → `prismal`). See `docs/history/PLAN_MIGRACION.md`.
 
 ### Changed
 - **Distribution renamed** `lightagent-agents` → `prismal`; project URLs now
@@ -1854,4 +1926,4 @@ Rebrand of the framework from **LightAgent** to **Prismal**
 ## Previous versions
 
 Versions prior to 2.0.0 were part of the `lightagent` monolithic package.
-See the main [CHANGELOG.md](../../CHANGELOG.md) in the repository root for history.
+Their history lives in the `lightagent` monorepo's own CHANGELOG (not part of this repository).

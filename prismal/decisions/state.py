@@ -135,6 +135,7 @@ class DecisionState:
 
     @property
     def total_chars(self) -> int:
+        """Total characters of all keys and values."""
         return sum(len(k) + len(v) for k, v in self.fields.items())
 
 
@@ -193,6 +194,11 @@ class DecisionStateBuilder:
         return registry is not None and registry.is_untrusted(value)
 
     def build(self) -> DecisionState:
+        """Freeze the fields into a :class:`DecisionState`.
+
+        Detects the language (unless given), hashes the canonical JSON and flags
+        ``over_limit`` when the total size exceeds ``max_chars``.
+        """
         fields = dict(self._fields)
         language = self._language or detect_language(
             " ".join(self._untrusted_text) or " ".join(fields.values())

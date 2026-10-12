@@ -65,10 +65,12 @@ class OpenAICompatibleGateway:
 
     @property
     def profile(self) -> GatewayProfile:
+        """The gateway profile this adapter was built from."""
         return self._profile
 
     @property
     def name(self) -> str:
+        """The gateway name (the ``<gateway>`` part of ``gw:<gateway>/<model>``)."""
         return self._profile.name
 
     # ── resolution (pure) ────────────────────────────────────────────────────
@@ -80,6 +82,11 @@ class OpenAICompatibleGateway:
         agent: str | None,
         session_id: str | None,  # noqa: ARG002 — used by OpenRouter / OpenCode
     ) -> ResolvedModel:
+        """Resolve *model_ref* to an ``openai/<model>`` LiteLLM target; pure, no I/O.
+
+        Raises ``GatewayConfigError`` for a foreign or malformed ref, ``GatewayPolicyError``
+        for a denied model and ``GatewayCredentialError`` when the key is missing.
+        """
         ref = self._parse(model_ref)
         self._check_policy(ref, agent=agent)
         return ResolvedModel(
@@ -131,19 +138,22 @@ class OpenAICompatibleGateway:
     # ── telemetry (fail-open) ────────────────────────────────────────────────
 
     def reported_cost(self, response: object) -> ReportedCost | None:
+        """Billed cost read from *response*, or ``None``; never raises."""
         return read_reported_cost(response)
 
     async def quota(self) -> QuotaSnapshot | None:
+        """No remote quota API for a generic gateway: always ``None``."""
         return None
 
     async def fetch_generation(
         self,
         generation_id: str,  # noqa: ARG002 — only gateways with a generation API
     ) -> GenerationStats | None:
+        """No generation API for a generic gateway: always ``None``."""
         return None
 
     async def astartup_check(self) -> None:
-        return None
+        """No startup gate for a generic gateway."""
 
     # ── HTTP client lifecycle ────────────────────────────────────────────────
 
@@ -160,6 +170,7 @@ class OpenAICompatibleGateway:
         return {"Authorization": f"Bearer {self._secret().get_secret_value()}"}
 
     async def aclose(self) -> None:
+        """Close the HTTP client when this adapter created it."""
         if self._owns_http and self._http is not None:
             with suppress(Exception):
                 await self._http.aclose()

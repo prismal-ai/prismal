@@ -79,6 +79,7 @@ class SystemOneHttpDecisionAdapter:
     # ── DecisionPort ──────────────────────────────────────────────────────────
 
     def supports(self, question: QuestionSpec, *, language: str) -> bool:
+        """False for a disallowed language or a Choice with too many options."""
         if self._languages is not None and language not in self._languages:
             return False
         return not (
@@ -93,6 +94,7 @@ class SystemOneHttpDecisionAdapter:
         *,
         policy: GatePolicy,
     ) -> Mapping[str, Decision]:
+        """One ``/systemone`` request for all questions, via ``guarded_decide``."""
         return await guarded_decide(self, questions, policy, lambda qs: self._decide(state, qs))
 
     async def decide_batch(
@@ -113,6 +115,7 @@ class SystemOneHttpDecisionAdapter:
                 chunk: list[Mapping[str, str]] = chunk,
                 results: list[dict[str, Decision]] = results,
             ) -> dict[str, Decision]:
+                """Decide the chunk; return the first state's answers."""
                 results.extend(await self._decide_batch(chunk, qs))
                 return results[0] if results else {}
 
@@ -124,6 +127,7 @@ class SystemOneHttpDecisionAdapter:
         return out
 
     async def aclose(self) -> None:
+        """Close the HTTP client, if one was created."""
         if self._client is not None:
             await self._client.aclose()
             self._client = None

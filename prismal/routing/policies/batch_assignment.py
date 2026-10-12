@@ -164,6 +164,7 @@ def _upgrade(
     parked: list[list[tuple[float, int, int, int, bool]]] = [[] for _ in range(k)]
 
     def push(i: int) -> None:
+        """Queue every accuracy-improving upgrade of item *i* by its Δa/Δĉ ratio."""
         cur = x[i]
         a0, c0 = acc[i][cur], cost[i][cur]
         for c, j, a in rows[i]:
@@ -175,6 +176,7 @@ def _upgrade(
     elig = [{j for _, j, _ in row} for row in rows]
 
     def move(i: int, j: int, *, frees: bool) -> None:
+        """Reassign item *i* to model *j*; *frees* re-queues upgrades parked on the old model."""
         members[x[i]].discard(i)
         if frees:  # capacity freed on x[i] ⇒ parked upgrades onto it may proceed
             for entry in parked[x[i]]:
@@ -400,12 +402,14 @@ class _DualSearch:
     next_repair: int = 1  # repair schedule t = 1, 2, 4, 8, …
 
     def repair_due(self, t: int) -> bool:
+        """True on the 1, 2, 4, 8, ... schedule or every ``_REPAIR_PERIOD`` iterations."""
         if t == self.next_repair:
             self.next_repair *= 2
             return True
         return t % _REPAIR_PERIOD == 0
 
     def track_dual(self, dual: float) -> None:
+        """Record a dual value; halve the step scale when it stalls for the oscillation window."""
         if dual > self.max_d + 1e-12:
             self.max_d = dual
             self.stall = 0
@@ -416,16 +420,19 @@ class _DualSearch:
                 self.stall = 0
 
     def offer(self, x: list[int], total_c: float) -> None:
+        """Keep *x* as the incumbent when it is cheaper than the best so far."""
         if total_c < self.best_cost - 1e-12:
             self.best_cost, self.best_x = total_c, x
 
     def converged(self, eps: float) -> bool:
+        """True when the relative primal/dual gap is within *eps*."""
         return (
             self.best_x is not None
             and (self.best_cost - self.max_d) / max(self.best_cost, 1e-9) <= eps
         )
 
     def step(self, eta: float, g_lam: float, g_mu: Sequence[float]) -> None:
+        """Projected subgradient step on the multipliers (kept non-negative)."""
         self.lam = max(0.0, self.lam + eta * g_lam)
         self.mu = [max(0.0, m + eta * g) for m, g in zip(self.mu, g_mu, strict=True)]
 
@@ -508,6 +515,7 @@ def solve_greedy(
         return [], False
 
     def regret(i: int) -> float:
+        """Cost gap between item *i*'s two cheapest eligible models (inf if one)."""
         row = rows[i]
         return row[1][0] - row[0][0] if len(row) > 1 else math.inf
 
@@ -535,6 +543,7 @@ def _max_accuracy(
     rows = _rows(cost, acc, k, eligible)
 
     def spread(i: int) -> float:
+        """Accuracy range of item *i* across its eligible models (-1 if none)."""
         accs = [a for _, _, a in rows[i]]
         return max(accs) - min(accs) if accs else -1.0
 

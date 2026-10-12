@@ -4,7 +4,7 @@ Runtime Hardening adds a **defense-in-depth layer** on top of Prismal's existing
 5-layer security stack, closing four residual runtime gaps from the 2025–2026
 OWASP **LLM / Agentic Top 10**. It is **opt-in** (`hardening_enabled`, default
 `False`) and **additive**: with the flag off, the compiled supervisor graph and
-the 26 agents are byte-for-byte unchanged (snapshot-tested).
+the supervisor routes are byte-for-byte unchanged (snapshot-tested).
 
 | Control | Module | OWASP |
 |---|---|---|

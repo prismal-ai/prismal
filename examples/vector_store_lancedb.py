@@ -8,7 +8,7 @@ backend to ``"sqlite_vec"`` for the in-process SQLite option, or ``"chroma"``
 
 Run::
 
-    pip install 'prismal[lancedb]'
+    pip install 'prismal-ai[lancedb]'
     python examples/vector_store_lancedb.py
 
 Every adapter conforms to ``VectorStorePort`` and returns ``(Document, score)``
@@ -39,7 +39,7 @@ def main() -> None:
     except VectorStoreBackendUnavailable as exc:
         # The base install does not ship LanceDB; the error guides to the extra.
         print(exc)
-        print("Install it with: pip install 'prismal[lancedb]'")
+        print("Install it with: pip install 'prismal-ai[lancedb]'")
         return
 
     assert conforms_to(store, VectorStorePort)

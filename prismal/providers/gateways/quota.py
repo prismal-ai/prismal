@@ -98,11 +98,17 @@ class QuotaEvent:
 class QuotaStore(Protocol):
     """Persistence port for ledger events, keyed by ``(org_id, gateway)``."""
 
-    def add(self, key: QuotaKey, event: QuotaEvent) -> None: ...
+    def add(self, key: QuotaKey, event: QuotaEvent) -> None:
+        """Append *event* under *key*."""
+        ...
 
-    def events(self, key: QuotaKey) -> list[QuotaEvent]: ...
+    def events(self, key: QuotaKey) -> list[QuotaEvent]:
+        """All stored events for *key*."""
+        ...
 
-    def prune(self, key: QuotaKey, before: datetime) -> None: ...
+    def prune(self, key: QuotaKey, before: datetime) -> None:
+        """Drop events for *key* older than *before*."""
+        ...
 
 
 class InMemoryQuotaStore:
@@ -113,14 +119,17 @@ class InMemoryQuotaStore:
         self._lock = threading.Lock()
 
     def add(self, key: QuotaKey, event: QuotaEvent) -> None:
+        """Append *event* under *key*."""
         with self._lock:
             self._events.setdefault(key, []).append(event)
 
     def events(self, key: QuotaKey) -> list[QuotaEvent]:
+        """A copy of the events stored for *key*."""
         with self._lock:
             return list(self._events.get(key, ()))
 
     def prune(self, key: QuotaKey, before: datetime) -> None:
+        """Drop events for *key* older than *before* (removes the key when empty)."""
         with self._lock:
             kept = [e for e in self._events.get(key, ()) if e.at >= before]
             if kept:

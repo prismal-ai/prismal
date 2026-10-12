@@ -1,3 +1,6 @@
+> **Documento histórico.** Plan de la migración `lightagent-agents` → `prismal`, completada en
+> v3.0.0. Se conserva como registro; `propuesta.md` no forma parte de este repositorio.
+
 # Plan de trabajo — Migración `lightagent-agents` → `prismal`
 
 > Compañero de `propuesta.md`. Este documento operacionaliza la migración del

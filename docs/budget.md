@@ -52,8 +52,8 @@ where it does not.
 
 ## Cost estimation
 
-`providers/cost.py::compute_cost_usd` is the **only** module that imports
-`litellm`. It prices a call from LiteLLM's native model map first; for models
+`providers/cost.py::compute_cost_usd` is the budget layer's pricing entry point
+(`litellm` is imported only inside `prismal/providers/`). It prices a call from LiteLLM's native model map first; for models
 LiteLLM cannot price it falls back to a configurable table and flags the figure
 as estimated:
 
@@ -131,8 +131,38 @@ persisted to SQLite for FinOps history.
 
 `resolve_budget(settings, org_id=...)` is the per-tenant seam: a host threads
 tenant ceilings via the composition root's `apply_org_overrides`, and the meter
-tags usage with `tenant=org_id`. Shared cross-tenant quota counters are a
-follow-up; this phase delivers per-run, per-tenant resolution and attribution.
+tags usage with `tenant=org_id`.
+
+### Shared tenant quotas (`budget_scope = "tenant"`)
+
+With `budget_scope = "tenant"`, a run's guard checks the **tenant's total over a
+UTC calendar window**, not the run's own usage. The window is
+`budget_tenant_window`: `month` (the default) or `day`. The tenant is the
+`org_id` passed to `seed_budget_run`, or else the one bound by the host's
+`RuntimeContext.bind_org()`.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `PRISMAL_BUDGET_TENANT_WINDOW` | `month` | `month` \| `day` (UTC calendar). |
+| `PRISMAL_BUDGET_TENANT_STORE_PATH` | `""` | SQLite file shared by every worker process. Empty keeps totals in process memory. |
+
+`prismal.budget.tenant_quota.TenantCostMeter` adds each call's delta to the
+store with an atomic SQLite upsert (`BEGIN IMMEDIATE`, WAL, busy timeout) and
+adopts the returned total. Another process's spend is therefore seen at this
+run's next recorded call, with no extra read on the hot path. Only the four
+guarded dimensions are shared (tokens, cost, calls, wall clock); per-call OTel
+and FinOps attribution is unchanged.
+
+Behaviour on failure and edge cases:
+
+- If the store fails, that call is counted locally
+  (`budget_tenant_quota_store_failed`). It never raises into the graph.
+- With tenant scope but no tenant, the run falls back to a per-run meter
+  (`budget_tenant_scope_without_org`).
+- Hosts can inject their own store with `set_tenant_quota_store()`. Server-backed
+  stores (Redis/Postgres) can implement `TenantQuotaStorePort`.
+
+Spec: `specs/cost-budget-governance/DELTA-2026-10-shared-tenant-quota.md`.
 
 ## Notes
 

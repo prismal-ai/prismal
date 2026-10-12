@@ -155,12 +155,22 @@ def _with_routing(policy: str, run: Callable[[], int]) -> int:
         set_config_source(previous)
 
 
+async def _run_and_close(runner: EvalRunner, eval_set: EvalSet) -> Scorecard:
+    """Run the set, then close the async graph's checkpointer so the process can exit."""
+    try:
+        return await runner.run_set(eval_set)
+    finally:
+        graph = sys.modules.get("prismal.agents.graph")
+        if graph is not None:
+            await graph.aclose_async_compiled_graph()
+
+
 def _cmd_run(args: argparse.Namespace, *, suite_path: str, loader: Callable[[str], EvalSet]) -> int:
     """Run a suite/corpus, render the scorecard, and optionally gate."""
     settings = get_settings()
     eval_set = loader(suite_path)
     runner = EvalRunner(settings=settings)
-    card = asyncio.run(runner.run_set(eval_set))
+    card = asyncio.run(_run_and_close(runner, eval_set))
 
     if getattr(args, "json_out", None):
         Path(args.json_out).write_text(to_json(card), encoding="utf-8")

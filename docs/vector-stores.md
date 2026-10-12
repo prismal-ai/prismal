@@ -36,7 +36,7 @@ No consumer code changes; only settings (env vars use the `PRISMAL_` prefix):
 # Embedded LanceDB
 PRISMAL_VECTOR_STORE_BACKEND=lancedb
 PRISMAL_VECTOR_STORE_PATH=data/db/vectors
-# pip install 'prismal[lancedb]'
+# pip install 'prismal-ai[lancedb]'
 ```
 
 ```python
@@ -66,14 +66,14 @@ private network are the operator's responsibility** — the defaults stay embedd
 PRISMAL_VECTOR_STORE_BACKEND=qdrant
 PRISMAL_VECTOR_STORE_URL=http://qdrant.internal:6333
 PRISMAL_VECTOR_STORE_API_KEY=<secret>
-# pip install 'prismal[qdrant]'
+# pip install 'prismal-ai[qdrant]'
 ```
 
 ```bash
 # PostgreSQL + pgvector
 PRISMAL_VECTOR_STORE_BACKEND=pgvector
 PRISMAL_VECTOR_STORE_URL=postgresql+psycopg://user:pass@db.internal:5432/prismal
-# pip install 'prismal[pgvector]'
+# pip install 'prismal-ai[pgvector]'
 ```
 
 Connection URLs and keys are treated as secrets and never logged. Qdrant without

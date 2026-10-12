@@ -84,6 +84,11 @@ class AdequacyChecker:
         *,
         risk_tier: RiskTier,  # noqa: ARG002 — abstention is risk-weighted by the cascade
     ) -> float | None:
+        """P(answer adequate) from the DEC Noul question, or ``None`` to abstain.
+
+        Abstains when no port/cascade is configured, the state is tainted or over limit,
+        on timeout or any error, or when the decision abstains. Never raises.
+        """
         if self._port is None and self._cascade is None:
             return None
         state = (
@@ -139,6 +144,7 @@ class CascadePolicy:
         self._features: OrderedDict[ModelChoice, TaskFeatures] = OrderedDict()
 
     def model_for(self, tier: ModelTier) -> str:
+        """Model ref of *tier* from the static policy."""
         return self._static.model_for(tier)
 
     def _capable(self, tier: ModelTier, features: TaskFeatures) -> bool:
@@ -162,6 +168,11 @@ class CascadePolicy:
             self._features.popitem(last=False)
 
     def select(self, features: TaskFeatures, *, budget: BudgetStatus | None = None) -> ModelChoice:
+        """Start at ``routing_cascade_start_tier`` (never above the inner choice).
+
+        Tainted turns stay at or above the static tier, the risk floor is honoured and
+        the first tier with the required capabilities is chosen. ``AUTO`` passes through.
+        """
         base = self.inner.select(features, budget=budget)
         if base.tier is ModelTier.AUTO:
             return base
@@ -202,6 +213,10 @@ class CascadePolicy:
         return None
 
     def on_outcome(self, choice: ModelChoice, outcome: RoutingOutcome) -> ModelChoice | None:
+        """Escalate one capable tier on a structured/adequacy/tool-error failure, else ``None``.
+
+        Capped by ``routing_cascade_max_escalations``; never raises.
+        """
         try:
             return self._on_outcome(choice, outcome)
         except Exception as exc:

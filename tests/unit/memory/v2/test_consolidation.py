@@ -673,39 +673,18 @@ async def test_broken_telemetry_never_breaks_consolidation() -> None:
 # ── scheduler registration (MEM4-01) ────────────────────────────────────────
 
 
-class FakeAPScheduler:
+class FakeExecutor:
+    """Records ``CronExecutor.add_callable`` calls (the public scheduling API)."""
+
     def __init__(self) -> None:
         self.jobs: list[dict[str, Any]] = []
 
-    def add_job(self, func: Any, trigger: Any, **kw: Any) -> None:
-        self.jobs.append({"func": func, "trigger": trigger, **kw})
+    def add_callable(self, job_id: str, func: Any, **kw: Any) -> str:
+        self.jobs.append({"id": job_id, "func": func, **kw})
+        return job_id
 
 
-class FakeDTS:
-    def get_scheduler_tz(self) -> Any:
-        from zoneinfo import ZoneInfo
-
-        return ZoneInfo("UTC")
-
-
-class FakeExecutor:
-    def __init__(self) -> None:
-        self._scheduler = FakeAPScheduler()
-        self._dts = FakeDTS()
-
-
-async def test_register_consolidation_job_runs_each_org(monkeypatch: pytest.MonkeyPatch) -> None:
-    from prismal.memory.v2 import consolidation as consolidation_mod
-
-    crontabs: list[tuple[str, Any]] = []
-
-    def fake_trigger(expr: str, timezone: Any = None) -> str:
-        crontabs.append((expr, timezone))
-        return f"trigger:{expr}"
-
-    # Patch the module seam, not apscheduler: tests/unit/agents/conftest.py may have
-    # replaced apscheduler with a MagicMock in sys.modules earlier in the session.
-    monkeypatch.setattr(consolidation_mod, "_cron_trigger", fake_trigger)
+async def test_register_consolidation_job_runs_each_org() -> None:
     backends = {"acme": InMemoryBackend(), "globex": InMemoryBackend()}
     await backends["acme"].put(_rec("a", "same fact", at=NOW - 2))
     await backends["acme"].put(_rec("b", "same fact", at=NOW - 1))
@@ -728,12 +707,11 @@ async def test_register_consolidation_job_runs_each_org(monkeypatch: pytest.Monk
         consolidator_for=consolidator_for,
     )
     assert job_id == CONSOLIDATION_JOB_ID
-    (job,) = executor._scheduler.jobs
+    (job,) = executor.jobs
     assert job["id"] == CONSOLIDATION_JOB_ID
-    assert job["replace_existing"] is True
+    assert job["cron"] == "15 2 * * *"
     assert job["max_instances"] == 1
-    assert job["trigger"] == "trigger:15 2 * * *"
-    assert [(expr, str(tz)) for expr, tz in crontabs] == [("15 2 * * *", "UTC")]
+    assert job["coalesce"] is True
     reports = await job["func"]()
     assert ran == ["acme", "broken", "globex"]
     assert [r.scope.org_id for r in reports] == ["acme", "globex"]
@@ -804,14 +782,3 @@ async def test_contradiction_across_users_is_never_resolved() -> None:
     report = await _consolidator(backend).run(ORG)
     assert report.superseded == 0
     assert (await _get(backend, "old")).superseded_by is None
-
-
-def test_cron_trigger_builds_crontab_trigger() -> None:
-    import sys
-
-    if not hasattr(sys.modules.get("apscheduler"), "__file__"):
-        pytest.skip("apscheduler replaced by a test stub in this session")
-    from prismal.memory.v2.consolidation import _cron_trigger
-
-    trigger = _cron_trigger("15 2 * * *", "UTC")
-    assert "15" in str(trigger)

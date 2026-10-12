@@ -55,9 +55,13 @@ class TaskRecord:
 class A2ATaskStorePort(Protocol):
     """Where the dual-stack handler records and queries v1 tasks."""
 
-    def put(self, task: TaskRecord) -> None: ...
+    def put(self, task: TaskRecord) -> None:
+        """Insert or replace the record for ``task.task_id``."""
+        ...
 
-    def get(self, task_id: str, *, org_id: str | None) -> TaskRecord | None: ...
+    def get(self, task_id: str, *, org_id: str | None) -> TaskRecord | None:
+        """The record for *task_id* when it belongs to *org_id*, else ``None``."""
+        ...
 
     def peek(self, task_id: str) -> TaskRecord | None:
         """Unscoped owner lookup — internal ownership checks only, never returned to callers."""
@@ -65,13 +69,21 @@ class A2ATaskStorePort(Protocol):
 
     def list(
         self, *, org_id: str | None, params: ListTasksRequest, principal: str | None = None
-    ) -> tuple[builtins.list[TaskRecord], str]: ...
+    ) -> tuple[builtins.list[TaskRecord], str]:
+        """One page of the tenant's records matching *params* and the next-page token
+        (``""`` on the last page).
+        """
+        ...
 
     def count(
         self, *, org_id: str | None, params: ListTasksRequest, principal: str | None = None
-    ) -> int: ...
+    ) -> int:
+        """Total number of the tenant's records matching *params* (ignores paging)."""
+        ...
 
-    def task(self, task_id: str) -> A2ATask | None: ...
+    def task(self, task_id: str) -> A2ATask | None:
+        """The full internal :class:`A2ATask` for *task_id*, if still registered."""
+        ...
 
 
 def _aware(value: datetime) -> datetime:
@@ -127,6 +139,9 @@ class InMemoryA2ATaskStore:
         return len(self._records)
 
     def put(self, task: TaskRecord) -> None:
+        """Insert or refresh *task* as most recent; evicts the oldest beyond ``max_entries``
+        (also dropping their tasks from the registry).
+        """
         self._records.pop(task.task_id, None)
         self._records[task.task_id] = task
         while len(self._records) > self._max_entries:
@@ -134,15 +149,18 @@ class InMemoryA2ATaskStore:
             self._registry.pop(evicted, None)
 
     def get(self, task_id: str, *, org_id: str | None) -> TaskRecord | None:
+        """The record for *task_id* only when it belongs to *org_id* (tenant-scoped)."""
         record = self._records.get(task_id)
         if record is None or record.org_id != org_id:
             return None
         return record
 
     def peek(self, task_id: str) -> TaskRecord | None:
+        """Unscoped lookup for internal ownership checks; never returned to callers."""
         return self._records.get(task_id)
 
     def task(self, task_id: str) -> A2ATask | None:
+        """The internal :class:`A2ATask` for *task_id* from the shared registry."""
         return self._registry.get(task_id)
 
     def _matching(
@@ -173,6 +191,10 @@ class InMemoryA2ATaskStore:
     def list(
         self, *, org_id: str | None, params: ListTasksRequest, principal: str | None = None
     ) -> tuple[builtins.list[TaskRecord], str]:
+        """One page of matching records, newest ``updated_at`` first, plus the next-page token.
+
+        Raises :class:`TaskStoreQueryError` for a malformed page token or timestamp filter.
+        """
         records = self._matching(org_id, params, principal)
         if params.page_token:
             cursor = _decode_token(params.page_token)
@@ -185,6 +207,7 @@ class InMemoryA2ATaskStore:
     def count(
         self, *, org_id: str | None, params: ListTasksRequest, principal: str | None = None
     ) -> int:
+        """Number of records matching the filters of *params* (before paging)."""
         return len(self._matching(org_id, params, principal))
 
 

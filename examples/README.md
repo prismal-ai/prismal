@@ -1,7 +1,9 @@
 # Ejemplos de prismal
 
-Colección completa de ejemplos que cubre todas las arquitecturas de agentes IA
-y sistemas RAG disponibles en el framework `prismal`.
+Colección completa de ejemplos que cubre todas las arquitecturas de agentes IA,
+sistemas RAG y capas opt-in disponibles en el framework `prismal` (v3.19.0).
+Salvo que se indique lo contrario, los ejemplos de la raíz de `examples/` corren
+**offline** con fakes inyectados (sin LLM, red ni API keys).
 
 ## Prerrequisitos
 
@@ -9,12 +11,17 @@ y sistemas RAG disponibles en el framework `prismal`.
 uv pip install -e ".[dev,all]"
 ```
 
-Configura al menos un proveedor LLM en `.env`:
+Solo los ejemplos que llaman a un LLM real (patrones, RAG y subgraphs con su
+backend por defecto) necesitan un proveedor configurado en `.env`:
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-...   # Claude (recomendado)
-OPENAI_API_KEY=sk-...          # GPT-4 (opcional)
+ANTHROPIC_API_KEY=sk-ant-...   # Claude (recomendado; alias de PRISMAL_ANTHROPIC_API_KEY)
+OPENAI_API_KEY=sk-...          # GPT (opcional)
 ```
+
+Todas las variables usan el prefijo `PRISMAL_`. La plantilla completa es
+[`env.example`](../env.example), generada desde `Settings` junto con
+[`docs/settings-reference.md`](../docs/settings-reference.md).
 
 ---
 
@@ -299,15 +306,24 @@ Ejemplos de las fases opt-in del framework. Todos deterministas y offline.
 | `a2a_remote_node.py` | I | Lado outbound: `A2AAgentNode` como nodo del grafo |
 | `a2a_tool_provider.py` | I | `A2AToolProvider`: skills remotas como tools `a2a__{agent}__{skill}`, composición con `CompositeToolProvider` y wiring vía `build_runtime(a2a_agents=...)` |
 | `multimodal_ingestion.py` | F | `ingest_media()` (descriptor por path bajo `metadata.mm.media`, validación de magic bytes) + `register_multimodal_pipeline()` en un registry propio |
-| `blind_review_pipeline.py` | — | Pipeline de revisión ciega |
+| `blind_review_pipeline.py` | BRP | Pipeline de revisión ciega: spec → implementación → dos revisores ciegos → `synthesize_verdicts` determinista → bucle de corrección acotado ([`docs/blind-review-pipeline.md`](../docs/blind-review-pipeline.md)) |
 
 ```bash
 uv run python examples/kokoro_deliberation.py
+uv run python examples/skynet_swarm.py
+uv run python examples/skynet_specialist_swarm.py
 uv run python examples/skynet_direct_api.py
+uv run python examples/budget_governance.py
 uv run python examples/budget_graph_integration.py
-uv run python examples/a2a_tool_provider.py
+uv run python examples/a2a_server.py
+uv run python examples/a2a_remote_node.py
+uv run python examples/a2a_tool_provider.py          # requiere el extra [a2a]
 uv run python examples/multimodal_ingestion.py
+uv run python examples/blind_review_pipeline.py
 ```
+
+Guías: [`docs/kokoro.md`](../docs/kokoro.md), [`docs/skynet.md`](../docs/skynet.md),
+[`docs/budget.md`](../docs/budget.md), [`docs/a2a.md`](../docs/a2a.md).
 
 ---
 
@@ -323,10 +339,75 @@ uv run python examples/multimodal_ingestion.py
 | `composition_root.py` | R | `build_runtime()`/`build_test_runtime()`: los 5 puertos compuestos + multi-tenant (`collection_for`) |
 | `config_source_env.py` / `config_source_custom.py` | W | `ConfigSourcePort`: fuentes env/mapping/encadenadas inyectadas en `Settings` |
 | `vector_store_lancedb.py` | Z | `VectorStoreFactory` con backend alternativo (LanceDB) |
-| `node_typesafety.py` | X | Validación tipada de entrada/salida en nodos |
+| `node_typesafety.py` | NTS | Validación tipada (Pydantic `input_model`/`output_model`) de entrada/salida en nodos `@prismal_node` (`off\|warn\|enforce`) |
 | `visualize_graphs.py` | — | `to_mermaid()`/`visualize()` sobre grafos y `SubgraphDefinition` |
-| `agent_eval.py` / `agent_identity.py` | — | Evaluación de agentes / identidad y scopes |
-| `guardrails_modernization.py` / `loop_hardening.py` / `runtime_hardening.py` / `observability_integration.py` | — | Seguridad, endurecimiento de loops y observabilidad |
+| `agent_eval.py` | V | Harness de evaluación sobre el grafo compilado real con fakes (`EvalRunner`, aserciones, gate de regresión) |
+| `agent_identity.py` | IDN | DID por agente, credenciales con scopes desde un vault, delegación on-behalf-of y `PolicyEngine` |
+| `runtime_hardening.py` | H | Taint tracking, `IndirectInjectionDetector`, `OutputValidator`, `ToolPolicyEngine`, `RunawayGuard` |
+| `guardrails_modernization.py` | GRD | Rails NeMo + clasificador de seguridad con razonamiento y `StructuredOutputGuard` |
+| `loop_hardening.py` | LH | `ContextCompactor` + `resolve_phase()` y gating de herramientas por fase |
+| `observability_integration.py` | OBS | `ObservabilityPort`: `RunSummary` consultable, paridad LangSmith/Langfuse, export de datasets |
+
+```bash
+uv run python examples/extension/custom_node.py
+uv run python examples/extension/custom_subgraph.py
+uv run python examples/extension/discover_plugins_demo.py
+uv run python examples/extension/langchain_migration.py
+uv run python examples/composition_root.py
+uv run python examples/config_source_env.py
+uv run python examples/config_source_custom.py
+uv run python examples/vector_store_lancedb.py      # requiere el extra [lancedb]
+uv run python examples/node_typesafety.py
+uv run python examples/visualize_graphs.py
+uv run python examples/agent_eval.py
+uv run python examples/agent_identity.py
+uv run python examples/runtime_hardening.py
+uv run python examples/guardrails_modernization.py
+uv run python examples/loop_hardening.py
+uv run python examples/observability_integration.py
+```
+
+El scaffold `plugin_template/` es un paquete instalable aparte (ver su
+[`README.md`](./plugin_template/README.md)): `uv pip install -e examples/plugin_template`
+y luego `uv run python -m prismal.plugins list` / `doctor` para verificar el descubrimiento.
+
+Guías: [`docs/extension.md`](../docs/extension.md), [`docs/composition-root.md`](../docs/composition-root.md),
+[`docs/configuration.md`](../docs/configuration.md), [`docs/vector-stores.md`](../docs/vector-stores.md),
+[`docs/node-typesafety.md`](../docs/node-typesafety.md), [`docs/eval.md`](../docs/eval.md),
+[`docs/identity.md`](../docs/identity.md), [`docs/security/`](../docs/security/),
+[`docs/loop-hardening.md`](../docs/loop-hardening.md), [`docs/observability-integration.md`](../docs/observability-integration.md).
+
+---
+
+## Wave 2026-10 (TKE · GW · DEC · AMR · PRT · MEM)
+
+Las seis fases de la ola 2026-10 (v3.13.0 → v3.18.0). Todas son **opt-in**: con
+su flag maestro apagado el grafo es byte a byte idéntico (snapshot-tested). Los
+ejemplos activan los flags en un `Settings(...)` local, así que **no hace falta
+tocar `.env`** ni instalar extras, y ninguno envía peticiones reales (sin API
+keys: las claves de gateway se inyectan con un `secret_resolver` falso).
+
+| Archivo | Fase | Qué muestra | Flags (en producción) / extras / keys | Guía |
+|---------|------|-------------|---------------------------------------|------|
+| `token_efficiency.py` | TKE | (1) precio v3.12 vs. contabilidad cache-aware de `CostMeter`; (2) layout `cache_stable` de `SecurePromptBuilder` (system prompt idéntico + canario de prefijo detectable); (3) breakpoints de `apply_cache_policy` (Anthropic); (4) `ToolOutputBudget` recorta una salida enorme y la guarda íntegra en `InMemoryArtifactStore`; (5) tabla uniforme codificada en TOON | `token_efficiency_enabled` + `prompt_layout="cache_stable"`, `prompt_canary_secret`, `tool_output_budget_enabled`, `tool_output_toon_enabled`. Extras opcionales de contexto RAG: `[rerank]`, `[compression]` | [`docs/token-efficiency.md`](../docs/token-efficiency.md) |
+| `gateways_openrouter.py` | GW | Resolución de `gw:openrouter/...` (modelo LiteLLM, headers, `extra_body` con `data_collection="deny"` + `zdr=true` y `session_id` hasheado); fallback del gateway (`models[]`) sin doble fallback; gate de política fail-closed (variante `:free` fuera de la allow-list); medición del coste facturado (`source="gateway"`) | `llm_gateways_enabled` + `openrouter_enabled`; key `PRISMAL_OPENROUTER_API_KEY` (o vault por tenant) | [`docs/gateways.md`](../docs/gateways.md) |
+| `gateways_opencode.py` | GW | OpenCode Zen: protocolo de wire por modelo (Anthropic Messages / Responses / Chat Completions); guardia de ToS de OpenCode Go (solo agentes de código); `QuotaLedger` de tarifa plana con downgrade antes de cualquier llamada | `llm_gateways_enabled` + `opencode_zen_enabled` / `opencode_go_enabled`, `opencode_go_monthly_cap_usd`, `opencode_go_quota_action`; key `PRISMAL_OPENCODE_API_KEY` | [`docs/gateways.md`](../docs/gateways.md) |
+| `gateways_omniroute.py` | GW | Gate de arranque fail-closed de OmniRoute contra un `/api/monitoring/health` falso (`httpx.MockTransport`): 3.8.50 (CVE-2026-88062) se rechaza y el router lo deshabilita; 3.8.51 resuelve modelos | `llm_gateways_enabled` + `omniroute_enabled`, `omniroute_upstream_attestation`; key `PRISMAL_OMNIROUTE_API_KEY` | [`docs/gateways.md`](../docs/gateways.md) |
+| `typed_decisions.py` | DEC | Calibración (temperatura) sobre un set etiquetado sintético con caída de ECE; ruteo del supervisor resuelto por la cascada sin llamada al LLM; inyección "pre-approved" ⇒ estado tainted y escalado; sesgo de primera opción detectado por el shuffle en una `Choice` de riesgo HIGH | `decisions_enabled` + `decision_routing_enabled` (y demás `decision_<integración>_enabled`), `decision_modes`. Backends reales: extras `[laya]` / `[jev]` (key `PRISMAL_JEV_API_KEY`) u Ollama local; el ejemplo usa `FakeDecisionAdapter` | [`docs/decisions.md`](../docs/decisions.md) |
+| `adaptive_routing.py` | AMR | Mapa de tiers de paridad (cada agente conserva `default_model`); cascada que escala tras errores de herramienta + afinidad de caché; suelo de riesgo `critical` ⇒ frontier; downgrade por soft cap de presupuesto; asignación por lotes (Skynet) bajo un suelo de precisión | `adaptive_routing_enabled`, `routing_mode` (`shadow` por defecto / `enforce`), `routing_policy`, `routing_tier_models`, `routing_predictor_path` | [`docs/routing.md`](../docs/routing.md) |
+| `agentic_memory.py` | MEM | Escrituras tipadas con dedupe y taint (contenido de herramienta ⇒ solo episodio), consolidación idempotente (episodios ⇒ hecho semántico), recall con presupuesto de tokens, recall cross-tenant rechazado, borrado por agente rechazado y borrado aprobado por un humano | `memory_v2_enabled`, `memory_mode` (`shadow` / `enforce`), `memory_v2_backend`, `memory_write_gate`, `memory_graph_backend` (`sqlite`; Graphiti vía extra `[graph-memory]`) | [`docs/memory.md`](../docs/memory.md) |
+| `agui_translate.py` | PRT | Traduce un `graph.astream(stream_mode=["messages","updates","custom"])` falso a eventos AG-UI 1.0 y frames SSE (`start_run` → `to_agui_events` → `finish_run` con `RunSummary`/usage) | Ninguno para el traductor puro; en un host, `agui_events_enabled`. A2A v1.0 y MCP stateless (`a2a_protocol_version`, `mcp_protocol_mode`) no tienen ejemplo propio | [`docs/protocols-2026.md`](../docs/protocols-2026.md) |
+
+```bash
+uv run python examples/token_efficiency.py
+uv run python examples/gateways_openrouter.py
+uv run python examples/gateways_opencode.py
+uv run python examples/gateways_omniroute.py
+uv run python examples/typed_decisions.py
+uv run python examples/adaptive_routing.py
+uv run python examples/agentic_memory.py
+uv run python examples/agui_translate.py
+```
 
 ---
 
@@ -367,14 +448,18 @@ if __name__ == "__main__":
 ```
 prismal/
 ├── agents/
-│   ├── patterns/          ← Patrones de agentes (ToT, Debate, LATS, etc.)
-│   ├── subgraphs/         ← Pipelines completos (ML, Financial, Dev, etc.)
-│   ├── graph.py           ← Grafo supervisor principal (26 agentes)
+│   ├── patterns/          ← 7 patrones de razonamiento + 2 primitivas (ToT, Debate, LATS, …)
+│   ├── subgraphs/         ← 15 paquetes de subgraphs (ML, Financial, Dev, Kokoro, Skynet, …)
+│   ├── graph.py           ← Grafo supervisor principal (30 rutas: 15 core + 15 opt-in)
 │   └── state.py           ← AgentState (TypedDict con add_messages)
-├── rag/                   ← Motores RAG (CRAG, HyDE, Fusion, etc.)
-├── providers/             ← Abstracción de LLMs (Anthropic, OpenAI, etc.)
-├── security/              ← 5 capas de defensa en profundidad
-└── memory/                ← Memoria corto/largo plazo
+├── rag/                   ← 11 motores RAG + VectorStorePort (rag/stores/)
+├── providers/             ← Abstracción de LLMs (LiteLLM) + gateways/ (OpenRouter, OpenCode, OmniRoute)
+├── security/              ← 5 capas de defensa en profundidad + hardening
+├── memory/                ← Memoria corto/largo plazo + v2/ (memoria agéntica, opt-in)
+├── budget/ · routing/ · decisions/   ← Presupuesto, ruteo adaptativo de modelos, decisiones tipadas
+├── a2a/ · mcp/ · events/             ← A2A v0.3/v1.0, cliente MCP, traductor AG-UI
+└── composition/ · identity/ · eval/  ← build_runtime(), identidad de agentes, harness de evaluación
 ```
 
-Referencia completa: `CLAUDE.md` en la raíz del repositorio.
+Referencia completa: `CLAUDE.md` en la raíz del repositorio, las guías de
+[`docs/`](../docs/) y la guía en español [`examples.md`](../examples.md).

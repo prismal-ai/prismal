@@ -491,6 +491,19 @@ class Settings(BaseSettings):
         default=True,
         description="True = abort (raise) on a hard cap; False = soft-only (warn).",
     )
+    budget_tenant_window: str = Field(
+        default="month",
+        description=(
+            "UTC calendar window of a tenant-scoped budget (budget_scope=tenant): month | day."
+        ),
+    )
+    budget_tenant_store_path: str = Field(
+        default="",
+        description=(
+            "SQLite file shared by every process for tenant quota totals "
+            '(budget_scope=tenant); "" keeps the totals in process memory.'
+        ),
+    )
     budget_pricing: dict[str, dict[str, float]] = Field(
         default_factory=dict,
         description=(
@@ -916,7 +929,9 @@ class Settings(BaseSettings):
     )
     openrouter_enabled: bool = Field(default=False, description="Enable OpenRouter.")
     openrouter_api_key: SecretStr = Field(default=SecretStr(""), description="OpenRouter key.")
-    openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1")
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1", description="OpenRouter API base URL."
+    )
     openrouter_app_url: str = Field(default="", description="HTTP-Referer attribution header.")
     openrouter_app_title: str = Field(
         default="prismal", description="X-OpenRouter-Title attribution header."
@@ -963,8 +978,12 @@ class Settings(BaseSettings):
     opencode_zen_enabled: bool = Field(default=False, description="Enable OpenCode Zen.")
     opencode_go_enabled: bool = Field(default=False, description="Enable OpenCode Go.")
     opencode_api_key: SecretStr = Field(default=SecretStr(""), description="OpenCode key.")
-    opencode_zen_base_url: str = Field(default="https://opencode.ai/zen/v1")
-    opencode_go_base_url: str = Field(default="https://opencode.ai/zen/go/v1")
+    opencode_zen_base_url: str = Field(
+        default="https://opencode.ai/zen/v1", description="OpenCode Zen API base URL."
+    )
+    opencode_go_base_url: str = Field(
+        default="https://opencode.ai/zen/go/v1", description="OpenCode Go API base URL."
+    )
     opencode_model_protocols_path: str = Field(
         default="config/opencode_models.yaml", description="Per-model wire-protocol map."
     )
@@ -992,7 +1011,9 @@ class Settings(BaseSettings):
     )
     omniroute_enabled: bool = Field(default=False, description="Enable OmniRoute.")
     omniroute_api_key: SecretStr = Field(default=SecretStr(""), description="OmniRoute key.")
-    omniroute_base_url: str = Field(default="http://localhost:20128/v1")
+    omniroute_base_url: str = Field(
+        default="http://localhost:20128/v1", description="OmniRoute API base URL."
+    )
     omniroute_min_version: str = Field(
         default="3.8.51", description="CVE-2026-88062 floor (VERIFY.md GW0-07)."
     )
@@ -1014,8 +1035,14 @@ class Settings(BaseSettings):
     gateway_reconcile_enabled: bool = Field(
         default=False, description="Reconcile reported cost against the generation API."
     )
-    gateway_reconcile_delay_s: float = Field(default=2.0, ge=0.0)
-    gateway_quota_poll_interval_s: int = Field(default=300, ge=1)
+    gateway_reconcile_delay_s: float = Field(
+        default=2.0,
+        ge=0.0,
+        description="Seconds the CostReconciler waits before fetching billed cost.",
+    )
+    gateway_quota_poll_interval_s: int = Field(
+        default=300, ge=1, description="Interval of the GatewayQuotaPoller, in seconds."
+    )
 
     # --- DEC --- Typed Decision Models (Phase DEC — SPEC-DEC-CFG-001) ────
     # Every integration is effective only with decisions_enabled=True plus its own
@@ -1071,14 +1098,38 @@ class Settings(BaseSettings):
     decision_languages: list[str] = Field(
         default_factory=lambda: ["en", "es"], description="Languages allowed to enforce."
     )
-    decision_min_calibration_examples: int = Field(default=300, ge=1)
-    decision_max_ece: float = Field(default=0.05, gt=0.0, le=1.0)
+    decision_min_calibration_examples: int = Field(
+        default=300,
+        ge=1,
+        description="Minimum calibration examples per language slice to allow enforce.",
+    )
+    decision_max_ece: float = Field(
+        default=0.05,
+        gt=0.0,
+        le=1.0,
+        description="Maximum expected calibration error for an enforce-mode record.",
+    )
     decision_tau_overrides: dict[str, float] = Field(
         default_factory=dict, description="Raise-only τ per risk tier (low|medium|high)."
     )
-    decision_min_margin: float = Field(default=0.20, ge=0.0, le=1.0)
-    decision_shadow_sample_rate: float = Field(default=1.0, ge=0.0, le=1.0)
-    decision_eval_audit_rate: float = Field(default=0.05, ge=0.0, le=1.0)
+    decision_min_margin: float = Field(
+        default=0.20,
+        ge=0.0,
+        le=1.0,
+        description="Minimum top-1 vs top-2 margin a decision needs to pass the gate.",
+    )
+    decision_shadow_sample_rate: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of shadow-mode calls compared against the legacy path.",
+    )
+    decision_eval_audit_rate: float = Field(
+        default=0.05,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of typed eval-judge decisions re-judged by the LLM.",
+    )
     decision_auto_demote: bool = Field(default=True, description="SHD-002 drift auto-demote.")
     decision_demote_floor: float = Field(
         default=0.95, ge=0.0, le=1.0, description="Rolling audited agreement floor (SHD-002)."
@@ -1415,7 +1466,7 @@ class Settings(BaseSettings):
             "Vector store backend selected by VectorStoreFactory. 'chroma' (default) "
             "and embedded 'lancedb'/'sqlite_vec' need no server; 'qdrant'/'pgvector' "
             "are server backends needing vector_store_url. Non-default backends "
-            "require their optional extra (pip install 'prismal[<backend>]')."
+            "require their optional extra (pip install 'prismal-ai[<backend>]')."
         ),
     )
     vector_store_path: str = Field(
@@ -2614,6 +2665,12 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"PRISMAL_BUDGET_SCOPE={self.budget_scope!r} is invalid; "
                 f"expected one of {sorted(valid_scopes)}."
+            )
+        valid_windows = {"month", "day"}
+        if self.budget_tenant_window not in valid_windows:
+            raise ValueError(
+                f"PRISMAL_BUDGET_TENANT_WINDOW={self.budget_tenant_window!r} is invalid; "
+                f"expected one of {sorted(valid_windows)}."
             )
         return self
 

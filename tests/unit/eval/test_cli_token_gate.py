@@ -86,3 +86,22 @@ def test_run_writes_token_baseline(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert main(["run", "--suite", str(suite), "--write-token-baseline", str(out)]) == 0
     assert load_baseline(str(out)) == _BASE
     assert json.loads(out.read_text())["solve_rate"] == 1.0
+
+
+def test_run_closes_the_async_graph_so_the_process_can_exit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import prismal.agents.graph as graph_module
+
+    closed: list[bool] = []
+
+    async def fake_close() -> None:
+        closed.append(True)
+
+    monkeypatch.setattr("prismal.eval.__main__.EvalRunner", _FakeRunner)
+    monkeypatch.setattr(graph_module, "aclose_async_compiled_graph", fake_close)
+    suite = tmp_path / "suite.yaml"
+    suite.write_text("suite: smoke\ncases:\n  - id: c1\n    input: hi\n    assertions: []\n")
+
+    assert main(["run", "--suite", str(suite)]) == 0
+    assert closed == [True]

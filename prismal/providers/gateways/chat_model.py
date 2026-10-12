@@ -78,6 +78,7 @@ class _Capture:
         self.quota_downgrade: str | None = None
 
     def observe(self, raw: Any) -> None:
+        """Record served model, generation id, reported cost and quota downgrade from *raw*."""
         getter = getattr(raw, "get", None)
         if callable(getter):
             model, gen_id = getter("model"), getter("id")
@@ -163,6 +164,10 @@ class GatewayChatLiteLLM(ChatLiteLLM):
     def completion_with_retry(
         self, run_manager: CallbackManagerForLLMRun | None = None, **kwargs: Any
     ) -> Any:
+        """Sync completion with quota preflight (may swap in the downgrade model).
+
+        Streaming responses are wrapped so the capture sees every chunk.
+        """
         capture: _Capture | None = kwargs.pop(_CAPTURE_KWARG, None)
         override = self._preflight()
         if override is not None:
@@ -176,6 +181,10 @@ class GatewayChatLiteLLM(ChatLiteLLM):
     async def acompletion_with_retry(
         self, run_manager: AsyncCallbackManagerForLLMRun | None = None, **kwargs: Any
     ) -> Any:
+        """Async completion with quota preflight (may swap in the downgrade model).
+
+        Streaming responses are wrapped so the capture sees every chunk.
+        """
         capture: _Capture | None = kwargs.pop(_CAPTURE_KWARG, None)
         override = self._preflight()
         if override is not None:
@@ -187,6 +196,7 @@ class GatewayChatLiteLLM(ChatLiteLLM):
         return _mark_downgrade(result, override)
 
     def model_post_init(self, context: Any, /) -> None:
+        """Wrap the litellm client so HTTP 402/429 map to gateway errors."""
         super().model_post_init(context)
         object.__setattr__(self, "client", _MappedClient(self))
 
@@ -350,12 +360,14 @@ class _MappedClient:
         self._inner = inner if inner is not None else litellm
 
     def completion(self, **kwargs: Any) -> Any:
+        """Delegate to ``litellm.completion``, mapping gateway HTTP errors."""
         try:
             return self._inner.completion(**kwargs)
         except Exception as exc:
             raise self._mapped(exc) from exc
 
     async def acompletion(self, **kwargs: Any) -> Any:
+        """Delegate to ``litellm.acompletion``, mapping gateway HTTP errors."""
         try:
             return await self._inner.acompletion(**kwargs)
         except Exception as exc:

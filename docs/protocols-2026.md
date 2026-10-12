@@ -152,9 +152,12 @@ leave the process. `RAW` never carries state: it holds only `{mode, payload_type
 mapping `custom` payload, its allowlist projection). Sub-agents still open at
 `finish_run`/`error_run` are closed with `SUBAGENT_ERROR` (`subagent_incomplete`).
 
-**Known limit (3.17.0):** nothing in prismal emits the `subagent` custom payload yet, so live
-Skynet / MoA runs show `STEP_*` events but no `SUBAGENT_*` events. Emitting it from
-`get_stream_writer()` in the Skynet worker and the MoA proposers is follow-up work.
+**Sub-agent emitters.** `prismal.events.subagent.emit_subagent()` writes the `subagent` custom
+payload through `get_stream_writer()`. The Skynet worker node emits one start/end (or `error`
+with `code="worker_failed"`) per order, id `skynet:<order_id>:<attempt>`, name `skynet_worker`;
+each MoA proposer emits id `moa:<index>:<model>`, name `moa_proposer` (`error` carries the
+exception type). Payloads carry ids, names and error kinds only — never worker or model output.
+Emission is a no-op unless the host streams `custom` (and outside a graph run); it never raises.
 
 Golden transcripts: `tests/fixtures/protocols/agui/*.json` (12; regenerate with
 `uv run python -m tests.unit.events._transcripts --write`). Example: `examples/agui_translate.py`.

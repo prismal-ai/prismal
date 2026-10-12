@@ -118,7 +118,7 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`.
 | AMR6-05 | Supervisor-routed agents adopt `get_llm(features=…)` (one line each, gated) | 0.6 d | AMR2 | INT-001 | DONE |
 | AMR6-06 | Snapshot: all flags off ⇒ graph + recorded `ChatLiteLLM` args identical | 0.4 d | AMR6-05 | SNP-001 | DONE |
 | AMR6-07 | Integration (fakes): cascade escalation, Skynet batch round, gateway no-`models` under cascade, plan-cache hit | 0.6 d | AMR6-02..05 | CAS-001, BAT-001, GW-001, PLC-001 | DONE |
-| AMR6-08 | `docs/routing.md`, `examples/adaptive_routing.py`, notebook | 0.6 d | AMR6-07 | — | DONE (docs + example; notebook TODO) |
+| AMR6-08 | `docs/routing.md`, `examples/adaptive_routing.py`, notebook | 0.6 d | AMR6-07 | — | DONE (docs + example; the notebook is tracked in the separate `prisma-notebooks` repository, like GW6-07) |
 | AMR6-09 | AST guard (no provider SDK in `routing/`), README/CHANGELOG (planned) | 0.4 d | AMR6-08 | INT-001 | DONE |
 
 **Done when:** `uv run pytest -m unit` green; ruff / mypy --strict / bandit clean; coverage ≥ 80 % on `prismal/routing/`; snapshot passes; eval gate met in shadow comparison.

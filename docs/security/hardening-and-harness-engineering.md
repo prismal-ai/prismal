@@ -120,7 +120,7 @@ Reuses what already exists: `build_test_runtime`, `FakeToolProvider`, the checkp
 
 **CLI:** `python -m prismal.eval run --suite redteam|regression|trajectory`.
 
-> **Why this is low-risk.** The **hexagonal** design (`ToolProvider`/`VectorStore`/`ConfigSource`/`Composition` ports) + the **Extension API** (`@prismal_node`, `PrismalStateGraphBuilder`) + the **deterministic fakes** (`FakeToolProvider`, `build_test_runtime`) let both hardening and the evaluation harness enter as **middleware/ports/subpackages** without touching the 26 agents. Same "flag off ⇒ graph byte-for-byte identical (snapshot-tested)" invariant already used by Multimodal/Kokoro/Skynet/Budget.
+> **Why this is low-risk.** The **hexagonal** design (`ToolProvider`/`VectorStore`/`ConfigSource`/`Composition` ports) + the **Extension API** (`@prismal_node`, `PrismalStateGraphBuilder`) + the **deterministic fakes** (`FakeToolProvider`, `build_test_runtime`) let both hardening and the evaluation harness enter as **middleware/ports/subpackages** without touching the agent nodes. Same "flag off ⇒ graph byte-for-byte identical (snapshot-tested)" invariant already used by Multimodal/Kokoro/Skynet/Budget.
 
 ---
 
@@ -149,7 +149,7 @@ Reuses what already exists: `build_test_runtime`, `FakeToolProvider`, the checkp
 - **Do not reinvent.** Repo rule #4 (provider isolation) requires any LLM classifier (injection detector, judge) to live in `prismal/providers/`.
 - **Cost.** LLM classifiers and LLM-as-judge add latency/cost → make them opt-in and metered through the existing Budget layer.
 - **Eval determinism.** Use fakes by default; LLM judges go in `live_api`/`slow` suites.
-- **Graph snapshot.** Preserve the "flag off ⇒ identical graph" invariant so the 26 agents are never disturbed.
+- **Graph snapshot.** Preserve the "flag off ⇒ identical graph" invariant so the agent nodes are never disturbed.
 
 ---
 

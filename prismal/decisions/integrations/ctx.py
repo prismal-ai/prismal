@@ -40,6 +40,7 @@ def make_relevance_scorer(
     levels = CTX_QUESTION.levels
 
     async def score(query: str, text: str) -> float | None:
+        """Relevance of *text* to *query* in ``[0, 1]``; ``None`` unless enforced and accepted."""
         if resolve_mode(settings, INTEGRATION) is not DecisionMode.ENFORCE:
             return None
         state = (

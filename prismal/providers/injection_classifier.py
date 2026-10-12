@@ -67,6 +67,7 @@ def build_injection_classifier(
         return resolved_llm
 
     async def classify(text: str) -> float:
+        """Injection risk of *text* in ``[0, 1]``; ``0.0`` for empty text or on any error."""
         if not text:
             return 0.0
         with suppress(Exception):

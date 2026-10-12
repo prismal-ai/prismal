@@ -215,7 +215,9 @@ class GatewayPort(Protocol):
     """Port every gateway adapter implements (SPEC-GW-BASE-003)."""
 
     @property
-    def profile(self) -> GatewayProfile: ...
+    def profile(self) -> GatewayProfile:
+        """Static description of the gateway (name, base URL, capabilities, policy)."""
+        ...
 
     def resolve(
         self, model_ref: str, *, agent: str | None, session_id: str | None

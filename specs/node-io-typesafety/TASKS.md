@@ -40,11 +40,11 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **IMPLEMENTED 2026-07-05 
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| NTS1-01 | `agents/extension/node_schema.py`: `NodeIOMode`, `NodeIODirection`, `NodeIOValidationResult` (SPEC-NTS-TYP-001) | 0.3 d | — | TODO |
-| NTS1-02 | `agents/extension/node_schema.py`: `validate_node_input()` — narrow-projection `model_validate`, never raises, `None`-model shortcut | 0.4 d | NTS1-01 | TODO |
-| NTS1-03 | `agents/extension/node_schema.py`: `validate_node_output()` — mirrors NTS1-02 for `state_update` dicts | 0.3 d | NTS1-01 | TODO |
-| NTS1-04 | `agents/extension/decorators.py`: `NodeMetadata` gains `input_model`/`output_model: type[BaseModel] \| None = None` (SPEC-NTS-TYP-002) | 0.2 d | — | TODO |
-| NTS1-05 | `agents/extension/decorators.py`: `prismal_node()` gains `input_model=`/`output_model=` kwargs, threaded into `NodeMetadata` construction | 0.3 d | NTS1-04 | TODO |
+| NTS1-01 | `agents/extension/node_schema.py`: `NodeIOMode`, `NodeIODirection`, `NodeIOValidationResult` (SPEC-NTS-TYP-001) | 0.3 d | — | DONE |
+| NTS1-02 | `agents/extension/node_schema.py`: `validate_node_input()` — narrow-projection `model_validate`, never raises, `None`-model shortcut | 0.4 d | NTS1-01 | DONE |
+| NTS1-03 | `agents/extension/node_schema.py`: `validate_node_output()` — mirrors NTS1-02 for `state_update` dicts | 0.3 d | NTS1-01 | DONE |
+| NTS1-04 | `agents/extension/decorators.py`: `NodeMetadata` gains `input_model`/`output_model: type[BaseModel] \| None = None` (SPEC-NTS-TYP-002) | 0.2 d | — | DONE |
+| NTS1-05 | `agents/extension/decorators.py`: `prismal_node()` gains `input_model=`/`output_model=` kwargs, threaded into `NodeMetadata` construction | 0.3 d | NTS1-04 | DONE |
 
 **Done when:** `validate_node_input`/`validate_node_output` round-trip a valid payload with `ok=True, errors=[]`; a malformed payload returns `ok=False` with field-name-only messages (never values); `NodeMetadata`/`prismal_node()` accept the two new parameters with `None` defaults and every pre-existing `@prismal_node(...)` call site in the repo still type-checks and behaves identically.
 
@@ -52,11 +52,11 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **IMPLEMENTED 2026-07-05 
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| NTS2-01 | `core/config.py`: `node_typesafety_enabled`/`node_typesafety_mode` settings + `_validate_node_typesafety` (SPEC-NTS-CFG-001) | 0.3 d | — | TODO |
-| NTS2-02 | `core/exceptions.py`: extend the existing `NodeValidationError` stub with `direction`/`schema_errors` + custom `__init__` (SPEC-NTS-ERR-001) | 0.3 d | — | TODO |
-| NTS2-03 | `agents/extension/_middleware.py`: `node_io_validation_middleware` — input check, `next_fn` call, output check, `_observe()` helper (SPEC-NTS-MDW-001) | 0.6 d | NTS1, NTS2-01, NTS2-02 | TODO |
-| NTS2-04 | Append `node_io_validation_middleware` as the new innermost entry of `DEFAULT_MIDDLEWARE_STACK`, one layer inside `hardening_middleware` | 0.2 d | NTS2-03 | TODO |
-| NTS2-05 | `agents/extension/builder.py`: `PrismalStateGraphBuilder.add_node()` gains `input_model=`/`output_model=` kwargs, forwarded on auto-wrap only (SPEC-NTS-BLD-001) | 0.3 d | NTS1-05 | TODO |
+| NTS2-01 | `core/config.py`: `node_typesafety_enabled`/`node_typesafety_mode` settings + `_validate_node_typesafety` (SPEC-NTS-CFG-001) | 0.3 d | — | DONE |
+| NTS2-02 | `core/exceptions.py`: extend the existing `NodeValidationError` stub with `direction`/`schema_errors` + custom `__init__` (SPEC-NTS-ERR-001) | 0.3 d | — | DONE |
+| NTS2-03 | `agents/extension/_middleware.py`: `node_io_validation_middleware` — input check, `next_fn` call, output check, `_observe()` helper (SPEC-NTS-MDW-001) | 0.6 d | NTS1, NTS2-01, NTS2-02 | DONE |
+| NTS2-04 | Append `node_io_validation_middleware` as the new innermost entry of `DEFAULT_MIDDLEWARE_STACK`, one layer inside `hardening_middleware` | 0.2 d | NTS2-03 | DONE |
+| NTS2-05 | `agents/extension/builder.py`: `PrismalStateGraphBuilder.add_node()` gains `input_model=`/`output_model=` kwargs, forwarded on auto-wrap only (SPEC-NTS-BLD-001) | 0.3 d | NTS1-05 | DONE |
 
 **Done when:** with `node_typesafety_enabled=False`, `node_io_validation_middleware` is provably a no-op (unit test asserts `next_fn` is called with the unmodified `state` and its return value is passed through unmodified); with `True` + `warn`, a malformed output logs + increments a counter and still returns the (malformed) `state_update` unchanged; with `True` + `enforce`, the same malformed output raises `NodeValidationError`, caught by the existing `error_mapping_middleware` with zero changes to that middleware.
 
@@ -64,11 +64,11 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **IMPLEMENTED 2026-07-05 
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| NTS3-01 | Draft and document `DD-NTS-003` (`AgentState` stays unmodified; models are boundary projections) — already captured in `ARCHITECTURE.md`, confirm no code changes needed to `agents/state.py` | 0.1 d | — | TODO |
-| NTS3-02 | Annotate `prismal/agents/file_manager.py::file_manager_node` with `FileManagerInput`/`FileManagerOutput` | 0.4 d | NTS2 | TODO |
-| NTS3-03 | Annotate `prismal/agents/cron_manager.py`'s node function with `CronManagerInput`/`CronManagerOutput` | 0.4 d | NTS2 | TODO |
-| NTS3-04 | Annotate `prismal/agents/skill_manager.py`'s node function with `SkillManagerInput`/`SkillManagerOutput` | 0.4 d | NTS2 | TODO |
-| NTS3-05 | `tests/unit/core/test_node_io_schema_field_names.py`: assert every pilot model's declared fields are a subset of `AgentState`'s `TypedDict` keys via `get_type_hints()` | 0.4 d | NTS3-02, NTS3-03, NTS3-04 | TODO |
+| NTS3-01 | Draft and document `DD-NTS-003` (`AgentState` stays unmodified; models are boundary projections) — already captured in `ARCHITECTURE.md`, confirm no code changes needed to `agents/state.py` | 0.1 d | — | DONE |
+| NTS3-02 | Annotate `prismal/agents/file_manager.py::file_manager_node` with `FileManagerInput`/`FileManagerOutput` | 0.4 d | NTS2 | DONE |
+| NTS3-03 | Annotate `prismal/agents/cron_manager.py`'s node function with `CronManagerInput`/`CronManagerOutput` | 0.4 d | NTS2 | DONE |
+| NTS3-04 | Annotate `prismal/agents/skill_manager.py`'s node function with `SkillManagerInput`/`SkillManagerOutput` | 0.4 d | NTS2 | DONE |
+| NTS3-05 | `tests/unit/core/test_node_io_schema_field_names.py`: assert every pilot model's declared fields are a subset of `AgentState`'s `TypedDict` keys via `get_type_hints()` | 0.4 d | NTS3-02, NTS3-03, NTS3-04 | DONE |
 
 **Done when:** the 3 pilot nodes carry real `input_model`/`output_model` declarations that pass `NTS3-05`'s drift guard; `agents/state.py` is untouched; `DD-NTS-003`'s rationale is captured in `ARCHITECTURE.md` (already drafted) with no follow-up code required for v1.
 
@@ -76,17 +76,17 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **IMPLEMENTED 2026-07-05 
 
 | ID | Task | Estimate | Dependency | Status |
 |---|---|---|---|---|
-| NTS4-01 | `monitoring/otel.py`: register `node_io_validation_failures_total` + `node_io_validated_total` (SPEC-NTS-OTEL-001) | 0.2 d | NTS2-03 | TODO |
-| NTS4-02 | Unit: `test_node_schema.py` — `validate_node_input`/`validate_node_output`, `None`-model shortcut, error-shape (no leaked values) | 0.5 d | NTS1 | TODO |
-| NTS4-03 | Unit: `test_decorators_io_models.py` + `test_builder_io_models.py` — kwarg plumbing, forwarding-only-on-auto-wrap behavior | 0.4 d | NTS1, NTS2-05 | TODO |
-| NTS4-04 | Unit: `test_middleware_node_io_validation.py` — off/warn/enforce dispatch, `_observe()` counter/log calls | 0.5 d | NTS2 | TODO |
-| NTS4-05 | Unit: `test_node_typesafety_settings.py` — `_validate_node_typesafety` rejects an unknown mode with the exact `PRISMAL_NODE_TYPESAFETY_MODE=...` message | 0.2 d | NTS2-01 | TODO |
-| NTS4-06 | Integration: `test_node_typesafety_disabled_snapshot.py` — `node_typesafety_enabled=False` ⇒ compiled supervisor graph structurally unchanged (mirrors Runtime Hardening's `H6-06`) | 0.4 d | NTS2 | TODO |
-| NTS4-07 | Integration: `test_node_typesafety_e2e.py` — `warn` passes through a malformed pilot-node output; `enforce` raises + is mapped by `error_mapping_middleware` end to end | 0.5 d | NTS3 | TODO |
-| NTS4-08 | AST/consistency guard: confirm no new provider-SDK import and no new `prismal.mcp`/`prismal.skills` import introduced by `node_schema.py` (existing repo-wide guards should already cover this — verify, do not duplicate) | 0.2 d | NTS1 | TODO |
-| NTS4-09 | `docs/node-typesafety.md` — quickstart, adoption path (warn→enforce), worked pilot-node example | 0.5 d | NTS3 | TODO |
-| NTS4-10 | `examples/node_typesafety.py` — runnable, annotates a toy node end to end (not one of the 3 pilots, to keep the example self-contained) | 0.3 d | NTS1, NTS2 | TODO |
-| NTS4-11 | `README.md` Roadmap item 8 + `CHANGELOG.md` — add entries describing this as **planned for `3.8.0`**, not shipped; do **not** mark PLAN/SPEC/ARCHITECTURE `IMPLEMENTED` | 0.2 d | — | TODO |
+| NTS4-01 | `monitoring/otel.py`: register `node_io_validation_failures_total` + `node_io_validated_total` (SPEC-NTS-OTEL-001) | 0.2 d | NTS2-03 | DONE |
+| NTS4-02 | Unit: `test_node_schema.py` — `validate_node_input`/`validate_node_output`, `None`-model shortcut, error-shape (no leaked values) | 0.5 d | NTS1 | DONE |
+| NTS4-03 | Unit: `test_decorators_io_models.py` + `test_builder_io_models.py` — kwarg plumbing, forwarding-only-on-auto-wrap behavior | 0.4 d | NTS1, NTS2-05 | DONE |
+| NTS4-04 | Unit: `test_middleware_node_io_validation.py` — off/warn/enforce dispatch, `_observe()` counter/log calls | 0.5 d | NTS2 | DONE |
+| NTS4-05 | Unit: `test_node_typesafety_settings.py` — `_validate_node_typesafety` rejects an unknown mode with the exact `PRISMAL_NODE_TYPESAFETY_MODE=...` message | 0.2 d | NTS2-01 | DONE |
+| NTS4-06 | Integration: `test_node_typesafety_disabled_snapshot.py` — `node_typesafety_enabled=False` ⇒ compiled supervisor graph structurally unchanged (mirrors Runtime Hardening's `H6-06`) | 0.4 d | NTS2 | DONE — as unit test `tests/unit/agents/test_graph_snapshot_node_typesafety.py` (see deviations) |
+| NTS4-07 | Integration: `test_node_typesafety_e2e.py` — `warn` passes through a malformed pilot-node output; `enforce` raises + is mapped by `error_mapping_middleware` end to end | 0.5 d | NTS3 | DONE — as unit test `tests/unit/agents/extension/test_node_io_validation_e2e.py` (see deviations) |
+| NTS4-08 | AST/consistency guard: confirm no new provider-SDK import and no new `prismal.mcp`/`prismal.skills` import introduced by `node_schema.py` (existing repo-wide guards should already cover this — verify, do not duplicate) | 0.2 d | NTS1 | DONE |
+| NTS4-09 | `docs/node-typesafety.md` — quickstart, adoption path (warn→enforce), worked pilot-node example | 0.5 d | NTS3 | DONE |
+| NTS4-10 | `examples/node_typesafety.py` — runnable, annotates a toy node end to end (not one of the 3 pilots, to keep the example self-contained) | 0.3 d | NTS1, NTS2 | DONE |
+| NTS4-11 | `README.md` Roadmap item 8 + `CHANGELOG.md` — add entries describing this as **planned for `3.8.0`**, not shipped; do **not** mark PLAN/SPEC/ARCHITECTURE `IMPLEMENTED` | 0.2 d | — | DONE — shipped (not just planned) in v3.9.0, which bundled 3.7–3.8 |
 
 **Done when:** `uv run pytest -m unit` is green for all new tests; `uv run pytest -m integration` is green for the two new integration tests; `ruff` + `mypy --strict` + `bandit` clean on every new/modified module; coverage on `node_schema.py` ≥ 85%, project-wide `fail_under=80` still satisfied; docs and example are runnable as written.
 

@@ -14,8 +14,10 @@ from typing import TYPE_CHECKING, Any
 
 from prismal.agents.handoff import handoff_scope
 from prismal.agents.skynet.types import SwarmOrder, WorkerResult
+from prismal.agents.skynet.worker import WORKER_AGENT_NAME
 from prismal.agents.subgraphs.skynet._helpers import WORKER_TAG, result_to_dict
 from prismal.core.logging import get_logger
+from prismal.events.subagent import emit_subagent
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -36,7 +38,13 @@ def make_worker_node(
         if isinstance(raw_order, dict) and raw_order:
             order = SwarmOrder(**raw_order)
             run_id, tenant = handoff_scope(state)
+            subagent_id = f"skynet:{order.order_id}:{order.attempt}"
+            emit_subagent("start", subagent_id, name=WORKER_AGENT_NAME)
             result = await worker.execute(order, run_id=run_id, tenant=tenant)
+            if result.success:
+                emit_subagent("end", subagent_id)
+            else:  # the error text may carry tool/model output: report its kind only
+                emit_subagent("error", subagent_id, code="worker_failed")
         else:  # defensive — the dispatcher always injects the order
             logger.warning("skynet_worker_missing_order")
             result = WorkerResult(

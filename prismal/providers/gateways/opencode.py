@@ -189,6 +189,7 @@ class OpenCodeGateway(OpenAICompatibleGateway):
 
     @property
     def plan(self) -> Plan:
+        """The OpenCode plan (``go`` subscription or ``zen`` metered)."""
         return self._plan
 
     def __repr__(self) -> str:
@@ -199,6 +200,12 @@ class OpenCodeGateway(OpenAICompatibleGateway):
     def resolve(
         self, model_ref: str, *, agent: str | None, session_id: str | None
     ) -> ResolvedModel:
+        """Resolve *model_ref* to the LiteLLM target for its wire protocol; pure, no I/O.
+
+        On the ``go`` plan the ToS agent allowlist is checked first (fail-closed); then the
+        retention policy and the protocol map. Adds the hashed session header when
+        *session_id* is given.
+        """
         # GW3-05: the ToS guard runs before anything else (zero I/O, fail-closed).
         if self._plan == "go" and (agent is None or agent not in self._allowed_agents()):
             self._deny("opencode_go_agent_not_allowed", agent=agent)
@@ -286,6 +293,7 @@ class OpenCodeGateway(OpenAICompatibleGateway):
         logger.warning("gateway.models_refresh_failed", gateway=self.name, error=error)
 
     async def astartup_check(self) -> None:
+        """Refresh the model protocol map when ``opencode_refresh_models`` (fail-open)."""
         if self._cfg.opencode_refresh_models:
             await self.refresh_protocols()
 
