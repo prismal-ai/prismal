@@ -84,7 +84,7 @@ and returns the inner result unchanged:
   `stable_dumps`, so the tool prefix is byte-stable.
 
 The agent name comes from `agent=` or, at call time, from the
-`langgraph_node` metadata, so none of the 26 agents needs a code change.
+`langgraph_node` metadata, so no agent node needs a code change.
 Volatile provider facts live in `config/prompt_cache.yaml`. They were verified
 against litellm 1.86.2 in `specs/token-efficiency/VERIFY.md`.
 

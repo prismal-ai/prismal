@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Package context
 
-`prismal` is the **agent framework layer** extracted from the larger `lightagent` monorepo. It is a standalone, publishable PyPI package containing everything needed to build and run AI agents — no web server, dashboard, or CLI. It was published as `lightagent-agents` through v2.x and **rebranded to `prismal` in v3.0.0** (distribution name plus the `lightagent.*` → `prismal.*` import namespace; see `propuesta.md` / `PLAN_MIGRACION.md`). The sibling app package (still named `lightagent`) historically depended on this one and shared the import namespace — see the namespace note below.
+`prismal` is the **agent framework layer** extracted from the larger `lightagent` monorepo. It is a standalone, publishable PyPI package containing everything needed to build and run AI agents — no web server, dashboard, or CLI. It was published as `lightagent-agents` through v2.x and **rebranded to `prismal` in v3.0.0** (distribution name plus the `lightagent.*` → `prismal.*` import namespace; see `docs/history/PLAN_MIGRACION.md`). The sibling app package (still named `lightagent`) historically depended on this one and shared the import namespace — see the namespace note below.
 
 Current version: **3.19.0** (single source of truth: `pyproject.toml`; history in `CHANGELOG.md`; release tag format `prismal/vMAJOR.MINOR.PATCH`). Pushing a release tag triggers both `release.yml` (PyPI + GitHub Release with notes extracted from the CHANGELOG section) and `docker-publish.yml` (container image to GHCR `ghcr.io/prismal-ai/prismal`, tagged `X.Y.Z` + `latest`; manual dispatch publishes `dev`).
 
@@ -22,7 +22,7 @@ uv pip install -e ".[dev,all]"
 uv run pytest                                        # full suite
 uv run pytest tests/unit                             # one tier
 uv run pytest -m unit                                # by marker (unit|integration|security|slow|live_api)
-uv run pytest tests/unit/security/test_sanitizer.py::TestSanitizer::test_strip_controls  # single test
+uv run pytest tests/unit/security/test_sanitizer.py::test_strip_removes_null_byte  # single test
 uv run pytest -n auto                                # parallel (pytest-xdist)
 uv run pytest --cov=prismal --cov-report=term-missing   # coverage (target fail_under=80)
 
@@ -56,10 +56,10 @@ During the migration a transitional shim `lightagent/__init__.py` redirected `li
 
 ### LangGraph SUPERVISOR state machine
 
-The core is a LangGraph `StateGraph[AgentState]` assembled in `prismal/agents/graph.py`. A central `supervisor_node` routes each turn to one of 26 specialist agent nodes (`coder`, `researcher`, `rag_agent`, `data_analyst`, `planner`, `critic`, `codeact_agent`, `cua_agent`, `file_manager`, `skill_manager`, `cron_manager`, `parallel_research`, `meta_learner`, `skill_creator`, `domain_supervisor`, `network_supervisor`, …), which each return control to the supervisor; the supervisor routes to `END` when done.
+The core is a LangGraph `StateGraph[AgentState]` assembled in `prismal/agents/graph.py`. A central `supervisor_node` routes each turn to one of **30 routes**: the 15 core `MEMBERS` (`researcher`, `coder`, `codeact`, `cua`, `rag_agent`, `planner`, `critic`, `data_analyst`, `file_manager`, `skill_manager`, `cron_manager`, `dev_pipeline`, `ml_pipeline`, `financial_analyst`, `parallel_researcher`) plus 15 opt-in members (`ADVANCED_MEMBERS` ×11, `MULTIMODAL_MEMBERS`, `KOKORO_MEMBERS`, `SKYNET_MEMBERS`, `BLIND_REVIEW_MEMBERS`), which each return control to the supervisor; the supervisor routes to `END` when done. `meta_learner`, `skill_creator`, `network_supervisor`, `spawner` and `factory` are standalone helper modules, not routes; `domain_supervisor` backs the hierarchical mode (`hierarchical_mode=True` → analysis/engineering/research orchestrators). Full inventory: `docs/agents.md`.
 
-- **Entry points**: `get_compiled_graph()` (sync) and `get_async_compiled_graph()` (async, LRU-cached). Async contexts must use the async variant — it wires `AsyncSqliteSaver`.
-- **State**: `AgentState` is a `TypedDict`. Only `messages` has a custom reducer (`add_messages`); all other fields use plain merge semantics.
+- **Entry points**: `get_compiled_graph()` (sync) and `get_async_compiled_graph()` (async, module-level singleton; the sync one is `lru_cache`d and never adds optional nodes). Async contexts must use the async variant — it wires `AsyncSqliteSaver` and the opt-in routes.
+- **State**: `AgentState` is a `TypedDict`. `messages` uses `add_messages`; `retrieved_docs`, `tool_results` and `parallel_results` use `operator.add`; all other fields use plain merge semantics.
 - **Routing wrapper**: `_supervisor_router` in `graph.py` exists purely so LangGraph's `get_type_hints()` can resolve `AgentState` — do not remove it.
 - **Checkpointing**: `build_checkpointer()` supports SQLite (default) and PostgreSQL (via `[postgres]` extra).
 - **Tool cap**: `agents/tool_registry.py` enforces a global `_MAX_TOTAL_TOOLS = 120` (Phase 44).
@@ -69,7 +69,7 @@ The core is a LangGraph `StateGraph[AgentState]` assembled in `prismal/agents/gr
 
 `agents/subgraphs/` holds composed multi-node pipelines wrapped as reusable subgraphs: `dev_pipeline` (PO → Architect → Developer → Tests → QA → Reviewer), `ml_pipeline` (Ingester → EDA → Features → Trainer → Evaluator → Exporter), `financial` (Collector → Technical → Fundamental → Risk → Report), plus `analysis_orchestrator`, `engineering_orchestrator`, `research_orchestrator`. They are built by `SubgraphFactory` and registered in `SubgraphRegistry`.
 
-**Advanced architectures (Fase A/B/C — `specs/advanced-architectures/`)** adds 7 RAG engines, 7 agent patterns, and 5 subgraph pipelines. All follow the same factory-injection pattern: business logic accepts callables (`generate_fn`, `evaluate_fn`, `reward_fn`, `plan_fn`, `tool_executor`, `linter_fn`, …) so tests run without LLM backends. Defaults wire `ProviderRegistry().get_llm()` lazily.
+**Advanced architectures (Fase A/B/C — `specs/advanced-architectures/`)** added 7 RAG engines (HyDE … Adaptive; with the standard engine, CRAG, Multimodal and Federated the package now has 11 — `docs/rag.md`), 7 agent patterns (6 of them wired as supervisor routes under `enable_subgraphs`; swarm is a library primitive — `docs/patterns.md`), and 5 subgraph pipelines (15 subgraph packages in total — `docs/subgraphs.md`). All follow the same factory-injection pattern: business logic accepts callables (`generate_fn`, `evaluate_fn`, `reward_fn`, `plan_fn`, `tool_executor`, `linter_fn`, …) so tests run without LLM backends. Defaults wire `ProviderRegistry().get_llm()` lazily.
 
 - `rag/hyde.py` — HyDE retriever (hypothetical doc embeddings).
 - `rag/fusion.py` — RAG-Fusion (multi-query + `reciprocal_rank_fusion`).
@@ -91,7 +91,7 @@ The core is a LangGraph `StateGraph[AgentState]` assembled in `prismal/agents/gr
 - `agents/subgraphs/code_review/` — linter → security_scanner → logic_reviewer → suggester → report_generator.
 - `agents/subgraphs/debate_consensus/` — proponent → opponent → moderator → consensus.
 
-Each subgraph exports both `build_<name>_subgraph()` (returns `SubgraphDefinition`) and `register_<name>()` (idempotent registry install), mirroring the existing `register_ml_pipeline`.
+These newer subgraphs export both `build_<name>_subgraph()` (returns `SubgraphDefinition`) and `register_<name>()` (idempotent registry install); the older dev/ml/financial pipelines and the three orchestrators use `_make_definition()` + `get_compiled_*` instead (9 `build_*`, 15 `register_*` in total).
 
 `agents/patterns/` provides composable primitives: `reflection_loop()` (generate → critique → refine) and `make_parallel_dispatcher()` (fan-out via LangGraph `Send()`).
 
@@ -99,7 +99,7 @@ Each subgraph exports both `build_<name>_subgraph()` (returns `SubgraphDefinitio
 
 ### Multimodal layer (Fase F — `specs/multimodal-agents/`, implemented, opt-in)
 
-A multimodal capability layer covers audio, image, and video on top of the existing text agents. It is **opt-in**: gated by `settings.multimodal_enabled` (default `False`). Without the toggle, the 26 text agents behave identically to today. When `multimodal_enabled=True`, `get_async_compiled_graph()` wires a single `multimodal_pipeline` supervisor route (the subgraph fans out to vision/audio/video internally and emits the answer); `effective_valid_routes`/`build_system_prompt` gate on the flag, and `intent_router.match_intent()` returns `multimodal_pipeline` for media intents. Incoming attachments reach the pipeline via `agents/multimodal/ingestion.py::ingest_media()`, which spills bytes to a content-addressed file and records a path-based descriptor under `state["metadata"]["mm"]["media"]` (never raw bytes in checkpointed state).
+A multimodal capability layer covers audio, image, and video on top of the existing text agents. It is **opt-in**: gated by `settings.multimodal_enabled` (default `False`). Without the toggle, the text routes behave identically to today. When `multimodal_enabled=True`, `get_async_compiled_graph()` wires a single `multimodal_pipeline` supervisor route (the subgraph fans out to vision/audio/video internally and emits the answer); `effective_valid_routes`/`build_system_prompt` gate on the flag, and `intent_router.match_intent()` returns `multimodal_pipeline` for media intents. Incoming attachments reach the pipeline via `agents/multimodal/ingestion.py::ingest_media()`, which spills bytes to a content-addressed file and records a path-based descriptor under `state["metadata"]["mm"]["media"]` (never raw bytes in checkpointed state).
 
 - `providers/stt.py`, `providers/tts.py`, `providers/vision.py`, `providers/multimodal.py`, `providers/cross_modal_embeddings.py` — provider wrappers (Whisper, pyttsx3/openai/elevenlabs, vision LLM, Gemini/GPT-4o/Sonnet, CLIP). All provider SDK imports stay isolated here.
 - `agents/multimodal/vision_agent.py` — `VisionAgent` (analyze + optional OCR).
@@ -197,7 +197,7 @@ A single composition *facade* that assembles every core port from `settings` plu
 
 Configuration is inverted as a hexagonal port (mirror of Y/Z): the core stops *reading* `.env`/`os.environ` and instead *consumes* an injected `ConfigSourcePort` that *supplies* raw values; `Settings` keeps its schema and only validates. **Additive and opt-in** — with no source injected the default `EnvConfigSource` reproduces today's behaviour byte-for-byte, so the ~151 `get_settings()` call sites are untouched. User guide: `docs/configuration.md`; examples: `examples/config_source_{env,custom}.py`.
 
-- `core/config_source.py` — `ConfigSourcePort` (`@runtime_checkable` Protocol, sync `load() -> Mapping[str, str|SecretStr]`, must not raise) + sources: `EnvConfigSource` (the **only** core reader of `os.environ`/`.env`; folds in the legacy `LIGHTAGENT_` mirror **into the returned mapping**, no global mutation; honours unprefixed provider keys), `MappingConfigSource`, `ChainedConfigSource` (first-wins, sub-error skipped), `FakeConfigSource`. Global registry `set_config_source()`/`get_config_source()` (invalidates the `get_settings` cache).
+- `core/config_source.py` — `ConfigSourcePort` (`@runtime_checkable` Protocol, sync `load() -> Mapping[str, str|SecretStr]`, must not raise) + sources: `EnvConfigSource` (the **only** core reader of `os.environ`/`.env` for `Settings` — `MaintenanceSettings` still declares `env_file=".env"` on its own; folds in the legacy `LIGHTAGENT_` mirror **into the returned mapping**, no global mutation; honours unprefixed provider keys), `MappingConfigSource`, `ChainedConfigSource` (first-wins, sub-error skipped), `FakeConfigSource`. Global registry `set_config_source()`/`get_config_source()` (invalidates the `get_settings` cache).
 - `core/config.py` — `env_file` dropped from `Settings.model_config`; `settings_customise_sources()` adapts the injected port via a `_ConfigSourceSettingsSource(EnvSettingsSource)` subclass (preserves prefix/`AliasChoices`/JSON-list decoding); init kwargs still win. `build_settings(source=None)` (pure, per-tenant; uses a `ContextVar` for isolation), `get_settings()` delegates behind `@lru_cache`, `reload_settings()`. New fields `tavily_api_key`, `config_source_strict`.
 - `core/env_compat.py` — the legacy `LIGHTAGENT_` mirror moved into `EnvConfigSource`; `apply_legacy_env_aliases()` is a deprecated **no-op** shim and is **no longer called at import** (`core/__init__.py` import-time side effect removed → importing `prismal.core` mutates zero `os.environ`).
 - `core/exceptions.py` — `ConfigSourceError(source, cause)` (raised by `build_settings` when `config_source_strict` and no source).
@@ -301,12 +301,14 @@ All LLM calls go through `prismal/providers/` (LiteLLM wrapper + per-provider co
 
 ### Other subsystems (one-liners)
 
-- `core/` — Pydantic Settings config (`get_settings()`), logging (`get_logger()`), exceptions, SQLAlchemy database, user model.
+- `core/` — Pydantic Settings config (`get_settings()`), logging (`get_logger()`), exceptions, `database.py` helpers, `UserStore` (plain `sqlite3`). Every setting is listed in `docs/settings-reference.md` (generated — re-run `scripts/gen_settings_docs.py` after adding/changing a field; `tests/unit/core/test_settings_docs_sync.py` fails otherwise).
 - `memory/` — short-term conversation history + long-term PII-sanitized store (SQLite + ChromaDB; optional MongoDB via `[mongodb]`).
 - `mcp/` — Model Context Protocol client, adapter, connection manager.
 - `rag/` — RAG engine, CRAG pipeline, interchangeable vector store (`VectorStorePort` + `rag/stores/` adapters, default Chroma; Fase Z), document loaders, embeddings, federated search.
 - `scheduler/` — APScheduler-based `CronExecutor`, `DateTimeService` (single time-of-truth, timezone-aware), Prefect flows.
-- `sandbox/` — `SandboxExecutor` with docker/podman/nsjail/bwrap/firejail backends (Phase 43); AST denylist in `codeact_agent.py`.
+- `sandbox/` — `SandboxExecutor` (Phase 43): `run_code` can use docker/podman/nsjail/bwrap/firejail isolation backends (Python only, off by default); `run_command` runs a time-limited host subprocess. AST denylist in `codeact_agent.py`. See `docs/sandbox.md`.
+- `events/` — AG-UI 1.0 translator, file watcher and webhook dispatcher adapters (not a pub/sub bus). See `docs/events.md`.
+- `scheduler/`, `skills/`, `mcp/`, `providers/`, `data/` — user guides in `docs/scheduler.md`, `docs/skills.md`, `docs/mcp.md`, `docs/providers.md`, `docs/data-utilities.md`; the docs index is `docs/README.md`.
 - `monitoring/` — Langfuse traces, OpenTelemetry spans, structlog.
 - `data/` — DuckDB + Polars utilities.
 - `agents/visualization.py` — `to_mermaid()`/`to_mermaid_png()`/`visualize()`/`save_graph_image()` for any graph-based architecture (compiled graph, `SubgraphDefinition`, `PrismalStateGraphBuilder`); re-exported from `prismal.langgraph`. `SubgraphDefinition` gains `.to_mermaid()`/`.visualize()`/`.save_image()`; `agents.graph.visualize_supervisor_graph()` renders the main graph. `subgraphs/factory.py::assemble_state_graph()` is the shared sync topology builder. Non-graph architectures (patterns, modal agents) raise `TypeError`.

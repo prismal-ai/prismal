@@ -18,7 +18,7 @@ Prismal is split across **eight repositories** in the [`prismal-ai`](https://git
 
 The macro architecture is a layered, client–server design where a single engine does the agent work and every other component talks to it through well-defined protocols:
 
-- **`prismal`** — the core agent framework (published to PyPI as `prismal-ai`). It owns the LangGraph SUPERVISOR graph, the 26 specialist agents, the 8 RAG engines + `VectorStorePort`, the reasoning patterns and subgraphs, the 5-layer security stack, the hexagonal ports, and the opt-in layers (Multimodal, Kokoro, Skynet, A2A, Budget). Its full internal architecture is in [Architecture](#architecture) below.
+- **`prismal`** — the core agent framework (published to PyPI as `prismal-ai`). It owns the LangGraph SUPERVISOR graph (30 supervisor routes: 15 core + 15 opt-in), the 11 RAG engines + `VectorStorePort`, the reasoning patterns and 15 subgraph packages, the 5-layer security stack, the hexagonal ports, and the opt-in layers (Multimodal, Kokoro, Skynet, A2A, Budget, Token Efficiency, Gateways, Decisions, Adaptive Routing, Protocols 2026, Memory v2). Its full internal architecture is in [Architecture](#architecture) below.
 - **`prismal-server`** — the backend host. It composes the engine via `build_runtime()` / `get_async_compiled_graph()` and exposes it over **REST, WebSocket, and SSE**, plus inbound A2A (the Agent Card at `/.well-known/agent-card.json`) and session/auth handling. This is the one process that turns the library into a service.
 - **`prismal-sdk`** — the client library that wraps the server's REST/WS/SSE endpoints so consumers don't hand-roll HTTP.
 - **`prismal-dashboard`, `prismal-tui`, `prismal-webchat`, `prismal-chatbot`** — the consumer front-ends (web admin, terminal, web chat, and external bots such as Slack/Discord). They all reach the engine through the SDK → server path.
@@ -30,19 +30,19 @@ Communication flows top-to-bottom: front-ends call the **SDK**, the SDK speaks *
 
 ## Features
 
-- **26 specialized AI agents** built on [LangGraph](https://langchain-ai.github.io/langgraph/) — coder, researcher, planner, critic, data_analyst, rag_agent, codeact_agent, cua_agent, and more
+- **30 supervisor routes** built on [LangGraph](https://langchain-ai.github.io/langgraph/) — 15 core routes (`researcher`, `coder`, `codeact`, `cua`, `rag_agent`, `planner`, `critic`, `data_analyst`, `file_manager`, `skill_manager`, `cron_manager`, `dev_pipeline`, `ml_pipeline`, `financial_analyst`, `parallel_researcher`) plus 15 opt-in routes (6 reasoning patterns, 5 domain pipelines, multimodal, Kokoro, Skynet, blind review) — see [`docs/agents.md`](./docs/agents.md)
 - **SUPERVISOR state machine** — central supervisor routes each turn to the right specialist, then back to `END`
 - **Security-first (5-layer defense)** — `InputSanitizer` → `GuardrailsEngine` (+ NeMo Guardrails L3) → `ActionInterceptor` → `AuditLogger` (hash-chained) + `SecurePromptBuilder` + `PermissionManager`
 - **Provider-agnostic** — Anthropic Claude, OpenAI GPT, Google Gemini, Ollama via LiteLLM (isolated in `prismal/providers/`)
-- **7 RAG engines** — standard + CRAG, HyDE, RAG-Fusion (RRF), Hybrid (BM25 + semantic), Self-RAG, Parent-Child hierarchical, Multi-Vector, and Adaptive facade
-- **7 agent reasoning patterns** — Tree of Thoughts, Debate, Constitutional AI, LATS (MCTS), LLM-Compiler (parallel DAG), Mixture of Agents, Swarm/Handoff
-- **5 domain subgraph pipelines** — Customer Service, Document Generation, Data ETL, Code Review, Debate/Consensus — on top of the existing dev/ml/financial pipelines
+- **11 RAG engines** — standard, CRAG, HyDE, RAG-Fusion (RRF), Hybrid (BM25 + semantic), Self-RAG, Parent-Child hierarchical, Multi-Vector, Adaptive facade, Multimodal and Federated — see [`docs/rag.md`](./docs/rag.md)
+- **7 agent reasoning patterns + 2 primitives** — Tree of Thoughts, Debate, Constitutional AI, LATS (MCTS), LLM-Compiler (parallel DAG), Mixture of Agents, Swarm/Handoff, plus `reflection_loop()` and `make_parallel_dispatcher()` — see [`docs/patterns.md`](./docs/patterns.md)
+- **15 subgraph packages** — dev / ML / financial pipelines; Customer Service, Document Generation, Data ETL, Code Review, Debate/Consensus; multimodal, Kokoro, Skynet and blind-review pipelines; analysis / engineering / research orchestrators — see [`docs/subgraphs.md`](./docs/subgraphs.md)
 - **Multimodal layer (implemented, opt-in)** — Vision / Audio / Video agents, modality router, multimodal fusion, multimodal subgraph, multimodal RAG engine with cross-modal embeddings, and `MediaValidator` security gate — gated by `settings.multimodal_enabled` (default `False`); see [`specs/multimodal-agents/`](./specs/multimodal-agents/)
 - **Kokoro deliberation (implemented, opt-in)** — three Markdown-authored persona souls (spirit 魂 / mind 知 / heart 情) deliberate toward agreement and a `KokoroJudgeAgent` renders the final, accountable verdict (optionally executing one `ActionInterceptor`-gated action) — gated by `settings.kokoro_enabled` (default `False`); see [`docs/kokoro.md`](./docs/kokoro.md) and [`specs/kokoro-deliberation/`](./specs/kokoro-deliberation/)
 - **Skynet swarm supervisor (implemented, opt-in)** — a meta-supervisor that decomposes one order into N sub-orders, dispatches a dynamically-sized worker swarm via LangGraph `Send` fan-out (supervisor-sized, hard-capped, overflow deferred), reduces the results, and re-plans unmet work in a bounded loop — gated by `settings.skynet_enabled` (default `False`); see [`docs/skynet.md`](./docs/skynet.md) and [`specs/skynet-swarm/`](./specs/skynet-swarm/). **Skynet S+** (opt-in) adds **heterogeneous specialist swarms** (a file-driven `RoleRegistry` binds each role to its own model / persona / tools), **truthfully-metered workers** (one shared `CostMeter` so `skynet_token_budget` bounds the whole swarm), and **remote workers** (a role bound to a remote A2A agent) — gated by `skynet_specialists_enabled` / `skynet_remote_workers_enabled`; see [`specs/skynet-swarm-plus/`](./specs/skynet-swarm-plus/)
 - **Extension surface (implemented, opt-in)** — `prismal.langgraph` re-export, `@prismal_node` decorator (security/OTel/audit/retry middleware), `PrismalStateGraphBuilder` fluent API, plugin discovery via `importlib.metadata` entry points, `LangChainRunnableAdapter`, and formal `Protocol`s for ports (checkpoint/audit/embeddings/tools) — see [`docs/extension.md`](./docs/extension.md) and [`specs/extension-surface/`](./specs/extension-surface/)
 - **MCP client with capability routing** — [Model Context Protocol](https://modelcontextprotocol.io) with auto-discovery and per-agent capability-based tool filtering (`config/mcp_servers.yaml`)
-- **Process isolation** — `SandboxExecutor` with docker/podman/nsjail/bwrap/firejail backends
+- **Sandboxed execution** — `SandboxExecutor` with docker/podman/nsjail/bwrap/firejail isolation backends for `run_code` (Python); shell commands (`run_command`) run as time-limited host subprocesses — see [`docs/sandbox.md`](./docs/sandbox.md)
 - **Human-in-the-Loop** — `hitl_gate()` with LangGraph `interrupt()` support
 - **Composable primitives** — `reflection_loop()` (generate → critique → refine) and `make_parallel_dispatcher()` (fan-out via `Send()`)
 - **Cron engine** — APScheduler + timezone-aware `DateTimeService` (single time source of truth)
@@ -190,7 +190,7 @@ The multimodal expansion described in [`specs/multimodal-agents/`](./specs/multi
 
 | Wrapper | Module | Backends |
 |---------|--------|----------|
-| **STT** | `stt.py` | OpenAI Whisper API, local (`openai-whisper` / `faster-whisper`) |
+| **STT** | `stt.py` | OpenAI Whisper API, local (`faster-whisper`) |
 | **TTS** | `tts.py` | `pyttsx3` (offline default), OpenAI, ElevenLabs — automatic cascade fallback |
 | **Vision LLM** | `vision.py` | Any LiteLLM model with vision (Claude, GPT-4o, Gemini) |
 | **Multimodal LLM** | `multimodal.py` | Gemini 2.x, GPT-4o, Sonnet 4.6 (native multimodal) |
@@ -220,7 +220,7 @@ Exports `build_multimodal_subgraph()` (returns `SubgraphDefinition`) and an idem
 
 #### Security (`prismal/security/`)
 
-`MediaValidator` enforces magic-byte verification + size/duration limits before any media reaches an agent. `InputSanitizer.sanitize_media()` strips EXIF; `AuditLogger.log_media()` records SHA-256 + modality (never content); `ActionInterceptor.check_media_op()` gates filesystem media operations; FFmpeg always runs inside `SandboxExecutor`.
+`MediaValidator` enforces magic-byte verification + size/duration limits before any media reaches an agent. `InputSanitizer.sanitize_media()` strips EXIF; `AuditLogger.log_media()` records SHA-256 + modality (never content); `ActionInterceptor.check_media_op()` gates filesystem media operations; FFmpeg always runs through `SandboxExecutor.run_command` (out of process, time-limited — the container/namespace isolation backends apply only to `run_code`; see [`docs/sandbox.md`](./docs/sandbox.md)).
 
 See [`specs/multimodal-agents/SPEC.md`](./specs/multimodal-agents/SPEC.md) for the full interface contracts of Phase F.
 
@@ -363,7 +363,7 @@ Runnable example: [`examples/budget_governance.py`](./examples/budget_governance
 
 ---
 
-## Roadmap — features to build
+## Roadmap — status
 
 Already implemented: extension surface (Phase X), tool provider injection (Phase Y), advanced architectures (Phase A/B/C), multimodal (Phase F), Kokoro (Phase K), Skynet (Phase S) plus the **Skynet S+ heterogeneous/metered/remote swarms (Phase S+)**, the **vector store port (Phase Z)**, the **runtime composition root (Phase R)**, the **config source injection (Phase W)**, the **cost & budget governance (Phase C)**, the **runtime hardening (Phase H)**, the **agent evaluation & reliability harness (Phase V)**, the **agent identity & access governance (Phase IDN)**, the **A2A interop (Phase I)**, the **guardrails modernization (Phase GRD)**, the **loop hardening (Phase LH)**, the **node I/O type-safety (Phase NTS)**, the **observability integration (Phase OBS)**, the **blind review pipeline (Phase BRP)**, the **token efficiency layer (Phase TKE, v3.13.0)**, the **LLM gateway providers (Phase GW, v3.14.0)**, the **typed decision models (Phase DEC, v3.15.0)**, the **adaptive model routing (Phase AMR, v3.16.0)**, the **protocol upgrades + host read surface (Phase PRT + HRS, v3.17.0)**, the **agentic memory v2 (Phase MEM, v3.18.0)**, the **local Ollama decision backend + one-way human-review gate (DEC delta, v3.19.0)**, and the dependency remediation (18/18 alerts in a terminal state).
 
@@ -371,7 +371,7 @@ Wave 2026-10 (GW, DEC, AMR, PRT + HRS, MEM) is planned in [`specs/wave-2026-10-i
 
 Each shipped feature has its SDD contract in [`specs/`](./specs/).
 
-1. **Finish Tool Provider Injection (Phase Y)** — *fast · necessary · in progress* — [`specs/tool-provider-injection/`](./specs/tool-provider-injection/). The Y1–Y5 code has already landed; what's left is closing Y6–Y8 (settings/observability, docs/examples, parity tests) and marking the spec `IMPLEMENTED`.
+1. **Tool Provider Injection (Phase Y)** — *fast · necessary · ✅ implemented* — [`specs/tool-provider-injection/`](./specs/tool-provider-injection/). The agent core resolves tools only through the injected `ToolProviderPort`; MCP/Skills/stub providers are composed by the host. See [`docs/tool-providers.md`](./docs/tool-providers.md).
 2. **Vector Store Port (Phase Z)** — *moderate · necessary · ✅ implemented* — [`specs/vector-store-port/`](./specs/vector-store-port/). Removes the ChromaDB lock-in behind a `VectorStorePort` with adapters (Chroma default + LanceDB, sqlite-vec, Qdrant, pgvector), selectable via `settings.vector_store_backend`. Reduces the security surface and opens up embedded backends. See [`docs/vector-stores.md`](./docs/vector-stores.md).
 3. **Runtime Composition Root (Phase R)** — *moderate · necessary · ✅ implemented* — [`specs/composition-root/`](./specs/composition-root/). `build_runtime()` composes and injects every port (tools, vector store, embeddings, checkpoint, audit) into a `RuntimeContext` in a single call, with `global`/`context` modes and per-`org_id` collection isolation; **unblocks `prismal-server` / `prismal-dashboard`**. See [`docs/composition-root.md`](./docs/composition-root.md).
 4. **Cost & Budget Governance (Phase C)** — *fast-to-moderate · useful · ✅ implemented* — [`specs/cost-budget-governance/`](./specs/cost-budget-governance/). Per-run/session/tenant budgets + cost/token/call/wall-clock circuit-breakers (soft = degrade, hard = abort) in `react_loop`, the expensive patterns (debate, ToT, LATS, MoA, reflection) and Skynet. A cheap insurance policy against runaway spend. See [`docs/budget.md`](./docs/budget.md).
@@ -380,7 +380,8 @@ Each shipped feature has its SDD contract in [`specs/`](./specs/).
 7. **Agent Evaluation & Reliability Harness (Phase V)** — *moderate-to-complex · useful (reliability) · ✅ implemented (v3.3.0)* — [`specs/agent-eval-harness/`](./specs/agent-eval-harness/). System-level evaluation of the graph (trajectories, tool usage, RAG groundedness), regression with a CI gate, and an adversarial red-team suite. Closes the "scaffold gap". See [`docs/eval.md`](./docs/eval.md).
 8. **Polish** — *variable · less urgent* — **per-node type safety (Phase NTS) ✅ implemented (v3.8.0)** — [`specs/node-io-typesafety/`](./specs/node-io-typesafety/): an opt-in Pydantic `input_model`/`output_model` contract per `@prismal_node`, validated at the node boundary (`off | warn | enforce`), byte-for-byte unchanged when disabled ([`docs/node-typesafety.md`](./docs/node-typesafety.md)). **Observability integration (Phase OBS) ✅ implemented (v3.9.0)** — [`specs/observability-integration/`](./specs/observability-integration/): an opt-in `ObservabilityPort` (queryable `RunSummary`, LangSmith/Langfuse naming/scoring/dataset-export parity) wrapping the existing OTel/Langfuse emission, byte-for-byte unchanged when disabled ([`docs/observability-integration.md`](./docs/observability-integration.md)). The framework ships the port; a first-party observability **UI** remains the planned `prismal-dashboard`'s job.
 9. **Guardrails Modernization (Phase GRD)** — *fast-to-moderate · necessary (security) · ✅ implemented (v3.6.0)* — [`specs/guardrails-modernization/`](./specs/guardrails-modernization/). Ships the NeMo config `NemoRailsLayer` always expected plus a reasoning-capable safety-classifier rail, and a new `StructuredOutputGuard` (bounded, Budget-metered re-ask + opt-in Hub validators) composing with `OutputValidator`. See [`docs/security/guardrails-modernization.md`](./docs/security/guardrails-modernization.md).
-10. **Loop Hardening (Phase LH)** — *moderate · necessary (agentic-loop mechanics) · spec ready* — [`specs/loop-hardening/`](./specs/loop-hardening/). Context compaction (`AgentState.messages` grows unbounded today) and dynamic tool gating by task phase.
+10. **Loop Hardening (Phase LH)** — *moderate · necessary (agentic-loop mechanics) · ✅ implemented* — [`specs/loop-hardening/`](./specs/loop-hardening/). Context compaction (`ContextCompactor`) and dynamic tool gating by task phase (`resolve_phase()` + `CompositeToolProvider(phase_capability_map=...)`). See [`docs/loop-hardening.md`](./docs/loop-hardening.md).
+11. **Wave 2026-10** — *✅ implemented (v3.13.0–v3.19.0)* — token efficiency (TKE), LLM gateways (GW), typed decision models (DEC, + Ollama backend in v3.19.0), adaptive model routing (AMR), protocol upgrades + host read surface (PRT + HRS) and agentic memory v2 (MEM). Plan: [`specs/wave-2026-10-implementation-plan.md`](./specs/wave-2026-10-implementation-plan.md); guides: [`docs/token-efficiency.md`](./docs/token-efficiency.md), [`docs/gateways.md`](./docs/gateways.md), [`docs/decisions.md`](./docs/decisions.md), [`docs/routing.md`](./docs/routing.md), [`docs/protocols-2026.md`](./docs/protocols-2026.md), [`docs/memory.md`](./docs/memory.md). Only the out-of-repo M7 (host integration in `prismal-server`) remains.
 
 ### Framework or host? (where each feature lives)
 
@@ -396,7 +397,12 @@ Rule: **contract/logic → framework (`prismal/`); serving HTTP, authenticating,
 | 5 | A2A / Agent Cards (Phase I) | ✅ types · card · client · `A2AToolProvider` · handler | **HTTP endpoint (`/a2a`, `/.well-known/agent-card.json`) + auth** |
 | 6 | Agent Identity & Governance | ✅ `PolicyEngine` + identity port (`security/`) | **IdP/OAuth + credential vault + DID issuance/rotation** |
 | 7 | Agent Eval Harness (Phase V) | ✅ `prismal/eval/` (runner/assertions/judges/regression/redteam/report/CLI) | runs as a dev/CI tool |
-| 8 | Polish | per-node type safety (`AgentState`) · ✅ `ObservabilityPort` (`prismal/monitoring/`) | observability **UI** (`prismal-dashboard`) consumes the port |
+| 8 | Polish | ✅ per-node type safety (`@prismal_node` I/O models) · ✅ `ObservabilityPort` (`prismal/monitoring/`) | observability **UI** (`prismal-dashboard`) consumes the port |
+| 9 | Guardrails / Loop hardening | ✅ `security/` (NeMo rails, `StructuredOutputGuard`) · ✅ `agents/context_compaction.py`, `loop_phase.py` | — |
+| 10 | Token efficiency · Gateways | ✅ `providers/prompt_cache.py`, `providers/gateways/` · `eval` token gate | per-tenant gateway keys (vault), quota dashboards |
+| 11 | Decisions · Adaptive routing | ✅ `prismal/decisions/` · `prismal/routing/` | calibration stores, routing reports (read via host surface) |
+| 12 | Protocols 2026 · Host surface | ✅ A2A v1.0 / MCP stateless / AG-UI translator · `composition/host_surface.py` | **HTTP/SSE endpoints**, AG-UI streaming transport |
+| 13 | Agentic memory v2 | ✅ `memory/v2/` | storage backend choice, human approval UI for forgets |
 
 The framework defines the ports and logic; the host composes and exposes them. Details in [`docs/competitive-analysis.md`](./docs/competitive-analysis.md).
 
@@ -418,7 +424,7 @@ uv pip install -e ".[dev,all]"
 uv run pytest                                      # full suite
 uv run pytest tests/unit                           # one tier
 uv run pytest -m unit                              # by marker (unit|integration|security|slow|live_api)
-uv run pytest tests/unit/security/test_sanitizer.py::TestSanitizer::test_strip_controls  # single test
+uv run pytest tests/unit/security/test_sanitizer.py::test_strip_removes_null_byte  # single test
 uv run pytest -n auto                              # parallel (pytest-xdist)
 uv run pytest --cov=prismal --cov-report=term-missing   # coverage (fail_under = 80)
 
@@ -443,7 +449,7 @@ uv run python -m build
 
 ## Architecture
 
-The core is a LangGraph `StateGraph[AgentState]` assembled in `prismal/agents/graph.py` following the **SUPERVISOR pattern**: a central `supervisor_node` routes each turn to one of 26 specialist agent nodes, each of which returns control to the supervisor; the supervisor routes to `END` when the task is complete. Checkpointing is handled by `AsyncSqliteSaver` (or PostgreSQL via the `[postgres]` extra).
+The core is a LangGraph `StateGraph[AgentState]` assembled in `prismal/agents/graph.py` following the **SUPERVISOR pattern**: a central `supervisor_node` routes each turn to one of 30 routes (15 core members always registered + 15 opt-in members gated by settings flags), each of which returns control to the supervisor; the supervisor routes to `END` when the task is complete. Checkpointing is handled by `AsyncSqliteSaver` (or PostgreSQL via the `[postgres]` extra).
 
 ![Prismal — Agent Framework Architecture](./assets/prismal_architecture.svg)
 
@@ -455,96 +461,68 @@ The diagram above reads top-to-bottom as a request flows through the framework, 
 
 **2 — Core supervisor.** The heart of the framework is the LangGraph `StateGraph[AgentState]`. A deterministic regex `intent_router.match_intent()` runs ahead of LLM supervision; the `SUPERVISOR` node then routes each turn to the right specialist (or to `END`). All turn state lives in `AgentState`, a `TypedDict` whose `messages` field uses the `add_messages` reducer, and progress is persisted by the checkpointer (SQLite by default, PostgreSQL optional).
 
-**3 — Specialist agents.** The supervisor dispatches to one of 26 specialist nodes — `coder`, `researcher`, `rag_agent`, `data_analyst`, `planner`, `critic`, `codeact_agent`, `cua_agent`, `file_manager`, `skill_manager`, `cron_manager`, `parallel_research`, `meta_learner`, `skill_creator`, `domain_supervisor`, `network_supervisor`, and more. Each node does its work and hands control back to the supervisor, which can also route into the reusable patterns and subgraphs below.
+**3 — Specialist agents.** The supervisor dispatches to the 15 core routes — `researcher`, `coder`, `codeact`, `cua`, `rag_agent`, `planner`, `critic`, `data_analyst`, `file_manager`, `skill_manager`, `cron_manager`, `parallel_researcher` (map-reduce fan-out) and the `dev_pipeline` / `ml_pipeline` / `financial_analyst` subgraphs — plus up to 15 opt-in routes (patterns, domain pipelines, multimodal, Kokoro, Skynet, blind review). `codeact` and `cua` are downgraded at routing time when their flags are off. With `hierarchical_mode=True` the graph becomes a 3-level hierarchy (analysis / engineering / research orchestrators built on `domain_supervisor`). Modules such as `meta_learner`, `skill_creator`, `network_supervisor` and `spawner` are standalone helpers, not supervisor routes — the full inventory is in [`docs/agents.md`](./docs/agents.md).
 
-**4 — Agent patterns.** Composable reasoning strategies live in `prismal/agents/patterns/`: Tree-of-Thoughts, N-agent Debate, Constitutional self-revision, LATS (MCTS with UCB1), LLM-Compiler (parallel task DAG), Mixture-of-Agents, Swarm handoff, and the `reflection_loop`.
+**4 — Agent patterns.** Composable reasoning strategies live in `prismal/agents/patterns/`: Tree-of-Thoughts, N-agent Debate, Constitutional self-revision, LATS (MCTS with UCB1), LLM-Compiler (parallel task DAG), Mixture-of-Agents, Swarm handoff, the `reflection_loop` and the `Send()` parallel dispatcher. Six of them (ToT, Debate, Constitutional, LATS, LLM-Compiler, MoA) become supervisor routes when `enable_subgraphs` is on — see [`docs/patterns.md`](./docs/patterns.md).
 
-**5 — Subgraphs / pipelines.** Multi-node pipelines assembled by `SubgraphFactory` and held in `SubgraphRegistry`: `dev_pipeline`, `ml_pipeline`, `financial`, `customer_service`, `document_generation`, `data_etl`, `code_review`, plus the analysis/engineering/research orchestrators.
+**5 — Subgraphs / pipelines.** Multi-node pipelines assembled by `SubgraphFactory` and held in `SubgraphRegistry`: 15 packages — `dev_pipeline`, `ml_pipeline`, `financial`, `customer_service`, `document_generation`, `data_etl`, `code_review`, `debate_consensus`, `multimodal_pipeline`, `kokoro`, `skynet`, `blind_review_pipeline`, plus the analysis/engineering/research orchestrators — see [`docs/subgraphs.md`](./docs/subgraphs.md).
 
-**6 — RAG + vector store.** Eight retrieval engines (HyDE, RAG-Fusion, Hybrid BM25+semantic, Self-RAG, Hierarchical, Multi-Vector, the Adaptive router, and CRAG) sit on top of the hexagonal `VectorStorePort`. A factory selects the backend — Chroma is the default, with LanceDB, sqlite-vec, Qdrant, and pgvector available via extras — and embeddings plus federated search round out the layer.
+**6 — RAG + vector store.** Eleven retrieval engines (standard, CRAG, HyDE, RAG-Fusion, Hybrid BM25+semantic, Self-RAG, Hierarchical, Multi-Vector, the Adaptive router, Multimodal and Federated — see [`docs/rag.md`](./docs/rag.md)) sit on top of the hexagonal `VectorStorePort`. A factory selects the backend — Chroma is the default, with LanceDB, sqlite-vec, Qdrant, and pgvector available via extras — and embeddings plus federated search round out the layer.
 
-**7 — Opt-in layers.** Capabilities gated by settings flags that, when off, leave the compiled graph byte-for-byte identical: Multimodal (vision/audio/video), Kokoro deliberation (Spirit/Mind/Heart souls + a Judge), Skynet swarm map-reduce (dynamic worker fan-out via `Send`), A2A interop, and Cost/Budget governance (`CostMeter` + `BudgetGuard`).
+**7 — Opt-in layers.** Capabilities gated by settings flags that, when off, leave the compiled graph byte-for-byte identical: Multimodal (vision/audio/video), Kokoro deliberation (Spirit/Mind/Heart souls + a Judge), Skynet swarm map-reduce (dynamic worker fan-out via `Send`), A2A interop, Cost/Budget governance (`CostMeter` + `BudgetGuard`), runtime hardening, identity, the blind review pipeline, and the wave 2026-10 layers — token efficiency, LLM gateways (`gw:` refs), typed decision cascades (`DecisionPort`), adaptive model routing (`RoutingPolicyPort`), protocol upgrades (A2A v1.0, MCP stateless, AG-UI) and agentic memory v2.
 
-**8 — Hexagonal ports, providers & infrastructure.** Tool resolution is inverted behind `ToolProviderPort` (composing MCP, Skills, and Souls); configuration behind `ConfigSourcePort`; and `build_runtime()` is the single composition root that wires every port together. All LLM calls are isolated behind the LiteLLM-based providers layer (Anthropic, OpenAI, Gemini, Ollama). Supporting infrastructure includes short/long-term memory, the scheduler (APScheduler/Prefect), the sandbox (docker/nsjail/bwrap), monitoring (OpenTelemetry/Langfuse/structlog), and the public Extension API (`@prismal_node`, plugins).
+**8 — Hexagonal ports, providers & infrastructure.** Tool resolution is inverted behind `ToolProviderPort` (composing MCP, Skills, A2A and stub providers); configuration behind `ConfigSourcePort`; and `build_runtime()` is the single composition root that wires every port together. All LLM calls are isolated behind the LiteLLM-based providers layer (Anthropic, OpenAI, Gemini, Ollama). Supporting infrastructure includes short/long-term memory, the scheduler (APScheduler/Prefect), the sandbox (`SandboxExecutor`; docker/podman/nsjail/bwrap/firejail for Python code), monitoring (OpenTelemetry/Langfuse/structlog), and the public Extension API (`@prismal_node`, plugins).
 
 **A2A detail panel.** Expanding layer 7's A2A box: `build_agent_card()` publishes an `AgentCard` (one `AgentSkill` per capability, identified by a `did:web`). Inbound traffic is served by `A2AServerHandler` over JSON-RPC + SSE (`message/send`, `tasks/get`, `tasks/cancel`); outbound, `A2AClient` + `A2AConnectionManager` reach remote agents behind an fnmatch allowlist with bearer/oauth2 auth. `A2AAgentNode.as_node()` turns a remote agent into a graph node, and `A2AToolProvider` (conforming to `ToolProviderPort`) surfaces remote skills as `a2a__agent__skill` tools. A2A complements MCP (tools vs. agents), and the trust boundary holds: every remote response is L1-sanitized and audited by hash, never by content.
 
 ```
 prismal/                ← PEP 420 namespace package (NO __init__.py at root)
-├── agents/                ← LangGraph state machine + 26 agent nodes
+├── agents/                ← LangGraph state machine (30 supervisor routes) — docs/agents.md
 │   ├── graph.py           ← get_compiled_graph() / get_async_compiled_graph()
-│   ├── supervisor.py      ← Central router
-│   ├── state.py           ← AgentState (TypedDict; messages uses add_messages reducer)
+│   ├── supervisor.py      ← Central router (MEMBERS + opt-in *_MEMBERS)
+│   ├── state.py           ← AgentState (TypedDict; messages uses add_messages)
 │   ├── intent_router.py   ← Deterministic regex routing
-│   ├── tool_registry.py   ← stable facade: delegates to the injected ToolProviderPort (Phase Y)
-│   ├── patterns/
-│   │   ├── reflection.py           ← reflection_loop()
-│   │   ├── parallel.py             ← make_parallel_dispatcher() via Send()
-│   │   ├── tree_of_thoughts.py     ← ToT with BFS/DFS/beam
-│   │   ├── debate.py               ← N-agent multi-round debate + Jaccard
-│   │   ├── constitutional.py       ← principle-driven self-revision + audit
-│   │   ├── lats.py                 ← MCTS with UCB1
-│   │   ├── llm_compiler.py         ← DAG compilation + Kahn validation + parallel waves
-│   │   ├── mixture_of_agents.py    ← multi-provider proposers + aggregator
-│   │   └── swarm.py                ← decentralised handoff with audit
-│   ├── multimodal/                  ← (Phase F) vision / audio / video agents + router + fusion
-│   │   ├── vision_agent.py
-│   │   ├── audio_agent.py
-│   │   ├── video_agent.py
-│   │   ├── modality_router.py
-│   │   └── multimodal_fusion.py
-│   └── subgraphs/
-│       ├── factory.py              ← SubgraphFactory
-│       ├── registry.py             ← SubgraphRegistry
-│       ├── gates.py                ← hitl_gate() with interrupt()
-│       ├── dev_pipeline/           ← PO → Architect → Developer → Tests → QA → Reviewer
-│       ├── ml_pipeline/            ← Ingester → EDA → Features → Trainer → Evaluator → Exporter
-│       ├── financial/              ← Collector → Technical → Fundamental → Risk → Report
-│       ├── customer_service/       ← classifier → faq_retrieval → gate → response | ticket
-│       ├── document_generation/    ← planner → researcher → writer → editor → formatter
-│       ├── data_etl/               ← extractor → validator → gate → transformer → loader → auditor
-│       ├── code_review/            ← linter → security_scanner → logic_reviewer → suggester → report
-│       ├── debate_consensus/       ← proponent → opponent → moderator → consensus
-│       ├── multimodal_pipeline/    ← (Phase F) router → vision|audio|video → fusion → output_formatter
-│       ├── analysis_orchestrator/
-│       ├── engineering_orchestrator/
-│       └── research_orchestrator/
-├── core/                  ← Pydantic Settings, logging, exceptions, DB, user model
-├── budget/                ← (Phase C) Cost & Budget Governance — opt-in (settings.budget_enabled)
-│   ├── types.py           ← Budget / BudgetScope / Usage / BudgetStatus / Degradation
-│   ├── usage.py           ← extract_token_usage() from LangChain message metadata
-│   ├── meter.py           ← CostMeter (accumulate Usage + OTel + optional CostTracker bridge)
-│   ├── guard.py           ← BudgetGuard (check/enforce/degradation) + make_budget_guard_fn()
-│   └── resolve.py         ← resolve_budget() + per-run seeding (session-keyed registry)
-├── providers/             ← LiteLLM wrapper (ONLY location for provider-specific imports;
-│                             Phase F adds stt/tts/vision/multimodal/cross_modal_embeddings;
-│                             Phase C adds cost.py — per-call USD pricing)
-├── memory/                ← Short-term history + long-term PII-sanitized store
-├── mcp/                   ← MCP client, adapter, connection manager, capability routing
-├── security/              ← 5-layer defense-in-depth (see below) + (Phase F) media_validator.py
-├── rag/                   ← 7 retrieval engines:
-│   ├── engine.py          ← standard RAGEngine
-│   ├── crag.py            ← CRAG pipeline
-│   ├── hyde.py            ← Hypothetical Document Embeddings
-│   ├── fusion.py          ← RAG-Fusion (RRF)
-│   ├── hybrid.py          ← BM25 + semantic hybrid search
-│   ├── self_rag.py        ← Self-RAG (conditional retrieval + self-assessment)
-│   ├── hierarchical.py    ← Parent-Child chunking
-│   ├── multi_vector.py    ← chunk + summary + N hypothetical questions
-│   ├── adaptive.py        ← facade routing by query type
-│   ├── federated.py       ← federated search
-│   ├── multimodal.py      ← (Phase F) MultimodalRAGEngine — text + image captions + audio/video transcripts
-│   ├── loaders/           ← (Phase F) document/image/audio/video loaders
-│   ├── stores/            ← (Phase Z) VectorStorePort adapters: chroma (default), lancedb, sqlite_vec, qdrant, pgvector
-│   ├── vector_store_factory.py ← (Phase Z) VectorStoreFactory + FakeVectorStore
-│   └── vector_store.py    ← (Phase Z) backward-compatible shim re-exporting ChromaVectorStore from stores/chroma.py
-├── skills/                ← available/ (source) · active/ (gitignored) · custom/ (gitignored)
+│   ├── tool_registry.py   ← stable facade over the injected ToolProviderPort (Phase Y)
+│   ├── context_compaction.py · loop_phase.py · tool_gate.py · tool_search.py
+│   ├── tool_output_budget.py · artifacts.py · handoff.py   ← loop hardening + TKE
+│   ├── extension/         ← @prismal_node, builder, plugins, adapters, ports, providers
+│   ├── patterns/          ← reflection, parallel, ToT, debate, constitutional, LATS,
+│   │                         LLM-compiler, mixture of agents, swarm — docs/patterns.md
+│   ├── multimodal/        ← (Phase F) vision / audio / video agents + router + fusion
+│   ├── kokoro/            ← (Phase K) soul agents, deliberation, judge
+│   ├── skynet/            ← (Phase S/S+) swarm supervisor, workers, reduce, roles
+│   └── subgraphs/         ← 15 pipeline packages — docs/subgraphs.md
+│       ├── factory.py · registry.py · gates.py (hitl_gate)
+│       ├── dev_pipeline/ · ml_pipeline/ · financial/
+│       ├── customer_service/ · document_generation/ · data_etl/ · code_review/
+│       ├── debate_consensus/ · multimodal_pipeline/ · kokoro/ · skynet/
+│       ├── blind_review_pipeline/
+│       └── analysis_orchestrator/ · engineering_orchestrator/ · research_orchestrator/
+├── a2a/                   ← (Phase I/PRT) A2A v0.3 + v1.0: card, server, client, provider
+├── budget/                ← (Phase C) CostMeter + BudgetGuard — docs/budget.md
+├── composition/           ← (Phase R/HRS) build_runtime(), RuntimeContext, host surface
+├── core/                  ← Settings (486 fields), ConfigSourcePort, logging, exceptions
+├── data/                  ← DuckDB + Polars utilities — docs/data-utilities.md
+├── decisions/             ← (Phase DEC) typed decision cascade — docs/decisions.md
+├── eval/                  ← (Phase V) eval harness, judges, red-team, token gate
+├── events/                ← AG-UI translator, file watcher, webhook dispatcher — docs/events.md
+├── identity/              ← (Phase IDN) DIDs, vaults, delegation, PolicyEngine
+├── mcp/                   ← MCP client, capability routing, stateless 2026 — docs/mcp.md
+├── memory/                ← short/long-term memory + v2/ agentic memory — docs/memory.md
+├── monitoring/            ← Langfuse, OpenTelemetry, ObservabilityPort, run summaries
+├── providers/             ← LiteLLM wrapper (ONLY place for provider SDK imports):
+│                             registry, cost, prompt cache, STT/TTS/vision, rerank,
+│                             batch adapters, gateways/ (OpenRouter, OpenCode, OmniRoute)
+├── rag/                   ← 11 engines + loaders/ + stores/ (VectorStorePort) — docs/rag.md
+├── routing/               ← (Phase AMR) RoutingPolicyPort, policies, caches, batch
+├── sandbox/               ← SandboxExecutor + isolation backends — docs/sandbox.md
 ├── scheduler/             ← APScheduler CronExecutor, DateTimeService, Prefect flows
-├── monitoring/            ← Langfuse, OpenTelemetry, structlog
-├── data/                  ← DuckDB + Polars utilities
-├── sandbox/               ← SandboxExecutor process isolation
+├── security/              ← 5-layer defense-in-depth + hardening + guardrails
+├── skills/                ← available/ (source) · active/ · custom/ (gitignored)
+├── souls/                 ← (Phase K) Kokoro persona SOUL.md files
 ├── utils/                 ← Shared utilities
-└── events/                ← Event bus
+├── langgraph.py           ← official LangGraph re-export + visualization helpers
+└── plugins.py             ← `python -m prismal.plugins` CLI
 ```
 
 ### Namespace package
@@ -580,13 +558,23 @@ See [CLAUDE.md](./CLAUDE.md) for the full working guide (commands, testing notes
 
 ---
 
+## Documentation
+
+- [`docs/README.md`](./docs/README.md) — index of every guide (core engine, composition, opt-in layers, security, ADRs).
+- [`docs/settings-reference.md`](./docs/settings-reference.md) — all 486 `Settings` fields; [`env.example`](./env.example) is generated from the same source (`uv run python scripts/gen_settings_docs.py`).
+- [`examples/README.md`](./examples/README.md) and [`examples.md`](./examples.md) — runnable examples (ES).
+- [`specs/roadmap.md`](./specs/roadmap.md) — index of every SDD spec and its status.
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — contributor workflow; [`CLASIFICACION_AGENTES.md`](./CLASIFICACION_AGENTES.md) — quick classification of routes, patterns and RAG engines (ES).
+
+---
+
 ## Versioning
 
 This package follows [Semantic Versioning](https://semver.org/).
 Tag format for releases: `prismal/vMAJOR.MINOR.PATCH`
 
 ```bash
-git tag prismal/v3.1.5
+git tag prismal/v3.19.0
 git push --tags
 ```
 
@@ -596,30 +584,34 @@ See [CHANGELOG.md](./CHANGELOG.md) for release history.
 
 ## Releasing (maintainers)
 
-Run only after the full suite, linters and type/security checks are green.
+Publishing is automated by [`.github/workflows/release.yml`](./.github/workflows/release.yml):
+every push to `main` builds the distribution and publishes it to PyPI (`skip-existing`, so it is a
+no-op while the version is unchanged), and pushing a `prismal/vX.Y.Z` tag additionally creates the
+GitHub Release (notes extracted from the matching CHANGELOG section) and triggers
+[`docker-publish.yml`](./.github/workflows/docker-publish.yml) (GHCR image). Run only after the
+full suite, linters and type/security checks are green.
 
 ```bash
-# 0) Verify on the release branch
-cd prismal && git switch main
+# 0) On the release branch, bump `version` in pyproject.toml and add the CHANGELOG section
+git switch main
 
 # 1) Quality gates (must all pass)
 uv pip install -e ".[dev,all]"
 uv run pytest -m "not live_api"
 uv run ruff check . && uv run mypy prismal && uv run bandit -r prismal -c pyproject.toml
+uv run python scripts/gen_settings_docs.py --check   # generated settings docs in sync
 
-# 2) Build + validate the prismal-ai distribution
-rm -rf dist/ && python -m build && twine check dist/*
-twine upload --repository testpypi dist/*          # validate on TestPyPI first
+# 2) Optional local validation of the distribution
+rm -rf dist/ && uv run python -m build && uv run twine check dist/*
 
-# 3) Push history and publish prismal-ai
+# 3) Publish: push main (PyPI) and the release tag (GitHub Release + GHCR image)
 git push origin main
-twine upload dist/*                                 # publish to PyPI
-git tag prismal/v3.1.5 && git push --tags         # tag format: prismal/vMAJOR.MINOR.PATCH
+git tag prismal/vX.Y.Z && git push origin prismal/vX.Y.Z   # tag format: prismal/vMAJOR.MINOR.PATCH
 
-# 4) Publish the deprecated compatibility bridge (lightagent-agents -> prismal-ai)
+# 4) Manual, only when it changes: the deprecated compatibility bridge (lightagent-agents -> prismal-ai)
 cd compat/lightagent-agents
 rm -rf dist/ && python -m build && twine check dist/*
-twine upload dist/*                                 # publishes lightagent-agents 2.9.0
+twine upload dist/*
 ```
 
 Post-release follow-ups: configure DNS/site for `prismal.dev`, coordinate the

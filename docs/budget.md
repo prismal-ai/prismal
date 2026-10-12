@@ -52,8 +52,8 @@ where it does not.
 
 ## Cost estimation
 
-`providers/cost.py::compute_cost_usd` is the **only** module that imports
-`litellm`. It prices a call from LiteLLM's native model map first; for models
+`providers/cost.py::compute_cost_usd` is the budget layer's pricing entry point
+(`litellm` is imported only inside `prismal/providers/`). It prices a call from LiteLLM's native model map first; for models
 LiteLLM cannot price it falls back to a configurable table and flags the figure
 as estimated:
 
