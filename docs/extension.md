@@ -39,6 +39,10 @@ original function).
 | `retry` | `None` | `RetryPolicy(max_attempts, backoff_s, retry_on)` |
 | `timeout_s` | `None` | Per-invocation `asyncio.wait_for` timeout → `NodeTimeoutError` |
 | `raise_on_error` | `False` | If `True`, propagate `NodeExecutionError`; else return `{"metadata": {"error": {...}}}` |
+| `propagate_errors` | `False` | If `True`, re-raise the node's own exception unchanged (overrides `raise_on_error`; a `ParentCommand` is still mapped) |
+
+An `interrupt()` inside a decorated node (a `GraphInterrupt`) always bubbles up
+unchanged and is never retried, so HITL pauses work with any of these settings.
 
 > **Middleware order note.** The chain is, outermost→innermost:
 > `error_mapping → otel → logger → security → audit → retry → timeout → user fn`.

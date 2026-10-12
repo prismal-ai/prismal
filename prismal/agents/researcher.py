@@ -16,10 +16,12 @@ non-human messages from the conversation history before each LLM call.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import BaseMessage, SystemMessage
+from pydantic import BaseModel
 
+from prismal.agents.extension.decorators import prismal_node
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
 from prismal.core.logging import get_logger
@@ -199,6 +201,32 @@ def _trim_to_last_human(messages: list[BaseMessage]) -> list[BaseMessage]:
     return messages[: last_human + 1]
 
 
+class ResearcherInput(BaseModel):
+    """Narrow input contract for ``researcher_node`` (Phase NTS.1, batch 1).
+
+    A boundary projection of ``AgentState`` — only the keys the node reads.
+    ``messages`` stays untyped (``list``), as in the NTS pilots.
+    """
+
+    messages: list[Any]
+    session_id: str
+
+
+class ResearcherOutput(BaseModel):
+    """Narrow output contract for ``researcher_node`` (Phase NTS.1, batch 1)."""
+
+    current_agent: str
+    messages: list[Any]
+
+
+@prismal_node(
+    name="researcher",
+    security="off",
+    audit=False,
+    input_model=ResearcherInput,
+    output_model=ResearcherOutput,
+    propagate_errors=True,
+)
 async def researcher_node(state: AgentState) -> dict[str, object]:
     """Execute the researcher sub-agent node with a ReAct tool loop.
 

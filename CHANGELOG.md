@@ -11,6 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- NTS.1 batch 1: I/O contracts on `coder`, `researcher`, `data_analyst`,
+  `planner` and `critic` (`<Node>Input` / `<Node>Output`, checked only with
+  `node_typesafety_enabled`; adopt in `warn` first). `planner` lists must be
+  strings; `critic.iteration_count >= 0` in and out.
+- `@prismal_node(propagate_errors=True)` re-raises a node's own exception
+  unchanged. Built-in nodes use it, so adopting a contract never changes their
+  error semantics.
 - Shared tenant quota counters: with `budget_scope="tenant"` the guard checks
   the tenant's total over a UTC calendar window (`budget_tenant_window`:
   `month` | `day`). Totals are kept in a SQLite file shared by every worker
@@ -64,6 +71,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   extra name in the vector-store docs.
 
 ### Fixed
+- `@prismal_node` broke HITL: `GraphInterrupt` (from `interrupt()`) is an
+  `Exception` subclass, so `error_mapping` swallowed or wrapped it and `retry`
+  could re-run it. It now always bubbles up and is never retried. A
+  `ParentCommand` is still mapped, because passing it through would skip the
+  output-side controls.
 - `python -m prismal.eval run --live-api` never exited after writing its
   results. The async graph's SQLite checkpointer (`aiosqlite`, whose worker
   thread is non-daemon) was never closed. The new

@@ -126,6 +126,12 @@ Order is by how much each item unblocks.
 - Migrate node by node, owner-driven (`specs/node-io-typesafety/ARCHITECTURE.md` §489).
   Needs a DELTA spec that picks the batch (e.g. `coder`, `researcher`, `critic`).
 
+> **As built (2026-10-12).** The user approved batch 1: `coder`, `researcher`, `data_analyst`,
+> `planner` and `critic`. Details are in `specs/node-io-typesafety/TASKS.md` § NTS.1.
+> Prerequisite fix: `@prismal_node` swallowed `interrupt()`. It now passes through only
+> `GraphInterrupt` (not `ParentCommand`), and the new `propagate_errors=True` keeps the
+> error semantics of built-in nodes.
+
 ## 3. Phase 3 — Data / ops (not code; owner action)
 
 - DEC3-07: ≥ 300 labelled Spanish cases per decision. DEC3-09: per-question latency profile.

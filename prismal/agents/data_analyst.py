@@ -6,10 +6,12 @@ data with Polars, and creating charts to answer data-driven questions.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import SystemMessage
+from pydantic import BaseModel
 
+from prismal.agents.extension.decorators import prismal_node
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
 from prismal.core.logging import get_logger
@@ -135,6 +137,32 @@ y exportarlos a un CSV para que los elimines de forma auditable.
 """
 
 
+class DataAnalystInput(BaseModel):
+    """Narrow input contract for ``data_analyst_node`` (Phase NTS.1, batch 1).
+
+    A boundary projection of ``AgentState`` — only the keys the node reads.
+    ``messages`` stays untyped (``list``), as in the NTS pilots.
+    """
+
+    messages: list[Any]
+    session_id: str
+
+
+class DataAnalystOutput(BaseModel):
+    """Narrow output contract for ``data_analyst_node`` (Phase NTS.1, batch 1)."""
+
+    current_agent: str
+    messages: list[Any]
+
+
+@prismal_node(
+    name="data_analyst",
+    security="off",
+    audit=False,
+    input_model=DataAnalystInput,
+    output_model=DataAnalystOutput,
+    propagate_errors=True,
+)
 async def data_analyst_node(state: AgentState) -> dict[str, object]:
     """Execute the data_analyst sub-agent node with a ReAct tool loop.
 
