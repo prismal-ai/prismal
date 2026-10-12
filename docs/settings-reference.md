@@ -4,7 +4,7 @@
 
 Every field of `prismal.core.config.Settings` (env prefix `PRISMAL_`) and
 `MaintenanceSettings` (env prefix `PRISMAL_MAINTENANCE_`), in source order.
-`Settings` declares **488** fields; `MaintenanceSettings` declares
+`Settings` declares **489** fields; `MaintenanceSettings` declares
 **6**. Values are resolved through the injected
 `ConfigSourcePort` — see [configuration.md](./configuration.md) for how
 sources are composed (env, `.env`, secrets managers, per-tenant).
@@ -15,7 +15,7 @@ Secret fields never show a default. Regenerate this page and
 
 ## Sections
 
-- [LLM](#llm) (9)
+- [LLM](#llm) (10)
 - [API Keys](#api-keys) (4)
 - [Security](#security) (3)
 - [Skills](#skills) (1)
@@ -87,6 +87,7 @@ Secret fields never show a default. Regenerate this page and
 | `PRISMAL_MAX_TOKENS` | `int` | `4096` | Maximum number of tokens in the LLM response |
 | `PRISMAL_TIMEOUT_SECONDS` | `int` | `60` | Timeout in seconds for a single LLM API call |
 | `PRISMAL_LLM_OLLAMA_TIMEOUT_SECONDS` | `int` | `300` | Timeout in seconds for calls routed to an Ollama model (``ollama/*`` or ``ollama_chat/*``). Local models are typically far slower than cloud providers — 60 s is not enough for a 7B-parameter+ model on CPU — so Ollama gets a generous override that takes effect automatically. |
+| `PRISMAL_OLLAMA_CHAT_ENDPOINT` | `bool` | `false` | Rewrite ``ollama/<model>`` to ``ollama_chat/<model>`` so calls use Ollama's /api/chat endpoint with native tool calling. ``ollama/`` goes through /api/generate, where LiteLLM emulates tool calls as text and multi-tool loops break. Off keeps model strings unchanged (a one-time warning names the fix). |
 | `PRISMAL_RETRY_ATTEMPTS` | `int` | `1` | Number of retry attempts on transient LLM API errors |
 
 ## API Keys

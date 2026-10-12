@@ -69,6 +69,24 @@ flowchart TD
   fallback is empty. When primary and fallback share one gateway, a 402 or a
   policy denial is **not** retried there (`_SameGatewayFallbackEligible`).
 
+### Ollama: use `ollama_chat/` for agents with tools
+
+LiteLLM has two Ollama prefixes:
+
+- `ollama/<model>` calls `/api/generate` and emulates tool calls as text;
+- `ollama_chat/<model>` uses `/api/chat` with Ollama's native tool calling.
+
+In the TKE9-04 pilot (2026-10-12), every local model failed a three-call tool
+loop under `ollama/`: the call came back printed as text, or it repeated
+forever. The same loop passed under `ollama_chat/`.
+`PRISMAL_LLM_PROVIDER=ollama` already defaults to `ollama_chat/llama3.1`.
+
+When you set an `ollama/` model explicitly, either change it to
+`ollama_chat/<model>` or set `PRISMAL_OLLAMA_CHAT_ENDPOINT=true`. That setting
+makes `get_llm` rewrite the primary and fallback models. It is off by default,
+so model strings stay unchanged. With it off, the first `ollama/` model built
+logs `provider.ollama_generate_endpoint` once, with the fix as a hint.
+
 ### Credentials bridge
 
 LiteLLM reads credentials from `os.environ`. `ProviderRegistry._inject_api_keys()`
@@ -190,6 +208,7 @@ All fields live on `prismal.core.config.Settings` (env prefix `PRISMAL_`). See
 | `PRISMAL_LLM_OLLAMA_TIMEOUT_SECONDS` | `300` | Timeout for `ollama/*` and `ollama_chat/*` |
 | `PRISMAL_RETRY_ATTEMPTS` | `1` | `max_retries` (forced to `0` when a gateway owns fallback) |
 | `PRISMAL_OLLAMA_BASE_URL` | `http://localhost:11434` | Exported as `OLLAMA_API_BASE` |
+| `PRISMAL_OLLAMA_CHAT_ENDPOINT` | `false` | Rewrite `ollama/<m>` to `ollama_chat/<m>` (native tool calling) |
 | `PRISMAL_ANTHROPIC_API_KEY` / `PRISMAL_OPENAI_API_KEY` / `PRISMAL_GOOGLE_API_KEY` | `""` | Provider keys (the unprefixed names are accepted too) |
 | `PRISMAL_BUDGET_PRICING` | `{}` | Fallback pricing table for `compute_cost_usd` |
 | `PRISMAL_BATCH_PRICE_RATIO` | `0.5` | Batch / on-demand price ratio |

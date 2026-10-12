@@ -35,6 +35,34 @@ if TYPE_CHECKING:
 
 logger = get_logger("prismal.providers.registry")
 
+# ``ollama/`` models already warned about (once per model string per process).
+_OLLAMA_GENERATE_WARNED: set[str] = set()
+
+
+def _ollama_endpoint(model: str, settings: Settings) -> str:
+    """Return *model* with ``ollama/`` rewritten to ``ollama_chat/`` when enabled.
+
+    ``ollama/`` goes through ``/api/generate``, where LiteLLM emulates tool
+    calls as text; ``ollama_chat/`` uses Ollama's native tool calling. With
+    ``settings.ollama_chat_endpoint`` off the string is returned unchanged and
+    a one-time warning names the fix.
+    """
+    if not model.startswith("ollama/"):
+        return model
+    if settings.ollama_chat_endpoint:
+        return "ollama_chat/" + model.removeprefix("ollama/")
+    if model not in _OLLAMA_GENERATE_WARNED:
+        _OLLAMA_GENERATE_WARNED.add(model)
+        logger.warning(
+            "provider.ollama_generate_endpoint",
+            model=model,
+            hint=(
+                "ollama/ emulates tool calls as text and breaks tool loops; use "
+                "ollama_chat/<model> or set PRISMAL_OLLAMA_CHAT_ENDPOINT=true"
+            ),
+        )
+    return model
+
 
 @dataclass
 class ModelInfo:
@@ -242,6 +270,7 @@ class ProviderRegistry:
                 gateway = _without_model_fallback(gateway)
             return self._gateway_llm(gateway, streaming, temp, agent), gateway
 
+        resolved_model = _ollama_endpoint(resolved_model, self._settings)
         # Ollama local models are much slower than cloud providers — use
         # the dedicated timeout override when the model is routed through
         # Ollama so the default 60 s ceiling does not break simple greetings.
