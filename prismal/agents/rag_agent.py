@@ -12,7 +12,9 @@ import re
 from typing import TYPE_CHECKING, Any, cast
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from pydantic import BaseModel, ConfigDict, Field
 
+from prismal.agents.extension.decorators import prismal_node
 from prismal.agents.patterns.reflection import reflection_loop
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
@@ -206,6 +208,44 @@ Sources: (none)
 """
 
 
+class RagAgentInput(BaseModel):
+    """Narrow input contract for ``rag_agent_node`` (Phase NTS.1, batch 2)."""
+
+    messages: list[Any]
+    session_id: str
+
+
+class RagAgentMeta(BaseModel):
+    """The ``metadata["rag_agent"]`` block ``rag_agent_node`` writes."""
+
+    reflection_score: float = Field(ge=0.0, le=1.0)
+    reflection_iterations: int = Field(ge=0)
+
+
+class RagAgentMetadata(BaseModel):
+    """``metadata`` as ``rag_agent_node`` returns it; other agents' keys pass through."""
+
+    model_config = ConfigDict(extra="allow")
+
+    rag_agent: RagAgentMeta
+
+
+class RagAgentOutput(BaseModel):
+    """Narrow output contract for ``rag_agent_node`` (Phase NTS.1, batch 2)."""
+
+    current_agent: str
+    messages: list[Any]
+    metadata: RagAgentMetadata
+
+
+@prismal_node(
+    name="rag_agent",
+    security="off",
+    audit=False,
+    input_model=RagAgentInput,
+    output_model=RagAgentOutput,
+    propagate_errors=True,
+)
 async def rag_agent_node(state: AgentState) -> dict[str, object]:
     """Execute the rag_agent sub-agent node using the CRAG pipeline.
 
