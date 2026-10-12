@@ -17,6 +17,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   never touching the cached prefix. Only with memory v2 in `enforce` mode and
   the cache-stable layout; `RuntimeContext.bind_org()` now also binds
   `ctx.memory` (`use_memory_service` / `set_memory_service` for other hosts).
+  Fail-closed: no recall without a user identity, untrusted records dropped,
+  and a run bound to `None` never falls back to the process-wide service.
 - `prismal.events.subagent.emit_subagent()`: Skynet workers and MoA proposers
   now emit the AG-UI `subagent` custom payload, so live runs streamed with
   `custom` show `SUBAGENT_STARTED` / `SUBAGENT_FINISHED` / `SUBAGENT_ERROR`

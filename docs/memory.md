@@ -124,7 +124,17 @@ It is a no-op unless all of these hold:
 - `memory_v2_enabled` is on and `memory_mode` is `enforce`;
 - the cache-stable layout is active (`token_efficiency_enabled` and
   `prompt_layout = "cache_stable"`);
-- a `MemoryService` is bound for the run.
+- a `MemoryService` is bound for the run;
+- the state carries a user identity (`channel_context["user_id"]`).
+
+Fail-closed rules:
+
+- **No user, no recall.** A user-less scope would *see* every user's records of
+  the tenant (`MemoryScope.covers`), so the helper does not recall at all.
+- **Trusted records only.** Tainted or `untrusted` recalled records are dropped
+  before rendering, because the message has user-role authority.
+- **No cross-tenant fallback.** A run bound to `None` (its tenant has no memory)
+  gets no memory; it never falls back to the process-wide service.
 
 `RuntimeContext.bind_org()` binds `ctx.memory`, so a host that already wraps
 each graph run in `ctx.bind_org()` gets it for free. Otherwise use

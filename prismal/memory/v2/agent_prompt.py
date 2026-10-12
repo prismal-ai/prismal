@@ -12,6 +12,15 @@ invariant. It is a no-op (``None``) unless ``memory_v2_enabled``,
 ``memory_mode == "enforce"``, the cache-stable layout is active
 (``token_efficiency_enabled`` and ``prompt_layout == "cache_stable"``) and a
 service is bound. It never raises: a recall failure is logged and skipped.
+
+Fail-closed rules:
+
+- No user identity in the state ⇒ no recall. A user-less scope would *see*
+  every user's records of the tenant (``MemoryScope.covers``).
+- Untrusted recalled records (tainted, or ``trust == "untrusted"``) are dropped:
+  the message has user-role authority, so only trusted memory may ride in it.
+- Binding ``None`` (a run whose tenant has no memory) disables memory for the
+  run; it never falls back to the process-wide service of another tenant.
 """
 
 from __future__ import annotations
@@ -19,12 +28,13 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import HumanMessage
 
 from prismal.core.logging import get_logger
-from prismal.memory.v2.render import memory_block_for_prompt
+from prismal.memory.v2.render import is_untrusted, memory_block_for_prompt, render_items
 from prismal.memory.v2.types import MemoryContext, MemoryScope, RecallQuery
 from prismal.security.prompt_builder import PromptLayout, SecurePromptBuilder
 
@@ -34,8 +44,9 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+_UNBOUND: Any = object()
 _SERVICE: MemoryService | None = None
-_BOUND: ContextVar[MemoryService | None] = ContextVar("prismal_memory_service", default=None)
+_BOUND: ContextVar[Any] = ContextVar("prismal_memory_service", default=_UNBOUND)
 
 
 def set_memory_service(service: MemoryService | None) -> None:
@@ -45,8 +56,12 @@ def set_memory_service(service: MemoryService | None) -> None:
 
 
 def get_memory_service() -> MemoryService | None:
-    """The service bound for this run (context first, then the process one)."""
-    return _BOUND.get() or _SERVICE
+    """The service bound for this run; the process one only when nothing is bound.
+
+    A run bound to ``None`` gets ``None`` — never another tenant's global service.
+    """
+    bound = _BOUND.get()
+    return _SERVICE if bound is _UNBOUND else bound
 
 
 @contextmanager
@@ -96,17 +111,21 @@ async def memory_turn_message(
         return None
     service = get_memory_service()
     query = _last_human_text(state)
-    if service is None or not query.strip():
+    user_id = _user_id(state)
+    if service is None or not query.strip() or user_id is None:
         return None
     try:
         ctx = MemoryContext(
-            scope=MemoryScope(org_id=service.org_id, user_id=_user_id(state)),
+            scope=MemoryScope(org_id=service.org_id, user_id=user_id),
             session_id=str(state.get("session_id") or ""),
             actor=agent,
         )
-        result = await service.recall(
-            RecallQuery(text=query), ctx=ctx, budget_tokens=settings.memory_recall_budget_tokens
-        )
+        budget = settings.memory_recall_budget_tokens
+        result = await service.recall(RecallQuery(text=query), ctx=ctx, budget_tokens=budget)
+        trusted = tuple(item for item in result.items if not is_untrusted(item.record))
+        if len(trusted) != len(result.items):
+            rendered, tokens = render_items(trusted, budget_tokens=budget)
+            result = replace(result, items=trusted, rendered=rendered, tokens=tokens)
         # Populate the builder's canaries (incl. the tenant prefix canary) so any
         # canary echoed in recalled text is redacted from the block.
         builder = SecurePromptBuilder(settings=settings)
