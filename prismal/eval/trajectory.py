@@ -1,8 +1,11 @@
 """Trajectory capture from the graph event stream (SPEC-EVL-TRJ-001).
 
 ``capture_trajectory`` drives ``graph.astream(..., stream_mode="updates")`` for a
-single case and reconstructs the :class:`~prismal.eval.types.Trajectory` purely
-from the public event stream — no agent instrumentation. Token counts reuse the
+single case and reconstructs the :class:`~prismal.eval.types.Trajectory` from
+the public event stream — no agent instrumentation. Token and cost figures come
+from a LangChain callback that observes every LLM call of the run (internal
+routing calls and rebuilt answers carry no usage in the stream); when no call is
+observed, the usage on streamed messages is used instead. Token counts reuse the
 LangChain-convention reader in :mod:`prismal.budget.usage`; cost is priced
 through the provider-agnostic :func:`prismal.providers.cost.compute_cost_usd`.
 """
@@ -12,6 +15,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import HumanMessage
 
 from prismal.budget.usage import extract_token_usage
@@ -20,6 +24,8 @@ from prismal.langgraph import AgentState, create_initial_state
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from langchain_core.outputs import LLMResult
 
 
 async def capture_trajectory(
@@ -52,10 +58,14 @@ async def capture_trajectory(
     final_answer = ""
     terminated = False
 
+    llm_usage = _LlmUsageCallback()
     input_state = _initial_state(case)
     start = clock()
     try:
-        async for chunk in graph.astream(input_state, config, stream_mode="updates"):
+        stream = graph.astream(
+            input_state, _with_callback(config, llm_usage), stream_mode="updates"
+        )
+        async for chunk in stream:
             for node, update in _iter_node_updates(chunk):
                 visited.append(node)
                 security_signals.extend(_metadata_signals(update))
@@ -75,6 +85,10 @@ async def capture_trajectory(
         terminated = False
 
     latency_ms = max(0.0, (clock() - start) * 1000.0)
+    usage_source = "messages"
+    if llm_usage.input.llm_calls:
+        usage_source = "callbacks"
+        tokens, cost_usd, input_usage = llm_usage.tokens, llm_usage.cost_usd, llm_usage.input
     return Trajectory(
         case_id=case.id,
         final_answer=final_answer,
@@ -91,7 +105,46 @@ async def capture_trajectory(
         cache_read_tokens=input_usage.cache_read_tokens,
         llm_calls=input_usage.llm_calls,
         input_cost_usd=input_usage.input_cost_usd,
+        usage_source=usage_source,
     )
+
+
+def _with_callback(config: dict[str, Any] | None, handler: BaseCallbackHandler) -> dict[str, Any]:
+    """A copy of *config* with *handler* added to its callbacks (caller's config untouched)."""
+    merged: dict[str, Any] = dict(config or {})
+    callbacks = merged.get("callbacks")
+    if callbacks is None:
+        merged["callbacks"] = [handler]
+    elif isinstance(callbacks, list):
+        merged["callbacks"] = [*callbacks, handler]
+    else:  # a callback manager
+        manager = callbacks.copy()
+        manager.add_handler(handler, inherit=True)
+        merged["callbacks"] = manager
+    return merged
+
+
+class _LlmUsageCallback(BaseCallbackHandler):
+    """Accumulates usage of every LLM call made during the run."""
+
+    run_inline = True  # mutate the counters on the event loop, never from a worker thread
+
+    def __init__(self) -> None:
+        self.tokens = 0
+        self.cost_usd = 0.0
+        self.input = _InputUsage()
+
+    def on_llm_end(self, response: LLMResult, **_: Any) -> None:
+        """Count the generation messages of one finished LLM call."""
+        for generations in response.generations:
+            for generation in generations:
+                message = getattr(generation, "message", None)
+                if message is None:
+                    continue
+                tokens, cost = _usage_of(message)
+                self.tokens += tokens
+                self.cost_usd += cost
+                self.input.add(message)
 
 
 def _initial_state(case: EvalCase) -> AgentState:
