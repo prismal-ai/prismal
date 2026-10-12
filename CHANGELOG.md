@@ -11,6 +11,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `CronExecutor.add_callable(job_id, func, *, cron, timezone=None,
+  max_instances=1, coalesce=True)`: the public way to schedule a coroutine
+  function on a crontab (scheduler timezone by default; nothing persisted).
+  Memory v2 `register_consolidation_job` now uses it instead of reaching into
+  `executor._scheduler`; an AST guard forbids private scheduler access outside
+  `prismal/scheduler/`.
 - `scripts/gen_settings_docs.py` generates `env.example` and the new
   `docs/settings-reference.md` from `Settings` / `MaintenanceSettings` (486 + 6
   fields, grouped by the config.py sections; secrets never show a default).

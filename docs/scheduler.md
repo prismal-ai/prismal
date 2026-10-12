@@ -74,6 +74,14 @@ working directory).
   and are removed after a successful run.
 - `add_job`, `remove_job`, `pause_job` and `resume_job` update the live
   scheduler. `await stop()` calls `shutdown(wait=False)`.
+- `add_callable(job_id, func, *, cron, timezone=None, max_instances=1,
+  coalesce=True)` schedules a zero-argument coroutine function on a five-field
+  crontab, in the scheduler timezone unless `timezone` is given. Nothing is
+  persisted to the `CronManager`; a job with the same id is replaced. A
+  non-crontab `cron` raises `ValueError`. This is the public way to schedule
+  framework work (memory v2 consolidation uses it); code outside
+  `prismal/scheduler/` must not touch `executor._scheduler` (AST-guarded by
+  `tests/unit/scheduler/test_private_scheduler_guard.py`).
 
 ### Run outcome and retries
 

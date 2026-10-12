@@ -186,7 +186,7 @@ These numbers measure the deterministic layers only: dedupe, typed storage and b
 - With **no** decision port, recall searches every type view. The SPEC's default `("preference","semantic")` still applies when the router *abstains*.
 - A rule actor is accepted only for selectors issued by `retention_rules()`, and only once.
 - Contradictions are resolved from existing `contradicts` / `updates` edges.
-- `register_consolidation_job` takes a `consolidator_for(org)` factory and adds the job to the executor's APScheduler directly, because `CronExecutor` has no public method for scheduling a callable.
+- `register_consolidation_job` takes a `consolidator_for(org)` factory and schedules the job through `CronExecutor.add_callable`.
 - Playbooks reject `add`/`modify` deltas without trusted citations, unless the curator runs with `allow_uncited=True`. A single edit per cycle is always allowed (the > 50 % rule has a floor of 1).
 - Graphiti stores records as episodes in hashed per-org groups. Typed edges and `as_of` queries live in a local SQLite graph inside the adapter, and tainted records are never sent to Graphiti. The record → episode index is persisted in that SQLite file, so erasure still finds episodes after a restart; a removal failure raises `MemoryErasureIncomplete`.
 
@@ -194,5 +194,4 @@ These numbers measure the deterministic layers only: dedupe, typed storage and b
 
 - Decision-gated eval numbers with a calibrated backend.
 - Agent adoption of `memory_block_for_prompt` (the library seam exists; no agent node is wired yet).
-- A public `CronExecutor` scheduling API.
 - The notebook (tracked in the separate `prisma-notebooks` repository).

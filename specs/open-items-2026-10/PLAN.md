@@ -70,9 +70,10 @@ Order is by how much each item unblocks.
   method that schedules a Python callable.
 - **Fix.** Add `CronExecutor.add_callable(name, func, *, cron, timezone=None, replace=True)`.
   It validates the cron expression the same way `add` does, uses the `DateTimeService` timezone
-  and returns the job id. Then refactor `register_consolidation_job` to use it. The existing
-  `_cron_trigger` seam stays, because the test gotcha patches module seams and never
-  `apscheduler` itself.
+  and returns the job id. Then refactor `register_consolidation_job` to use it.
+  *(As built: the crontab trigger seam moved from `consolidation._cron_trigger`
+  to `scheduler.executor._crontab_trigger`, and cron validation is syntactic
+  (five fields), so it still works when `apscheduler` is a test stub.)*
 - **Tests first.**
   - Unit tests on `add_callable` (valid/invalid cron, replace semantics, timezone).
   - The consolidation tests pass unchanged.

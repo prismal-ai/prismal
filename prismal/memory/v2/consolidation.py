@@ -509,13 +509,6 @@ class Consolidator:
             st.errors.append(f"playbooks:{type(exc).__name__}")
 
 
-def _cron_trigger(expr: str, tz: Any) -> Any:
-    """Build the APScheduler crontab trigger (deferred import; seam for tests)."""
-    from apscheduler.triggers.cron import CronTrigger
-
-    return CronTrigger.from_crontab(expr, timezone=tz)
-
-
 def register_consolidation_job(
     executor: CronExecutor,
     *,
@@ -527,15 +520,11 @@ def register_consolidation_job(
 
     Orgs run sequentially (per-org serialization; ``max_instances=1`` prevents
     overlapping ticks); a failing org is counted and does not stop the others.
-    ``CronExecutor`` only schedules agent-graph tasks publicly, so the job is added
-    to its APScheduler instance directly (same timezone resolution as its own jobs).
+    The job is scheduled through ``CronExecutor.add_callable`` (scheduler timezone).
     """
-    scheduler = getattr(executor, "_scheduler", None)
-    if scheduler is None or not hasattr(scheduler, "add_job"):
-        raise MemoryConfigError("consolidation needs a CronExecutor with an APScheduler")
-    dts = getattr(executor, "_dts", None)
-    tz = dts.get_scheduler_tz() if dts is not None else None
-    trigger = _cron_trigger(settings.memory_consolidation_cron, tz)
+    add_callable = getattr(executor, "add_callable", None)
+    if not callable(add_callable):
+        raise MemoryConfigError("consolidation needs a CronExecutor (add_callable)")
 
     async def tick() -> list[ConsolidationReport]:
         reports: list[ConsolidationReport] = []
@@ -546,15 +535,14 @@ def register_consolidation_job(
                 _count("error")
         return reports
 
-    scheduler.add_job(
+    job_id: str = add_callable(
+        CONSOLIDATION_JOB_ID,
         tick,
-        trigger,
-        id=CONSOLIDATION_JOB_ID,
-        replace_existing=True,
+        cron=settings.memory_consolidation_cron,
         max_instances=1,
         coalesce=True,
     )
-    return CONSOLIDATION_JOB_ID
+    return job_id
 
 
 __all__ = [
