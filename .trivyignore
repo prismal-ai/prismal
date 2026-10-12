@@ -68,6 +68,7 @@ CVE-2026-45829
 # org_id)`, no el RBAC de Chroma -> ningun vector expuesto. Mismo ignore en
 # pip-audit (ci.yml + .pre-commit-config.yaml).
 # Re-verificado 2026-10-11 en OSV (last_affected 1.5.9, sin fix).
+# Guard: tests/unit/security/test_unpatched_dependency_surface.py.
 # TRIGGER de re-evaluacion: chromadb publica version con fix -> subir y quitar.
 CVE-2026-45830
 CVE-2026-45831
@@ -80,6 +81,7 @@ CVE-2026-45833
 # llmlingua (extra opcional `[compression]`, TKE8); prismal no llama a ninguna
 # API de nltk ni pasa rutas de usuario. Mismo ignore en pip-audit.
 # Re-verificado 2026-10-11 en OSV (last_affected 3.10.3, sin fix).
+# Guard: tests/unit/security/test_unpatched_dependency_surface.py.
 # TRIGGER de re-evaluacion: nltk publica version con fix -> quitar ignore.
 CVE-2026-81726
 
