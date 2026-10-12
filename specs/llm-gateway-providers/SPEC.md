@@ -222,12 +222,12 @@ def load_opencode_model_protocols(path: str | None = None) -> dict[str, dict[str
     """Load config/opencode_models.yaml ({'zen': {id: protocol}, 'go': {id: protocol}}). A bad shape
     raises GatewayConfigError at load time."""
 ```
-- THE SYSTEM SHALL map `gw:opencode/<id>` to base `opencode_zen_base_url` (default `https://opencode.ai/zen/v1`) and `gw:opencode-go/<id>` to `opencode_go_base_url` (default `https://opencode.ai/zen/go/v1`) **[verify]**.
+- THE SYSTEM SHALL map `gw:opencode/<id>` to base `opencode_zen_base_url` (default `https://opencode.ai/inference/v1` — amended 2026-10-12, GW0-05: the docs moved off `/zen/v1`) and `gw:opencode-go/<id>` to `opencode_go_base_url` (default `https://opencode.ai/inference/go/v1`) **[verify]**.
 - WHEN the model's protocol is `openai_chat`, THE SYSTEM SHALL use `litellm_model="openai/<id>"`; WHEN it is `anthropic_messages`, `"anthropic/<id>"`; WHEN it is `openai_responses`, `"openai/responses/<id>"` **[verify LiteLLM support]**. All three use `api_base` = the plan's base URL.
 - IF a model id is absent from the protocol map, THEN THE SYSTEM SHALL raise `GatewayConfigError("unknown_opencode_model")`. Protocols are never guessed.
 - THE SYSTEM SHALL send `User-Agent: prismal/<package version>` and `x-opencode-session: sha256(org_id + ":" + session_id)[:32]`, which is stable for a session and never the raw id.
 - WHERE the plan is `go` and `agent` is not in `opencode_go_allowed_agents` (default `["coder","codeact_agent","dev_pipeline","code_review"]`), THE SYSTEM SHALL raise `GatewayPolicyError("opencode_go_agent_not_allowed")` before any network I/O, and SHALL treat `agent=None` as not allowed.
-- IF the upstream model matches `opencode_denied_models` (default `["grok*","muse-spark*","deepseek-v4-flash*"]` — amended 2026-10-05 (GW0-06): the DeepSeek ZDR ended 2026-08-31 and V4 Flash is now used for training), THEN THE SYSTEM SHALL raise `GatewayPolicyError("retention_denied_model")`.
+- IF the upstream model matches `opencode_denied_models` (default `["grok*","muse-spark*","deepseek-v4-flash*","big-pickle","exo-free","mimo-*-free","ling-*-free","nemotron-*-free"]` — amended 2026-10-05 (GW0-06): the DeepSeek ZDR ended 2026-08-31 and V4 Flash is now used for training; amended 2026-10-12 (GW0-06): free tiers whose data may train the upstream model and NVIDIA trial endpoints), THEN THE SYSTEM SHALL raise `GatewayPolicyError("retention_denied_model")`.
 - WHERE the plan is `go`, THE SYSTEM SHALL set `cost_mode="subscription"`.
 
 ## SPEC-GW-OMNI-001: OmniRoute (`gateways/omniroute.py`)
@@ -383,7 +383,7 @@ def build_runtime(settings: Settings | None = None, *, org_id: str | None = None
 | `opencode_zen_enabled` / `opencode_go_enabled` / `opencode_api_key` | `bool` / `bool` / `SecretStr` | `False` / `False` / `""` | |
 | `opencode_zen_base_url` / `opencode_go_base_url` | `str` | see SPEC-GW-OC-001 | |
 | `opencode_model_protocols_path` / `opencode_refresh_models` | `str` / `bool` | `config/opencode_models.yaml` / `False` | Protocol map; refresh from `/v1/models` |
-| `opencode_go_allowed_agents` / `opencode_denied_models` | `list[str]` | 4 coding agents / `["grok*","muse-spark*","deepseek-v4-flash*"]` | ToS guard; retention deny-list (amended GW0-06) |
+| `opencode_go_allowed_agents` / `opencode_denied_models` | `list[str]` | 4 coding agents / `["grok*","muse-spark*","deepseek-v4-flash*","big-pickle","exo-free","mimo-*-free","ling-*-free","nemotron-*-free"]` | ToS guard; retention/training deny-list (amended GW0-06, 2026-10-05 and 2026-10-12) |
 | `opencode_go_monthly_cap_usd` | `float` | `0.0` | `0` = ledger disabled |
 | `opencode_go_window_5h_ratio` / `_week_ratio` | `float` | `0.20` / `0.50` | |
 | `opencode_go_quota_action` / `opencode_go_downgrade_model` | `str` / `str \| None` | `"refuse"` / `None` | `refuse`\|`downgrade` (model required for downgrade) |

@@ -38,7 +38,7 @@ def _go_ledger(clock: Clock | None = None, **kw: Any) -> QuotaLedger:
 def _llm(client: FakeClient, **kw: Any) -> GatewayChatLiteLLM:
     base: dict[str, Any] = {
         "model": "openai/glm-5.3",
-        "api_base": "https://opencode.ai/zen/go/v1",
+        "api_base": "https://opencode.ai/inference/go/v1",
         "api_key": SENTINEL,
         "gateway_name": "opencode-go",
         "resolved_model_ref": "gw:opencode-go/glm-5.3",

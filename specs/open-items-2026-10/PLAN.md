@@ -137,7 +137,7 @@ Order is by how much each item unblocks.
 - DEC3-07: ≥ 300 labelled Spanish cases per decision. DEC3-09: per-question latency profile.
 - DEC6-07: re-run the injection corpus against the real Ollama models.
 - DEC0-08: reproduce the Laya benchmarks on our hardware.
-- Refresh `config/opencode_models.yaml`, which is illustrative today.
+- ~~Refresh `config/opencode_models.yaml`, which is illustrative today.~~ Done 2026-10-12: regenerated from the docs tables, bases moved to `/inference/…`, deny-list extended (VERIFY.md GW0-05/06).
 
 ## 4. Deferred by design (no action)
 

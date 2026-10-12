@@ -979,10 +979,10 @@ class Settings(BaseSettings):
     opencode_go_enabled: bool = Field(default=False, description="Enable OpenCode Go.")
     opencode_api_key: SecretStr = Field(default=SecretStr(""), description="OpenCode key.")
     opencode_zen_base_url: str = Field(
-        default="https://opencode.ai/zen/v1", description="OpenCode Zen API base URL."
+        default="https://opencode.ai/inference/v1", description="OpenCode Zen API base URL."
     )
     opencode_go_base_url: str = Field(
-        default="https://opencode.ai/zen/go/v1", description="OpenCode Go API base URL."
+        default="https://opencode.ai/inference/go/v1", description="OpenCode Go API base URL."
     )
     opencode_model_protocols_path: str = Field(
         default="config/opencode_models.yaml", description="Per-model wire-protocol map."
@@ -995,8 +995,19 @@ class Settings(BaseSettings):
         description="Agents allowed on OpenCode Go (ToS: coding agents only).",
     )
     opencode_denied_models: list[str] = Field(
-        default_factory=lambda: ["grok*", "muse-spark*", "deepseek-v4-flash*"],
-        description="Retention deny-list (fnmatch, case-insensitive) — VERIFY.md GW0-06.",
+        default_factory=lambda: [
+            "grok*",
+            "muse-spark*",
+            "deepseek-v4-flash*",
+            # Free tiers whose data may train the upstream model, or NVIDIA
+            # "trial use only" endpoints (VERIFY.md GW0-06, 2026-10-12).
+            "big-pickle",
+            "exo-free",
+            "mimo-*-free",
+            "ling-*-free",
+            "nemotron-*-free",
+        ],
+        description="Retention/training deny-list (fnmatch, case-insensitive) — VERIFY.md GW0-06.",
     )
     opencode_go_monthly_cap_usd: float = Field(
         default=0.0, ge=0.0, description="Go monthly allowance in USD; 0 disables the ledger."

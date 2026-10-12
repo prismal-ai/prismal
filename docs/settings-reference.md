@@ -330,12 +330,12 @@ Secret fields never show a default. Regenerate this page and
 | `PRISMAL_OPENCODE_ZEN_ENABLED` | `bool` | `false` | Enable OpenCode Zen. |
 | `PRISMAL_OPENCODE_GO_ENABLED` | `bool` | `false` | Enable OpenCode Go. |
 | `PRISMAL_OPENCODE_API_KEY` | `SecretStr` | *(secret)* | OpenCode key. |
-| `PRISMAL_OPENCODE_ZEN_BASE_URL` | `str` | `https://opencode.ai/zen/v1` | OpenCode Zen API base URL. |
-| `PRISMAL_OPENCODE_GO_BASE_URL` | `str` | `https://opencode.ai/zen/go/v1` | OpenCode Go API base URL. |
+| `PRISMAL_OPENCODE_ZEN_BASE_URL` | `str` | `https://opencode.ai/inference/v1` | OpenCode Zen API base URL. |
+| `PRISMAL_OPENCODE_GO_BASE_URL` | `str` | `https://opencode.ai/inference/go/v1` | OpenCode Go API base URL. |
 | `PRISMAL_OPENCODE_MODEL_PROTOCOLS_PATH` | `str` | `config/opencode_models.yaml` | Per-model wire-protocol map. |
 | `PRISMAL_OPENCODE_REFRESH_MODELS` | `bool` | `false` | Refresh the protocol map from /v1/models at startup. |
 | `PRISMAL_OPENCODE_GO_ALLOWED_AGENTS` | `list[str]` | `["coder", "codeact_agent", "dev_pipeline", "code_review"]` | Agents allowed on OpenCode Go (ToS: coding agents only). |
-| `PRISMAL_OPENCODE_DENIED_MODELS` | `list[str]` | `["grok*", "muse-spark*", "deepseek-v4-flash*"]` | Retention deny-list (fnmatch, case-insensitive) — VERIFY.md GW0-06. |
+| `PRISMAL_OPENCODE_DENIED_MODELS` | `list[str]` | `["grok*", "muse-spark*", "deepseek-v4-flash*", "big-pickle", "exo-free", "mimo-*-free", "ling-*-free", "nemotron-*-free"]` | Retention/training deny-list (fnmatch, case-insensitive) — VERIFY.md GW0-06. |
 | `PRISMAL_OPENCODE_GO_MONTHLY_CAP_USD` | `float` | `0.0` | Go monthly allowance in USD; 0 disables the ledger. |
 | `PRISMAL_OPENCODE_GO_WINDOW_5H_RATIO` | `float` | `0.2` | 5 h window ratio. |
 | `PRISMAL_OPENCODE_GO_WINDOW_WEEK_RATIO` | `float` | `0.5` | Weekly ratio. |
