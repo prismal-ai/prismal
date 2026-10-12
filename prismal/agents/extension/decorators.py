@@ -74,6 +74,8 @@ class NodeMetadata:
     # default to None, so every pre-existing construction site is unaffected.
     input_model: type[BaseModel] | None = None
     output_model: type[BaseModel] | None = None
+    # Re-raise the node's own exception unchanged (no mapping, no wrapping).
+    propagate_errors: bool = False
 
 
 def prismal_node(
@@ -87,6 +89,7 @@ def prismal_node(
     raise_on_error: bool = False,
     input_model: type[BaseModel] | None = None,
     output_model: type[BaseModel] | None = None,
+    propagate_errors: bool = False,
 ) -> Callable[[_NodeFnT], _NodeFnT]:
     """Wrap a LangGraph node with prismal cross-cutting middleware.
 
@@ -118,6 +121,11 @@ def prismal_node(
         output_model: Optional Pydantic model describing the subset of the
             returned ``state_update`` this node produces. ``None`` (default)
             disables output validation.
+        propagate_errors: If True, re-raise the node's own exception unchanged
+            (overrides ``raise_on_error``): for built-in nodes that adopt I/O
+            contracts without changing how their failures reach the graph.
+            A HITL pause (``interrupt()``) always bubbles up unchanged, whatever
+            this is set to; a ``ParentCommand`` is mapped, never passed through.
 
     Returns:
         A decorator that returns the wrapped ``NodeFn`` with two attributes:
@@ -143,6 +151,7 @@ def prismal_node(
             source_module=fn.__module__,
             input_model=input_model,
             output_model=output_model,
+            propagate_errors=propagate_errors,
         )
         pipeline = build_pipeline(fn, metadata)
 

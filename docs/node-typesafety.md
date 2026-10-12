@@ -79,7 +79,12 @@ builder.add_node("classify", classify_fn, input_model=ClassifyInput, output_mode
 1. Ship with the feature **off** (the default) — invisible to every deployment.
 2. Annotate high-value / security-sensitive nodes first. The in-repo pilots are
    `file_manager`, `cron_manager`, and `skill_manager` — nodes whose writes have
-   cross-cutting consequences if silently wrong.
+   cross-cutting consequences if silently wrong. **NTS.1 batch 1** adds
+   `coder`, `researcher`, `data_analyst` (same `{current_agent, messages}`
+   shape), `planner` (`task_plan` / `pending_tasks` / `completed_tasks` must be
+   lists of strings, plus `metadata`) and `critic` (`iteration_count >= 0` on
+   the way in and out, so a corrupted reflection counter is caught before the
+   LLM call).
 3. Turn the feature on in **`warn`** and observe
    `prismal.node_io_validation_failures_total{node,direction}` for a period.
 4. Promote individual nodes to **`enforce`** only after a clean `warn` window.
@@ -106,8 +111,15 @@ convention of `NodeExecutionError`.
 - `AgentState` itself is **unchanged** — the models are boundary projections, not
   the graph's state schema (LangGraph's reducer machinery stays on the
   `TypedDict`). See `specs/node-io-typesafety/ARCHITECTURE.md` DD-NTS-003.
-- Only the three pilot nodes are annotated in this phase; broad migration of the
-  remaining specialist nodes is a follow-up.
+- Annotated so far: the three pilots and NTS.1 batch 1 (`coder`, `researcher`,
+  `data_analyst`, `planner`, `critic`). The remaining specialists (`rag_agent`,
+  `parallel_research`, `codeact`, `cua`) are a later batch.
+- Built-in nodes adopt contracts with `propagate_errors=True`, so their
+  failures still reach the graph exactly as before: the default
+  `error_mapping` would turn them into an error update that replaces the whole
+  `metadata` dict. An `interrupt()` (HITL pause) always bubbles up from a
+  decorated node, and is never retried. A `ParentCommand` is mapped and never
+  passed through, because it would skip the output-side controls.
 - A pluggable non-Pydantic validation engine (`NodeIOValidatorPort`) is designed
   but deferred (DD-NTS-004).
 

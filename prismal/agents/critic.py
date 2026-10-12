@@ -7,10 +7,12 @@ when the score falls below the acceptance threshold.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import SystemMessage
+from pydantic import BaseModel, Field
 
+from prismal.agents.extension.decorators import prismal_node
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
 from prismal.core.logging import get_logger
@@ -136,6 +138,34 @@ Problems:
 """
 
 
+class CriticInput(BaseModel):
+    """Narrow input contract for ``critic_node`` (Phase NTS.1, batch 1).
+
+    A boundary projection of ``AgentState`` — only the keys the node reads.
+    ``messages`` stays untyped (``list``), as in the NTS pilots.
+    """
+
+    messages: list[Any]
+    session_id: str
+    iteration_count: int = Field(default=0, ge=0)
+
+
+class CriticOutput(BaseModel):
+    """Narrow output contract for ``critic_node`` (Phase NTS.1, batch 1)."""
+
+    current_agent: str
+    messages: list[Any]
+    iteration_count: int = Field(ge=0)
+
+
+@prismal_node(
+    name="critic",
+    security="off",
+    audit=False,
+    input_model=CriticInput,
+    output_model=CriticOutput,
+    propagate_errors=True,
+)
 async def critic_node(state: AgentState) -> dict[str, object]:
     """Execute the critic sub-agent node with a ReAct tool loop.
 

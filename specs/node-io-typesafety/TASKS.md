@@ -128,3 +128,15 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`. **IMPLEMENTED 2026-07-05 
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | 1.0 | 2026-07-04 | Ernesto Crespo | Initial draft from gap-analysis (docs/gap-analysis-loops-harness-guardrails-2026-07.md, item #5) and README Roadmap item 8 |
+
+## NTS.1 — batch 1 (2026-10-12, DONE)
+
+| ID | Task | Status |
+|---|---|---|
+| NTS.1-01 | `@prismal_node(propagate_errors=True)`: built-in nodes keep their error semantics. Fix: `GraphInterrupt` always bubbles up and is never retried; `ParentCommand` is still mapped (security review) | DONE |
+| NTS.1-02 | `coder`, `researcher`, `data_analyst`: `{messages, session_id}` → `{current_agent, messages}` | DONE |
+| NTS.1-03 | `planner`: output adds `task_plan` / `pending_tasks` / `completed_tasks: list[str]` and `metadata` | DONE |
+| NTS.1-04 | `critic`: `iteration_count >= 0` on input and output | DONE |
+| NTS.1-05 | Drift guard extended (`test_node_io_schema_field_names.py`); `enforce` end-to-end test on the real nodes (`test_nts1_batch1_enforce.py`) | DONE |
+
+Next batch: `rag_agent` (types part of `metadata`), `parallel_research` (`parallel_results` is an `operator.add` channel), `codeact`, `cua`.
