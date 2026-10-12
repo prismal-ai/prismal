@@ -142,7 +142,7 @@ mongodb = [
 local-embeddings = [
   "torch>=2.6",            # >=2.6 neutralizes CVE-2026-1839 (transformers Trainer torch.load)
   "transformers>=5.3.0",   # >=5.3.0 fixes CVE-2026-4372 (RCE); earlier 4.x only on py>=3.14
-  "accelerate>=1.2.1",
+  "accelerate>=1.15.0",    # >=1.15.0 fixes CVE-2026-69112 (sharded checkpoint path traversal)
 ]
 
 # Ollama local LLM support
