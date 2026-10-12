@@ -259,7 +259,7 @@ async def test_lazy_store_built_when_not_injected(monkeypatch: pytest.MonkeyPatc
         built.append(settings)
         return store
 
-    monkeypatch.setattr(cc, "build_artifact_store", fake_build)
+    monkeypatch.setattr(cc, "shared_artifact_store", fake_build)
     settings = _settings()
     compactor = ContextCompactor(settings=settings)
     result = await compactor.mask_observations(_history(), run_id="r", tenant="t")

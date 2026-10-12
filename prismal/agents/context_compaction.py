@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, ToolMessage
 
-from prismal.agents.artifacts import anonymous_run_id, build_artifact_store
+from prismal.agents.artifacts import anonymous_run_id, shared_artifact_store
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
 from prismal.utils.token_estimate import estimate_tokens
@@ -386,7 +386,7 @@ class ContextCompactor:
 
     def _store(self) -> ArtifactStorePort:
         if self._artifact_store is None:
-            self._artifact_store = build_artifact_store(self._settings)
+            self._artifact_store = shared_artifact_store(self._settings)
         return self._artifact_store
 
     def _mask(

@@ -363,6 +363,26 @@ def build_artifact_store(settings: Settings | None = None) -> ArtifactStorePort:
     raise ArtifactStoreError(f"unknown artifact store backend: {backend!r}")
 
 
+# One store per backend (and SQLite path) per process: the compactor, the
+# tool-output budget and ``read_artifact`` must see the same artifacts. Runs stay
+# isolated by the (tenant, run_id) scope every get/put carries.
+_SHARED_STORES: dict[tuple[str, str], ArtifactStorePort] = {}
+_SHARED_LOCK = threading.Lock()
+
+
+def shared_artifact_store(settings: Settings | None = None) -> ArtifactStorePort:
+    """Return the process-wide store for ``settings.artifact_store_backend``."""
+    resolved = settings if settings is not None else get_settings()
+    path = resolved.artifact_store_path if resolved.artifact_store_backend == "sqlite" else ""
+    key = (resolved.artifact_store_backend, path)
+    with _SHARED_LOCK:
+        store = _SHARED_STORES.get(key)
+        if store is None:
+            store = build_artifact_store(resolved)
+            _SHARED_STORES[key] = store
+        return store
+
+
 def anonymous_run_id() -> str:
     """A fresh, unguessable run scope for callers without a ``session_id``.
 
@@ -421,4 +441,5 @@ __all__ = [
     "anonymous_run_id",
     "build_artifact_store",
     "make_read_artifact_tool",
+    "shared_artifact_store",
 ]
