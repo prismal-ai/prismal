@@ -11,8 +11,13 @@ from typing import get_type_hints
 
 import pytest
 
+from prismal.agents.coder import CoderInput, CoderOutput
+from prismal.agents.critic import CriticInput, CriticOutput
 from prismal.agents.cron_manager import CronManagerInput, CronManagerOutput
+from prismal.agents.data_analyst import DataAnalystInput, DataAnalystOutput
 from prismal.agents.file_manager import FileManagerInput, FileManagerOutput
+from prismal.agents.planner import PlannerInput, PlannerOutput
+from prismal.agents.researcher import ResearcherInput, ResearcherOutput
 from prismal.agents.skill_manager import SkillManagerInput, SkillManagerOutput
 from prismal.agents.state import AgentState
 
@@ -23,6 +28,17 @@ _PILOT_MODELS = [
     CronManagerOutput,
     SkillManagerInput,
     SkillManagerOutput,
+    # NTS.1 batch 1
+    CoderInput,
+    CoderOutput,
+    ResearcherInput,
+    ResearcherOutput,
+    DataAnalystInput,
+    DataAnalystOutput,
+    PlannerInput,
+    PlannerOutput,
+    CriticInput,
+    CriticOutput,
 ]
 
 
