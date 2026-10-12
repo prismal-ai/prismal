@@ -98,6 +98,26 @@ def test_sqlite_increments_are_atomic_under_concurrency(tmp_path: Path) -> None:
     assert (total.total_tokens, total.calls) == (200, 200)
 
 
+def test_opening_waits_for_a_writer_holding_the_lock(tmp_path: Path) -> None:
+    """SQLite skips busy_timeout on the WAL switch: a worker opening the store
+    while another holds the write lock must wait, not fail ``database is locked``."""
+    import sqlite3
+
+    path = tmp_path / "quota.db"
+    holder = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
+    holder.execute("BEGIN IMMEDIATE")
+    holder.execute("CREATE TABLE t (x)")
+    release = threading.Timer(0.3, holder.execute, args=("COMMIT",))
+    release.start()
+    try:
+        store = SqliteTenantQuotaStore(path, timeout_s=5.0)
+    finally:
+        release.join()
+        holder.close()
+    store.add("acme", "2026-10", _call(1, 0.0))
+    assert store.get("acme", "2026-10").calls == 1
+
+
 # ── meter + guard ───────────────────────────────────────────────────────────
 
 

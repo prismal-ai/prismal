@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+import time
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
@@ -110,7 +111,21 @@ class SqliteTenantQuotaStore:
         self._timeout_s = timeout_s
         if self._path != ":memory:":
             Path(self._path).parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
+        # SQLite does not apply busy_timeout to the WAL switch, so a worker
+        # opening the store while another holds the write lock retries here.
+        deadline = time.monotonic() + timeout_s
+        while True:
+            try:
+                self._init_schema()
+                return
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc) or time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.01)
+
+    def _init_schema(self) -> None:
+        conn = self._connect()
+        try:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS budget_tenant_quota ("
@@ -122,6 +137,8 @@ class SqliteTenantQuotaStore:
                 " wall_clock_s REAL NOT NULL DEFAULT 0,"
                 " PRIMARY KEY (org_id, window))"
             )
+        finally:
+            conn.close()
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._path, timeout=self._timeout_s, isolation_level=None)
