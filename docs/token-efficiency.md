@@ -84,8 +84,13 @@ Use **`ollama_chat/`**, not `ollama/`. With `ollama/`, LiteLLM calls
 then failed a three-call tool loop: it printed the call as text or repeated it
 forever. `ollama_chat/` uses Ollama's native tool calling.
 
-**The gate blocks.** Under those conditions, repeat runs agree to within
-10 tokens (0.1 %), so `token-gate` runs without `--report-only`. The earlier
+**The gate blocks.** Under those conditions, back-to-back repeat runs agree
+to within 10 tokens (0.1 %), so `token-gate` runs without `--report-only`.
+Across a model reload they are only near-deterministic. Later the same day,
+`seq-001` (a 5-hop chain) stopped one hop early in **every** arm, A included:
+4 tool calls instead of 5, and a wrong sum. The cause was the code before and
+after a rebase being run on a reloaded model, not TKE. Compare arms only
+inside one session, and repeat a case whose result flips. The earlier
 +12.7 % "variance" had two causes:
 
 - the eval runner reused a fixed thread id against the on-disk checkpointer,
