@@ -72,6 +72,16 @@ calls per task, solve rate 1.0. The cache-hit ratio and cost are 0 because local
 Ollama reports neither. The PLAN §4 savings targets still need the TKE9-04 A/B
 run with the TKE flags on.
 
+**Keep `--report-only` for now.** A second identical run on 2026-10-12 measured
+3,556.5 tokens per successful task (+12.7 %), so `token-gate` flagged it as a
+regression. The cause is run-to-run variance, not a code change: qwen3 is a
+reasoning model, and at temperature 0.7 the length of its thinking varies.
+Before the gate can block, either pin generation (temperature 0 or a
+non-reasoning model for eval), or baseline on the mean of several runs and size
+the tolerance to the measured spread. Also, a live `prismal.eval run` does not
+exit by itself after writing its results (a LiteLLM coroutine is left pending).
+Wrap it in `timeout` until that is fixed.
+
 ## TKE2 — Prompt caching and a cache-stable layout
 
 `ProviderRegistry.get_llm(..., agent=)` returns a `CacheAwareChatModel`
