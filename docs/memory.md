@@ -195,4 +195,4 @@ These numbers measure the deterministic layers only: dedupe, typed storage and b
 - Decision-gated eval numbers with a calibrated backend.
 - Agent adoption of `memory_block_for_prompt` (the library seam exists; no agent node is wired yet).
 - A public `CronExecutor` scheduling API.
-- The notebook.
+- The notebook (tracked in the separate `prisma-notebooks` repository).
