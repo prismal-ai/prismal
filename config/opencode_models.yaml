@@ -1,19 +1,23 @@
 # OpenCode Zen / Go per-model wire protocols (Phase GW — SPEC-GW-OC-001, DD-GW-008).
 #
-# Sources (read 2026-10-05):
-#   https://opencode.ai/docs/zen  — base https://opencode.ai/zen/v1
-#   https://opencode.ai/docs/go   — base https://opencode.ai/zen/go/v1
+# Sources (read 2026-10-12; the opencode.ai/docs/zen and /docs/go pages now 404):
+#   anomalyco/opencode@dev services/www/src/docs/content/console/models.mdx
+#     — Zen, base https://opencode.ai/inference/v1
+#   anomalyco/opencode@dev services/www/src/docs/content/console/go.mdx
+#     — Go, base https://opencode.ai/inference/go/v1
+#   cross-checked against GET <base>/models (the old /zen/v1 and /zen/go/v1
+#   bases still answer, but are no longer documented).
 #
-# Illustrative; refresh_protocols() or edit to update.
+# Regenerate from those tables; refresh_protocols() or edit to update.
 #
 # Protocols: openai_chat (/chat/completions), anthropic_messages (/messages),
 # openai_responses (/responses). An id absent from this map raises
 # GatewayConfigError("unknown_opencode_model") — protocols are never guessed.
 # Deliberately omitted: Google-native Gemini models (/models/{id}, VERIFY.md
 # GW0-05) and the Jev models served on /systemone — neither is a supported
-# WireProtocol. Retention-denied ids (grok*, muse-spark*, deepseek-v4-flash*,
-# VERIFY.md GW0-06) are listed for completeness; the deny-list refuses them
-# before resolution.
+# WireProtocol. Ids on the retention/training deny-list
+# (settings.opencode_denied_models, VERIFY.md GW0-06) are listed for
+# completeness; the deny-list refuses them before resolution.
 
 zen:
   # /responses
@@ -57,9 +61,11 @@ zen:
   claude-opus-4-7: anthropic_messages
   claude-opus-4-6: anthropic_messages
   claude-opus-4-5: anthropic_messages
+  claude-sonnet-5-5: anthropic_messages
   claude-sonnet-5: anthropic_messages
   claude-sonnet-4-6: anthropic_messages
   claude-sonnet-4-5: anthropic_messages
+  claude-haiku-5-5: anthropic_messages
   claude-haiku-4-5: anthropic_messages
   qwen3.8-flash: anthropic_messages
   qwen3.7-max: anthropic_messages
@@ -80,14 +86,16 @@ zen:
   glm-5.2: openai_chat
   glm-5.1: openai_chat
   glm-5: openai_chat
-  kimi-k3: openai_chat
-  kimi-k2.7-code: openai_chat
-  kimi-k2.6: openai_chat
   kimi-k2.5: openai_chat
+  kimi-k2.6: openai_chat
+  kimi-k2.7-code: openai_chat
+  kimi-k3: openai_chat
+  mistral-large-4: openai_chat
   big-pickle: openai_chat
   space-bunny-free: openai_chat
   longcat-2.5-preview-free: openai_chat
-  fledge-alpha-free: openai_chat
+  step-5-preview-free: openai_chat
+  exo-free: openai_chat
   mimo-v2.6-flash-free: openai_chat
   mimo-v2.5-free: openai_chat
   ling-3.1-flash-free: openai_chat
@@ -104,6 +112,7 @@ go:
   muse-spark-1.3-contributor: openai_responses
   muse-spark-1.2-contributor: openai_responses
   # /messages
+  claude-haiku-5-5: anthropic_messages
   minimax-m3: anthropic_messages
   minimax-m2.7: anthropic_messages
   qwen3.8-max: anthropic_messages
@@ -117,7 +126,6 @@ go:
   kimi-k2.7-code: openai_chat
   kimi-k2.6: openai_chat
   longcat-2.0: openai_chat
-  longcat-2.5-preview-free: openai_chat
   deepseek-v4.1-flash: openai_chat
   deepseek-v4-pro: openai_chat
   deepseek-v4-flash: openai_chat
@@ -128,4 +136,6 @@ go:
   mimo-v2.5-pro: openai_chat
   hy4-preview: openai_chat
   hy3: openai_chat
-  space-bunny-free: openai_chat
+  space-bunny: openai_chat
+  longcat-2.5-preview-free: openai_chat
+  step-5-preview-free: openai_chat

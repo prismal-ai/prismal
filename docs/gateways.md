@@ -116,8 +116,10 @@ because their availability under ZDR is undocumented.
 
 ## OpenCode Zen and Go
 
-- **Endpoints.** `gw:opencode/<id>` uses Zen (`https://opencode.ai/zen/v1`) and
-  `gw:opencode-go/<id>` uses Go (`https://opencode.ai/zen/go/v1`).
+- **Endpoints.** `gw:opencode/<id>` uses Zen (`https://opencode.ai/inference/v1`)
+  and `gw:opencode-go/<id>` uses Go (`https://opencode.ai/inference/go/v1`), the
+  bases documented since 2026-10 (the older `/zen/v1` and `/zen/go/v1` still
+  answer but are undocumented; override with `opencode_{zen,go}_base_url`).
 - **Protocol map.** Each model speaks one protocol, configured in
   `config/opencode_models.yaml`: `openai_chat` → `openai/<id>`,
   `anthropic_messages` → `anthropic/<id>`, `openai_responses` →

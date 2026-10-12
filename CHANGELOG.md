@@ -94,7 +94,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `tests/eval/baselines/tokens.json` is committed (TKE1-08; smoke suite, local
   Ollama `qwen3:14b`). TKE9-04 (A/B with the TKE flags on) is unblocked.
 
+### Changed
+- OpenCode defaults follow the 2026-10 docs: `opencode_zen_base_url` =
+  `https://opencode.ai/inference/v1`, `opencode_go_base_url` =
+  `https://opencode.ai/inference/go/v1` (the old `/zen/...` bases still answer
+  but are undocumented). `config/opencode_models.yaml` regenerated from the
+  docs' tables: Zen adds `claude-haiku-5-5`, `claude-sonnet-5-5`,
+  `mistral-large-4`, `exo-free`, `step-5-preview-free` and drops
+  `fledge-alpha-free`; Go adds `claude-haiku-5-5`, `space-bunny`,
+  `step-5-preview-free` and drops `space-bunny-free`.
+
 ### Security
+- OpenCode deny-list (`opencode_denied_models`) now also refuses the free
+  tiers whose data may train the upstream model and NVIDIA's "trial use only"
+  endpoints: `big-pickle`, `exo-free`, `mimo-*-free`, `ling-*-free`,
+  `nemotron-*-free` (VERIFY.md GW0-06, re-verified 2026-10-12).
 - `mako` 1.3.12 → 1.4.3 (lock; transitive via `alembic` / `prefect`) — fixes
   CVE-2026-102991 (GHSA-5639-2j2p-m4mx, `TemplateLookup` path traversal).
 - `accelerate` 1.13.0 → 1.15.0 and floor `accelerate>=1.15.0` in
