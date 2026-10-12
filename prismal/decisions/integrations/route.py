@@ -114,6 +114,7 @@ def route_rule_hook(
     from prismal.agents.intent_router import match_intent
 
     def hook(state: Mapping[str, str], question: QuestionSpec) -> Decision | None:
+        """Certain decision for the ``match_intent`` route when valid, else ``None``."""
         text = _unfence(state.get("user", ""))
         intent = match_intent(text)
         if intent is None or intent not in valid_routes or intent not in question.labels():
@@ -211,6 +212,7 @@ class RouteOutcome:
             self._shadow.record_reference(route)
 
     async def wait(self) -> None:
+        """Wait until the shadow comparison (if any) has been recorded."""
         if self._shadow is not None:
             await self._shadow.wait()
 

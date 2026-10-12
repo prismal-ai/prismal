@@ -56,6 +56,7 @@ class LlmFallbackDecisionAdapter:
         self._llm_factory = llm_factory
 
     def supports(self, question: QuestionSpec, *, language: str) -> bool:  # noqa: ARG002
+        """The LLM tier supports every question."""
         return True
 
     async def decide(
@@ -65,6 +66,11 @@ class LlmFallbackDecisionAdapter:
         *,
         policy: GatePolicy,
     ) -> Mapping[str, Decision]:
+        """Ask the LLM once per question via structured output over the label set.
+
+        A denied budget check abstains that question; an answer outside the labels
+        is a backend error (handled by ``guarded_decide``).
+        """
         return await guarded_decide(self, questions, policy, lambda qs: self._decide(state, qs))
 
     def _llm(self) -> Any:
@@ -128,7 +134,7 @@ class LlmFallbackDecisionAdapter:
             logger.warning("decision_llm_metering_failed", error_type=type(exc).__name__)
 
     async def aclose(self) -> None:
-        return None
+        """Nothing to release."""
 
 
 def _system_prompt(q: QuestionSpec) -> str:

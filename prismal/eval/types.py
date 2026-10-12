@@ -93,6 +93,9 @@ class Trajectory:
     cache_read_tokens: int = 0
     llm_calls: int = 0
     input_cost_usd: float = 0.0
+    # Where the token/cost figures came from: ``callbacks`` (every LLM call of the
+    # run, incl. internal routing calls) or ``messages`` (usage on streamed messages).
+    usage_source: str = "messages"
 
 
 @dataclass(frozen=True)

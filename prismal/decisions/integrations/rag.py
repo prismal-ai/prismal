@@ -99,6 +99,7 @@ class CandidateDecisions:
         self._handles = handles or [None] * len(scores)
 
     def score(self, index: int) -> float | None:
+        """Pre-grade of candidate *index*, or ``None``."""
         return self.scores[index] if index < len(self.scores) else None
 
     def record(self, index: int, relevant: bool) -> None:

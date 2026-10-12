@@ -44,6 +44,7 @@ class CostReconciler:
 
     @property
     def pending(self) -> int:
+        """Number of reconciliation tasks still running."""
         return len(self._tasks)
 
     def schedule(self, meta: GatewayCallMeta) -> None:

@@ -62,6 +62,7 @@ async def safe_decide(
 
 
 def accepted(decision: Decision | None) -> TypeIs[Decision]:
+    """True for a non-abstained, accepted decision."""
     return decision is not None and decision.outcome is Outcome.ACCEPTED and not decision.abstained
 
 

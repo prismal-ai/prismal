@@ -13,6 +13,15 @@
 | **SPEC** | `specs/dependency-security-remediation/SPEC.md` |
 | **Priority** | **HIGH** |
 
+> **Closure note (2026-10-12).** This spec was executed and merged in PR #10 (2026-06).
+> The checkboxes below are the original runbook. They were never ticked at the time, so they are
+> kept as history, and only the items re-verified against the repository on 2026-10-12 are ticked.
+> - `python-jose` → `PyJWT` migration done on 2026-07-11. `ecdsa` is gone from `uv.lock`, so
+>   CVE-2024-23342 is resolved (see `.trivyignore`).
+> - Every `uses:` in `.github/workflows/**` is pinned to a 40-char SHA (0 mutable refs).
+> - Later refreshes: `ADDENDUM-refresh-2026-07.md` and the `CHANGELOG.md` Security entries
+>   (the latest is the 2026-10 Dependabot pass, PR #69).
+
 ---
 
 ## 1. Execution Summary
@@ -53,7 +62,7 @@
 #### P0-03 — Document no-fix mitigations (chromadb #15, ecdsa #1)
 - [ ] Confirm that `chromadb` is used only embedded (no `chroma run` / HTTP server).
 - [ ] Keep `CVE-2026-45829` and `CVE-2024-23342` in `.trivyignore` with: reason, surface, reference to `SPEC.md`, and re-evaluation **trigger**.
-- [ ] Record debt: `python-jose` → `PyJWT` migration (follow-up issue).
+- [x] Record debt: `python-jose` → `PyJWT` migration (follow-up issue). *Resolved 2026-07-11: migrated to PyJWT.*
 - **Done:** both alerts with documented mitigation and trigger; #15 and #1 marked "mitigated/won't-fix".
 
 ---
@@ -100,7 +109,7 @@
 - **Done:** three mirrored sources; 0 ignores without justification.
 
 #### P2-02 — Pin GitHub Actions to SHA (P0-02 debt → policy)
-- [ ] Pin all actions in `.github/workflows/**` to an immutable SHA (not just trivy).
+- [x] Pin all actions in `.github/workflows/**` to an immutable SHA (not just trivy). *Verified 2026-10-12.*
 - **Done:** 0 actions with a mutable tag.
 
 #### P2-03 — Final validation
@@ -113,7 +122,7 @@
 
 #### P2-04 — Documentation and closure
 - [ ] Security entry in `CHANGELOG.md` (remediated + mitigated CVEs).
-- [ ] Mark this spec `IMPLEMENTED`; update the per-alert status table in `SPEC.md`.
+- [x] Mark this spec `IMPLEMENTED`; update the per-alert status table in `SPEC.md`.
 - [ ] Confirm 18/18 alerts in terminal state in Dependabot.
 - **Done:** complete traceability.
 
@@ -174,7 +183,7 @@ Coverage: 18/18 alerts assigned to a task.
 - [ ] trivy-action incident closed; actions pinned to SHA; secrets rotated if it applied.
 - [ ] `.trivyignore` / pip-audit / ci.yml synchronized; 0 ignores without justification.
 - [ ] `pip-audit` + `trivy` + `bandit` + `pytest -m "not live_api"` green.
-- [ ] `CHANGELOG.md` updated; spec `IMPLEMENTED`.
+- [x] `CHANGELOG.md` updated; spec `IMPLEMENTED`.
 
 ---
 

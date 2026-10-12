@@ -226,6 +226,7 @@ class OllamaTierGroup:
         fast: OllamaDecisionAdapter | None = None,
         accurate: OllamaDecisionAdapter | None = None,
     ) -> OllamaTierGroup:
+        """Group *fast* and *accurate* and point each adapter's ``group`` at it."""
         group = cls(fast=fast, accurate=accurate)
         for adapter in (fast, accurate):
             if adapter is not None:
@@ -290,6 +291,7 @@ class OllamaDecisionAdapter(SystemOneHttpDecisionAdapter):
     # ── DecisionPort ──────────────────────────────────────────────────────────
 
     def supports(self, question: QuestionSpec, *, language: str) -> bool:
+        """Choice/Score need between ``MIN_OPTIONS`` and ``MAX_OPTIONS``; any language."""
         del language  # the decision models are multilingual (es/en verified, DEC0-10)
         if question.kind is DecisionKind.CHOICE:
             return MIN_OPTIONS <= len(question.options) <= MAX_OPTIONS
@@ -338,6 +340,7 @@ class OllamaDecisionAdapter(SystemOneHttpDecisionAdapter):
         return result is not None and not result.ok
 
     def p95_ms(self) -> float | None:
+        """p95 of the recent latency samples, or ``None``."""
         return _p95(list(self.latency_samples))
 
     # ── internals ─────────────────────────────────────────────────────────────

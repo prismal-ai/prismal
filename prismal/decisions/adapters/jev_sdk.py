@@ -53,6 +53,7 @@ class JevSdkDecisionAdapter:
         return f"JevSdkDecisionAdapter(name={self.name!r}, model={self.model!r})"
 
     def supports(self, question: QuestionSpec, *, language: str) -> bool:  # noqa: ARG002
+        """False only for a Choice with too many options."""
         return not (
             question.kind is DecisionKind.CHOICE
             and len(question.options) > self._max_choice_options
@@ -65,6 +66,7 @@ class JevSdkDecisionAdapter:
         *,
         policy: GatePolicy,
     ) -> Mapping[str, Decision]:
+        """One ``system_one`` SDK call for all questions; a model mismatch abstains all."""
         return await guarded_decide(self, questions, policy, lambda qs: self._decide(state, qs))
 
     async def _decide(
@@ -107,6 +109,7 @@ class JevSdkDecisionAdapter:
         return response.model_dump() if hasattr(response, "model_dump") else response
 
     async def aclose(self) -> None:
+        """Close the SDK client, if one was created."""
         client, self._client = self._client, None
         closer = getattr(client, "aclose", None) or getattr(client, "close", None)
         if closer is not None:

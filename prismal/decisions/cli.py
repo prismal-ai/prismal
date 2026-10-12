@@ -190,6 +190,7 @@ def _bench(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Argument parser for the ``calibrate`` and ``bench`` subcommands."""
     parser = argparse.ArgumentParser(prog="python -m prismal.decisions")
     sub = parser.add_subparsers(dest="command")
     cal = sub.add_parser("calibrate", help="Fit a calibration record from labeled predictions")
@@ -209,6 +210,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """CLI entry point; returns the exit code (2 without a subcommand)."""
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "calibrate":

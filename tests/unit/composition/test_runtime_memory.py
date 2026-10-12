@@ -167,3 +167,14 @@ async def test_llm_gate_without_hooks_fails_composition() -> None:
     with pytest.raises(RuntimeCompositionError) as exc:
         await build_runtime(_settings(memory_write_gate="llm"), org_id="acme", mode="context")
     assert exc.value.port == "memory"
+
+
+def test_bind_org_binds_the_tenant_memory_service_for_agent_nodes() -> None:
+    from prismal.memory.v2.agent_prompt import get_memory_service
+
+    svc = MemoryService(org_id="acme", backend=InMemoryBackend(), settings=_settings())
+    ctx = build_test_runtime(org_id="acme", memory=svc)
+
+    with ctx.bind_org():
+        assert get_memory_service() is svc
+    assert get_memory_service() is None

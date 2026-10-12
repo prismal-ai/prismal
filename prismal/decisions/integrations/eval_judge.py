@@ -42,7 +42,9 @@ _DRIFT_TOLERANCE = 0.25  # |decision - LLM| within one level of a 5-level scale
 class ScoringJudge(Protocol):
     """The LLM judge (:class:`prismal.eval.judges.Judge` conforms)."""
 
-    async def score(self, *, rubric: str, answer: str, context: str = "") -> float: ...
+    async def score(self, *, rubric: str, answer: str, context: str = "") -> float:
+        """Score *answer* against *rubric* in ``[0, 1]``."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -76,11 +78,13 @@ class JudgeResult:
     _shadow: ShadowHandle | None = field(default=None, repr=False)
 
     async def wait_shadow(self) -> None:
+        """Wait until the shadow comparison (if any) has been recorded."""
         if self._shadow is not None:
             await self._shadow.wait()
 
 
 def build_eval_question(rubric: Rubric) -> QuestionSpec:
+    """Low-risk Score question rating an answer against *rubric* on its levels."""
     return QuestionSpec(
         id=EVAL_DECISION_ID,
         kind=DecisionKind.SCORE,

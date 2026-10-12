@@ -74,6 +74,7 @@ class GatewayRouter:
 
     @property
     def settings(self) -> Settings:
+        """The settings this router was built with."""
         return self._settings
 
     def target_for(self, model: str | None, *, agent: str | None) -> str | None:
@@ -91,6 +92,11 @@ class GatewayRouter:
     def resolve(
         self, model: str | None, *, agent: str | None, session_id: str | None
     ) -> ResolvedModel | None:
+        """Resolve the gateway target for *model* / *agent*, or ``None`` for the legacy path.
+
+        Raises ``GatewayPolicyError`` for a gateway disabled at startup and
+        ``GatewayConfigError`` for an unknown gateway.
+        """
         target = self.target_for(model, agent=agent)
         if target is None:
             return None
@@ -105,9 +111,11 @@ class GatewayRouter:
         return gateway.resolve(target, agent=agent, session_id=session_id)
 
     def get(self, name: str) -> GatewayPort | None:
+        """The adapter registered as *name*, or ``None``."""
         return self._gateways.get(name)
 
     def names(self) -> tuple[str, ...]:
+        """Sorted names of the active (not disabled) gateways."""
         return tuple(sorted(self._gateways))
 
     async def astartup(self) -> None:
@@ -146,6 +154,7 @@ class GatewayRouter:
         return snapshots
 
     async def aclose(self) -> None:
+        """Close every adapter that has an ``aclose`` (errors suppressed)."""
         for gateway in self._gateways.values():
             closer = getattr(gateway, "aclose", None)
             if callable(closer):
@@ -157,6 +166,7 @@ def settings_secret_resolver(settings: Settings) -> SecretResolver:
     """Global keys from ``Settings`` (built-in refs) or the injected config source."""
 
     def resolve(auth_ref: str) -> SecretStr | None:
+        """Key for *auth_ref* from a settings field or the config source; ``None`` if empty."""
         field = _SETTINGS_KEYS.get(auth_ref)
         if field is not None:
             secret: SecretStr = getattr(settings, field)
@@ -181,6 +191,7 @@ def vault_secret_resolver(vault: Any, *, org_id: str | None, settings: Settings)
     fallback = settings_secret_resolver(settings)
 
     def lookup(ref: str) -> SecretStr | None:
+        """Vault value for *ref*, or ``None`` when absent, empty or failing."""
         try:
             value: SecretStr = vault.resolve(ref).value
         except Exception:
@@ -188,6 +199,7 @@ def vault_secret_resolver(vault: Any, *, org_id: str | None, settings: Settings)
         return value if value.get_secret_value() else None
 
     def resolve(auth_ref: str) -> SecretStr | None:
+        """Tenant key ``<auth_ref>@<org>``; global key only without a tenant or with fallback."""
         if org_id is None:
             return lookup(auth_ref) or fallback(auth_ref)
         scoped = lookup(f"{auth_ref}@{org_id}")

@@ -107,6 +107,41 @@ await ctx.memory.forget(selector, actor=ForgetActor("human", "dpo@acme", req.req
 - Without a `curator`, it does not curate playbooks. `PlaybookCurator(llm_fn=…)` also needs an injected LLM callable.
 - An `llm` write gate or low-confidence policy without an `llm_classifier` fails at composition (`MemoryConfigError` / `RuntimeCompositionError("memory")`) instead of silently skipping every write.
 
+## Recalled memory in agent prompts
+
+The `researcher` node is the pilot adopter. Before its ReAct loop it calls
+`prismal.memory.v2.agent_prompt.memory_turn_message(state, agent="researcher")`.
+That recalls against the last user message (budget
+`memory_recall_budget_tokens`) and returns one trailing message:
+`<turn_context>memory:<memory …>…</memory></turn_context>`. The block comes from
+`memory_block_for_prompt`: it is sanitized, its tags are neutralised, and any
+canary (including the tenant prefix canary) is redacted. The message is
+appended **after** the conversation, so the system prompt and history (the
+cache-stable prefix) are byte-identical with and without memory.
+
+It is a no-op unless all of these hold:
+
+- `memory_v2_enabled` is on and `memory_mode` is `enforce`;
+- the cache-stable layout is active (`token_efficiency_enabled` and
+  `prompt_layout = "cache_stable"`);
+- a `MemoryService` is bound for the run;
+- the state carries a user identity (`channel_context["user_id"]`).
+
+Fail-closed rules:
+
+- **No user, no recall.** A user-less scope would *see* every user's records of
+  the tenant (`MemoryScope.covers`), so the helper does not recall at all.
+- **Trusted records only.** Tainted or `untrusted` recalled records are dropped
+  before rendering, because the message has user-role authority.
+- **No cross-tenant fallback.** A run bound to `None` (its tenant has no memory)
+  gets no memory; it never falls back to the process-wide service.
+
+`RuntimeContext.bind_org()` binds `ctx.memory`, so a host that already wraps
+each graph run in `ctx.bind_org()` gets it for free. Otherwise use
+`use_memory_service(service)` (`context` mode) or `set_memory_service(service)`
+(`global` mode). A recall failure is logged as `memory_turn_recall_failed` and
+skipped; it never fails the agent.
+
 ## Migration from the legacy memory APIs (no breaking change)
 
 1. **3.18.0 (flag off):** nothing changes.
@@ -186,13 +221,12 @@ These numbers measure the deterministic layers only: dedupe, typed storage and b
 - With **no** decision port, recall searches every type view. The SPEC's default `("preference","semantic")` still applies when the router *abstains*.
 - A rule actor is accepted only for selectors issued by `retention_rules()`, and only once.
 - Contradictions are resolved from existing `contradicts` / `updates` edges.
-- `register_consolidation_job` takes a `consolidator_for(org)` factory and adds the job to the executor's APScheduler directly, because `CronExecutor` has no public method for scheduling a callable.
+- `register_consolidation_job` takes a `consolidator_for(org)` factory and schedules the job through `CronExecutor.add_callable`.
 - Playbooks reject `add`/`modify` deltas without trusted citations, unless the curator runs with `allow_uncited=True`. A single edit per cycle is always allowed (the > 50 % rule has a floor of 1).
 - Graphiti stores records as episodes in hashed per-org groups. Typed edges and `as_of` queries live in a local SQLite graph inside the adapter, and tainted records are never sent to Graphiti. The record → episode index is persisted in that SQLite file, so erasure still finds episodes after a restart; a removal failure raises `MemoryErasureIncomplete`.
 
 ## Open items
 
 - Decision-gated eval numbers with a calibrated backend.
-- Agent adoption of `memory_block_for_prompt` (the library seam exists; no agent node is wired yet).
-- A public `CronExecutor` scheduling API.
-- The notebook.
+- Agent adoption beyond the researcher (the pilot node; see "Recalled memory in agent prompts").
+- The notebook (tracked in the separate `prisma-notebooks` repository).

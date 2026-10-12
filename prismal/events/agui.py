@@ -122,6 +122,8 @@ class AgUiEvent(_Wire):
 
 
 class RunStarted(AgUiEvent):
+    """``RUN_STARTED``: a run began on ``thread_id`` (stamped with the protocol version)."""
+
     type: AgUiEventType | str = AgUiEventType.RUN_STARTED
     thread_id: str
     run_id: str
@@ -131,6 +133,12 @@ class RunStarted(AgUiEvent):
 
 
 class RunFinished(AgUiEvent):
+    """``RUN_FINISHED``: the run ended; carries ``result``, ``outcome`` and native ``usage[]``.
+
+    An interrupted run ends here with ``outcome = {"type": "interrupt", ...}`` (AG-UI 1.0
+    has no ``INTERRUPT`` event).
+    """
+
     type: AgUiEventType | str = AgUiEventType.RUN_FINISHED
     thread_id: str
     run_id: str
@@ -140,6 +148,8 @@ class RunFinished(AgUiEvent):
 
 
 class RunError(AgUiEvent):
+    """``RUN_ERROR``: the run failed with ``message`` / ``code``; may carry ``usage[]``."""
+
     type: AgUiEventType | str = AgUiEventType.RUN_ERROR
     message: str
     code: str | None = None
@@ -147,16 +157,22 @@ class RunError(AgUiEvent):
 
 
 class StepStarted(AgUiEvent):
+    """``STEP_STARTED``: a graph node (``step_name``) started executing."""
+
     type: AgUiEventType | str = AgUiEventType.STEP_STARTED
     step_name: str
 
 
 class StepFinished(AgUiEvent):
+    """``STEP_FINISHED``: a graph node (``step_name``) finished executing."""
+
     type: AgUiEventType | str = AgUiEventType.STEP_FINISHED
     step_name: str
 
 
 class TextMessageStart(AgUiEvent):
+    """``TEXT_MESSAGE_START``: opens a streamed text message ``message_id``."""
+
     type: AgUiEventType | str = AgUiEventType.TEXT_MESSAGE_START
     message_id: str
     role: str | None = "assistant"
@@ -164,17 +180,23 @@ class TextMessageStart(AgUiEvent):
 
 
 class TextMessageContent(AgUiEvent):
+    """``TEXT_MESSAGE_CONTENT``: one text ``delta`` of an open message."""
+
     type: AgUiEventType | str = AgUiEventType.TEXT_MESSAGE_CONTENT
     message_id: str
     delta: str
 
 
 class TextMessageEnd(AgUiEvent):
+    """``TEXT_MESSAGE_END``: closes the text message ``message_id``."""
+
     type: AgUiEventType | str = AgUiEventType.TEXT_MESSAGE_END
     message_id: str
 
 
 class ToolCallStart(AgUiEvent):
+    """``TOOL_CALL_START``: opens tool call ``tool_call_id`` for ``tool_call_name``."""
+
     type: AgUiEventType | str = AgUiEventType.TOOL_CALL_START
     tool_call_id: str
     tool_call_name: str
@@ -182,17 +204,23 @@ class ToolCallStart(AgUiEvent):
 
 
 class ToolCallArgs(AgUiEvent):
+    """``TOOL_CALL_ARGS``: one streamed JSON-argument ``delta`` of a tool call."""
+
     type: AgUiEventType | str = AgUiEventType.TOOL_CALL_ARGS
     tool_call_id: str
     delta: str
 
 
 class ToolCallEnd(AgUiEvent):
+    """``TOOL_CALL_END``: the arguments of tool call ``tool_call_id`` are complete."""
+
     type: AgUiEventType | str = AgUiEventType.TOOL_CALL_END
     tool_call_id: str
 
 
 class ToolCallResult(AgUiEvent):
+    """``TOOL_CALL_RESULT``: the tool's output ``content`` for ``tool_call_id``."""
+
     type: AgUiEventType | str = AgUiEventType.TOOL_CALL_RESULT
     message_id: str
     tool_call_id: str
@@ -201,21 +229,29 @@ class ToolCallResult(AgUiEvent):
 
 
 class StateSnapshot(AgUiEvent):
+    """``STATE_SNAPSHOT``: the full client-visible state (allowlisted keys only)."""
+
     type: AgUiEventType | str = AgUiEventType.STATE_SNAPSHOT
     snapshot: Any
 
 
 class StateDelta(AgUiEvent):
+    """``STATE_DELTA``: an RFC 6902 JSON Patch against the last state snapshot."""
+
     type: AgUiEventType | str = AgUiEventType.STATE_DELTA
     delta: list[dict[str, Any]]  # RFC 6902 JSON Patch operations
 
 
 class MessagesSnapshot(AgUiEvent):
+    """``MESSAGES_SNAPSHOT``: the full message list of the thread."""
+
     type: AgUiEventType | str = AgUiEventType.MESSAGES_SNAPSHOT
     messages: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class SubagentStarted(AgUiEvent):
+    """``SUBAGENT_STARTED``: a sub-agent run ``subagent_run_id`` began (with its parent links)."""
+
     type: AgUiEventType | str = AgUiEventType.SUBAGENT_STARTED
     subagent_run_id: str
     name: str
@@ -226,6 +262,8 @@ class SubagentStarted(AgUiEvent):
 
 
 class SubagentFinished(AgUiEvent):
+    """``SUBAGENT_FINISHED``: a sub-agent run completed (``outcome`` defaults to success)."""
+
     type: AgUiEventType | str = AgUiEventType.SUBAGENT_FINISHED
     subagent_run_id: str
     result: Any = None
@@ -233,6 +271,8 @@ class SubagentFinished(AgUiEvent):
 
 
 class SubagentError(AgUiEvent):
+    """``SUBAGENT_ERROR``: a sub-agent run failed with ``message`` / ``code``."""
+
     type: AgUiEventType | str = AgUiEventType.SUBAGENT_ERROR
     subagent_run_id: str
     message: str
@@ -240,12 +280,16 @@ class SubagentError(AgUiEvent):
 
 
 class RawEvent(AgUiEvent):
+    """``RAW``: an untranslatable chunk; ``event`` carries only a sanitized projection."""
+
     type: AgUiEventType | str = AgUiEventType.RAW
     event: Any
     source: str | None = None
 
 
 class CustomEvent(AgUiEvent):
+    """``CUSTOM``: a named extension event (e.g. ``prismal.usage``, ``prismal.routing``)."""
+
     type: AgUiEventType | str = AgUiEventType.CUSTOM
     name: str
     value: Any = None
@@ -362,6 +406,7 @@ class AgUiContext:
     seq: int = 0
 
     def next_id(self, kind: str) -> str:
+        """Return a fresh run-scoped id ``<run_id>-<kind>-<seq>`` (bumps ``seq``)."""
         self.seq += 1
         return f"{self.run_id}-{kind}-{self.seq}"
 

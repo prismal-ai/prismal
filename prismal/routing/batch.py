@@ -76,7 +76,9 @@ SyncFn = Callable[[BatchRequest], Awaitable[BatchResult]]
 
 
 class _Rng(Protocol):
-    def uniform(self, a: float, b: float) -> float: ...
+    def uniform(self, a: float, b: float) -> float:
+        """Return a random float in ``[a, b]`` (``random.Random.uniform`` shape)."""
+        ...
 
 
 class _JobFailedError(Exception):
@@ -213,6 +215,7 @@ class BatchExecutor:
                 limit = asyncio.Semaphore(max(1, int(self._settings.parallel_max_workers)))
 
                 async def bounded(req: BatchRequest) -> BatchResult:
+                    """Run one sync fallback under the ``parallel_max_workers`` semaphore."""
                     async with limit:
                         return await self._run_sync(req)
 

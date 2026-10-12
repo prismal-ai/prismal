@@ -223,8 +223,9 @@ class StaticTierPolicy:
         return ModelTier.MEDIUM
 
     def select(self, features: TaskFeatures, *, budget: BudgetStatus | None = None) -> ModelChoice:  # noqa: ARG002 — port signature
+        """The agent's static tier and its model (reason ``static``)."""
         tier = self.tier_for_agent(features.agent)
         return ModelChoice(model_ref=self.model_for(tier), tier=tier, reason="static")
 
-    def on_outcome(self, choice: ModelChoice, outcome: RoutingOutcome) -> None:  # noqa: ARG002 — port signature
-        return None
+    def on_outcome(self, choice: ModelChoice, outcome: RoutingOutcome) -> None:
+        """Static routing never escalates."""

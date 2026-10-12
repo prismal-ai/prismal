@@ -93,6 +93,7 @@ def part_from_internal(part: A2APart) -> PartV1:
 
 
 def message_to_internal(message: MessageV1) -> A2AMessage:
+    """Decode a v1 message into the internal :class:`A2AMessage` (v0.3 roles)."""
     role = cast("Any", c.V1_TO_LEGACY_ROLE[message.role.value])
     return A2AMessage(
         role=role,
@@ -104,6 +105,7 @@ def message_to_internal(message: MessageV1) -> A2AMessage:
 def message_from_internal(
     message: A2AMessage, *, context_id: str | None = None, task_id: str | None = None
 ) -> MessageV1:
+    """Encode an internal message as v1, optionally bound to *context_id* / *task_id*."""
     return MessageV1(
         message_id=message.message_id,
         role=Role(c.LEGACY_TO_V1_ROLE[message.role]),
@@ -122,22 +124,26 @@ def message_text(message: MessageV1) -> str:
 
 
 def state_to_v1(status: str) -> TaskState:
+    """Map an internal task status to the v1 ``TaskState`` (unknown ⇒ ``UNSPECIFIED``)."""
     return TaskState(c.LEGACY_TO_V1_STATE.get(status, c.TASK_STATE_UNSPECIFIED))
 
 
 def state_to_internal(state: TaskState) -> TaskStatus:
+    """Map a v1 ``TaskState`` to the internal status (v1-only states are folded in)."""
     if state in _V1_ONLY_TO_INTERNAL:
         return _V1_ONLY_TO_INTERNAL[state]
     return cast("TaskStatus", c.V1_TO_LEGACY_STATE[state.value])
 
 
 def artifact_to_internal(artifact: ArtifactV1) -> A2AArtifact:
+    """Decode a v1 artifact into the internal :class:`A2AArtifact`."""
     return A2AArtifact(
         artifact_id=artifact.artifact_id, parts=[part_to_internal(p) for p in artifact.parts]
     )
 
 
 def artifact_from_internal(artifact: A2AArtifact) -> ArtifactV1:
+    """Encode an internal artifact as a v1 :class:`ArtifactV1`."""
     return ArtifactV1(
         artifact_id=artifact.artifact_id, parts=[part_from_internal(p) for p in artifact.parts]
     )
@@ -170,6 +176,7 @@ def task_from_internal(
 
 
 def task_to_internal(task: TaskV1) -> A2ATask:
+    """Decode a v1 task (status, history, artifacts) into the internal :class:`A2ATask`."""
     return A2ATask(
         id=task.id,
         status=state_to_internal(task.status.state),

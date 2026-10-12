@@ -38,6 +38,7 @@ from prismal.agents.handoff import (
 from prismal.core.config import get_settings
 from prismal.core.exceptions import MoAError
 from prismal.core.logging import get_logger
+from prismal.events.subagent import emit_subagent
 from prismal.monitoring.otel import OTelManager
 from prismal.providers.registry import ProviderRegistry
 from prismal.security.prompt_builder import SecurePromptBuilder
@@ -204,13 +205,21 @@ class MixtureOfAgents:
         successful calls only.
         """
 
-        async def _propose_one(model: str) -> str:
-            llm = registry.get_llm(model)
-            return await self._propose(llm, query)
+        async def _propose_one(index: int, model: str) -> str:
+            subagent_id = f"moa:{index}:{model}"
+            emit_subagent("start", subagent_id, name="moa_proposer")
+            try:
+                llm = registry.get_llm(model)
+                output = await self._propose(llm, query)
+            except BaseException as exc:
+                emit_subagent("error", subagent_id, code=type(exc).__name__)
+                raise
+            emit_subagent("end", subagent_id)
+            return output
 
         models = self._routed_proposers(query)
         results = await asyncio.gather(
-            *(_propose_one(m) for m in models),
+            *(_propose_one(i, m) for i, m in enumerate(models)),
             return_exceptions=True,
         )
         outputs: list[str] = []

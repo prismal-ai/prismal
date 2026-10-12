@@ -140,6 +140,7 @@ class A2AClient:
         return self._client
 
     async def aclose(self) -> None:
+        """Close the HTTP client this instance created or was given (idempotent)."""
         if self._client is not None:
             await self._client.aclose()
             self._client = None
@@ -552,6 +553,7 @@ class A2AConnectionManager:
         return client
 
     async def aclose(self) -> None:
+        """Close every pooled :class:`A2AClient` and empty the pool."""
         for client in self._pool.values():
             await client.aclose()
         self._pool.clear()

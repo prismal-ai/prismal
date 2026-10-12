@@ -90,9 +90,11 @@ def build_batch_policy(settings: Settings) -> BatchAssignerPort | None:
         tier_by_model = {static.model_for(t): t for t in TIER_ORDER if static.has_tier(t)}
 
         def tier_of(ref: str) -> ModelTier:
+            """The configured tier of candidate model *ref*."""
             return tier_by_model[ref]
 
         def eligible(features: TaskFeatures, ref: str) -> bool:
+            """Whether *ref* may serve *features*: tainted never below static, gateway allowed."""
             tier = tier_by_model[ref]
             if features.tainted:  # SEC-001: tainted never below the agent's static tier
                 static_tier = static.tier_for_agent(features.agent)
@@ -101,6 +103,7 @@ def build_batch_policy(settings: Settings) -> BatchAssignerPort | None:
             return _gateway_allows(settings, ref, features.agent)
 
         def price(ref: str, tokens_in: int, tokens_out: int) -> float:
+            """Estimated USD cost of *ref* for the given token counts."""
             from prismal.providers.cost import compute_cost_usd
 
             return compute_cost_usd(ref, tokens_in, tokens_out, settings=settings).cost_usd

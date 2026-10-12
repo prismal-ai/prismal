@@ -84,15 +84,18 @@ class DecisionCascade:
 
     @property
     def tier_names(self) -> tuple[str, ...]:
+        """Tier names in cascade order (``rule`` first when enabled)."""
         names = [b.name for b in self._backends]
         return ((RULE_TIER,) if self._rule_enabled else ()) + tuple(names)
 
     @property
     def backends(self) -> tuple[DecisionPort, ...]:
+        """The model-tier backends in cascade order."""
         return tuple(self._backends)
 
     @property
     def audit(self) -> Any:
+        """The audit sink records are written to (may be ``None``)."""
         return self._audit
 
     # ── public API ────────────────────────────────────────────────────────────
@@ -141,6 +144,7 @@ class DecisionCascade:
         return resolved
 
     async def aclose(self) -> None:
+        """Close every backend (errors are logged, not raised)."""
         for backend in self._backends:
             try:
                 await backend.aclose()

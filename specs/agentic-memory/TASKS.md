@@ -116,7 +116,7 @@ Status legend: `TODO` · `WIP` · `DONE` · `BLOCKED`.
 | MEM6-04 | LoCoMo-style eval subset + legacy vs. v2 report in the eval harness | 0.8 d | MEM3, MEM0-05 | EVL-001 | DONE |
 | MEM6-05 | Snapshot: flags off ⇒ graph identical, no job registered, legacy call recording identical | 0.4 d | MEM5 | SNP-001, ADP-002 | DONE |
 | MEM6-06 | Integration + security tests (injection → deletion attempt, two-tenant isolation, erasure completeness) | 0.6 d | MEM4, MEM5 | DEL-001, TEN-001, TNT-001 | DONE |
-| MEM6-07 | `docs/memory.md` (incl. migration guide), `examples/agentic_memory.py`, notebook | 0.6 d | MEM6-06 | ADP-002 | DONE (docs + example; notebook TODO) |
+| MEM6-07 | `docs/memory.md` (incl. migration guide), `examples/agentic_memory.py`, notebook | 0.6 d | MEM6-06 | ADP-002 | DONE (docs + example; the notebook is tracked in the separate `prisma-notebooks` repository, like GW6-07) |
 | MEM6-08 | README/CHANGELOG (planned); AST guards (no graph SDK outside adapters, no provider imports) | 0.3 d | MEM6-07 | PRT-002 | DONE |
 
 **Done when:** `uv run pytest -m unit` green; ruff / mypy --strict / bandit clean; coverage ≥ 80 % on `memory/v2/`; eval report meets PLAN §4 targets in shadow comparison.

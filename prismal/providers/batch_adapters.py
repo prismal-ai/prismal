@@ -103,13 +103,21 @@ class BatchApiPort(Protocol):
 
     family: str  # "anthropic" | "openai" | "openrouter"
 
-    async def submit(self, requests: Sequence[BatchRequest]) -> str: ...
+    async def submit(self, requests: Sequence[BatchRequest]) -> str:
+        """Submit *requests* as one batch job; returns the provider job id."""
+        ...
 
-    async def poll(self, job_id: str) -> BatchStatus: ...
+    async def poll(self, job_id: str) -> BatchStatus:
+        """Current normalized :class:`BatchStatus` of *job_id*."""
+        ...
 
-    async def results(self, job_id: str) -> Sequence[BatchResult]: ...
+    async def results(self, job_id: str) -> Sequence[BatchResult]:
+        """Per-request results of a completed job."""
+        ...
 
-    async def cancel(self, job_id: str) -> None: ...
+    async def cancel(self, job_id: str) -> None:
+        """Cancel *job_id* (best effort)."""
+        ...
 
 
 # ── model-ref helpers ─────────────────────────────────────────────────────────
@@ -377,6 +385,10 @@ class AnthropicBatchAdapter(_HttpBatchAdapter):
         return params
 
     async def submit(self, requests: Sequence[BatchRequest]) -> str:
+        """Create a Message Batch; system messages are folded into ``system``.
+
+        Raises :class:`BatchExecutorError` when no job id is returned.
+        """
         payload = {
             "requests": [{"custom_id": r.custom_id, "params": self._params(r)} for r in requests]
         }
@@ -387,10 +399,12 @@ class AnthropicBatchAdapter(_HttpBatchAdapter):
         return job_id
 
     async def poll(self, job_id: str) -> BatchStatus:
+        """Map ``processing_status`` to :class:`BatchStatus` (unknown ⇒ ``FAILED``)."""
         data = await self._json("GET", f"{self._batches}/{job_id}")
         return self._STATUS.get(str(_get(data, "processing_status")), BatchStatus.FAILED)
 
     async def results(self, job_id: str) -> Sequence[BatchResult]:
+        """Download and parse the JSONL at ``results_url``; raises if there is none."""
         data = await self._json("GET", f"{self._batches}/{job_id}")
         url = _get(data, "results_url")
         if not isinstance(url, str) or not url:
@@ -398,6 +412,7 @@ class AnthropicBatchAdapter(_HttpBatchAdapter):
         return _parse_jsonl(await self._text(url))
 
     async def cancel(self, job_id: str) -> None:
+        """Request cancellation of the Message Batch *job_id*."""
         await self._request("POST", f"{self._batches}/{job_id}/cancel")
 
 
@@ -434,6 +449,10 @@ class OpenRouterBatchAdapter(_HttpBatchAdapter):
         }
 
     async def submit(self, requests: Sequence[BatchRequest]) -> str:
+        """Create a 24h batch with the GW privacy defaults on every body.
+
+        Raises :class:`BatchExecutorError` when no job id is returned.
+        """
         payload = {
             "completion_window": "24h",
             "requests": [{"custom_id": r.custom_id, "body": _openrouter_body(r)} for r in requests],
@@ -445,10 +464,15 @@ class OpenRouterBatchAdapter(_HttpBatchAdapter):
         return job_id
 
     async def poll(self, job_id: str) -> BatchStatus:
+        """Map the batch ``status`` to :class:`BatchStatus` (unknown ⇒ ``FAILED``)."""
         data = await self._json("GET", f"{self._base_url}/batches/{job_id}")
         return self._STATUS.get(str(_get(data, "status")), BatchStatus.FAILED)
 
     async def results(self, job_id: str) -> Sequence[BatchResult]:
+        """Results from inline ``results``, ``results_url`` or ``output_file_id`` (first found).
+
+        Raises :class:`BatchExecutorError` when the batch exposes none.
+        """
         data = await self._json("GET", f"{self._base_url}/batches/{job_id}")
         inline = _get(data, "results")
         if isinstance(inline, list):
@@ -462,6 +486,7 @@ class OpenRouterBatchAdapter(_HttpBatchAdapter):
         raise BatchExecutorError("openrouter batch has no results")
 
     async def cancel(self, job_id: str) -> None:
+        """Delete (cancel) the batch *job_id*."""
         await self._request("DELETE", f"{self._base_url}/batches/{job_id}")
 
 
@@ -522,6 +547,10 @@ class OpenAIBatchAdapter:
             raise BatchExecutorError(f"openai batch {name} failed: {type(exc).__name__}") from None
 
     async def submit(self, requests: Sequence[BatchRequest]) -> str:
+        """Upload the requests as a JSONL file and create a 24h chat-completions batch.
+
+        Raises :class:`BatchExecutorError` when no job id is returned.
+        """
         _require_key(self._api_key, self.family)
         lines = [
             json.dumps(
@@ -548,10 +577,12 @@ class OpenAIBatchAdapter:
         return job_id
 
     async def poll(self, job_id: str) -> BatchStatus:
+        """Map the batch ``status`` to :class:`BatchStatus` (unknown ⇒ ``FAILED``)."""
         batch = await self._call("aretrieve_batch", batch_id=job_id)
         return self._STATUS.get(str(_get(batch, "status")), BatchStatus.FAILED)
 
     async def results(self, job_id: str) -> Sequence[BatchResult]:
+        """Download and parse the batch's output file; raises if it has none."""
         batch = await self._call("aretrieve_batch", batch_id=job_id)
         file_id = _get(batch, "output_file_id")
         if not isinstance(file_id, str) or not file_id:
@@ -562,6 +593,7 @@ class OpenAIBatchAdapter:
         return _parse_jsonl(text)
 
     async def cancel(self, job_id: str) -> None:
+        """Cancel the batch *job_id*."""
         await self._call("acancel_batch", batch_id=job_id)
 
 
@@ -578,6 +610,7 @@ def default_adapters(
     """
 
     def key_for(family: str, fallback: SecretStr) -> SecretStr | None:
+        """The family's key (resolver or settings fallback); ``None`` when unset or empty."""
         key = key_resolver(family) if key_resolver is not None else fallback
         return key if key is not None and key.get_secret_value() else None
 

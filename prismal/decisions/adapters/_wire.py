@@ -36,6 +36,7 @@ def wire_question(q: QuestionSpec) -> dict[str, Any]:
 
 
 def wire_questions(questions: Mapping[str, QuestionSpec]) -> dict[str, Any]:
+    """Map question ids to their Jev wire objects."""
     return {qid: wire_question(q) for qid, q in questions.items()}
 
 
