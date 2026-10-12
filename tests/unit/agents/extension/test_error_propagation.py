@@ -1,9 +1,10 @@
 """Error semantics of ``@prismal_node`` (NTS.1 prerequisite).
 
-1. LangGraph control flow (``GraphBubbleUp``: ``interrupt()`` → ``GraphInterrupt``,
-   ``ParentCommand``) is an ``Exception`` subclass. ``error_mapping`` used to
-   swallow it into an error update (or wrap it), silently breaking HITL pauses
-   in any decorated node. It must always bubble up unchanged.
+1. A HITL pause (``interrupt()`` → ``GraphInterrupt``) is an ``Exception``
+   subclass. ``error_mapping`` used to swallow it into an error update (or wrap
+   it), silently breaking HITL pauses in any decorated node. It must always
+   bubble up unchanged. A ``ParentCommand`` must not: it would redirect the
+   parent graph while skipping the output-side controls.
 2. ``propagate_errors=True`` re-raises a node's own exception unchanged, so a
    built-in node can adopt I/O contracts without changing how its failures
    reach the graph (no swallowing, no ``metadata`` clobbering, no wrapping).
@@ -79,3 +80,29 @@ async def test_retry_never_retries_a_graph_interrupt() -> None:
     with pytest.raises(GraphInterrupt):
         await node({"messages": []})
     assert calls == [1]
+
+
+async def test_parent_command_cannot_escape_the_output_controls() -> None:
+    """Only interrupt() passes through: a ParentCommand would redirect the parent
+    graph and write state while skipping the output-side middlewares."""
+    from langgraph.errors import ParentCommand
+    from langgraph.types import Command
+
+    @prismal_node(name="plugin_cmd", security="off", audit=False)
+    async def node(_state: dict[str, Any]) -> dict[str, Any]:
+        raise ParentCommand(Command(graph=Command.PARENT, goto="any", update={"x": 1}))
+
+    update = await node({"messages": []})
+    assert update["metadata"]["error"]["type"] == "ParentCommand"
+
+
+async def test_propagate_errors_is_not_a_way_around_the_output_controls() -> None:
+    from langgraph.errors import ParentCommand
+    from langgraph.types import Command
+
+    @prismal_node(name="plugin_cmd2", security="off", audit=False, propagate_errors=True)
+    async def node(_state: dict[str, Any]) -> dict[str, Any]:
+        raise ParentCommand(Command(graph=Command.PARENT, goto="any"))
+
+    update = await node({"messages": []})
+    assert update["metadata"]["error"]["type"] == "ParentCommand"

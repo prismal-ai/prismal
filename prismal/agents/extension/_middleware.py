@@ -20,7 +20,7 @@ from contextlib import suppress
 from typing import TYPE_CHECKING, Any, cast
 
 import structlog
-from langgraph.errors import GraphBubbleUp
+from langgraph.errors import GraphInterrupt, ParentCommand
 
 from prismal.agents.extension.node_schema import (
     NodeIOValidationResult,
@@ -205,7 +205,7 @@ async def retry_middleware(
     for attempt in range(policy.max_attempts):
         try:
             return await next_fn(state)
-        except GraphBubbleUp:  # interrupt()/parent Command: control flow, never retried
+        except GraphInterrupt:  # a HITL pause is control flow, never retried
             raise
         except policy.retry_on as exc:
             last_exc = exc
@@ -241,16 +241,19 @@ async def error_mapping_middleware(
 ) -> dict[str, Any]:
     """Catch failures and map to ``NodeExecutionError`` or an error state_update.
 
-    LangGraph control flow (``GraphBubbleUp``: ``interrupt()``, parent
-    ``Command``) always bubbles up unchanged, and ``propagate_errors`` nodes
-    re-raise their own exception as-is.
+    A HITL pause (``interrupt()`` → ``GraphInterrupt``) always bubbles up
+    unchanged, and ``propagate_errors`` nodes re-raise their own exception
+    as-is. Other LangGraph control flow (``ParentCommand``) is deliberately
+    *not* passed through: it would redirect the parent graph and write state
+    while skipping every output-side control (hardening, I/O validation,
+    audit), so it is mapped like any other failure.
     """
     try:
         return await next_fn(state)
-    except GraphBubbleUp:
+    except GraphInterrupt:
         raise
     except Exception as exc:
-        if metadata.propagate_errors:
+        if metadata.propagate_errors and not isinstance(exc, ParentCommand):
             raise
         if isinstance(exc, NodeTimeoutError):
             if metadata.raise_on_error:

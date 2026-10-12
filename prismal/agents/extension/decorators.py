@@ -124,8 +124,8 @@ def prismal_node(
         propagate_errors: If True, re-raise the node's own exception unchanged
             (overrides ``raise_on_error``): for built-in nodes that adopt I/O
             contracts without changing how their failures reach the graph.
-            LangGraph control flow (``interrupt()``, ``Command`` to a parent)
-            always bubbles up unchanged, whatever this is set to.
+            A HITL pause (``interrupt()``) always bubbles up unchanged, whatever
+            this is set to; a ``ParentCommand`` is mapped, never passed through.
 
     Returns:
         A decorator that returns the wrapped ``NodeFn`` with two attributes:
