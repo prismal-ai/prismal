@@ -11,6 +11,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Eval `contains` assertion: every `must_contain` value must appear in the
+  final answer (case-insensitive, digit grouping ignored). The long-loop cases
+  now check their answers against the toolkit's true values.
+- Sequential long-loop eval set (`long_loop_sequential.yaml`) with a chained
+  toolkit (`tool_provider: eval_toolkit_chain`, tool `get_linked_order`): each
+  record names the next order, so lookups cannot be batched.
 - NTS.1 batch 1: I/O contracts on `coder`, `researcher`, `data_analyst`,
   `planner` and `critic` (`<Node>Input` / `<Node>Output`, checked only with
   `node_typesafety_enabled`; adopt in `warn` first). `planner` lists must be
@@ -57,6 +63,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `providers/` and `decisions/` (199 added; no behaviour change).
 
 ### Documentation
+- `docs/token-efficiency.md`: the TKE9-04 A/B results.
+  - Tuned controls give −16.7 % (batched lookups) and −21.4 % (sequential
+    lookups), with solve rate 1.0.
+  - The defaults change nothing on these workloads.
+  - The result is below the PLAN §4 target of ≥ 30 %.
+  - In-loop observation masking is not yet wired (TKE4 known gap).
+  - The measurement conditions are documented, including `ollama_chat/` rather
+    than `ollama/` for tool use. The token baseline was refreshed to 2,723.5,
+    and `token-gate` now blocks.
 - New guides: `docs/agents.md`, `rag.md`, `patterns.md`, `subgraphs.md`,
   `providers.md`, `mcp.md`, `skills.md`, `sandbox.md`, `scheduler.md`,
   `events.md`, `data-utilities.md`, plus the `docs/README.md` index.
@@ -75,6 +90,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   extra name in the vector-store docs.
 
 ### Fixed
+- Eval runs no longer resume earlier runs' history. The runner used a fixed
+  `eval-<case>` thread against the on-disk checkpointer, so a live case could
+  start with the previous run's messages. Its token count then included them,
+  which caused the smoke baseline's +12.7 % "variance". Each run now uses
+  `eval-<case>-<uuid>`, and the session id follows the thread.
 - `@prismal_node` broke HITL: `GraphInterrupt` (from `interrupt()`) is an
   `Exception` subclass, so `error_mapping` swallowed or wrapped it and `retry`
   could re-run it. It now always bubbles up and is never retried. A

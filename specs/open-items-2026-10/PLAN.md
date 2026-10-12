@@ -54,6 +54,12 @@ Order is by how much each item unblocks.
 > automatically. Live result: 3,156 tokens per successful task (was 0); the baseline is
 > committed.
 
+>
+> **TKE9-04 (2026-10-12).** The A/B ran with the TKE flags on, after fixing eval thread reuse
+> and switching to `ollama_chat/` with thinking off. Tuned controls give −16.7 % on batched
+> lookups and −21.4 % on sequential lookups, both with solve rate 1.0. That is below the ≥ 30 %
+> target. The gate now blocks. Results are in `docs/token-efficiency.md`.
+
 
 ### 2.2 Emit AG-UI `subagent` payloads (PRT follow-up) — P2
 
