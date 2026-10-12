@@ -48,6 +48,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `docs/history/`; fixed the broken CHANGELOG link and the `prismal-ai[...]`
   extra name in the vector-store docs.
 
+### Fixed
+- Eval trajectories recorded 0 tokens on live runs: the supervisor's internal
+  routing calls and rebuilt answers carry no usage in the update stream.
+  `capture_trajectory` now counts every LLM call of the run through a LangChain
+  callback (`Trajectory.usage_source`), and the token baseline
+  `tests/eval/baselines/tokens.json` is committed (TKE1-08; smoke suite, local
+  Ollama `qwen3:14b`). TKE9-04 (A/B with the TKE flags on) is unblocked.
+
 ### Security
 - `mako` 1.3.12 → 1.4.3 (lock; transitive via `alembic` / `prefect`) — fixes
   CVE-2026-102991 (GHSA-5639-2j2p-m4mx, `TemplateLookup` path traversal).

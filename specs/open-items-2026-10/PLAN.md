@@ -46,6 +46,15 @@ Order is by how much each item unblocks.
   then make the gate blocking.
 - **Est.** 1 d of code + the live run (needs local Ollama: user action).
 
+> **As built (2026-10-12).** The `CostMeter` only exists with `budget_enabled`, and the
+> supervisor's routing calls (`agents/supervisor.py`) are not metered at all, so reading
+> the meter would not have fixed the problem. `capture_trajectory` now adds a LangChain
+> callback (`on_llm_end`) to the run config. It sees every LLM call, including those made
+> by nodes that do not forward `config`, because the runnable context is propagated
+> automatically. Live result: 3,156 tokens per successful task (was 0); the baseline is
+> committed.
+
+
 ### 2.2 Emit AG-UI `subagent` payloads (PRT follow-up) — P2
 
 - **Problem.** `events/agui.py` translates a `subagent` custom payload into `SUBAGENT_*` events,

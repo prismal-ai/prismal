@@ -42,7 +42,7 @@ Ten phases (TKE0 verify → TKE9 integration) plus the **optional P3** TKE10, ea
 | TKE1-05 | `core/config.py` `token_efficiency_enabled` + all TKE settings + `_validate_token_efficiency`; `core/exceptions.py` `TokenEfficiencyError` tree | 0.3 d | — | CFG-001, ERR-001 | DONE |
 | TKE1-06 | `monitoring/otel.py`: register all TKE metrics | 0.2 d | — | OTEL-001 | DONE |
 | TKE1-07 | `RunSummary` cache fields + aggregation in `DefaultObservabilityProvider` | 0.3 d | TKE1-01 | ACC-005 | DONE |
-| TKE1-08 | `eval/metrics_tokens.py`: `TokenReport`, `build_token_report`, `load_baseline`, `check_token_regression`; capture `tests/eval/baselines/tokens.json` — code + `token-gate` CLI done; **baseline capture pending**: a 2026-10-05 local Ollama run recorded 0 tokens because trajectories only see state messages (internal routing calls / rebuilt direct answers carry no `usage_metadata`) — needs a live run and/or meter-based token capture | 0.6 d | TKE1-04/07 | ACC-005 | WIP |
+| TKE1-08 | `eval/metrics_tokens.py`: `TokenReport`, `build_token_report`, `load_baseline`, `check_token_regression`; capture `tests/eval/baselines/tokens.json` — **baseline committed 2026-10-12** (smoke suite, local Ollama `qwen3:14b`). The 0-token blocker was fixed by capturing usage from every LLM call of the run via a LangChain callback (`Trajectory.usage_source="callbacks"`) instead of streamed messages only | 0.6 d | TKE1-04/07 | ACC-005 | DONE |
 | TKE1-09 | Tests: extraction fixtures per provider, pricing precedence, v3.12.0 contract for defaults | 0.6 d | TKE1-01..04 | ACC-001..004 | DONE |
 ### PHASE TKE2 — Prompt caching + cache-stable layout
 **Done when:** two consecutive supervisor turns produce byte-identical prefixes; fake-provider hit ratio > 0 with flag on; red-team parity green.
@@ -128,7 +128,7 @@ Ten phases (TKE0 verify → TKE9 integration) plus the **optional P3** TKE10, ea
 | TKE9-01 | Graph snapshot test with all TKE flags off (**mandatory**) | 0.3 d | TKE1..8 | COMPAT-001 | DONE |
 | TKE9-02 | Disabled contract test: tools, prompts, `ChatLiteLLM` kwargs, `Usage`/`cost_usd` identical to v3.12.0 | 0.3 d | TKE1..8 | COMPAT-001 | DONE |
 | TKE9-03 | CI token-regression gate (report-only → blocking) — `python -m prismal.eval token-gate` (report-only flag); CI eval job runs unit tests only, so the gate runs after a live eval | 0.6 d | TKE1-08 | ACC-005 | DONE |
-| TKE9-04 | Eval A/B on fixed + long-loop sets; record success metrics in docs — blocked on TKE1-08 baseline (see note there); PLAN §4 targets not yet measured | 0.6 d | TKE9-03 | ACC-005 | BLOCKED |
+| TKE9-04 | Eval A/B on fixed + long-loop sets; record success metrics in docs — unblocked 2026-10-12 (TKE1-08 baseline committed); A/B run with the TKE flags on still to do | 0.6 d | TKE9-03 | ACC-005 | TODO |
 | TKE9-05 | AST guards re-run (provider imports, `mcp`/`skills`, env reads) | 0.2 d | TKE1..8 | COMPAT-001 | DONE |
 | TKE9-06 | `docs/token-efficiency.md` (incl. canary DD, LH delta table) | 0.5 d | TKE9-04 | — | DONE |
 | TKE9-07 | Notebook (`prisma-notebooks`) + `examples/token_efficiency.py` | 0.5 d | TKE9-06 | — | DONE |

@@ -57,14 +57,20 @@ The gate fails when tokens per successful task grow more than 10 % or the
 cache-hit ratio drops more than 0.10 below the baseline. Use `--report-only`
 until two green runs have been recorded.
 
-**Known limitation: baseline not yet committed.** The `TokenReport` is built
-from trajectory messages. A local run on 2026-10-05 (Ollama `qwen3:14b`)
-recorded 0 tokens, because internal LLM calls (supervisor routing) and
-rebuilt direct answers carry no `usage_metadata` in the graph's update stream.
-This was already true of `Trajectory.tokens` in v3.12. A meaningful baseline
-needs a live run and, ideally, token capture from the per-run `CostMeter` /
-`RunSummary` instead of from state messages. Until then the PLAN §4 savings
-targets are unmeasured.
+**Where the token numbers come from.** `capture_trajectory` adds a LangChain
+callback to the run config. The callback sees every LLM call the run makes,
+including the supervisor's internal routing calls and rebuilt direct answers.
+Those carry no `usage_metadata` in the graph's update stream, so before this
+change a live run recorded 0 tokens. The callback's totals win; when no call is
+observed, the usage on streamed messages is used (`Trajectory.usage_source` is
+`callbacks` or `messages`).
+
+**Committed baseline (2026-10-12).** `tests/eval/baselines/tokens.json` was
+captured from the smoke suite against local Ollama `qwen3:14b` (fallback
+`qwen3:8b`), with the TKE flags off: 3,156 tokens per successful task, 2 LLM
+calls per task, solve rate 1.0. The cache-hit ratio and cost are 0 because local
+Ollama reports neither. The PLAN §4 savings targets still need the TKE9-04 A/B
+run with the TKE flags on.
 
 ## TKE2 — Prompt caching and a cache-stable layout
 
