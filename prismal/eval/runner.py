@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import random
+import uuid
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
@@ -73,7 +74,10 @@ class EvalRunner:
         runtime = self._make_runtime(case)
         try:
             graph = await self._make_graph(runtime)
-            config = {"configurable": {"thread_id": f"eval-{case.id}"}}
+            # A fresh thread per run: the default graph checkpoints on disk, so a
+            # fixed id would resume the previous run's history.
+            thread_id = f"eval-{case.id}-{uuid.uuid4().hex[:12]}"
+            config = {"configurable": {"thread_id": thread_id}}
             with _case_tools(case, runtime):
                 trajectory = await capture_trajectory(graph, case, config=config)
             assertion_results = await self._evaluate(trajectory, case, runtime)

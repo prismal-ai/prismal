@@ -59,7 +59,8 @@ async def capture_trajectory(
     terminated = False
 
     llm_usage = _LlmUsageCallback()
-    input_state = _initial_state(case)
+    thread_id = ((config or {}).get("configurable") or {}).get("thread_id")
+    input_state = _initial_state(case, session_id=thread_id)
     start = clock()
     try:
         stream = graph.astream(
@@ -166,9 +167,9 @@ class _LlmUsageCallback(BaseCallbackHandler):
         self.tool_errors += 1
 
 
-def _initial_state(case: EvalCase) -> AgentState:
-    """Build the graph input for *case* via the public state factory."""
-    state = create_initial_state(f"eval-{case.id}")
+def _initial_state(case: EvalCase, *, session_id: str | None = None) -> AgentState:
+    """Build the graph input for *case*; the session id follows the run's thread."""
+    state = create_initial_state(session_id or f"eval-{case.id}")
     state["messages"] = [HumanMessage(content=case.input)]
     return state
 
