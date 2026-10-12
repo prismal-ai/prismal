@@ -104,6 +104,13 @@ Order is by how much each item unblocks.
   - Red-team: recalled text that contains `</memory>` or a canary cannot escape the fence.
 - **Est.** 1 d. Needs a design decision first: which node or nodes adopt it.
 
+> **As built (2026-10-12, decisions approved by the user).** The researcher does not use
+> `SecurePromptBuilder` (it passes raw messages to `react_loop`), so the block travels as one
+> trailing `HumanMessage` `<turn_context>memory:…</turn_context>` after the history. It is gated on
+> the `CACHE_STABLE` layout. The builder is run once only to obtain the tenant prefix canary for
+> redaction. The seam is `memory/v2/agent_prompt.py` (`use_memory_service`, `set_memory_service`,
+> `get_memory_service`), and `RuntimeContext.bind_org()` binds `ctx.memory`.
+
 ### 2.5 Shared cross-tenant budget quota counters — P3, spec first
 
 - `docs/budget.md` marks this as a follow-up. It needs a durable store and a concurrency design,

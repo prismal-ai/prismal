@@ -23,6 +23,7 @@ from langchain_core.messages import BaseMessage, SystemMessage
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
 from prismal.core.logging import get_logger
+from prismal.memory.v2.agent_prompt import memory_turn_message
 from prismal.providers.registry import ProviderRegistry
 from prismal.routing.outcome import llm_route_kwargs, track_outcome
 from prismal.security.hardening_run import hardening_react_kwargs
@@ -229,6 +230,11 @@ async def researcher_node(state: AgentState) -> dict[str, object]:
     # budget when combined with the system prompt and tool results.
     recent = list(state["messages"])[-_HISTORY_WINDOW:]
     loop_messages = list(_trim_to_last_human(recent))
+    # Phase MEM: recalled memory rides in a tail <turn_context> message after the
+    # conversation, never in the cached prefix (None unless memory v2 is enforced).
+    memory = await memory_turn_message(state, agent="researcher")
+    if memory is not None:
+        loop_messages.append(memory)
 
     response = await track_outcome(
         state,

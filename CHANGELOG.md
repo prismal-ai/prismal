@@ -11,6 +11,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Recalled memory in agent prompts (Phase MEM follow-up): the `researcher`
+  node appends one tail `<turn_context>` message built by
+  `memory_block_for_prompt` (`prismal.memory.v2.agent_prompt.memory_turn_message`),
+  never touching the cached prefix. Only with memory v2 in `enforce` mode and
+  the cache-stable layout; `RuntimeContext.bind_org()` now also binds
+  `ctx.memory` (`use_memory_service` / `set_memory_service` for other hosts).
 - `prismal.events.subagent.emit_subagent()`: Skynet workers and MoA proposers
   now emit the AG-UI `subagent` custom payload, so live runs streamed with
   `custom` show `SUBAGENT_STARTED` / `SUBAGENT_FINISHED` / `SUBAGENT_ERROR`
@@ -236,7 +242,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Notes
 - Not yet measured: decision-gated eval numbers with a calibrated DEC backend.
-- Not yet wired: agent adoption of `memory_block_for_prompt` (library seam only).
+- Not yet wired: agent adoption of `memory_block_for_prompt` (library seam only). *(Wired for the `researcher` in [Unreleased].)*
 - The notebook is still to come.
 - Graphiti sends anonymous telemetry unless `GRAPHITI_TELEMETRY_ENABLED=false`.
 

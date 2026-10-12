@@ -245,11 +245,14 @@ class RuntimeContext:
         Wraps :func:`prismal.monitoring.host_stats.use_org`; a host wraps each
         graph run with it so :meth:`decisions_report` / :meth:`routing_report` of
         this tenant see the run. ``org_id=None`` binds "no tenant". Sync, nests,
-        and restores the previous binding on exit (also on error).
+        and restores the previous binding on exit (also on error). It also binds
+        :attr:`memory` so agent nodes can recall it (Phase MEM,
+        :func:`prismal.memory.v2.agent_prompt.use_memory_service`).
         """
+        from prismal.memory.v2.agent_prompt import use_memory_service
         from prismal.monitoring.host_stats import use_org
 
-        with use_org(self.org_id):
+        with use_org(self.org_id), use_memory_service(self.memory):
             yield
 
     def budget_status(self, *, thread_id: str | None = None) -> BudgetStatusView:
