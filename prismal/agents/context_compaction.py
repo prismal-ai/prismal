@@ -63,7 +63,9 @@ class CompactionStrategy(StrEnum):
 
 
 #: Replacement content for a masked observation (SPEC-TKE-MSK-001).
-OBSERVATION_STUB = "[observation elided: tool={tool} artifact={artifact_id} tokens≈{tokens}]"
+OBSERVATION_STUB = (
+    "[observation elided: tool={tool} artifact={artifact_id} tokens≈{tokens}; use read_artifact]"
+)
 _MASKED_PREFIX = "[observation elided:"
 
 #: Optional relevance hook (SPEC-TKE-MSK-001): ``(observation, history) -> score``.
