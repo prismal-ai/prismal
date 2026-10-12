@@ -49,3 +49,26 @@ def test_in_memory_store_evicts_the_oldest_beyond_its_cap() -> None:
 
 def test_default_cap_is_bounded() -> None:
     assert 0 < InMemoryArtifactStore().max_records <= 100_000
+
+
+def test_one_tenant_flooding_cannot_evict_another_tenants_artifacts() -> None:
+    store = InMemoryArtifactStore(max_records=10, max_records_per_tenant=3)
+    victim = store.put("keep me", run_id="r", tenant="b", kind="k")
+    for i in range(50):
+        store.put(f"flood {i}", run_id="r", tenant="a", kind="k")
+    assert store.get(victim.id, run_id="r", tenant="b").content == "keep me"
+    assert sum(1 for r in store._records.values() if r.ref.tenant == "a") == 3
+
+
+def test_per_tenant_cap_evicts_that_tenants_oldest_first() -> None:
+    store = InMemoryArtifactStore(max_records=10, max_records_per_tenant=2)
+    first = store.put("1", run_id="r", tenant="a", kind="k")
+    store.put("2", run_id="r", tenant="a", kind="k")
+    store.put("3", run_id="r", tenant="a", kind="k")
+    with pytest.raises(ArtifactNotFound):
+        store.get(first.id, run_id="r", tenant="a")
+
+
+def test_default_per_tenant_cap_is_below_the_global_cap() -> None:
+    store = InMemoryArtifactStore()
+    assert 0 < store.max_records_per_tenant < store.max_records
