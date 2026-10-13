@@ -10,6 +10,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.20.0] — 2026-10-12
+
+Measured token savings (TKE9-04) and the fixes that measurement uncovered:
+in-loop observation masking is now wired, there is a bounded shared artifact
+store, and agents get `read_artifact`. Also in this release:
+`ollama_chat_endpoint`, the NTS.1 I/O contracts on nine more nodes, shared
+tenant quotas, AG-UI sub-agent events, an eval-harness isolation fix, the
+OpenCode refresh, and the dependency security updates.
+
 ### Added
 - `read_artifact` for agents when `mask_observations` is on. `react_loop`
   binds it to the loop's own `(tenant, run_id)` on the shared store. Reads are
