@@ -206,6 +206,50 @@ python -m prismal.decisions calibrate \
 temperature scaling, Jev an isotonic map; τ is the smallest threshold reaching the target precision,
 clamped to the tier default (raise-only).
 
+### Building a calibration set (DEC3-07)
+
+Calibration only means something if the model is asked **the production question over the
+production state**. `prismal.decisions.calset` guarantees both, and two CLI subcommands wrap it:
+
+```bash
+# 1. Validate a hand-labelled case file against the production question
+python -m prismal.decisions cases-check \
+  --cases specs/typed-decision-models/data/es/route.supervisor.jsonl \
+  --decision-id route.supervisor            # --routes-profile base|advanced (route only)
+
+# 2. Raw predictions of one Ollama sub-tier (live; one question per request)
+python -m prismal.decisions collect \
+  --cases specs/typed-decision-models/data/es/route.supervisor.jsonl \
+  --decision-id route.supervisor --tier fast   # --limit 60 for a pilot
+
+# 3. It prints the matching `calibrate` command (model key = <name>@<digest12>)
+```
+
+- **Question.** `resolve_question()` returns the integration's own `QuestionSpec`
+  (`build_route_question(effective_valid_routes(...))`, `RAG_QUESTION`): same English
+  instructions, same options in the same order. Only the *state* is in the target language.
+  `route.supervisor` has two profiles: `base` (15 core routes + `END`, `enable_subgraphs` off)
+  and `advanced` (adds the pattern and domain-pipeline routes). A record fits one profile; the
+  run summary stores a `question_sha256` so a later option change is visible.
+- **State.** Built by the integration's own builder (`build_route_state`, `build_rag_state`):
+  same fences, sanitizer, language detection and hash as in production.
+- **Checks.** `cases-check` rejects wrong decision ids, labels outside the question, duplicate
+  ids, bad inputs and languages other than `es`/`en`. It warns when the language production
+  *detects* differs from the declared one (the enforce gate uses the detected language) and
+  when an answer label has no case.
+- **Collection.** `collect` uses a calibration-only adapter: `max_batch=1`, no rolling-p95
+  skipping and no stored records, so every case is asked and the raw distribution is kept. The
+  per-request timeout defaults to 60 s instead of the 800 ms gate default, because dropping slow
+  answers would drop the hardest cases. Abstentions are left out of *both* output files (they
+  stay aligned) and listed in the summary.
+- **Outputs** (default `specs/typed-decision-models/data/runs/`):
+  `<decision_id>@<name>@<digest12>.labeled.jsonl`, `.preds.jsonl` and `.summary.json`
+  (accuracy, per-label accuracy, confusions, latency p50/p95, abstentions).
+
+Case format and labelling workflow: `specs/typed-decision-models/data/README.md`. Supported so
+far: `route.supervisor`, `rag.chunk_relevance`; other integrations are added to the
+`_QUESTIONS` / `_STATE_BUILDERS` registries in `calset.py` together with their case sets.
+
 ## Benchmark (live, opt-in)
 
 ```bash

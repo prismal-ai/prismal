@@ -8,6 +8,11 @@
 * ``bench`` (DEC6-04) measures latency and metered cost of one configured
   backend on a fixed EN/ES question set. It calls the **live** backend (spends
   real requests) — opt-in, never run by the test suite.
+* ``cases-check`` (DEC3-07) validates a hand-labelled case file against the
+  production question and prints its label / language / tag balance.
+* ``collect`` (DEC3-07) asks one Ollama sub-tier the production question for
+  every case and writes the ``labeled`` / ``preds`` pair ``calibrate`` reads
+  (see :mod:`prismal.decisions.calset`). Live, opt-in.
 """
 
 from __future__ import annotations
@@ -31,6 +36,8 @@ from prismal.decisions.types import Decision, DecisionKind, OptionSpec, Question
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from prismal.core.config import Settings
+    from prismal.decisions.adapters.ollama import OllamaDecisionAdapter
     from prismal.decisions.ports import DecisionPort
 
 
@@ -189,8 +196,125 @@ def _bench(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cases_check(args: argparse.Namespace) -> int:
+    from prismal.decisions.calset import check_cases, load_cases, resolve_question
+
+    try:
+        question = resolve_question(args.decision_id, routes_profile=args.routes_profile)
+        report = check_cases(load_cases(args.cases), question)
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
+    return 1 if report.errors else 0
+
+
+def _collect_backend(*, tier: str, settings: Settings) -> OllamaDecisionAdapter:
+    """One Ollama sub-tier configured for calibration runs, not for serving.
+
+    One question per request (``max_batch=1``), no rolling-p95 skipping on
+    ``accurate`` and no stored calibration/batch records: the run must see every
+    case and record the raw distribution.
+    """
+    from prismal.decisions.adapters.ollama import OllamaDecisionAdapter, resolve_base_url
+
+    model_name = settings.decision_ollama_models.get(tier)
+    if not model_name:
+        raise ValueError(f"no Ollama model configured for tier {tier!r}")
+    return OllamaDecisionAdapter(
+        base_url=resolve_base_url(settings),
+        model_name=model_name,
+        tier=tier,  # type: ignore[arg-type]
+        keep_alive=settings.decision_ollama_keep_alive,
+        min_version=settings.decision_ollama_min_version,
+        max_batch=1,
+        accurate_max_p95_ms=10**9,
+        budget_ms=settings.decision_ollama_timeout_ms,
+        calibration_dir=None,
+        settings=settings,
+    )
+
+
+def _model_key(backend: object) -> str:
+    """``<name>@<digest12>`` for a preflighted Ollama adapter, else ``backend.model``."""
+    preflight = getattr(backend, "preflight", None)
+    digest = getattr(preflight, "digest12", "") if preflight is not None else ""
+    name = getattr(backend, "model_name", None) or getattr(backend, "model", "unknown")
+    return f"{name}@{digest}" if digest else str(name)
+
+
+def _collect(args: argparse.Namespace) -> int:
+    from prismal.core.config import get_settings
+    from prismal.decisions.calset import (
+        check_cases,
+        collect,
+        load_cases,
+        resolve_question,
+        write_collect,
+    )
+
+    try:
+        question = resolve_question(args.decision_id, routes_profile=args.routes_profile)
+        cases = load_cases(args.cases)
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if args.limit:
+        cases = cases[: args.limit]
+    report = check_cases(cases, question)
+    if report.errors:
+        print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
+        print("error: fix the case file before collecting", file=sys.stderr)
+        return 1
+    try:
+        backend = _collect_backend(tier=args.tier, settings=get_settings())
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    def progress(done: int, total: int) -> None:
+        if done % 25 == 0 or done == total:
+            print(f"  {done}/{total}", file=sys.stderr, flush=True)
+
+    async def _go() -> tuple[object, str]:
+        try:
+            result = await collect(
+                cases, question, backend, timeout_ms=args.timeout_ms, on_progress=progress
+            )
+            return result, _model_key(backend)
+        finally:
+            await backend.aclose()
+
+    result, model_key = asyncio.run(_go())
+    paths = write_collect(result, args.out_dir, model_key=model_key)  # type: ignore[arg-type]
+    summary = json.loads(paths.summary.read_text("utf-8"))
+    print(
+        json.dumps(
+            {
+                k: summary[k]
+                for k in ("model", "n_cases", "n_predictions", "accuracy", "latency_ms")
+            },
+            indent=2,
+        )
+    )
+    print(
+        "next: python -m prismal.decisions calibrate"
+        f" --labeled {paths.labeled} --predictions {paths.predictions}"
+        f" --decision-id {question.id} --model {model_key}"
+        f" --floor {_tier_floor(question)} --target-precision <target> --version v1"
+    )
+    return 0
+
+
+def _tier_floor(question: QuestionSpec) -> float:
+    from prismal.decisions.types import GatePolicy
+
+    tau = GatePolicy().tau(question.risk_tier)
+    return tau if tau is not None else 1.0
+
+
 def build_parser() -> argparse.ArgumentParser:
-    """Argument parser for the ``calibrate`` and ``bench`` subcommands."""
+    """Argument parser for ``calibrate``, ``bench``, ``cases-check`` and ``collect``."""
     parser = argparse.ArgumentParser(prog="python -m prismal.decisions")
     sub = parser.add_subparsers(dest="command")
     cal = sub.add_parser("calibrate", help="Fit a calibration record from labeled predictions")
@@ -206,6 +330,20 @@ def build_parser() -> argparse.ArgumentParser:
     bench = sub.add_parser("bench", help="Latency / cost of one live backend (spends requests)")
     bench.add_argument("--backend", choices=["laya", "jev", "llm"], required=True)
     bench.add_argument("--n", type=int, default=5, help="Rounds over the fixed state set")
+    check = sub.add_parser("cases-check", help="Validate a labeled case file (DEC3-07)")
+    check.add_argument("--cases", required=True, help="Case JSONL file")
+    check.add_argument("--decision-id", required=True)
+    check.add_argument("--routes-profile", choices=["base", "advanced"], default="base")
+    col = sub.add_parser(
+        "collect", help="Raw predictions of one Ollama sub-tier for a case file (live)"
+    )
+    col.add_argument("--cases", required=True, help="Case JSONL file")
+    col.add_argument("--decision-id", required=True)
+    col.add_argument("--tier", choices=["fast", "accurate"], required=True)
+    col.add_argument("--routes-profile", choices=["base", "advanced"], default="base")
+    col.add_argument("--out-dir", default="specs/typed-decision-models/data/runs")
+    col.add_argument("--limit", type=int, default=0, help="Only the first N cases (pilot)")
+    col.add_argument("--timeout-ms", type=int, default=60_000, help="Per-request timeout")
     return parser
 
 
@@ -217,5 +355,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _calibrate(args)
     if args.command == "bench":
         return _bench(args)
+    if args.command == "cases-check":
+        return _cases_check(args)
+    if args.command == "collect":
+        return _collect(args)
     parser.print_help()
     return 2

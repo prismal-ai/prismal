@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from prismal.core.config import Settings
     from prismal.decisions.cascade import DecisionCascade
     from prismal.decisions.shadow import ShadowRunner
+    from prismal.decisions.state import DecisionState
 
 INTEGRATION = "rag"
 RAG_DECISION_ID = "rag.chunk_relevance"
@@ -39,6 +40,16 @@ RAG_QUESTION = QuestionSpec(
 
 def _content(chunk: Any) -> str:
     return str(getattr(chunk, "page_content", getattr(chunk, "content", chunk)))
+
+
+def build_rag_state(query: str, content: str) -> DecisionState:
+    """The decision state graded for one chunk: query and chunk, both untrusted."""
+    return (
+        DecisionStateBuilder()
+        .add_untrusted("query", query, source="user")
+        .add_untrusted("chunk", content, source="rag")
+        .build()
+    )
 
 
 async def grade_chunks(
@@ -59,12 +70,7 @@ async def grade_chunks(
     out: list[bool | None] = []
     for chunk in chunks:
         content = _content(chunk)
-        state = (
-            DecisionStateBuilder()
-            .add_untrusted("query", query, source="user")
-            .add_untrusted("chunk", content, source="rag")
-            .build()
-        )
+        state = build_rag_state(query, content)
         if mode is DecisionMode.SHADOW:
             launch_shadow(shadow, state, RAG_QUESTION, gate, INTEGRATION)
             out.append(None)
@@ -126,12 +132,7 @@ async def maybe_grade_candidates(
         return CandidateDecisions([None if g is None else (1.0 if g else 0.0) for g in graded])
     handles: list[ShadowHandle | None] = []
     for content in contents:
-        state = (
-            DecisionStateBuilder()
-            .add_untrusted("query", query, source="user")
-            .add_untrusted("chunk", content, source="rag")
-            .build()
-        )
+        state = build_rag_state(query, content)
         handles.append(
             launch_shadow(runtime.shadow, state, RAG_QUESTION, runtime.policy, INTEGRATION)
         )

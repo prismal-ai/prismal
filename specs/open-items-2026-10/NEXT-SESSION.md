@@ -50,7 +50,9 @@ Source of truth: `specs/typed-decision-models/TASKS.md` and
      production data; synthesize or anonymize.
   2. Review the labels by hand. Two passes are recommended, and disagreements
      go to a third pass.
-  3. Run each case on `ollama:fast` and `ollama:accurate` to collect raw scores.
+  3. Run each case on `ollama:fast` and `ollama:accurate` to collect raw scores
+     (`python -m prismal.decisions collect`; validate first with `cases-check`, case format in
+     `specs/typed-decision-models/data/README.md`; route + rag supported).
   4. Run `calibrate`. It writes `<id>@<name>@<digest12>` records. Check the ECE
      and the margin against the gate thresholds.
   5. Measure accuracy with batching on and off. It writes

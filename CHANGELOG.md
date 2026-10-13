@@ -10,6 +10,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- DEC3-07 calibration-set tooling: `prismal.decisions.calset` and two CLI subcommands.
+  `cases-check` validates a hand-labelled case file against the **production** question
+  (labels, duplicates, inputs, language; warns when production detects another language or a
+  label has no case). `collect` asks one Ollama sub-tier that question over the
+  **production-built** state, one question per request with a 60 s timeout, and writes the
+  aligned `labeled` / `preds` pair plus a summary (accuracy, confusions, latency) that
+  `calibrate` consumes. Supported: `route.supervisor` (`base` / `advanced` route profiles) and
+  `rag.chunk_relevance`. Case format: `specs/typed-decision-models/data/README.md`.
+
+### Changed
+- `rag.py`: the per-chunk decision state is built by the new `build_rag_state()` (same fields,
+  fences and hash as before), so calibration sets reuse the production builder.
+
 ## [3.20.0] — 2026-10-12
 
 Measured token savings (TKE9-04) and the fixes that measurement uncovered:
