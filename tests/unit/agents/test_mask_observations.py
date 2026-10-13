@@ -115,9 +115,10 @@ def test_strategy_enum_has_mask_observations() -> None:
 
 
 def test_stub_format() -> None:
-    assert (
-        OBSERVATION_STUB.format(tool="search", artifact_id="abc", tokens=100)
-        == "[observation elided: tool=search artifact=abc tokens≈100]"
+    """The stub names the recovery tool: without it the model never re-reads
+    an elided observation (TKE9-04 live run: 0/3 with read_artifact available)."""
+    assert OBSERVATION_STUB.format(tool="search", artifact_id="abc", tokens=100) == (
+        "[observation elided: tool=search artifact=abc tokens≈100; use read_artifact]"
     )
 
 
@@ -259,7 +260,7 @@ async def test_lazy_store_built_when_not_injected(monkeypatch: pytest.MonkeyPatc
         built.append(settings)
         return store
 
-    monkeypatch.setattr(cc, "build_artifact_store", fake_build)
+    monkeypatch.setattr(cc, "shared_artifact_store", fake_build)
     settings = _settings()
     compactor = ContextCompactor(settings=settings)
     result = await compactor.mask_observations(_history(), run_id="r", tenant="t")

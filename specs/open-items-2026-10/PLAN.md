@@ -54,6 +54,12 @@ Order is by how much each item unblocks.
 > automatically. Live result: 3,156 tokens per successful task (was 0); the baseline is
 > committed.
 
+>
+> **TKE9-04 (2026-10-12).** The A/B ran with the TKE flags on, after fixing eval thread reuse
+> and switching to `ollama_chat/` with thinking off. Tuned controls give −16.7 % on batched
+> lookups and −21.4 % on sequential lookups, both with solve rate 1.0. That is below the ≥ 30 %
+> target. The gate now blocks. Results are in `docs/token-efficiency.md`.
+
 
 ### 2.2 Emit AG-UI `subagent` payloads (PRT follow-up) — P2
 
@@ -134,10 +140,12 @@ Order is by how much each item unblocks.
 
 ## 3. Phase 3 — Data / ops (not code; owner action)
 
+> Step-by-step plan for the next session, together with the TKE ≥ 30 % track: [`NEXT-SESSION.md`](NEXT-SESSION.md).
+
 - DEC3-07: ≥ 300 labelled Spanish cases per decision. DEC3-09: per-question latency profile.
 - DEC6-07: re-run the injection corpus against the real Ollama models.
 - DEC0-08: reproduce the Laya benchmarks on our hardware.
-- Refresh `config/opencode_models.yaml`, which is illustrative today.
+- ~~Refresh `config/opencode_models.yaml`, which is illustrative today.~~ Done 2026-10-12: regenerated from the docs tables, bases moved to `/inference/…`, deny-list extended (VERIFY.md GW0-05/06).
 
 ## 4. Deferred by design (no action)
 

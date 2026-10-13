@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from langchain_core.messages import SystemMessage
 from pydantic import BaseModel, Field
 
+from prismal.agents.context_compaction import context_compaction_react_kwargs
 from prismal.agents.extension.decorators import prismal_node
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
 from prismal.budget.resolve import get_budget_guard
@@ -204,6 +205,7 @@ async def critic_node(state: AgentState) -> dict[str, object]:
             session_id=str(session_id) if session_id else None,
             budget_guard=get_budget_guard(state),
             **hardening_react_kwargs(state),
+            **context_compaction_react_kwargs(state),
         ),
     )
 

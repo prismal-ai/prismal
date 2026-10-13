@@ -206,7 +206,7 @@ class TestOverBudget:
             calls.append(settings)
             return built
 
-        monkeypatch.setattr(mod, "build_artifact_store", fake_build)
+        monkeypatch.setattr(mod, "shared_artifact_store", fake_build)
         s = _settings()
         b = ToolOutputBudget(settings=s)
         _apply(b, "s", "m" * 5000)

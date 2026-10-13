@@ -33,7 +33,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from pydantic import BaseModel, Field
 
+from prismal.agents.context_compaction import context_compaction_react_kwargs
+from prismal.agents.extension.decorators import prismal_node
 from prismal.agents.handoff import (
     HandoffEnvelope,
     envelope_to_message_text,
@@ -72,6 +75,60 @@ the bounds of your assigned sub-task.
 _MAX_WORKER_ITERATIONS: int = 3
 
 
+class ParallelResult(BaseModel):
+    """One ``parallel_results`` entry: written by a worker, read by the aggregator."""
+
+    agent: str
+    task: str
+    result: str
+    envelope: dict[str, Any] | None = None
+
+
+class ParallelResearcherInput(BaseModel):
+    """Narrow input contract for ``parallel_researcher_node`` (Phase NTS.1, batch 2)."""
+
+    pending_tasks: list[str] = Field(default_factory=list)
+
+
+class ParallelResearcherOutput(BaseModel):
+    """Narrow output contract for ``parallel_researcher_node`` (Phase NTS.1, batch 2)."""
+
+    current_agent: str
+
+
+class ParallelWorkerOutput(BaseModel):
+    """Output contract for ``parallel_researcher_worker`` (Phase NTS.1, batch 2).
+
+    ``parallel_results`` is an ``operator.add`` channel: each worker appends
+    exactly one entry. Returning the accumulated list would duplicate every
+    earlier finding. The worker declares no input model because its input is a
+    ``Send`` payload carrying ``_task``, which is not an ``AgentState`` key.
+    """
+
+    parallel_results: list[ParallelResult] = Field(min_length=1, max_length=1)
+
+
+class ResearchAggregatorInput(BaseModel):
+    """Narrow input contract for ``research_aggregator_node`` (Phase NTS.1, batch 2)."""
+
+    parallel_results: list[ParallelResult] = Field(default_factory=list)
+
+
+class ResearchAggregatorOutput(BaseModel):
+    """Narrow output contract for ``research_aggregator_node`` (Phase NTS.1, batch 2)."""
+
+    current_agent: str
+    messages: list[Any]
+
+
+@prismal_node(
+    name="parallel_researcher",
+    security="off",
+    audit=False,
+    input_model=ParallelResearcherInput,
+    output_model=ParallelResearcherOutput,
+    propagate_errors=True,
+)
 async def parallel_researcher_node(state: AgentState) -> dict[str, Any]:
     """Pass-through node that anchors the conditional dispatcher edges.
 
@@ -97,6 +154,14 @@ async def parallel_researcher_node(state: AgentState) -> dict[str, Any]:
     return {"current_agent": "parallel_researcher"}
 
 
+@prismal_node(
+    name="parallel_researcher_worker",
+    security="off",
+    audit=False,
+    input_model=None,
+    output_model=ParallelWorkerOutput,
+    propagate_errors=True,
+)
 async def parallel_researcher_worker(state: AgentState) -> dict[str, Any]:
     """Execute a single research sub-task and append the result.
 
@@ -156,6 +221,7 @@ async def parallel_researcher_worker(state: AgentState) -> dict[str, Any]:
             session_id=str(session_id) if session_id else None,
             budget_guard=get_budget_guard(state),
             **hardening_react_kwargs(state),
+            **context_compaction_react_kwargs(state),
         ),
     )
 
@@ -178,6 +244,14 @@ async def parallel_researcher_worker(state: AgentState) -> dict[str, Any]:
     return {"parallel_results": [entry]}
 
 
+@prismal_node(
+    name="research_aggregator",
+    security="off",
+    audit=False,
+    input_model=ResearchAggregatorInput,
+    output_model=ResearchAggregatorOutput,
+    propagate_errors=True,
+)
 async def research_aggregator_node(state: AgentState) -> dict[str, Any]:
     """Consolidate ``parallel_results`` into a single AIMessage.
 

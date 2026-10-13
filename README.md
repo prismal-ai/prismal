@@ -574,7 +574,7 @@ This package follows [Semantic Versioning](https://semver.org/).
 Tag format for releases: `prismal/vMAJOR.MINOR.PATCH`
 
 ```bash
-git tag prismal/v3.19.0
+git tag prismal/v3.20.0
 git push --tags
 ```
 

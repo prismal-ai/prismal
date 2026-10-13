@@ -32,11 +32,11 @@ from __future__ import annotations
 from contextlib import suppress
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, ToolMessage
 
-from prismal.agents.artifacts import anonymous_run_id, build_artifact_store
+from prismal.agents.artifacts import anonymous_run_id, shared_artifact_store
 from prismal.core.logging import get_logger
 from prismal.monitoring.otel import OTelManager
 from prismal.utils.token_estimate import estimate_tokens
@@ -63,7 +63,9 @@ class CompactionStrategy(StrEnum):
 
 
 #: Replacement content for a masked observation (SPEC-TKE-MSK-001).
-OBSERVATION_STUB = "[observation elided: tool={tool} artifact={artifact_id} tokens≈{tokens}]"
+OBSERVATION_STUB = (
+    "[observation elided: tool={tool} artifact={artifact_id} tokens≈{tokens}; use read_artifact]"
+)
 _MASKED_PREFIX = "[observation elided:"
 
 #: Optional relevance hook (SPEC-TKE-MSK-001): ``(observation, history) -> score``.
@@ -386,7 +388,7 @@ class ContextCompactor:
 
     def _store(self) -> ArtifactStorePort:
         if self._artifact_store is None:
-            self._artifact_store = build_artifact_store(self._settings)
+            self._artifact_store = shared_artifact_store(self._settings)
         return self._artifact_store
 
     def _mask(
@@ -572,7 +574,13 @@ def clear_context_compaction_run(state: AgentState) -> None:
     _RUN_ENGINES.pop(_run_key(state), None)
 
 
-def context_compaction_react_kwargs(state: AgentState) -> dict[str, ContextCompactor]:
+class CompactionReactKwargs(TypedDict, total=False):
+    """The ``react_loop`` keyword :func:`context_compaction_react_kwargs` may supply."""
+
+    context_compactor: ContextCompactor
+
+
+def context_compaction_react_kwargs(state: AgentState) -> CompactionReactKwargs:
     """Return the ``react_loop`` kwargs for *state* (mirrors ``hardening_react_kwargs``).
 
     Returns an **empty dict** when disabled/unseeded, so splatting this into

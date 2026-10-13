@@ -150,8 +150,8 @@ def test_satisfies_port() -> None:
 @pytest.mark.parametrize(
     ("plan", "name", "base"),
     [
-        ("zen", "opencode", "https://opencode.ai/zen/v1"),
-        ("go", "opencode-go", "https://opencode.ai/zen/go/v1"),
+        ("zen", "opencode", "https://opencode.ai/inference/v1"),
+        ("go", "opencode-go", "https://opencode.ai/inference/go/v1"),
     ],
 )
 def test_protocol_prefix_table(
@@ -281,6 +281,16 @@ def test_zen_has_no_agent_restriction() -> None:
         ("go", "gw:opencode-go/deepseek-v4-flash"),
         ("go", "gw:opencode-go/deepseek-v4-flash-vision-exp"),
         ("go", "gw:opencode-go/muse-spark-1.3-contributor"),
+        # 2026-10-12 refresh: free models whose data may train the upstream
+        # model, or "trial use only — do not submit personal data" (NVIDIA).
+        ("zen", "gw:opencode/big-pickle"),
+        ("zen", "gw:opencode/exo-free"),
+        ("zen", "gw:opencode/mimo-v2.6-flash-free"),
+        ("zen", "gw:opencode/mimo-v2.5-free"),
+        ("zen", "gw:opencode/ling-3.1-flash-free"),
+        ("zen", "gw:opencode/ling-3.0-flash-fin-free"),
+        ("zen", "gw:opencode/nemotron-3-ultra-free"),
+        ("zen", "gw:opencode/nemotron-3.5-lightning-free"),
     ],
 )
 def test_retention_deny_list_with_zero_requests(
@@ -293,6 +303,36 @@ def test_retention_deny_list_with_zero_requests(
     assert info.value.reason == "retention_denied_model"
     assert guard.requests == []
     assert otel.counts["gateway_policy_denials"][0]["reason"] == "retention_denied_model"
+
+
+@pytest.mark.parametrize(
+    ("plan", "model"),
+    [("go", "mimo-v2.6-flash"), ("go", "mimo-v2.5-pro"), ("zen", "step-5-preview-free")],
+)
+def test_zero_retention_models_stay_allowed(plan: str, model: str) -> None:
+    """The training deny patterns must not catch the paid / zero-retention ids."""
+    prefix = "opencode-go" if plan == "go" else "opencode"
+    gw = _gw(plan, protocols={model: CHAT})
+    assert (
+        gw.resolve(f"gw:{prefix}/{model}", agent="coder", session_id=None).upstream_model == model
+    )
+
+
+def test_default_base_urls_are_the_documented_inference_endpoints() -> None:
+    settings = gw_settings()
+    assert settings.opencode_zen_base_url == "https://opencode.ai/inference/v1"
+    assert settings.opencode_go_base_url == "https://opencode.ai/inference/go/v1"
+
+
+def test_shipped_protocol_map_matches_the_2026_10_12_docs() -> None:
+    maps = load_opencode_model_protocols()
+    assert maps["zen"]["claude-sonnet-5-5"] is MSG
+    assert maps["zen"]["claude-haiku-5-5"] is MSG
+    assert maps["zen"]["mistral-large-4"] is CHAT
+    assert maps["go"]["claude-haiku-5-5"] is MSG
+    assert maps["go"]["space-bunny"] is CHAT
+    assert "fledge-alpha-free" not in maps["zen"]  # no longer listed
+    assert "space-bunny-free" not in maps["go"]  # renamed to space-bunny
 
 
 def test_deny_list_configurable() -> None:
@@ -410,7 +450,7 @@ async def test_refresh_merges_per_model_protocols() -> None:
                 "data": [
                     {
                         "id": "new-chat",
-                        "endpoint": "https://opencode.ai/zen/go/v1/chat/completions",
+                        "endpoint": "https://opencode.ai/inference/go/v1/chat/completions",
                     },
                     {"id": "opencode-go/new-msg", "protocol": "anthropic_messages"},
                     {"id": "new-resp", "endpoint": "/v1/responses"},
@@ -422,7 +462,7 @@ async def test_refresh_merges_per_model_protocols() -> None:
     gw = _gw("go", http=_client(handler))
     merged = await gw.refresh_protocols()
     assert merged == {"new-chat": CHAT, "new-msg": MSG, "new-resp": RESP}
-    assert str(seen[0].url) == "https://opencode.ai/zen/go/v1/models"
+    assert str(seen[0].url) == "https://opencode.ai/inference/go/v1/models"
     assert seen[0].headers["Authorization"] == f"Bearer {SENTINEL}"
     r = gw.resolve("gw:opencode-go/new-msg", agent="coder", session_id=None)
     assert r.litellm_model == "anthropic/new-msg"
@@ -493,8 +533,8 @@ def test_build_from_settings_per_plan() -> None:
         ledger=ledger,
     )
     assert set(both) == {"opencode", "opencode-go"}
-    assert both["opencode"].profile.base_url == "https://opencode.ai/zen/v1"
-    assert both["opencode-go"].profile.base_url == "https://opencode.ai/zen/go/v1"
+    assert both["opencode"].profile.base_url == "https://opencode.ai/inference/v1"
+    assert both["opencode-go"].profile.base_url == "https://opencode.ai/inference/go/v1"
     assert both["opencode"].profile.auth_ref == "opencode_api_key"
     r = both["opencode-go"].resolve("gw:opencode-go/glm-5.3", agent="coder", session_id=None)
     assert r.litellm_model == "openai/glm-5.3"

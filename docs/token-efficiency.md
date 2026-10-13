@@ -54,8 +54,9 @@ python -m prismal.eval token-gate --current out.json [--report-only]           #
 ```
 
 The gate fails when tokens per successful task grow more than 10 % or the
-cache-hit ratio drops more than 0.10 below the baseline. Use `--report-only`
-until two green runs have been recorded.
+cache-hit ratio drops more than 0.10 below the baseline. It blocks (exit 1);
+`--report-only` prints the violations and always exits 0. The gate runs
+locally, because it needs live Ollama; CI does not run it.
 
 **Where the token numbers come from.** `capture_trajectory` adds a LangChain
 callback to the run config. The callback sees every LLM call the run makes,
@@ -65,20 +66,75 @@ change a live run recorded 0 tokens. The callback's totals win; when no call is
 observed, the usage on streamed messages is used (`Trajectory.usage_source` is
 `callbacks` or `messages`).
 
-**Committed baseline (2026-10-12).** `tests/eval/baselines/tokens.json` was
-captured from the smoke suite against local Ollama `qwen3:14b` (fallback
-`qwen3:8b`), with the TKE flags off: 3,156 tokens per successful task, 2 LLM
-calls per task, solve rate 1.0. The cache-hit ratio and cost are 0 because local
-Ollama reports neither. The PLAN §4 savings targets still need the TKE9-04 A/B
-run with the TKE flags on.
+**Committed baseline (2026-10-12).** `tests/eval/baselines/tokens.json` is
+the smoke suite with the TKE flags off: 2,723.5 tokens per successful task,
+2 LLM calls per task, solve rate 1.0. The cache-hit ratio and cost are 0
+because local Ollama reports neither. It was measured under these conditions,
+which every gated run must reproduce:
 
-**Keep `--report-only` for now.** A second identical run on 2026-10-12 measured
-3,556.5 tokens per successful task (+12.7 %), so `token-gate` flagged it as a
-regression. The cause is run-to-run variance, not a code change: qwen3 is a
-reasoning model, and at temperature 0.7 the length of its thinking varies.
-Before the gate can block, either pin generation (temperature 0 or a
-non-reasoning model for eval), or baseline on the mean of several runs and size
-the tolerance to the measured spread.
+- `PRISMAL_DEFAULT_MODEL=ollama_chat/qwen3:14b`, `PRISMAL_TEMPERATURE=0`,
+  thinking off (`reasoning_effort="none"` on every call);
+- a fresh working directory with an empty `data/` (the eval otherwise writes
+  into the local profile `data/workspace/profile/PREFERENCES.md` and long-term
+  memory, which later prompts read back);
+- the power profile set to `performance` on the measuring host.
+
+Use **`ollama_chat/`**, not `ollama/`. With `ollama/`, LiteLLM calls
+`/api/generate` and emulates tool calls as text. Every local model we tried
+then failed a three-call tool loop: it printed the call as text or repeated it
+forever. `ollama_chat/` uses Ollama's native tool calling.
+
+**The gate blocks.** Under those conditions, back-to-back repeat runs agree
+to within 10 tokens (0.1 %), so `token-gate` runs without `--report-only`.
+Across a model reload they are only near-deterministic. Later the same day,
+`seq-001` (a 5-hop chain) stopped one hop early in **every** arm, A included:
+4 tool calls instead of 5, and a wrong sum. The cause was the code before and
+after a rebase being run on a reloaded model, not TKE. Compare arms only
+inside one session, and repeat a case whose result flips. The earlier
++12.7 % "variance" had two causes:
+
+- the eval runner reused a fixed thread id against the on-disk checkpointer,
+  so every run resumed the previous run's history (fixed: each run now gets
+  `eval-<case>-<uuid>`);
+- qwen3's thinking at temperature 0.7.
+
+### A/B results (TKE9-04, 2026-10-12)
+
+The run had three arms, each repeated twice with the same model and
+conditions as the baseline. The `contains` assertions check each answer
+against the toolkit's true values, so the solve rate reflects quality, not
+just tool use.
+
+- **A** — `token_efficiency_enabled=False`.
+- **B-default** — master on, plus `tool_output_budget_enabled`,
+  `context_compaction_enabled` with `mask_observations`, and
+  `handoff_envelope_enabled`, all at their default values.
+- **B-tuned** — B-default plus `tool_output_max_tokens_default=400`,
+  `tool_output_toon_enabled`, `context_mask_keep_turns=2` and a 1,500 / 800
+  high/low-water band.
+- TKE2 (prompt caching) is not measured, because Ollama has no prompt cache.
+  TKE6 (effort) stays off in every arm, so thinking is off in all of them.
+
+| Suite | A tokens/case | B-default | B-tuned | Solve rate (all arms) |
+|---|---|---|---|---|
+| `long_loop` (3 cases, lookups batched: 13 tool calls in 4 turns) | 10,347 | 10,342 (0.0 %) | 8,618 (**−16.7 %**) | 1.0 |
+| `long_loop_sequential` (3 chains of 3–5 hops, one turn per hop) | 21,190 | 21,187 (0.0 %) | 16,660 (**−21.4 %**) | 1.0 |
+| `smoke` (no tools) | 2,724 | 2,724 | 2,724 | 1.0 |
+
+What the numbers show:
+
+- **The defaults do nothing on these workloads.** A 1 k-token record is under
+  the 2,000-token output budget, and no case exceeds `keep_turns=10`. The
+  savings need knobs sized to the workload.
+- **Tuned controls save 17–21 % with no quality loss,** plus about 27 % lower
+  latency on `long_loop`. That is below the PLAN §4 target of ≥ 30 %.
+- **Most of the saving comes from the output budget and TOON, not from
+  masking.** All the hops of a case run inside one agent's `react_loop`.
+  Observation masking is applied at the supervisor seam
+  (`maybe_compact_context`), and the in-loop hook is not wired, so masking
+  barely acts here (see TKE4).
+- **What remains is fixed cost:** the supervisor and agent prompts take about
+  1,350 tokens per call.
 
 ## TKE2 — Prompt caching and a cache-stable layout
 
@@ -166,7 +222,7 @@ ttl_ms=)` is the seam for MCP `ttlMs` (Phase PRT).
 
 `context_compaction_strategy="mask_observations"` replaces the content of every
 `ToolMessage` older than the last `context_mask_keep_turns` human/AI turns with
-`[observation elided: tool=… artifact=… tokens≈…]`:
+`[observation elided: tool=… artifact=… tokens≈…; use read_artifact]`:
 
 - the full payload is stored first;
 - the replacement keeps the **same id and tool_call_id**, so `add_messages`
@@ -176,8 +232,59 @@ ttl_ms=)` is the seam for MCP `ttlMs` (Phase PRT).
 An optional `relevance_fn` (the DEC hook) keeps relevant observations. A
 high/low-water band (`context_compaction_high_water` / `_low_water`, measured in
 estimated tokens) compacts once per crossing. `high_water=0` keeps the LH
-trigger. Note that each stub costs about 13 tokens, so a very long history may
+trigger. Note that each stub costs about 17 tokens, so a very long history may
 stay above low-water once every eligible observation has been masked.
+
+**Inside the agent loop (2026-10-12).** Every agent passes
+`context_compaction_react_kwargs(state)` to `react_loop`, so observations
+produced inside one agent's tool loop are masked as the loop runs, not only
+at the supervisor seam. An AST guard keeps that call paired with
+`hardening_react_kwargs`.
+
+**Masked data stays reachable.**
+
+- The compactor, the output budget and `read_artifact` share one store per
+  process and backend (`shared_artifact_store`).
+- With `mask_observations` on, `get_tools_for_agent` appends a
+  `read_artifact` schema. It is not appended for the output budget alone: the
+  budget keeps a head+tail excerpt, and in the live run the always-on schema
+  cost 2–3 % tokens per call, was never called, and changed 2 of 6 answers.
+- `react_loop` binds that tool to its own `(tenant, run_id)`, so the model
+  picks only the id and the window.
+- Each read returns at most 8,000 characters plus a pointer to the next
+  `start`. Reads are exempt from re-budgeting, and they still pass the
+  Phase H tool-result screen.
+
+**When masking helps, and when it hurts (live, 2026-10-12).** On the
+sequential suite, in-loop masking with `context_mask_keep_turns=2` solved
+**0/3** cases, even with `read_artifact` available and named in the stub. The
+reasons:
+
+- Those tasks aggregate every observation, so masking removes data the
+  answer needs.
+- Reading it back would cost as many tokens as keeping it.
+- The agents' ReAct caps (coder 5, researcher 4 iterations) leave no turn to
+  re-read after a 4–5-hop chain.
+
+Use masking for long loops whose old observations are no longer needed, such
+as search-then-act. Use the output budget and TOON for aggregation.
+
+Confirmation run with the final code, in one session. The budget arm is
+`tool_output_max_tokens_default=400` plus TOON, with no masking, so no
+`read_artifact` schema:
+
+| Suite | A | Budget arm | Solve rate (A / budget) |
+|---|---|---|---|
+| `long_loop` | 10,338 | 8,617 (**−16.6 %**) | 3/3 / 3/3 |
+| `long_loop_sequential` | 19,053 | 15,268 (**−19.9 %**) | 2/3 / 2/3 (`seq-001` flipped in both) |
+
+This reproduces the A/B above. The ≥ 30 % target is still not met. Masking
+reaches −36 % on the sequential suite, but only by losing the answers.
+
+**Store bounds.** The shared in-memory store keeps at most 1,000 artifacts per
+tenant. A tenant over that limit evicts only its own oldest artifacts, so one
+tenant cannot push out another's. A 10,000-artifact overall cap is a backstop.
+`put` also purges expired artifacts at most once a minute.
 
 `ArtifactStorePort` has in-memory (default) and SQLite adapters. Artifacts
 are scoped to tenant and run: a mismatch raises `ArtifactNotFound`, which looks

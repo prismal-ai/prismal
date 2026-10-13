@@ -133,3 +133,46 @@ async def test_scorecard_stamps_prismal_version() -> None:
     runner, _ = _runner(_FakeGraph(chunks))
     card = await runner.run_set(EvalSet(suite="s", cases=[_answer_case()]))
     assert card.version == version("prismal-ai")
+
+
+class _RecordingGraph:
+    """Records the (input, config) of every run."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[Any, Any]] = []
+
+    async def astream(
+        self, graph_input: Any, config: Any = None, *, stream_mode: str = "updates"
+    ) -> AsyncIterator[dict[str, Any]]:
+        self.calls.append((graph_input, config))
+        yield {"supervisor": {"messages": [AIMessage(content="ok")]}}
+
+
+async def test_each_run_of_a_case_gets_a_fresh_thread() -> None:
+    """Repeat runs never resume a checkpointed thread from an earlier run.
+
+    The default graph persists checkpoints on disk; a fixed ``eval-<id>`` thread
+    made every run inherit the previous run's history (and its tokens).
+    """
+    graph = _RecordingGraph()
+    runner, _ = _runner(graph)
+    other_runner, _ = _runner(graph)
+
+    await runner.run_case(_answer_case())
+    await runner.run_case(_answer_case())
+    await other_runner.run_case(_answer_case())
+
+    thread_ids = [cfg["configurable"]["thread_id"] for _, cfg in graph.calls]
+    assert len(set(thread_ids)) == 3
+    assert all(t.startswith("eval-c1-") for t in thread_ids)
+
+
+async def test_session_id_matches_the_run_thread() -> None:
+    """Session-scoped state (budget registry, memory) is keyed by the same run id."""
+    graph = _RecordingGraph()
+    runner, _ = _runner(graph)
+
+    await runner.run_case(_answer_case())
+
+    graph_input, config = graph.calls[0]
+    assert graph_input["session_id"] == config["configurable"]["thread_id"]

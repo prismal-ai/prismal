@@ -73,7 +73,9 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from pydantic import BaseModel
 
+from prismal.agents.extension.decorators import prismal_node
 from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
@@ -487,6 +489,28 @@ def _format_execution_feedback(stdout: str, stderr: str, exit_code: int) -> str:
 # ---------------------------------------------------------------------------
 
 
+class CodeActInput(BaseModel):
+    """Narrow input contract for ``codeact_node`` (Phase NTS.1, batch 2)."""
+
+    messages: list[Any]
+    session_id: str
+
+
+class CodeActOutput(BaseModel):
+    """Narrow output contract for ``codeact_node`` (Phase NTS.1, batch 2)."""
+
+    current_agent: str
+    messages: list[Any]
+
+
+@prismal_node(
+    name="codeact",
+    security="off",
+    audit=False,
+    input_model=CodeActInput,
+    output_model=CodeActOutput,
+    propagate_errors=True,
+)
 async def codeact_node(state: AgentState) -> dict[str, Any]:
     """Run the CodeAct generate → execute → auto-correct loop.
 

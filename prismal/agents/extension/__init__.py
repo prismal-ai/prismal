@@ -53,6 +53,7 @@ from prismal.agents.extension.providers import (
     StubToolProvider,
     build_default_tool_provider,
 )
+from prismal.agents.tool_registry import use_tool_provider
 
 __all__ = [
     "AuditPort",
@@ -90,4 +91,5 @@ __all__ = [
     "list_plugins",
     "list_registered_nodes",
     "prismal_node",
+    "use_tool_provider",
 ]

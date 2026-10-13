@@ -40,12 +40,21 @@ def test_gateway_defaults_match_spec() -> None:
     assert s.opencode_zen_enabled is False
     assert s.opencode_go_enabled is False
     assert s.opencode_api_key.get_secret_value() == ""
-    assert s.opencode_zen_base_url == "https://opencode.ai/zen/v1"
-    assert s.opencode_go_base_url == "https://opencode.ai/zen/go/v1"
+    assert s.opencode_zen_base_url == "https://opencode.ai/inference/v1"
+    assert s.opencode_go_base_url == "https://opencode.ai/inference/go/v1"
     assert s.opencode_model_protocols_path == "config/opencode_models.yaml"
     assert s.opencode_refresh_models is False
     assert s.opencode_go_allowed_agents == ["coder", "codeact_agent", "dev_pipeline", "code_review"]
-    assert s.opencode_denied_models == ["grok*", "muse-spark*", "deepseek-v4-flash*"]
+    assert s.opencode_denied_models == [
+        "grok*",
+        "muse-spark*",
+        "deepseek-v4-flash*",
+        "big-pickle",
+        "exo-free",
+        "mimo-*-free",
+        "ling-*-free",
+        "nemotron-*-free",
+    ]
     assert s.opencode_go_monthly_cap_usd == 0.0
     assert s.opencode_go_window_5h_ratio == 0.20
     assert s.opencode_go_window_week_ratio == 0.50

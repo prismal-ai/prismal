@@ -41,6 +41,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
+from prismal.agents.extension.decorators import prismal_node
 from prismal.core.config import get_settings
 from prismal.core.logging import get_logger
 from prismal.providers.registry import ProviderRegistry
@@ -315,6 +316,28 @@ def _audit_cua_action(
 # ---------------------------------------------------------------------------
 
 
+class CuaInput(BaseModel):
+    """Narrow input contract for ``cua_node`` (Phase NTS.1, batch 2)."""
+
+    messages: list[Any]
+    session_id: str
+
+
+class CuaOutput(BaseModel):
+    """Narrow output contract for ``cua_node`` (Phase NTS.1, batch 2)."""
+
+    current_agent: str
+    messages: list[Any]
+
+
+@prismal_node(
+    name="cua",
+    security="off",
+    audit=False,
+    input_model=CuaInput,
+    output_model=CuaOutput,
+    propagate_errors=True,
+)
 async def cua_node(state: AgentState) -> dict[str, Any]:
     """Run the CUA perception → plan → (HITL) → execute → audit loop.
 

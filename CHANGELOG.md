@@ -10,11 +10,41 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.20.0] — 2026-10-12
+
+Measured token savings (TKE9-04) and the fixes that measurement uncovered:
+in-loop observation masking is now wired, there is a bounded shared artifact
+store, and agents get `read_artifact`. Also in this release:
+`ollama_chat_endpoint`, the NTS.1 I/O contracts on nine more nodes, shared
+tenant quotas, AG-UI sub-agent events, an eval-harness isolation fix, the
+OpenCode refresh, and the dependency security updates.
+
 ### Added
+- `read_artifact` for agents when `mask_observations` is on. `react_loop`
+  binds it to the loop's own `(tenant, run_id)` on the shared store. Reads are
+  windowed to 8,000 characters with a next-start pointer, are not re-budgeted,
+  and pass the Phase H tool-result screen. The masked-observation stub now
+  ends with `; use read_artifact`.
+- Eval `contains` assertion: every `must_contain` value must appear in the
+  final answer (case-insensitive, digit grouping ignored). The long-loop cases
+  now check their answers against the toolkit's true values.
+- Sequential long-loop eval set (`long_loop_sequential.yaml`) with a chained
+  toolkit (`tool_provider: eval_toolkit_chain`, tool `get_linked_order`): each
+  record names the next order, so lookups cannot be batched.
+- `ollama_chat_endpoint` (opt-in, default off) makes `ProviderRegistry.get_llm`
+  rewrite `ollama/<model>` to `ollama_chat/<model>`, for both the primary and
+  the fallback model. `ollama/` goes through `/api/generate`, where LiteLLM
+  emulates tool calls as text and multi-tool loops break. With the setting off,
+  model strings are unchanged and a one-time warning
+  (`provider.ollama_generate_endpoint`) names the fix.
 - NTS.1 batch 1: I/O contracts on `coder`, `researcher`, `data_analyst`,
   `planner` and `critic` (`<Node>Input` / `<Node>Output`, checked only with
   `node_typesafety_enabled`; adopt in `warn` first). `planner` lists must be
   strings; `critic.iteration_count >= 0` in and out.
+- NTS.1 batch 2: I/O contracts on `rag_agent` (typed `metadata.rag_agent`),
+  `parallel_researcher`, `parallel_researcher_worker` (exactly one
+  `parallel_results` entry per worker — the channel is `operator.add`),
+  `research_aggregator`, `codeact` and `cua`.
 - `@prismal_node(propagate_errors=True)` re-raises a node's own exception
   unchanged. Built-in nodes use it, so adopting a contract never changes their
   error semantics.
@@ -53,6 +83,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `providers/` and `decisions/` (199 added; no behaviour change).
 
 ### Documentation
+- `docs/token-efficiency.md`: the TKE9-04 A/B results.
+  - Tuned controls give −16.7 % (batched lookups) and −21.4 % (sequential
+    lookups), with solve rate 1.0.
+  - The defaults change nothing on these workloads.
+  - The result is below the PLAN §4 target of ≥ 30 %.
+  - In-loop observation masking is not yet wired (TKE4 known gap).
+  - The measurement conditions are documented, including `ollama_chat/` rather
+    than `ollama/` for tool use. The token baseline was refreshed to 2,723.5,
+    and `token-gate` now blocks.
 - New guides: `docs/agents.md`, `rag.md`, `patterns.md`, `subgraphs.md`,
   `providers.md`, `mcp.md`, `skills.md`, `sandbox.md`, `scheduler.md`,
   `events.md`, `data-utilities.md`, plus the `docs/README.md` index.
@@ -71,6 +110,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   extra name in the vector-store docs.
 
 ### Fixed
+- In-loop observation masking now runs. `react_loop` has accepted a
+  `context_compactor` since LH1-06, but no agent node passed it. All nine now
+  do, and an AST guard keeps the call paired with `hardening_react_kwargs`.
+- The compactor and the output budget share one artifact store per process
+  and backend (`shared_artifact_store`). Before, an artifact one of them wrote
+  could not be read back through the other.
+- The shared in-memory store is bounded: at most 1,000 artifacts per tenant
+  (a tenant over the limit evicts only its own oldest), a 10,000-artifact
+  overall cap, and expired artifacts purged on `put` at most once a minute.
+  Found by security review.
+- Eval runs no longer resume earlier runs' history. The runner used a fixed
+  `eval-<case>` thread against the on-disk checkpointer, so a live case could
+  start with the previous run's messages. Its token count then included them,
+  which caused the smoke baseline's +12.7 % "variance". Each run now uses
+  `eval-<case>-<uuid>`, and the session id follows the thread.
 - `@prismal_node` broke HITL: `GraphInterrupt` (from `interrupt()`) is an
   `Exception` subclass, so `error_mapping` swallowed or wrapped it and `retry`
   could re-run it. It now always bubbles up and is never retried. A
@@ -94,7 +148,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `tests/eval/baselines/tokens.json` is committed (TKE1-08; smoke suite, local
   Ollama `qwen3:14b`). TKE9-04 (A/B with the TKE flags on) is unblocked.
 
+### Changed
+- OpenCode defaults follow the 2026-10 docs: `opencode_zen_base_url` =
+  `https://opencode.ai/inference/v1`, `opencode_go_base_url` =
+  `https://opencode.ai/inference/go/v1` (the old `/zen/...` bases still answer
+  but are undocumented). `config/opencode_models.yaml` regenerated from the
+  docs' tables: Zen adds `claude-haiku-5-5`, `claude-sonnet-5-5`,
+  `mistral-large-4`, `exo-free`, `step-5-preview-free` and drops
+  `fledge-alpha-free`; Go adds `claude-haiku-5-5`, `space-bunny`,
+  `step-5-preview-free` and drops `space-bunny-free`.
+
 ### Security
+- OpenCode deny-list (`opencode_denied_models`) now also refuses the free
+  tiers whose data may train the upstream model and NVIDIA's "trial use only"
+  endpoints: `big-pickle`, `exo-free`, `mimo-*-free`, `ling-*-free`,
+  `nemotron-*-free` (VERIFY.md GW0-06, re-verified 2026-10-12).
 - `mako` 1.3.12 → 1.4.3 (lock; transitive via `alembic` / `prefect`) — fixes
   CVE-2026-102991 (GHSA-5639-2j2p-m4mx, `TemplateLookup` path traversal).
 - `accelerate` 1.13.0 → 1.15.0 and floor `accelerate>=1.15.0` in
@@ -105,7 +173,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   are the latest releases. The ignores stay because prismal is not exposed:
   Chroma runs embedded only (no HTTP server/RBAC) and nothing imports `nltk`,
   which arrives only through `llmlingua` in the optional `[compression]` extra.
-  Next review: 2027-01.
+  Next review: 2027-01. That justification is now enforced by
+  `tests/unit/security/test_unpatched_dependency_surface.py` (AST guard: no
+  `nltk` import, no Chroma HTTP/cloud client or server settings, the adapter
+  persists to a local directory), and Dependabot alerts #49/#50/#51/#101 are
+  dismissed as tolerable risk.
 
 ## [3.19.0] — 2026-10-11
 
