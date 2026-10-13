@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any, cast
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
+from prismal.agents.context_compaction import context_compaction_react_kwargs
 from prismal.agents.extension.decorators import prismal_node
 from prismal.agents.handoff import (
     HandoffEnvelope,
@@ -220,6 +221,7 @@ async def parallel_researcher_worker(state: AgentState) -> dict[str, Any]:
             session_id=str(session_id) if session_id else None,
             budget_guard=get_budget_guard(state),
             **hardening_react_kwargs(state),
+            **context_compaction_react_kwargs(state),
         ),
     )
 

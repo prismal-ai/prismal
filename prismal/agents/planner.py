@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel
 
+from prismal.agents.context_compaction import context_compaction_react_kwargs
 from prismal.agents.extension.decorators import prismal_node
 from prismal.agents.patterns.reflection import reflection_loop
 from prismal.agents.tool_registry import get_tools_for_agent, react_loop
@@ -334,6 +335,7 @@ async def planner_node(state: AgentState) -> dict[str, object]:
                 session_id=str(session_id) if session_id else None,
                 budget_guard=get_budget_guard(state),
                 **hardening_react_kwargs(state),
+                **context_compaction_react_kwargs(state),
             ),
         )
         last_response = response

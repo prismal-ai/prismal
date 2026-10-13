@@ -128,7 +128,7 @@ Ten phases (TKE0 verify → TKE9 integration) plus the **optional P3** TKE10, ea
 | TKE9-01 | Graph snapshot test with all TKE flags off (**mandatory**) | 0.3 d | TKE1..8 | COMPAT-001 | DONE |
 | TKE9-02 | Disabled contract test: tools, prompts, `ChatLiteLLM` kwargs, `Usage`/`cost_usd` identical to v3.12.0 | 0.3 d | TKE1..8 | COMPAT-001 | DONE |
 | TKE9-03 | CI token-regression gate (report-only → blocking) — `python -m prismal.eval token-gate` (report-only flag); CI eval job runs unit tests only, so the gate runs after a live eval | 0.6 d | TKE1-08 | ACC-005 | DONE |
-| TKE9-04 | Eval A/B on fixed + long-loop sets; record success metrics in docs — unblocked 2026-10-12 (TKE1-08 baseline committed); A/B run with the TKE flags on still to do | 0.6 d | TKE9-03 | ACC-005 | TODO |
+| TKE9-04 | Eval A/B on fixed + long-loop sets; record success metrics in docs. Done 2026-10-12: tuned controls give −16.7 % (batched) / −21.4 % (sequential) with solve rate 1.0, below the ≥ 30 % target; masking is not wired inside `react_loop` (docs TKE4 known gap); gate now blocking | 0.6 d | TKE9-03 | ACC-005 | DONE |
 | TKE9-05 | AST guards re-run (provider imports, `mcp`/`skills`, env reads) | 0.2 d | TKE1..8 | COMPAT-001 | DONE |
 | TKE9-06 | `docs/token-efficiency.md` (incl. canary DD, LH delta table) | 0.5 d | TKE9-04 | — | DONE |
 | TKE9-07 | Notebook (`prisma-notebooks`) + `examples/token_efficiency.py` | 0.5 d | TKE9-06 | — | DONE |
@@ -162,7 +162,7 @@ Ten phases (TKE0 verify → TKE9 integration) plus the **optional P3** TKE10, ea
 ## 6. Definition of Done (feature)
 - [ ] All MUST requirements implemented and tested (§8); SHOULD implemented; TKE10 optional. _(2026-10-10: open — ACC-005 baseline capture TKE1-08 is WIP; TKE10 deferred.)_
 - [x] All flags off ⇒ graph snapshot + disabled contract tests prove zero behavior change; LH suite passes unmodified; LH delta documented (MODIFIED/ADDED).
-- [ ] Canary leak-detection parity proven on the H red-team corpus; eval gate green; PLAN §4 targets recorded in `docs/token-efficiency.md`. _(2026-10-10: leak parity proven by `test_canary_leak_cache_stable.py`; PLAN §4 targets not measured — blocked on TKE1-08 / TKE9-04.)_
+- [x] Canary leak-detection parity proven on the H red-team corpus; eval gate green; PLAN §4 targets recorded in `docs/token-efficiency.md`. _(2026-10-10: leak parity proven by `test_canary_leak_cache_stable.py`. 2026-10-12: A/B recorded. The long-loop target of ≥ 30 % is **not met** (−16.7 % / −21.4 %); the cached-workload and supervisor-hit-ratio targets are not measurable on local Ollama.)_
 - [x] `ruff` + `mypy --strict` + `bandit` clean; coverage ≥ 80 % on new modules; AST guards pass.
 ## 7. Effort Summary
 | TKE0 | TKE1 | TKE2 | TKE3 | TKE4 | TKE5 | TKE6 | TKE7 | TKE8 | TKE9 | **Core total** | TKE10 (optional P3) |

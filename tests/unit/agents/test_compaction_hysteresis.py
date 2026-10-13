@@ -133,17 +133,18 @@ async def test_mask_oldest_first_until_low_water() -> None:
     settings = _settings(
         context_compaction_strategy="mask_observations",
         context_compaction_high_water=150,
-        context_compaction_low_water=130,
+        context_compaction_low_water=140,
         context_mask_keep_turns=1,
     )
     compactor = ContextCompactor(settings=settings, artifact_store=FakeStore())
     msgs = _mask_history()
     assert compactor.should_compact(msgs) == (True, "high_water")
     result = await compactor.mask_observations(msgs, run_id="r", tenant="t")
-    # masking t0 and t1 brings the estimate from 201 to 127 (≤ 130)
+    # masking t0 and t1 brings the estimate from 201 to 137 (≤ 140); the stub
+    # now names read_artifact, so it costs a few tokens more than before
     assert [m.id for m in result.replaced] == ["t0", "t1"]
     merged = add_messages(add_messages([], msgs), list(result.replaced))
-    assert _tokens(merged) <= 130
+    assert _tokens(merged) <= 140
     assert compactor.should_compact(merged) == (False, "")
 
 

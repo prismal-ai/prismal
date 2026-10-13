@@ -126,6 +126,15 @@ class _Record:
     expires_at: float | None
 
 
+#: Minimum seconds between opportunistic purges of expired artifacts on ``put``.
+_PURGE_INTERVAL_S = 60.0
+#: Upper bound on records kept by the in-memory backend (backstop).
+_MAX_IN_MEMORY_RECORDS = 10_000
+#: Per-tenant share: a tenant over it evicts only its own oldest records, so
+#: one tenant flooding the shared store cannot push out another's artifacts.
+_MAX_IN_MEMORY_RECORDS_PER_TENANT = 1_000
+
+
 class _BaseArtifactStore:
     """Shared put/get/scope/TTL logic; subclasses supply persistence."""
 
@@ -138,6 +147,7 @@ class _BaseArtifactStore:
     ) -> None:
         self._settings = settings if settings is not None else get_settings()
         self._clock = clock
+        self._last_purge = clock()
         self._audit = audit
 
     # -- persistence hooks -------------------------------------------------
@@ -175,6 +185,11 @@ class _BaseArtifactStore:
         if ttl < 0:
             raise ValueError("ttl_s must be >= 0")
         now = self._clock()
+        if now - self._last_purge >= _PURGE_INTERVAL_S:
+            # The shared store lives for the whole process: drop expired
+            # artifacts as we go instead of letting them accumulate.
+            self._last_purge = now
+            self._delete_expired(now)
         ref = ArtifactRef(
             id=secrets.token_urlsafe(16),
             run_id=run_id,
@@ -235,7 +250,12 @@ class _BaseArtifactStore:
 
 
 class InMemoryArtifactStore(_BaseArtifactStore):
-    """Process-local artifact store (default backend)."""
+    """Process-local artifact store (default backend).
+
+    Bounded: a tenant beyond ``max_records_per_tenant`` evicts its own oldest
+    artifacts; beyond ``max_records`` overall the oldest are evicted. A later
+    read of an evicted id fails closed with ``ArtifactNotFound``.
+    """
 
     def __init__(
         self,
@@ -243,14 +263,32 @@ class InMemoryArtifactStore(_BaseArtifactStore):
         settings: Settings | None = None,
         clock: Callable[[], float] = time.time,
         audit: Any | None = None,
+        max_records: int = _MAX_IN_MEMORY_RECORDS,
+        max_records_per_tenant: int = _MAX_IN_MEMORY_RECORDS_PER_TENANT,
     ) -> None:
         super().__init__(settings=settings, clock=clock, audit=audit)
         self._records: dict[str, _Record] = {}
         self._lock = threading.Lock()
+        self.max_records = max_records
+        self.max_records_per_tenant = max_records_per_tenant
+        self._tenant_ids: dict[str, list[str]] = {}
 
     def _save(self, record: _Record) -> None:
         with self._lock:
             self._records[record.ref.id] = record
+            ids = self._tenant_ids.setdefault(record.ref.tenant, [])
+            ids.append(record.ref.id)
+            while len(ids) > self.max_records_per_tenant:
+                self._records.pop(ids.pop(0), None)  # this tenant's oldest
+            while len(self._records) > self.max_records:
+                self._forget(next(iter(self._records)))  # insertion order = oldest
+
+    def _forget(self, artifact_id: str) -> None:
+        record = self._records.pop(artifact_id, None)
+        if record is not None:
+            ids = self._tenant_ids.get(record.ref.tenant)
+            if ids is not None and artifact_id in ids:
+                ids.remove(artifact_id)
 
     def _load(self, artifact_id: str) -> _Record | None:
         with self._lock:
@@ -264,7 +302,7 @@ class InMemoryArtifactStore(_BaseArtifactStore):
                 if r.expires_at is not None and now >= r.expires_at
             ]
             for k in expired:
-                del self._records[k]
+                self._forget(k)
             return len(expired)
 
 
@@ -363,6 +401,26 @@ def build_artifact_store(settings: Settings | None = None) -> ArtifactStorePort:
     raise ArtifactStoreError(f"unknown artifact store backend: {backend!r}")
 
 
+# One store per backend (and SQLite path) per process: the compactor, the
+# tool-output budget and ``read_artifact`` must see the same artifacts. Runs stay
+# isolated by the (tenant, run_id) scope every get/put carries.
+_SHARED_STORES: dict[tuple[str, str], ArtifactStorePort] = {}
+_SHARED_LOCK = threading.Lock()
+
+
+def shared_artifact_store(settings: Settings | None = None) -> ArtifactStorePort:
+    """Return the process-wide store for ``settings.artifact_store_backend``."""
+    resolved = settings if settings is not None else get_settings()
+    path = resolved.artifact_store_path if resolved.artifact_store_backend == "sqlite" else ""
+    key = (resolved.artifact_store_backend, path)
+    with _SHARED_LOCK:
+        store = _SHARED_STORES.get(key)
+        if store is None:
+            store = build_artifact_store(resolved)
+            _SHARED_STORES[key] = store
+        return store
+
+
 def anonymous_run_id() -> str:
     """A fresh, unguessable run scope for callers without a ``session_id``.
 
@@ -378,12 +436,15 @@ def make_read_artifact_tool(
     run_id: str,
     tenant: str,
     sanitize: Callable[[str], str] | None = None,
+    max_chars: int | None = None,
 ) -> BaseTool:
     """Return a ``read_artifact`` tool bound to one ``(tenant, run_id)`` scope.
 
     Content is passed through *sanitize* (default ``InputSanitizer().sanitize``)
     — the same path as the original tool output. Missing or out-of-scope ids
     yield ``"artifact not found"`` instead of raising into the agent loop.
+    With *max_chars*, one read returns at most that many characters plus a
+    pointer to the next ``start``.
     """
     from langchain_core.tools import StructuredTool
 
@@ -395,11 +456,17 @@ def make_read_artifact_tool(
 
     def read_artifact(artifact_id: str, start: int = 0, end: int | None = None) -> str:
         """Read a character window [start, end) of a stored artifact by id."""
+        if max_chars is not None:
+            window_end = max(start, 0) + max_chars
+            end = window_end if end is None else min(end, window_end)
         try:
             sl = store.get(artifact_id, run_id=run_id, tenant=tenant, start=start, end=end)
         except ArtifactNotFound:
             return NOT_FOUND_MESSAGE
-        return clean(sl.content)
+        text = clean(sl.content)
+        if max_chars is not None and sl.end < sl.total_chars:
+            text += f"\n[more: call read_artifact with start={sl.end} (of {sl.total_chars} chars)]"
+        return text
 
     return StructuredTool.from_function(
         func=read_artifact,
@@ -421,4 +488,5 @@ __all__ = [
     "anonymous_run_id",
     "build_artifact_store",
     "make_read_artifact_tool",
+    "shared_artifact_store",
 ]

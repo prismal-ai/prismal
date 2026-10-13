@@ -11,6 +11,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `read_artifact` for agents when `mask_observations` is on. `react_loop`
+  binds it to the loop's own `(tenant, run_id)` on the shared store. Reads are
+  windowed to 8,000 characters with a next-start pointer, are not re-budgeted,
+  and pass the Phase H tool-result screen. The masked-observation stub now
+  ends with `; use read_artifact`.
+- Eval `contains` assertion: every `must_contain` value must appear in the
+  final answer (case-insensitive, digit grouping ignored). The long-loop cases
+  now check their answers against the toolkit's true values.
+- Sequential long-loop eval set (`long_loop_sequential.yaml`) with a chained
+  toolkit (`tool_provider: eval_toolkit_chain`, tool `get_linked_order`): each
+  record names the next order, so lookups cannot be batched.
 - NTS.1 batch 1: I/O contracts on `coder`, `researcher`, `data_analyst`,
   `planner` and `critic` (`<Node>Input` / `<Node>Output`, checked only with
   `node_typesafety_enabled`; adopt in `warn` first). `planner` lists must be
@@ -57,6 +68,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `providers/` and `decisions/` (199 added; no behaviour change).
 
 ### Documentation
+- `docs/token-efficiency.md`: the TKE9-04 A/B results.
+  - Tuned controls give −16.7 % (batched lookups) and −21.4 % (sequential
+    lookups), with solve rate 1.0.
+  - The defaults change nothing on these workloads.
+  - The result is below the PLAN §4 target of ≥ 30 %.
+  - In-loop observation masking is not yet wired (TKE4 known gap).
+  - The measurement conditions are documented, including `ollama_chat/` rather
+    than `ollama/` for tool use. The token baseline was refreshed to 2,723.5,
+    and `token-gate` now blocks.
 - New guides: `docs/agents.md`, `rag.md`, `patterns.md`, `subgraphs.md`,
   `providers.md`, `mcp.md`, `skills.md`, `sandbox.md`, `scheduler.md`,
   `events.md`, `data-utilities.md`, plus the `docs/README.md` index.
@@ -75,6 +95,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   extra name in the vector-store docs.
 
 ### Fixed
+- In-loop observation masking now runs. `react_loop` has accepted a
+  `context_compactor` since LH1-06, but no agent node passed it. All nine now
+  do, and an AST guard keeps the call paired with `hardening_react_kwargs`.
+- The compactor and the output budget share one artifact store per process
+  and backend (`shared_artifact_store`). Before, an artifact one of them wrote
+  could not be read back through the other.
+- The shared in-memory store is bounded: at most 1,000 artifacts per tenant
+  (a tenant over the limit evicts only its own oldest), a 10,000-artifact
+  overall cap, and expired artifacts purged on `put` at most once a minute.
+  Found by security review.
+- Eval runs no longer resume earlier runs' history. The runner used a fixed
+  `eval-<case>` thread against the on-disk checkpointer, so a live case could
+  start with the previous run's messages. Its token count then included them,
+  which caused the smoke baseline's +12.7 % "variance". Each run now uses
+  `eval-<case>-<uuid>`, and the session id follows the thread.
 - `@prismal_node` broke HITL: `GraphInterrupt` (from `interrupt()`) is an
   `Exception` subclass, so `error_mapping` swallowed or wrapped it and `retry`
   could re-run it. It now always bubbles up and is never retried. A

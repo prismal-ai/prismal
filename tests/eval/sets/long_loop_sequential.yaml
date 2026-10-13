@@ -1,0 +1,51 @@
+# Sequential long-loop eval set (TKE9-04). get_linked_order returns a record
+# plus the id of the next order in its chain, so lookups cannot be batched:
+# every hop is a new loop turn and the context grows turn after turn — the
+# shape observation masking targets. Live only:
+#   python -m prismal.eval run --suite tests/eval/sets/long_loop_sequential.yaml --live-api --json out.json
+# Expected values come from prismal.eval.toolkit (chain_from / order_total);
+# tests/unit/eval/test_eval_toolkit_chain.py pins them.
+
+suite: long_loop_sequential
+cases:
+  - id: seq-001
+    input: >-
+      Start with order ORD-001. Use get_linked_order to fetch it, then keep
+      fetching the order named in each record's linked_order field until it is
+      null. Report the sum of the totals of every order in the chain.
+    setup: { tool_provider: eval_toolkit_chain, vector_store: fake, seed: 0 }
+    tags: [long_loop, sequential]
+    assertions:
+      - type: tool_usage
+        must_call: [get_linked_order]
+        max_steps: 24
+      - type: contains
+        must_contain: ['3448']
+
+  - id: seq-002
+    input: >-
+      Start with order ORD-003. Use get_linked_order to fetch it, then keep
+      following each record's linked_order field until it is null. Which order
+      in the chain has the highest total, and what is that total?
+    setup: { tool_provider: eval_toolkit_chain, vector_store: fake, seed: 1 }
+    tags: [long_loop, sequential]
+    assertions:
+      - type: tool_usage
+        must_call: [get_linked_order]
+        max_steps: 24
+      - type: contains
+        must_contain: [ORD-008, '719']
+
+  - id: seq-003
+    input: >-
+      Start with order ORD-004. Use get_linked_order to fetch it, then keep
+      following each record's linked_order field until it is null. List the
+      status and total of every order in the chain.
+    setup: { tool_provider: eval_toolkit_chain, vector_store: fake, seed: 2 }
+    tags: [long_loop, sequential]
+    assertions:
+      - type: tool_usage
+        must_call: [get_linked_order]
+        max_steps: 24
+      - type: contains
+        must_contain: ['714', '676', '655']

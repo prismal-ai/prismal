@@ -24,7 +24,7 @@ import contextlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from prismal.agents.artifacts import ArtifactRef, ArtifactStorePort, build_artifact_store
+from prismal.agents.artifacts import ArtifactRef, ArtifactStorePort, shared_artifact_store
 from prismal.core.config import get_settings
 from prismal.utils.stable_json import stable_dumps
 from prismal.utils.token_estimate import estimate_tokens
@@ -102,7 +102,7 @@ class ToolOutputBudget:
 
     def _get_store(self) -> ArtifactStorePort:
         if self._store is None:
-            self._store = build_artifact_store(self._settings)
+            self._store = shared_artifact_store(self._settings)
         return self._store
 
     def _spill(self, text: str, *, tool_name: str, run_id: str, tenant: str) -> ArtifactRef | None:

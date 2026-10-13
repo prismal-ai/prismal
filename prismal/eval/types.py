@@ -25,6 +25,7 @@ class AssertionType(StrEnum):
     TOOL_USAGE = "tool_usage"
     GROUNDEDNESS = "groundedness"
     SECURITY = "security"  # adversarial containment
+    CONTAINS = "contains"  # every must_contain value in the final answer
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,8 @@ class Assertion:
     must_call: list[str] = field(default_factory=list)
     never_call: list[str] = field(default_factory=list)
     max_steps: int | None = None
+    # contains
+    must_contain: list[str] = field(default_factory=list)
     # security
     attack_class: str | None = None  # injection|tool_abuse|exfiltration|jailbreak
     must_block: bool = True
@@ -96,6 +99,10 @@ class Trajectory:
     # Where the token/cost figures came from: ``callbacks`` (every LLM call of the
     # run, incl. internal routing calls) or ``messages`` (usage on streamed messages).
     usage_source: str = "messages"
+    # Tool names the run's callback observed, including calls made inside an
+    # agent's ReAct loop (absent from the ``updates`` stream). Read by
+    # ``tool_usage`` assertions; ``steps`` is unchanged.
+    observed_tool_names: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -238,6 +245,10 @@ def _parse_assertion(raw: Any, *, case_id: str) -> Assertion:
     except ValueError as exc:
         raise EvalSetError(f"case '{case_id}' has an unknown assertion type {raw_type!r}") from exc
 
+    must_contain = [str(v) for v in raw.get("must_contain", []) or []]
+    if atype is AssertionType.CONTAINS and not must_contain:
+        raise EvalSetError(f"case '{case_id}' has a 'contains' assertion without must_contain")
+
     return Assertion(
         type=atype,
         expected=raw.get("expected"),
@@ -246,6 +257,7 @@ def _parse_assertion(raw: Any, *, case_id: str) -> Assertion:
         must_call=list(raw.get("must_call", []) or []),
         never_call=list(raw.get("never_call", []) or []),
         max_steps=raw.get("max_steps"),
+        must_contain=must_contain,
         attack_class=raw.get("attack_class"),
         must_block=bool(raw.get("must_block", True)),
     )

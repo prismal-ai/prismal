@@ -1,0 +1,48 @@
+# Long-loop eval set (TKE9-04). Each case needs several tool calls whose
+# observations are verbose, so the context grows turn after turn — the shape
+# observation masking, tool-output budgets and handoff envelopes target.
+# Live only (the fakes never call tools):
+#   python -m prismal.eval run --suite tests/eval/sets/long_loop.yaml --live-api --json out.json
+# Expected values come from prismal.eval.toolkit.order_total(<id>); the
+# `contains` assertions are pinned to it by tests/unit/eval/test_eval_toolkit.py.
+
+suite: long_loop
+cases:
+  - id: loop-001
+    input: >-
+      Use the get_order tool to look up orders ORD-001, ORD-002, ORD-003 and
+      ORD-004 one by one, then report the sum of their totals.
+    setup: { tool_provider: eval_toolkit, vector_store: fake, seed: 0 }
+    tags: [long_loop]
+    assertions:
+      - type: tool_usage
+        must_call: [get_order]
+        max_steps: 24
+      - type: contains
+        must_contain: ['2798']
+
+  - id: loop-002
+    input: >-
+      Call list_orders, then use get_order on the first five orders it returns
+      and tell me which of those five has the highest total.
+    setup: { tool_provider: eval_toolkit, vector_store: fake, seed: 1 }
+    tags: [long_loop]
+    assertions:
+      - type: tool_usage
+        must_call: [list_orders, get_order]
+        max_steps: 24
+      - type: contains
+        must_contain: [ORD-002, '735']
+
+  - id: loop-003
+    input: >-
+      Using get_order, fetch ORD-007, ORD-008 and ORD-009 and list the status
+      and total of each.
+    setup: { tool_provider: eval_toolkit, vector_store: fake, seed: 2 }
+    tags: [long_loop]
+    assertions:
+      - type: tool_usage
+        must_call: [get_order]
+        max_steps: 24
+      - type: contains
+        must_contain: ['655', '719', '702']
