@@ -22,6 +22,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Sequential long-loop eval set (`long_loop_sequential.yaml`) with a chained
   toolkit (`tool_provider: eval_toolkit_chain`, tool `get_linked_order`): each
   record names the next order, so lookups cannot be batched.
+- `ollama_chat_endpoint` (opt-in, default off) makes `ProviderRegistry.get_llm`
+  rewrite `ollama/<model>` to `ollama_chat/<model>`, for both the primary and
+  the fallback model. `ollama/` goes through `/api/generate`, where LiteLLM
+  emulates tool calls as text and multi-tool loops break. With the setting off,
+  model strings are unchanged and a one-time warning
+  (`provider.ollama_generate_endpoint`) names the fix.
 - NTS.1 batch 1: I/O contracts on `coder`, `researcher`, `data_analyst`,
   `planner` and `critic` (`<Node>Input` / `<Node>Output`, checked only with
   `node_typesafety_enabled`; adopt in `warn` first). `planner` lists must be

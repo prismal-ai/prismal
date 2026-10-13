@@ -246,6 +246,16 @@ class Settings(BaseSettings):
             "generous override that takes effect automatically."
         ),
     )
+    ollama_chat_endpoint: bool = Field(
+        default=False,
+        description=(
+            "Rewrite ``ollama/<model>`` to ``ollama_chat/<model>`` so calls use "
+            "Ollama's /api/chat endpoint with native tool calling.  "
+            "``ollama/`` goes through /api/generate, where LiteLLM emulates "
+            "tool calls as text and multi-tool loops break.  Off keeps model "
+            "strings unchanged (a one-time warning names the fix)."
+        ),
+    )
     retry_attempts: int = Field(
         default=1,
         ge=0,
