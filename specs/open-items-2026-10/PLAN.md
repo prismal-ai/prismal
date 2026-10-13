@@ -140,6 +140,8 @@ Order is by how much each item unblocks.
 
 ## 3. Phase 3 — Data / ops (not code; owner action)
 
+> Step-by-step plan for the next session, together with the TKE ≥ 30 % track: [`NEXT-SESSION.md`](NEXT-SESSION.md).
+
 - DEC3-07: ≥ 300 labelled Spanish cases per decision. DEC3-09: per-question latency profile.
 - DEC6-07: re-run the injection corpus against the real Ollama models.
 - DEC0-08: reproduce the Laya benchmarks on our hardware.
