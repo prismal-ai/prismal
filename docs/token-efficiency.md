@@ -222,7 +222,7 @@ ttl_ms=)` is the seam for MCP `ttlMs` (Phase PRT).
 
 `context_compaction_strategy="mask_observations"` replaces the content of every
 `ToolMessage` older than the last `context_mask_keep_turns` human/AI turns with
-`[observation elided: tool=… artifact=… tokens≈…]`:
+`[observation elided: tool=… artifact=… tokens≈…; use read_artifact]`:
 
 - the full payload is stored first;
 - the replacement keeps the **same id and tool_call_id**, so `add_messages`
@@ -232,14 +232,59 @@ ttl_ms=)` is the seam for MCP `ttlMs` (Phase PRT).
 An optional `relevance_fn` (the DEC hook) keeps relevant observations. A
 high/low-water band (`context_compaction_high_water` / `_low_water`, measured in
 estimated tokens) compacts once per crossing. `high_water=0` keeps the LH
-trigger. Note that each stub costs about 13 tokens, so a very long history may
+trigger. Note that each stub costs about 17 tokens, so a very long history may
 stay above low-water once every eligible observation has been masked.
 
-> **Known gap (2026-10-12).** Masking runs only at the supervisor seam, between
-> agent turns. `react_loop` accepts a `context_compactor` (LH1-06) and
-> `context_compaction_react_kwargs(state)` builds it, but no agent node passes
-> it yet. Observations produced inside a single agent's tool loop are
-> therefore never masked while that loop runs.
+**Inside the agent loop (2026-10-12).** Every agent passes
+`context_compaction_react_kwargs(state)` to `react_loop`, so observations
+produced inside one agent's tool loop are masked as the loop runs, not only
+at the supervisor seam. An AST guard keeps that call paired with
+`hardening_react_kwargs`.
+
+**Masked data stays reachable.**
+
+- The compactor, the output budget and `read_artifact` share one store per
+  process and backend (`shared_artifact_store`).
+- With `mask_observations` on, `get_tools_for_agent` appends a
+  `read_artifact` schema. It is not appended for the output budget alone: the
+  budget keeps a head+tail excerpt, and in the live run the always-on schema
+  cost 2–3 % tokens per call, was never called, and changed 2 of 6 answers.
+- `react_loop` binds that tool to its own `(tenant, run_id)`, so the model
+  picks only the id and the window.
+- Each read returns at most 8,000 characters plus a pointer to the next
+  `start`. Reads are exempt from re-budgeting, and they still pass the
+  Phase H tool-result screen.
+
+**When masking helps, and when it hurts (live, 2026-10-12).** On the
+sequential suite, in-loop masking with `context_mask_keep_turns=2` solved
+**0/3** cases, even with `read_artifact` available and named in the stub. The
+reasons:
+
+- Those tasks aggregate every observation, so masking removes data the
+  answer needs.
+- Reading it back would cost as many tokens as keeping it.
+- The agents' ReAct caps (coder 5, researcher 4 iterations) leave no turn to
+  re-read after a 4–5-hop chain.
+
+Use masking for long loops whose old observations are no longer needed, such
+as search-then-act. Use the output budget and TOON for aggregation.
+
+Confirmation run with the final code, in one session. The budget arm is
+`tool_output_max_tokens_default=400` plus TOON, with no masking, so no
+`read_artifact` schema:
+
+| Suite | A | Budget arm | Solve rate (A / budget) |
+|---|---|---|---|
+| `long_loop` | 10,338 | 8,617 (**−16.6 %**) | 3/3 / 3/3 |
+| `long_loop_sequential` | 19,053 | 15,268 (**−19.9 %**) | 2/3 / 2/3 (`seq-001` flipped in both) |
+
+This reproduces the A/B above. The ≥ 30 % target is still not met. Masking
+reaches −36 % on the sequential suite, but only by losing the answers.
+
+**Store bounds.** The shared in-memory store keeps at most 1,000 artifacts per
+tenant. A tenant over that limit evicts only its own oldest artifacts, so one
+tenant cannot push out another's. A 10,000-artifact overall cap is a backstop.
+`put` also purges expired artifacts at most once a minute.
 
 `ArtifactStorePort` has in-memory (default) and SQLite adapters. Artifacts
 are scoped to tenant and run: a mismatch raises `ArtifactNotFound`, which looks

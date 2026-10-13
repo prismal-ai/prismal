@@ -11,6 +11,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `read_artifact` for agents when `mask_observations` is on. `react_loop`
+  binds it to the loop's own `(tenant, run_id)` on the shared store. Reads are
+  windowed to 8,000 characters with a next-start pointer, are not re-budgeted,
+  and pass the Phase H tool-result screen. The masked-observation stub now
+  ends with `; use read_artifact`.
 - Eval `contains` assertion: every `must_contain` value must appear in the
   final answer (case-insensitive, digit grouping ignored). The long-loop cases
   now check their answers against the toolkit's true values.
@@ -90,6 +95,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   extra name in the vector-store docs.
 
 ### Fixed
+- In-loop observation masking now runs. `react_loop` has accepted a
+  `context_compactor` since LH1-06, but no agent node passed it. All nine now
+  do, and an AST guard keeps the call paired with `hardening_react_kwargs`.
+- The compactor and the output budget share one artifact store per process
+  and backend (`shared_artifact_store`). Before, an artifact one of them wrote
+  could not be read back through the other.
+- The shared in-memory store is bounded: at most 1,000 artifacts per tenant
+  (a tenant over the limit evicts only its own oldest), a 10,000-artifact
+  overall cap, and expired artifacts purged on `put` at most once a minute.
+  Found by security review.
 - Eval runs no longer resume earlier runs' history. The runner used a fixed
   `eval-<case>` thread against the on-disk checkpointer, so a live case could
   start with the previous run's messages. Its token count then included them,
