@@ -57,9 +57,11 @@ def test_flags_off_leave_the_tool_list_unchanged(monkeypatch: pytest.MonkeyPatch
     assert _names() == ["get_order"]
 
 
-def test_output_budget_adds_read_artifact(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_output_budget_alone_adds_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The budget keeps a head+tail excerpt, so the schema is not worth its cost:
+    live (qwen3:14b) it added ~3 % tokens per call and flipped 2 of 6 answers."""
     _with_settings(monkeypatch, token_efficiency_enabled=True, tool_output_budget_enabled=True)
-    assert _names() == ["get_order", "read_artifact"]
+    assert _names() == ["get_order"]
 
 
 def test_observation_masking_adds_read_artifact(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -83,7 +85,12 @@ def test_truncate_compaction_alone_adds_nothing(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_read_artifact_is_never_duplicated(monkeypatch: pytest.MonkeyPatch) -> None:
-    _with_settings(monkeypatch, token_efficiency_enabled=True, tool_output_budget_enabled=True)
+    _with_settings(
+        monkeypatch,
+        token_efficiency_enabled=True,
+        context_compaction_enabled=True,
+        context_compaction_strategy="mask_observations",
+    )
     with use_tool_provider(FakeToolProvider(default=[_tool("read_artifact")])):
         assert [t.name for t in get_tools_for_agent("researcher")] == ["read_artifact"]
 

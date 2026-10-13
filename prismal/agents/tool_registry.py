@@ -529,14 +529,16 @@ _READ_ARTIFACT_MARKER = "prismal_read_artifact_placeholder"
 
 
 def _artifacts_active(settings: Any) -> bool:
-    """True when TKE can leave ``artifact=<id>`` pointers in the loop's messages."""
-    if not settings.token_efficiency_enabled:
-        return False
-    masking = (
-        settings.context_compaction_enabled
+    """True when observation masking can remove data the model may need back.
+
+    Only masking: the output budget keeps a head+tail excerpt, and live the
+    always-on schema cost ~3 % tokens per call and flipped answers (TKE9-04).
+    """
+    return bool(
+        settings.token_efficiency_enabled
+        and settings.context_compaction_enabled
         and settings.context_compaction_strategy == "mask_observations"
     )
-    return bool(settings.tool_output_budget_enabled or masking)
 
 
 def _read_artifact_placeholder() -> BaseTool:
@@ -560,7 +562,7 @@ def _read_artifact_placeholder() -> BaseTool:
 
 
 def _with_read_artifact(tools: list[BaseTool]) -> list[BaseTool]:
-    """Append ``read_artifact`` when TKE can produce artifacts (never duplicated)."""
+    """Append ``read_artifact`` when observation masking is on (never duplicated)."""
     try:
         from prismal.core.config import get_settings
 
