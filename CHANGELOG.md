@@ -21,7 +21,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Dependency floors raised for advisories that have fixes: `pypdf>=6.21.1`,
   `unstructured>=0.24.1`, `mcp>=1.30.0,<2` (stays on 1.x), `Pillow>=13.0.0`.
   The lock also moves `virtualenv`, `apprise` and `certifi` forward, and
-  `virtualenv` pulls `prefect` 3.9.0 and `fastapi` 0.150.0 with it.
+  `virtualenv` pulls `prefect` 3.8.8 and `fastapi` 0.143.2 with it.
+- Dependency cooldown: `[tool.uv] exclude-newer = "7 days"`, so a hijacked
+  upload is pulled from the index before it can reach the lock.
+  `[tool.uv.exclude-newer-package]` exempts only the security fixes still
+  inside the window (pillow, pypdf, certifi, virtualenv). Each exemption is
+  capped at the day after the fixing release. Remove them after 2026-10-28.
 - Pillow 13 needs `[tool.uv] override-dependencies`, because `fastembed` (via
   `nemoguardrails`) caps `pillow<13` on Python 3.13. Remove the override once
   fastembed allows Pillow 13.

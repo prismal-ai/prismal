@@ -223,7 +223,7 @@ a2a = [
 
 # Multimodal layer — base media handling (Fase F)
 multimodal = [
-  "Pillow>=13.0.0",  # >=13.0.0 fixes CVE-2026-96636..96644/-112390..112901 (2026-10-22; needs [tool.uv] override); >=12.3.0 fixes PYSEC-2026-2253..2257/-3451..3453
+  "Pillow>=13.0.0",  # >=13.0.0 fixes CVE-2026-96636..96644/-112390..112901 (2026-10-22; needs the uv override-dependencies entry below); >=12.3.0 fixes PYSEC-2026-2253..2257/-3451..3453
   "ffmpeg-python>=0.2.0",
   "imagehash>=4.3.1",
 ]
@@ -346,12 +346,24 @@ exclude = [
 # UV — RESOLVER OVERRIDES
 # ============================================================
 [tool.uv]
+# Dependency cooldown: never resolve a release younger than 7 days, so a
+# hijacked upload (e.g. litellm 1.107.0, live ~2 h on 2026-10-21) is pulled
+# before we can lock it.
+exclude-newer = "7 days"
 # fastembed (via nemoguardrails) caps pillow<13 on py<3.14, but Pillow 13.0.0
 # is the only release fixing CVE-2026-96636..96644/-96778/-112390..112901 and
 # GHSA-78g4-xqwv-q3g8 (heap overflow / double free / OOB read in image
 # decoders; 2026-10-22). Override the cap; drop it once fastembed allows 13.
 # TRIGGER: fastembed release with pillow<14 (or no upper bound).
 override-dependencies = ["pillow>=13.0.0"]
+# Exceptions ONLY for security fixes still inside the cooldown, each capped at
+# the day after the fixing release (not "latest"). Remove each entry once its
+# date is more than 7 days old (all of them after 2026-10-28).
+[tool.uv.exclude-newer-package]
+pillow = "2026-10-17T00:00:00Z"      # 13.0.0 (2026-10-16): CVE-2026-96636.. / -112390..
+pypdf = "2026-10-18T00:00:00Z"       # 6.21.1 (2026-10-17): CVE-2026-113786/113789-113793
+certifi = "2026-10-21T00:00:00Z"     # 2026.10.19 (2026-10-20): GHSA-6q48-6c7w-9gw2
+virtualenv = "2026-10-18T00:00:00Z"  # 21.14.9 (2026-10-17): CVE-2026-113722/-113725
 
 # ============================================================
 # RUFF — LINTER + FORMATTER
