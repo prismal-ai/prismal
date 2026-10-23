@@ -10,6 +10,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- `litellm` excludes `1.107.0`, the release compromised on 2026-10-21 (a
+  credential stealer in all seven PyPI wheels and the Docker images). The lock
+  stays on `1.96.2`, so nothing that was installed is affected.
+- The container image now installs from `uv.lock` with `uv sync --frozen`
+  (hash-verified, `[tool.uv]` overrides applied) instead of
+  `pip install <wheel>`, which re-resolved dependencies against the latest
+  releases on PyPI at build time. uv is pinned and stays in the builder stage.
+- Dependency floors raised for advisories that have fixes: `pypdf>=6.21.1`,
+  `unstructured>=0.24.1`, `mcp>=1.30.0,<2` (stays on 1.x), `Pillow>=13.0.0`.
+  The lock also moves `virtualenv`, `apprise` and `certifi` forward, and
+  `virtualenv` pulls `prefect` 3.9.0 and `fastapi` 0.150.0 with it.
+- Pillow 13 needs `[tool.uv] override-dependencies`, because `fastembed` (via
+  `nemoguardrails`) caps `pillow<13` on Python 3.13. Remove the override once
+  fastembed allows Pillow 13.
+
+### Changed
+- `.pre-commit-config.yaml` sets `language_version: python3.13` explicitly on
+  every `language: python` hook.
+
 ## [3.20.0] — 2026-10-12
 
 Measured token savings (TKE9-04) and the fixes that measurement uncovered:
