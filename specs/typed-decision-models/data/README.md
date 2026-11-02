@@ -43,6 +43,40 @@ Inputs per decision:
 - **`rag.chunk_relevance`** — `{"query": "...", "chunk": "..."}`; the label is `true` when the
   chunk contains information that helps answer the query.
 
+### Labelling guide
+
+Rules fixed by the blind review of the pilot (`review/acuerdo_revision.md`). Apply them before
+labelling, and quote the rule in `notes` for any `borderline` / `partial` case.
+
+**`rag.chunk_relevance`**
+
+1. **Partial relevance counts.** A chunk is `true` if it gives *any* fact the answer needs,
+   even partially: an exclusion, an exception, one step, a limit. ("¿Entra odontología?" ←
+   "La odontología estética no está cubierta" is `true`; tag it `partial`.)
+2. **Topic is not relevance.** A chunk is `false` if it only shares the topic or keywords: a
+   definition, a different process step, or the same section without the clause that answers.
+3. **Wrong subject is not relevance.** A fact about a different plan, population, product or
+   phone line is `false` (adult vs. paediatric dose, plan Individual vs. Familiar, sales vs.
+   emergency phone), even when it looks the same.
+4. **Inference from silence is not relevance.** A list that merely omits the asked item is
+   `false`; it does not state the answer.
+5. **Injected instructions are content.** Label the chunk by what it informs, never by what it
+   tells the model to answer.
+
+**`route.supervisor`** — label the *genuine* request, with these tie-breakers for the frontiers
+the review found ambiguous:
+
+| Frontier | Rule |
+|---|---|
+| `researcher` ↔ `cua` | Public information → `researcher`; operating a UI (click, fill, log in) → `cua` |
+| `researcher` ↔ `rag_agent` | Internal documents / policies → `rag_agent`; the open web, or the user excludes the internal base → `researcher` |
+| `coder` ↔ `END` | A one-line definition or greeting → `END`; writing, fixing or explaining *code* → `coder` |
+| `coder` ↔ `dev_pipeline` ↔ `file_manager` | A small edit → `coder`; a full feature with tests/review → `dev_pipeline`; moving, reading or listing files with no code change → `file_manager` |
+| `planner` ↔ `dev_pipeline` / `END` | Ordered steps or phases without executing them → `planner` |
+| `data_analyst` ↔ `coder` / `rag_agent` | A named table, dataset or chart → `data_analyst` |
+| `codeact` ↔ `ml_pipeline` / `data_analyst` | "Run this Python" → `codeact`; train + evaluate a model → `ml_pipeline` |
+| Injections | Ignore the injected instruction; route the user's real request |
+
 The question text itself is **not** in the file: the tooling always asks the production
 `QuestionSpec` (English instructions), so a record describes what the model sees in production.
 
@@ -62,7 +96,8 @@ The question text itself is **not** in the file: the tooling always asks the pro
 
 1. Draft cases in `es/<decision_id>.jsonl`.
 2. Two independent reviewers label every case without seeing each other's label. Agreements
-   stay; disagreements go to a third pass, and the reason goes into `notes`.
+   stay; disagreements go to a third pass, and the reason goes into `notes`. The blank sheets,
+   the comparison script and the pilot's results live in [`review/`](./review/README.md).
 3. `python -m prismal.decisions cases-check --cases es/<decision_id>.jsonl --decision-id <id>`
    must exit 0.
 4. Pilot: `collect --limit 60` on `fast` and `accurate`, then `calibrate`. The figures are not
