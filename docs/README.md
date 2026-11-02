@@ -77,6 +77,7 @@ Architecture diagrams: [`assets/prismal_architecture.svg`](../assets/prismal_arc
 | [gap-analysis-loops-harness-guardrails-2026-07.md](./gap-analysis-loops-harness-guardrails-2026-07.md) | July 2026 gap analysis (ES) — closed by LH / GRD / BRP |
 | [gap-analysis-gateways-tokens-decisions-2026-10.md](./gap-analysis-gateways-tokens-decisions-2026-10.md) | October 2026 gap analysis — closed by wave 2026-10 |
 | [mcp-skills-injection-analysis.md](./mcp-skills-injection-analysis.md) | Analysis that led to Phase Y |
+| [integration-prompts.md](./integration-prompts.md) | Cross-project integration prompts the engine owns: OTel GenAI spans (#2) and the shared MCP config / consent policy (#5) |
 | [running-the-ecosystem.md](./running-the-ecosystem.md) | Running the full 8-repo ecosystem locally (ES) |
 | [blog-prismal-ecosystem.md](./blog-prismal-ecosystem.md) | Ecosystem overview blog post (ES) |
 | [history/PLAN_MIGRACION.md](./history/PLAN_MIGRACION.md) | Historical `lightagent-agents` → `prismal` migration plan (ES) |
