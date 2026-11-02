@@ -52,7 +52,7 @@ dependencies = [
   "langgraph>=0.2.66",
   "langchain-community>=0.3.14",
   "langchain-core>=0.3.28",
-  "litellm>=1.96.2,!=1.107.0",      # Provider-agnostic LLM proxy (Claude/OpenAI/Gemini/Ollama); >=1.96.2 clears the 2026-10 advisories; !=1.107.0: supply-chain compromise 2026-10-21 (credential stealer, docs.litellm.ai/blog/security-incident-oct-21-2026)
+  "litellm>=1.100.4,!=1.107.0",     # Provider-agnostic LLM proxy (Claude/OpenAI/Gemini/Ollama); >=1.100.4 fixes CVE-2026-114612 (2026-11); >=1.96.2 clears the 2026-10 advisories; !=1.107.0: supply-chain compromise 2026-10-21 (credential stealer, docs.litellm.ai/blog/security-incident-oct-21-2026)
   "langchain-anthropic>=1.4.6",     # Anthropic Claude integration; >=1.4.6 fixes GHSA-gr75-jv2w-4656 (path traversal)
   "langchain-openai>=0.3.1",        # OpenAI integration
   "langchain-google-genai>=2.0.8",  # Google Gemini integration
@@ -69,7 +69,7 @@ dependencies = [
   "chromadb>=0.6.2",                # Embedding database for RAG
   # ── Document Processing ───────────────────────────────────
   "soupsieve>=2.8.4",               # bs4 CSS selector engine (transitive); >=2.8.4 fixes CVE-2026-49476 (memory exhaustion) + CVE-2026-49477 (ReDoS)
-  "pypdf>=6.21.1",                  # PDF loader (>=6.21.1 fixes CVE-2026-113786/113789-113793, 2026-10-22; >=6.20.0 fixes PYSEC-2026-3655/3656/3910-3913/4153-4160, 2026-10; earlier >=6.13.3 GHSA-jm82-fx9c-mx94)
+  "pypdf>=6.21.4",                  # PDF loader (>=6.21.4 fixes CVE-2026-115572/-115580/-115585/-119203..119209, 2026-11; >=6.21.1 fixes CVE-2026-113786/113789-113793, 2026-10-22; >=6.20.0 fixes PYSEC-2026-3655/3656/3910-3913/4153-4160, 2026-10; earlier >=6.13.3 GHSA-jm82-fx9c-mx94)
   "docx2txt>=0.8",                  # DOCX loader
   "unstructured>=0.24.1",           # Universal document parser (>=0.24.1 fixes CVE-2026-104250 HTML-output XSS, 2026-10-22; >=0.21.5: floor lifted so a fresh resolve on py3.13 can't drag ancient numba 0.53.1/llvmlite via the old dep tree — see CHANGELOG 3.10.1)
   "python-magic>=0.4.27",           # File type detection
@@ -90,7 +90,7 @@ dependencies = [
   # ── Security & Guardrails ─────────────────────────────────
   "nemoguardrails>=0.10.1",         # NVIDIA NeMo Guardrails for LLMs
   "bandit>=1.8.0",                  # Security linter (used in skill validation)
-  "setuptools>=83.0.0",             # Floor transitive setuptools; >=83.0.0 fixes PYSEC-2026-3447
+  "setuptools>=84.1.0",             # Floor transitive setuptools; >=84.1.0 fixes GHSA-xmj3-9gf7-h52w (2026-11); >=83.0.0 fixes PYSEC-2026-3447
   # ── Configuration ─────────────────────────────────────────
   "pydantic>=2.10.3",               # Data validation
   "pydantic-settings>=2.14.2",      # Settings from env vars / .env files (>=2.14.2 fixes GHSA-4xgf-cpjx-pc3j)
@@ -355,15 +355,29 @@ exclude-newer = "7 days"
 # GHSA-78g4-xqwv-q3g8 (heap overflow / double free / OOB read in image
 # decoders; 2026-10-22). Override the cap; drop it once fastembed allows 13.
 # TRIGGER: fastembed release with pillow<14 (or no upper bound).
-override-dependencies = ["pillow>=13.0.0"]
+# unstructured (every release up to 0.27.36, 2026-10-30) caps filelock<4, but
+# filelock 4.2.1 is the only fix for CVE-2026-112907/-112909/-112910/-112913/
+# -112915/-112935/-112936/-112939/-112940 (no 3.x backport; -112909 affects
+# every version). unstructured only calls FileLock(path, timeout=-1), which 4.x
+# keeps. TRIGGER: drop it once unstructured allows filelock 4.
+override-dependencies = ["pillow>=13.0.0", "filelock>=4.2.1"]
+# Lock-level floors for vulnerable *transitive* packages (2026-11 advisories).
+# They constrain resolution without making these direct dependencies.
+constraint-dependencies = [
+  "langgraph-sdk>=0.4.6",   # CVE-2026-118667
+  "msgpack>=1.2.3",         # CVE-2026-114613
+  "pyasn1>=0.6.5",          # CVE-2026-119194..119197
+  "dnspython>=2.9.0",       # CVE-2026-114605 (trivy HIGH)
+  "nltk>=3.10.4",           # GHSA-j456-xh4h-cpf2 (trivy HIGH)
+  "pymongo>=4.18.3",        # CVE-2026-106435 (trivy HIGH)
+  "virtualenv>=21.14.13",   # CVE-2026-115586 (trivy HIGH)
+]
 # Exceptions ONLY for security fixes still inside the cooldown, each capped at
 # the day after the fixing release (not "latest"). Remove each entry once its
-# date is more than 7 days old (all of them after 2026-10-28).
+# date is more than 7 days old (both of them after 2026-11-05).
 [tool.uv.exclude-newer-package]
-pillow = "2026-10-17T00:00:00Z"      # 13.0.0 (2026-10-16): CVE-2026-96636.. / -112390..
-pypdf = "2026-10-18T00:00:00Z"       # 6.21.1 (2026-10-17): CVE-2026-113786/113789-113793
-certifi = "2026-10-21T00:00:00Z"     # 2026.10.19 (2026-10-20): GHSA-6q48-6c7w-9gw2
-virtualenv = "2026-10-18T00:00:00Z"  # 21.14.9 (2026-10-17): CVE-2026-113722/-113725
+pyasn1 = "2026-10-28T00:00:00Z"  # 0.6.5 (2026-10-27): CVE-2026-119194..119197
+pypdf = "2026-10-29T00:00:00Z"   # 6.21.4 (2026-10-28): CVE-2026-119203..119205
 
 # ============================================================
 # RUFF — LINTER + FORMATTER
