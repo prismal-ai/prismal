@@ -11,6 +11,8 @@ sheets, never the case files or their labels. Full analysis (Spanish):
 | `revision_ciega_route_revisorB.csv`, `revision_ciega_rag_revisorB.csv` | Annotator B's labels and doubt comments |
 | `acuerdo_revision.md` | Agreement, Cohen's kappa, confusions, per-tag agreement, disagreements, B's doubtful agreements, findings and next steps |
 | `desacuerdos_rag.csv` | Adjudication sheet for the 3 `rag` disagreements, with a proposed decision; `route` had none |
+| `revision_ciega_{route,rag}_lote2.csv`, `…_lote2_revisorB.csv` | Scale-up batch (route-0072…0304, rag-0061…0300): blank sheets and annotator B's labels. The route sheet was reviewed in a shuffled order (the case file interleaves labels round-robin, so file order leaks the label) |
+| `desacuerdos_rag_lote2.csv` | Adjudication of the 2 `rag` disagreements of the scale-up batch |
 | `compare_reviews.py` | Standard-library script that recomputes the comparison for any case file + review sheet |
 
 ## Results
@@ -19,6 +21,9 @@ sheets, never the case files or their labels. Full analysis (Spanish):
 |---|---|---|---|
 | `route.supervisor` | 71/71 (100 %) | 1.000 | 0 |
 | `rag.chunk_relevance` | 57/60 (95 %) | 0.900 | 3 (`rag-0035`, `rag-0043`, `rag-0056`), all partial relevance |
+
+| `route.supervisor`, scale-up batch | 233/233 (100 %) | 1.000 | 0 (17 doubtful agreements) |
+| `rag.chunk_relevance`, scale-up batch | 238/240 (99.2 %) | 0.983 | 2 (`rag-0179`, `rag-0260`), closed in the third pass |
 
 Caveat: annotators A and B are two separate instances of the same model, so their errors are
 correlated. A human blind pass on the doubtful cases plus a random sample is still required
