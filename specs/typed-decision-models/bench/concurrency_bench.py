@@ -12,7 +12,9 @@ value (the server setting; restart Ollama between runs)::
         --label num_parallel=1 --out /tmp/route-accurate-np1.json
 
 Latency is wall time around ``decide`` (queueing included), which is what a caller's
-budget sees; the adapter's own ``latency_ms`` is reported next to it.
+budget sees; the adapter's own ``latency_ms`` is reported next to it. Each level runs on
+its own slice of cases (and the warm-up on another), so no level is answered from the
+prompt cache that an earlier level filled — a real turn is always a new state.
 """
 
 from __future__ import annotations
@@ -78,16 +80,23 @@ async def main_async(args: argparse.Namespace) -> dict[str, Any]:
 
     settings = get_settings()
     question = resolve_question(args.decision_id, routes_profile="base")
-    cases = load_cases(args.cases)[: args.n]
-    states = [dict(build_case_state(c).fields) for c in cases]
+    cases = load_cases(args.cases)
+    needed = args.n * len(args.concurrency) + 3
+    if len(cases) < needed:
+        raise SystemExit(f"need {needed} cases for disjoint slices, have {len(cases)}")
+    states = [dict(build_case_state(c).fields) for c in cases[:needed]]
+    warm, states = states[-3:], states[:-3]
     backend = _collect_backend(tier=args.tier, settings=settings)
     budget = args.budget_ms or settings.decision_ollama_timeout_ms
     try:
-        for state in states[:3]:  # warm-up: load the model, fill the KV cache
+        for state in warm:  # warm-up: load the model, fill the KV cache
             await backend.decide(
                 state, {question.id: question}, policy=GatePolicy(timeout_ms=60_000)
             )
-        levels = [await _run_level(backend, question, states, k, budget) for k in args.concurrency]
+        levels = [
+            await _run_level(backend, question, states[i * args.n : (i + 1) * args.n], k, budget)
+            for i, k in enumerate(args.concurrency)
+        ]
         return {
             "label": args.label,
             "decision_id": args.decision_id,
@@ -106,7 +115,7 @@ def main() -> int:
     parser.add_argument("--decision-id", required=True)
     parser.add_argument("--tier", choices=["fast", "accurate"], required=True)
     parser.add_argument("--concurrency", type=int, nargs="+", default=[1, 2, 4])
-    parser.add_argument("--n", type=int, default=60, help="Cases per concurrency level")
+    parser.add_argument("--n", type=int, default=60, help="Cases per level (disjoint slices)")
     parser.add_argument("--budget-ms", type=float, default=0, help="Default: settings budget")
     parser.add_argument("--label", default="", help="Free text, e.g. num_parallel=2")
     parser.add_argument("--out", type=Path)
