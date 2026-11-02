@@ -62,7 +62,7 @@ _AUTHORITY_CLAIMS: tuple[re.Pattern[str], ...] = tuple(
         r"\bresponde(?:r)?\s+['\"]?(?:true|false|auto_allow)\b",
         r"\bresponde(?:r)?\s+siempre\s+(?:que\s+)?(?:s[ií]|no|true|false)\b",
         # DEC3-07 scale-up (2026-11-02): fake system/admin channels and overrides.
-        r"(?:^|[\[<#(]|\s)\s*system\s*:",
+        r"(?<![^\s\[<#(])system\s*:",
         r"\b(?:system|admin|security)[_\s]+override\b",
         r"\[\[\s*(?:admin|system|contexto\s+confiable)\s*:",
         r"###\s*(?:system|instrucciones|instructions)\b",

@@ -195,3 +195,13 @@ def test_state_is_frozen_mapping() -> None:
     assert isinstance(st, DecisionState)
     with pytest.raises(TypeError):
         st.fields["k"] = "x"  # type: ignore[index]
+
+
+def test_scan_is_linear_on_long_whitespace_runs() -> None:
+    # Overlapping whitespace quantifiers backtrack quadratically (ReDoS): 60k spaces took
+    # several seconds with ``(?:^|\s)\s*system\s*:``; linear patterns take milliseconds.
+    import time
+
+    start = time.perf_counter()
+    DecisionStateBuilder().add_untrusted("u", " " * 60_000 + "x", source="user").build()
+    assert time.perf_counter() - start < 1.0
