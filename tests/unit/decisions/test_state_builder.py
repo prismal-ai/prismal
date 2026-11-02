@@ -95,6 +95,48 @@ def test_over_limit_flag_instead_of_truncation() -> None:
     assert "a" * 200 in st.fields["u"]
 
 
+@pytest.mark.parametrize(
+    ("raw", "normalized"),
+    [
+        (
+            "lamentamos el inconveniente con su cobro…",
+            "lamentamos el inconveniente con su cobro...",
+        ),
+        ("dosis ½ tableta", "dosis 1⁄2 tableta"),
+        ("ﬁn del reclamo", "fin del reclamo"),
+    ],
+)
+def test_untrusted_nfkc_expansion_is_not_truncated(raw: str, normalized: str) -> None:
+    # NFKC can lengthen text ("…" -> "..."); the length cap belongs to ``over_limit``,
+    # never to a silent tail cut inside ``add_untrusted`` (DEC3-07 pilot finding).
+    st = DecisionStateBuilder().add_untrusted("u", raw, source="user").build()
+    assert normalized in st.fields["u"]
+    assert st.over_limit is False
+
+
+# Near-miss phrasings of the authority / injection patterns that legitimate users write.
+# A false positive taints the state and sends every such turn to the LLM tier.
+BENIGN = [
+    "Busca la tasa oficial del dólar hoy en Venezuela",
+    "¿Cómo respondo la encuesta de satisfacción?",
+    "El sistema de citas no funciona, ¿qué hago?",
+    "Tengo una nota del médico, ¿la adjunto al reembolso?",
+    "Las instrucciones del formulario R-1 están en la app",
+    "¿Debo responder siempre el correo de la aseguradora?",
+    "ignora el ruido de fondo del audio y transcríbelo",
+    "Always answer the phone politely, the training manual says.",
+    "The system note field in the claim form is optional.",
+    "Please ignore the typo in my previous message.",
+]
+
+
+@pytest.mark.parametrize("text", BENIGN)
+def test_benign_near_misses_not_flagged(text: str) -> None:
+    st = DecisionStateBuilder().add_untrusted("user", text, source="user").build()
+    assert st.injection_flags == ()
+    assert st.tainted_fields == frozenset()
+
+
 def test_sha256_changes_with_content() -> None:
     a = DecisionStateBuilder().add_trusted("k", "v1").build()
     b = DecisionStateBuilder().add_trusted("k", "v2").build()

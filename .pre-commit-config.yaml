@@ -11,6 +11,10 @@
 #   uv run pre-commit run --all-files   # primera ejecucion completa
 # ============================================================
 
+# Python 3.13 en todos los hooks (alineado con requires-python >=3.13,
+# ruff target-version py313, mypy python_version 3.13 y .python-version).
+# Los hooks `language: python` lo fijan ademas explicitamente con
+# `language_version`; los `language: system` usan .venv/bin (3.13).
 default_language_version:
   python: python3.13
 
@@ -56,30 +60,40 @@ repos:
     hooks:
       - id: trailing-whitespace
         name: "fmt: trailing whitespace"
+        language_version: python3.13
       - id: end-of-file-fixer
         name: "fmt: end of file"
+        language_version: python3.13
       - id: check-yaml
         name: "lint: YAML valido"
+        language_version: python3.13
         args: [--unsafe]         # permite tags custom en docker-compose
       - id: check-toml
         name: "lint: TOML valido"
+        language_version: python3.13
       - id: check-json
         name: "lint: JSON valido"
+        language_version: python3.13
       - id: check-merge-conflict
         name: "git: sin conflict markers"
+        language_version: python3.13
       - id: check-added-large-files
         name: "git: archivos grandes (max 500KB)"
+        language_version: python3.13
         args: [--maxkb=500]
       - id: detect-private-key
         name: "secrets: private keys"
+        language_version: python3.13
         # file_manager.py docstring lists the PEM header literally as a pattern
         # the agent must refuse to write -- excluded as false positive.
         # Exclude both old path (monolith) and new path (extracted package).
         exclude: ^(prismal/agents/file_manager\.py|packages/prismal/prismal/agents/file_manager\.py)$
       - id: debug-statements
         name: "python: sin breakpoint() / pdb / set_trace()"
+        language_version: python3.13
       - id: check-ast
         name: "python: AST valido (sintaxis)"
+        language_version: python3.13
 
   # ----------------------------------------------------------
   # 3. DOCKERFILE — Hadolint
@@ -109,9 +123,11 @@ repos:
     hooks:
       - id: ruff
         name: "lint: Ruff (lint + C901)"
+        language_version: python3.13
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
         name: "fmt: Ruff format"
+        language_version: python3.13
 
   # ----------------------------------------------------------
   # 5. TYPE CHECKING — ty (Astral)
@@ -143,6 +159,7 @@ repos:
     hooks:
       - id: flake8
         name: "complexity: cognitive CCR001 (baseline=100)"
+        language_version: python3.13
         additional_dependencies:
           - flake8-cognitive-complexity==0.1.0
         args:
@@ -217,6 +234,7 @@ repos:
     hooks:
       - id: bandit
         name: "sast: Bandit (medium+)"
+        language_version: python3.13
         additional_dependencies: ["bandit[toml]"]
         args:
           - -r
