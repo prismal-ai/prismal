@@ -10,6 +10,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.21.0] — 2026-11-02
+
+DEC3-07 calibration data work and what it uncovered: case-set tooling
+(`cases-check`, `collect`), the Spanish pilot sets for `route.supervisor` and
+`rag.chunk_relevance` with a blind review and a live Ollama pilot, a closed
+prompt-injection bypass, an NFKC truncation fix and a clearer route question.
+Also in this release: the 2026-10/11 dependency security refresh (litellm
+1.107.0 excluded, lock-based container image, 7-day uv cooldown, and every
+fixable pip-audit / trivy advisory cleared).
+
 ### Added
 - DEC3-07 calibration-set tooling: `prismal.decisions.calset` and two CLI subcommands.
   `cases-check` validates a hand-labelled case file against the **production** question

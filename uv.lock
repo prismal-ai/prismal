@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-10-26T19:59:47.784386851Z"
+exclude-newer = "2026-10-26T20:15:06.104704484Z"
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
@@ -5490,7 +5490,7 @@ wheels = [
 
 [[package]]
 name = "prismal-ai"
-version = "3.20.0"
+version = "3.21.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
