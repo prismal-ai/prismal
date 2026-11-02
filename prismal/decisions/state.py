@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -46,8 +47,20 @@ _AUTHORITY_CLAIMS: tuple[re.Pattern[str], ...] = tuple(
         r"\bpre-?aprobad[oa]s?\b",
         r"\bya\s+(?:est[aá]\s+)?(?:autorizad[oa]|aprobad[oa])\b",
         r"\bautorizad[oa]\s+por\s+(?:seguridad|el\s+administrador)\b",
-        r"\bignora(?:r)?\s+(?:las\s+|todas\s+las\s+)?instrucciones\s+(?:anteriores|previas)\b",
+        r"\b(?:ignora(?:r)?|olvida(?:r)?|omite|omitir)\s+"
+        r"(?:(?:las|tus|sus|todas\s+(?:las|tus|sus))\s+)?"
+        r"(?:instrucciones|indicaciones|reglas)\s+(?:anteriores|previas)\b",
         r"\bnota\s+para\s+el\s+(?:revisor|clasificador|modelo)\b",
+        # DEC3-07 live pilot (2026-11-02): phrasings that reached the model unflagged.
+        r"\bignore\s+(?:all\s+)?(?:your|the|my)\s+(?:previous\s+|prior\s+)?"
+        r"(?:instructions|rules|guidance)\b",
+        r"\bsystem\s+note\s*:",
+        r"\b(?:must|should)\s+always\s+answer\b",
+        r"\balways\s+answer\s+['\"]?(?:yes|no|true|false|auto_allow)\b",
+        r"\b(?:nota|mensaje|aviso)\s+del\s+sistema\s*:",
+        r"\b(?:el|la)\s+(?:asistente|modelo|clasificador|revisor)\s+debe\s+responder\b",
+        r"\bresponde(?:r)?\s+['\"]?(?:true|false|auto_allow)\b",
+        r"\bresponde(?:r)?\s+siempre\s+(?:que\s+)?(?:s[ií]|no|true|false)\b",
     )
 )
 
@@ -174,7 +187,9 @@ class DecisionStateBuilder:
     def add_untrusted(self, key: str, value: str, *, source: str) -> DecisionStateBuilder:
         """User / tool / RAG / worker text: sanitize, scan, fence and label."""
         raw = value
-        clean = self._sanitizer.sanitize(value, max_chars=max(len(value), 1))
+        # No cap here: NFKC can lengthen text ("…" -> "..."), so a cap at the raw length
+        # silently cut the tail. The size limit is ``over_limit`` (escalation, not truncation).
+        clean = self._sanitizer.sanitize(value, max_chars=sys.maxsize)
         previous = None
         while previous != clean:  # nested markers ("«/untr«/untrusted»usted»") collapse
             previous, clean = clean, _FENCE_MARKER_RE.sub("", clean)
