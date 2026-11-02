@@ -24,7 +24,7 @@ import statistics
 import sys
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from prismal.decisions.calibration import (
     CalibrationStore,
@@ -37,7 +37,8 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from prismal.core.config import Settings
-    from prismal.decisions.adapters.ollama import OllamaDecisionAdapter
+    from prismal.decisions.adapters.ollama import OllamaDecisionAdapter, Tier
+    from prismal.decisions.calset import CollectResult
     from prismal.decisions.ports import DecisionPort
 
 
@@ -209,7 +210,7 @@ def _cases_check(args: argparse.Namespace) -> int:
     return 1 if report.errors else 0
 
 
-def _collect_backend(*, tier: str, settings: Settings) -> OllamaDecisionAdapter:
+def _collect_backend(*, tier: Tier, settings: Settings) -> OllamaDecisionAdapter:
     """One Ollama sub-tier configured for calibration runs, not for serving.
 
     One question per request (``max_batch=1``), no rolling-p95 skipping on
@@ -224,7 +225,7 @@ def _collect_backend(*, tier: str, settings: Settings) -> OllamaDecisionAdapter:
     return OllamaDecisionAdapter(
         base_url=resolve_base_url(settings),
         model_name=model_name,
-        tier=tier,  # type: ignore[arg-type]
+        tier=tier,
         keep_alive=settings.decision_ollama_keep_alive,
         min_version=settings.decision_ollama_min_version,
         max_batch=1,
@@ -267,7 +268,7 @@ def _collect(args: argparse.Namespace) -> int:
         print("error: fix the case file before collecting", file=sys.stderr)
         return 1
     try:
-        backend = _collect_backend(tier=args.tier, settings=get_settings())
+        backend = _collect_backend(tier=cast("Tier", args.tier), settings=get_settings())
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -276,7 +277,7 @@ def _collect(args: argparse.Namespace) -> int:
         if done % 25 == 0 or done == total:
             print(f"  {done}/{total}", file=sys.stderr, flush=True)
 
-    async def _go() -> tuple[object, str]:
+    async def _go() -> tuple[CollectResult, str]:
         try:
             result = await collect(
                 cases, question, backend, timeout_ms=args.timeout_ms, on_progress=progress
@@ -286,7 +287,7 @@ def _collect(args: argparse.Namespace) -> int:
             await backend.aclose()
 
     result, model_key = asyncio.run(_go())
-    paths = write_collect(result, args.out_dir, model_key=model_key)  # type: ignore[arg-type]
+    paths = write_collect(result, args.out_dir, model_key=model_key)
     summary = json.loads(paths.summary.read_text("utf-8"))
     print(
         json.dumps(

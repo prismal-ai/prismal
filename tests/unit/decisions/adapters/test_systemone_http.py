@@ -16,6 +16,7 @@ from prismal.budget.meter import CostMeter
 from prismal.core.config import Settings
 from prismal.decisions.adapters.systemone_http import SystemOneHttpDecisionAdapter
 from prismal.decisions.types import GatePolicy
+from prismal.providers import cost as cost_mod
 from tests.unit.decisions.contract import CHOICE, NOUL, QUESTIONS, SCORE, STATE
 
 POLICY = GatePolicy(timeout_ms=500)
@@ -176,7 +177,15 @@ async def test_usage_recorded_in_cost_meter() -> None:
     assert u.calls == 1
 
 
-async def test_usage_priced_from_table_when_not_reported() -> None:
+async def test_usage_priced_from_table_when_not_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Hermetic: litellm's remote price map (fetched at import) now lists
+    # ``typesafe/jev-*``, which would price MODEL before the table is consulted.
+    def _unmapped(**kw: object) -> tuple[float, float]:
+        raise ValueError("model not mapped")
+
+    monkeypatch.setattr(cost_mod.litellm, "cost_per_token", _unmapped, raising=True)
     s = Settings(budget_pricing={MODEL: {"input": 0.000042, "output": 0.0}})
     meter = CostMeter(settings=s)
     await _adapter(Recorder(), cost_meter=meter, settings=s).decide(STATE, QUESTIONS, policy=POLICY)
