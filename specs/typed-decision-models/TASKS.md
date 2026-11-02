@@ -144,8 +144,8 @@ Task IDs keep the delta's numbering (its draft "DEC1-07" is **DEC1-12** here —
 | DEC6-08 | One-way safety gate: models raise, never clear; `ollama:fast` / `llm` negatives at most `confirm`; §1.4 injection + chest-pain tests | 0.3 d | DEC6-01, DEC2-07 | OLL-012 | DONE |
 | DEC3-08 | Calibration keyed by local digest; stale digest ⇒ uncalibrated (shadow-only) + `decision_calibration_stale_total`; enforce startup accepts any digest record per Ollama name | 0.3 d | DEC3-01 | OLL-003, CAL-002 | DONE |
 | DEC6-07 | Non-loopback guard (`decision_ollama_allow_remote`); injection corpus re-run against Nimble/Tev1 | 0.3 d | DEC6-01 | OLL-010 | WIP (guard DONE; live corpus re-run against the real models pending) |
-| DEC3-07 | Benchmark on target hardware + ≥ 300 labeled Spanish cases per decision (incl. the safety slice) | 0.6 d | DEC2-07 | OLL-007, CAL-002 | WIP (data work; smoke/quantization/batch/controlled runs done — delta §1.1–§1.9) |
-| DEC3-09 | Per-question latency profile, `OLLAMA_NUM_PARALLEL`, label review of the double-charge cases | 0.3 d | DEC3-07 | PLAN-LAT, CAL-002 | TODO (research / data, not code) |
+| DEC3-07 | Benchmark on target hardware + ≥ 300 labeled Spanish cases per decision (incl. the safety slice) | 0.6 d | DEC2-07 | OLL-007, CAL-002 | WIP (data work; smoke/quantization/batch/controlled runs done — delta §1.1–§1.9; case tooling `calset` + `cases-check` / `collect` done for route + rag; 2026-11-02: pilot sets route 71 / rag 60 blind-reviewed (κ 1.000 / 0.900) and adjudicated, live pilot on fast + accurate — route 91.5 % / 91.5 %, rag 93.3 % / 96.7 % (`docs/decisions.md#dec3-07-live-pilot-2026-11-02`); open: human blind pass, scale to ≥ 300 per decision, the other six integrations) |
+| DEC3-09 | Per-question latency profile, `OLLAMA_NUM_PARALLEL`, label review of the double-charge cases | 0.3 d | DEC3-07 | PLAN-LAT, CAL-002 | TODO (research / data, not code; pilot: accurate route p50 2.38 s > the 2000 ms default budget) |
 
 ## 4. Test Inventory (planned)
 

@@ -41,6 +41,12 @@ Source of truth: `specs/typed-decision-models/TASKS.md` and
 
 ### A1. DEC3-07: ≥ 300 labeled Spanish cases per decision (P1)
 
+> **Progress 2026-11-02.** Pilot sets `route.supervisor` (71) and `rag.chunk_relevance` (60)
+> blind-reviewed, adjudicated and run live on both sub-tiers (results:
+> `docs/decisions.md#dec3-07-live-pilot-2026-11-02`). Next: the human blind pass described in
+> `specs/typed-decision-models/data/review/README.md`, then scale route + rag to ≥ 300 (weight
+> the confused frontiers) and start the other six integrations.
+
 - **Goal.** For each decision integration (route, eval_judge, hitl, tool, rag,
   ctx, swarm, safety), at least 300 labeled Spanish cases. Include the HITL
   **safety slice**: the five one-fact questions plus `rule_flags`.
@@ -50,7 +56,9 @@ Source of truth: `specs/typed-decision-models/TASKS.md` and
      production data; synthesize or anonymize.
   2. Review the labels by hand. Two passes are recommended, and disagreements
      go to a third pass.
-  3. Run each case on `ollama:fast` and `ollama:accurate` to collect raw scores.
+  3. Run each case on `ollama:fast` and `ollama:accurate` to collect raw scores
+     (`python -m prismal.decisions collect`; validate first with `cases-check`, case format in
+     `specs/typed-decision-models/data/README.md`; route + rag supported).
   4. Run `calibrate`. It writes `<id>@<name>@<digest12>` records. Check the ECE
      and the margin against the gate thresholds.
   5. Measure accuracy with batching on and off. It writes

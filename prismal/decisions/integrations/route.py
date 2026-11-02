@@ -63,13 +63,16 @@ ROUTE_DESCRIPTIONS: dict[str, str] = {
     "codeact": "Writes and executes Python code in a sandbox to act on a task.",
     "cua": "Operates a browser or desktop user interface step by step.",
     "rag_agent": "Answers from the internal knowledge base and indexed documents.",
-    "planner": "Breaks a large goal into an ordered plan of tasks.",
+    "planner": "Writes an ordered plan of tasks for a goal without building or running it.",
     "critic": "Reviews a draft answer and points out weaknesses.",
     "data_analyst": "Queries tabular data with SQL or DataFrames and draws charts.",
     "file_manager": "Reads, writes, lists or moves files in the workspace.",
     "skill_manager": "Installs, lists or manages agent skills.",
     "cron_manager": "Schedules, lists, pauses or removes recurring jobs.",
-    "dev_pipeline": "Runs a full software delivery pipeline from spec to review.",
+    "dev_pipeline": (
+        "Builds and ships a whole software feature end to end: "
+        "requirements, design, code, tests, QA and review."
+    ),
     "ml_pipeline": "Trains and evaluates a machine-learning model end to end.",
     "financial_analyst": "Analyses stocks, crypto or forex markets (read-only).",
     "parallel_researcher": "Researches several independent questions in parallel.",
