@@ -41,6 +41,12 @@ Source of truth: `specs/typed-decision-models/TASKS.md` and
 
 ### A1. DEC3-07: ≥ 300 labeled Spanish cases per decision (P1)
 
+> **Progress 2026-11-02.** Pilot sets `route.supervisor` (71) and `rag.chunk_relevance` (60)
+> blind-reviewed, adjudicated and run live on both sub-tiers (results:
+> `docs/decisions.md#dec3-07-live-pilot-2026-11-02`). Next: the human blind pass described in
+> `specs/typed-decision-models/data/review/README.md`, then scale route + rag to ≥ 300 (weight
+> the confused frontiers) and start the other six integrations.
+
 - **Goal.** For each decision integration (route, eval_judge, hitl, tool, rag,
   ctx, swarm, safety), at least 300 labeled Spanish cases. Include the HITL
   **safety slice**: the five one-fact questions plus `rule_flags`.

@@ -1,0 +1,36 @@
+{
+  "decision_id": "rag.chunk_relevance",
+  "question_sha256": "5ff6a40899a4ee7edd0a05381da0b3146f1a1a8c4f2fdc19ce63a4d8df024b3b",
+  "backend": "ollama:accurate",
+  "model": "nimble:9b-q4_K_M@572f1f4c801d",
+  "n_cases": 60,
+  "n_predictions": 60,
+  "abstained": [],
+  "accuracy": 0.9666666666666667,
+  "accuracy_by_label": {
+    "false": {
+      "n": 28,
+      "accuracy": 0.9642857142857143
+    },
+    "true": {
+      "n": 32,
+      "accuracy": 0.96875
+    }
+  },
+  "confusion": [
+    {
+      "label": "false",
+      "predicted": "true",
+      "n": 1
+    },
+    {
+      "label": "true",
+      "predicted": "false",
+      "n": 1
+    }
+  ],
+  "latency_ms": {
+    "p50": 1067.7976469996793,
+    "p95": 1197.8425340021204
+  }
+}

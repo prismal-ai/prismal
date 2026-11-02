@@ -21,6 +21,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `rag.chunk_relevance`. Case format: `specs/typed-decision-models/data/README.md`.
 
 ### Changed
+- `route.supervisor` option texts for `dev_pipeline` ("builds and ships a whole software feature
+  end to end …") and `planner` ("… without building or running it"). In the DEC3-07 live pilot
+  `tev1:4b` sent 4/4 `dev_pipeline` cases to `planner`; the reworded question lifts route
+  accuracy from 84.5 % to 91.5 % (fast) and 90.1 % to 91.5 % (accurate) with no regressions. The
+  route `question_sha256` changes; no calibration record existed yet.
 - `rag.py`: the per-chunk decision state is built by the new `build_rag_state()` (same fields,
   fences and hash as before), so calibration sets reuse the production builder.
 
@@ -50,6 +55,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `rag.chunk_relevance` (60), with a blind second-annotator review (`data/review/`: route
   κ = 1.000, rag κ = 0.900), a third-pass adjudication of the 3 rag disagreements, and a
   labelling guide (partial relevance, route tie-breakers) in `data/README.md`.
+- DEC3-07 live pilot outputs (`data/runs/`, both Ollama sub-tiers) and their figures in
+  `docs/decisions.md#dec3-07-live-pilot-2026-11-02` — not enforceable (< 300 per slice).
 
 ## [3.20.0] — 2026-10-12
 

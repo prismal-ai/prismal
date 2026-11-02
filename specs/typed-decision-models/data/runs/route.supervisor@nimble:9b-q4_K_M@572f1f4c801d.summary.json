@@ -1,0 +1,112 @@
+{
+  "decision_id": "route.supervisor",
+  "question_sha256": "746ea6b9d599d5e0ec27c0bb6f75ec222d3a5da9a3aad620246b2c60c5cffdeb",
+  "backend": "ollama:accurate",
+  "model": "nimble:9b-q4_K_M@572f1f4c801d",
+  "n_cases": 71,
+  "n_predictions": 71,
+  "abstained": [],
+  "accuracy": 0.9154929577464789,
+  "accuracy_by_label": {
+    "END": {
+      "n": 5,
+      "accuracy": 1.0
+    },
+    "codeact": {
+      "n": 4,
+      "accuracy": 1.0
+    },
+    "coder": {
+      "n": 5,
+      "accuracy": 1.0
+    },
+    "critic": {
+      "n": 4,
+      "accuracy": 1.0
+    },
+    "cron_manager": {
+      "n": 4,
+      "accuracy": 1.0
+    },
+    "cua": {
+      "n": 4,
+      "accuracy": 0.75
+    },
+    "data_analyst": {
+      "n": 5,
+      "accuracy": 1.0
+    },
+    "dev_pipeline": {
+      "n": 4,
+      "accuracy": 1.0
+    },
+    "file_manager": {
+      "n": 4,
+      "accuracy": 0.75
+    },
+    "financial_analyst": {
+      "n": 4,
+      "accuracy": 1.0
+    },
+    "ml_pipeline": {
+      "n": 4,
+      "accuracy": 0.75
+    },
+    "parallel_researcher": {
+      "n": 4,
+      "accuracy": 0.5
+    },
+    "planner": {
+      "n": 5,
+      "accuracy": 1.0
+    },
+    "rag_agent": {
+      "n": 5,
+      "accuracy": 0.8
+    },
+    "researcher": {
+      "n": 6,
+      "accuracy": 1.0
+    },
+    "skill_manager": {
+      "n": 4,
+      "accuracy": 1.0
+    }
+  },
+  "confusion": [
+    {
+      "label": "cua",
+      "predicted": "END",
+      "n": 1
+    },
+    {
+      "label": "file_manager",
+      "predicted": "codeact",
+      "n": 1
+    },
+    {
+      "label": "ml_pipeline",
+      "predicted": "codeact",
+      "n": 1
+    },
+    {
+      "label": "parallel_researcher",
+      "predicted": "END",
+      "n": 1
+    },
+    {
+      "label": "parallel_researcher",
+      "predicted": "researcher",
+      "n": 1
+    },
+    {
+      "label": "rag_agent",
+      "predicted": "END",
+      "n": 1
+    }
+  ],
+  "latency_ms": {
+    "p50": 2382.072579002852,
+    "p95": 2462.0773649985495
+  }
+}
