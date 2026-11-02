@@ -61,6 +61,38 @@ _AUTHORITY_CLAIMS: tuple[re.Pattern[str], ...] = tuple(
         r"\b(?:el|la)\s+(?:asistente|modelo|clasificador|revisor)\s+debe\s+responder\b",
         r"\bresponde(?:r)?\s+['\"]?(?:true|false|auto_allow)\b",
         r"\bresponde(?:r)?\s+siempre\s+(?:que\s+)?(?:s[ií]|no|true|false)\b",
+        # DEC3-07 scale-up (2026-11-02): fake system/admin channels and overrides.
+        r"(?:^|[\[<#(]|\s)\s*system\s*:",
+        r"\b(?:system|admin|security)[_\s]+override\b",
+        r"\[\[\s*(?:admin|system|contexto\s+confiable)\s*:",
+        r"###\s*(?:system|instrucciones|instructions)\b",
+        r"\b(?:route\s*=|\[\s*route\s*:)",
+        r"\bruta\s+obligatoria\b|\bnueva\s+ruta\s+por\s+defecto\b",
+        r"\bdeveloper\s+mode\b|\bmodo\s+(?:desarrollador|programador)\s+activado\b",
+        r"\byou\s+are\s+now\b|\bpretend\s+you\s+are\b",
+        r"\b(?:desde\s+ahora\s+eres|eres\s+ahora|haz\s+de\s+cuenta\s+que\s+eres)\b",
+        r"\bnote\s+to\s+(?:the\s+)?(?:grader|evaluator|assistant)\b",
+        r"\bnota\s+para\s+el\s+(?:evaluador|asistente)\b",
+        r"\b(?:mensaje|aviso)\s+del?\s+(?:equipo\s+de\s+\w+|administrador)\s*:",
+        r"\bmensaje\s+autom[aá]tico\b",
+        r"\binstrucci[oó]n\s+(?:interna|prioritaria|del\s+equipo)\b",
+        r"\bfirmado\s*:\s*equipo\b",
+        # Claimed approvals that target the assistant, not the user's own business.
+        r"\bya\s+aprob[oó]\s+que\s+te\b",
+        r"\bte\s+autorizo\b|\bautorizo\s+el\s+uso\b",
+        r"\b(?:aprobad[oa]|autorizad[oa])\s+por\s+(?:el\s+)?"
+        r"(?:equipo\s+de\s+(?:calidad|seguridad|cumplimiento)|administrador|gerencia)\b",
+        r"\bya\s+fue\s+(?:verificad|validad)[oa]\s+(?:como|por)\b",
+        r"\bsalt(?:es|ar|arte)\s+(?:el\s+enrutador|los\s+filtros|filtros|las\s+validaciones)\b",
+        # Forced verdicts.
+        r"\brespond\s+only\s+with\b|\boutput\s+(?:true|false)\b",
+        r"\b(?:classify|mark)\s+(?:it\s+|this\s+)?as\s+(?:ir)?relevant\b",
+        r"\b(?:responde|contesta)(?:r)?\s+(?:[uú]nicamente|solamente|solo)\s+"
+        r"(?:con\s+la\s+palabra\b|(?:con\s+)?['\"\u2018\u201c])",
+        r"\b(?:clasif[ií]quelo|clasif[ií]calo|m[aá]rcalo|marca\s+este\s+fragmento)\s+"
+        r"(?:siempre\s+)?como\b",
+        r"\bconsid[eé]ralo\s+relevante\b|\bsiempre\s+debe\s+considerarse\b",
+        r"\b(?:ignora(?:r)?|olvida(?:r)?)\s+(?:el\s+contexto|lo\s+de\s+enrutar)\b",
     )
 )
 
