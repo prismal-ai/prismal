@@ -10,6 +10,49 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- `litellm` excludes `1.107.0`, the release compromised on 2026-10-21 (a
+  credential stealer in all seven PyPI wheels and the Docker images). The lock
+  stays on `1.96.2`, so nothing that was installed is affected.
+- The container image now installs from `uv.lock` with `uv sync --frozen`
+  (hash-verified, `[tool.uv]` overrides applied) instead of
+  `pip install <wheel>`, which re-resolved dependencies against the latest
+  releases on PyPI at build time. uv is pinned and stays in the builder stage.
+- 2026-11 advisories (pip-audit + trivy HIGH), all cleared:
+  - `litellm>=1.100.4` (CVE-2026-114612). The lock takes the smallest fixed
+    step, `1.100.5`, not the latest; from 1.100 litellm depends on `boto3`, so
+    `boto3` / `botocore` / `jmespath` / `s3transfer` join the lock.
+  - `pypdf>=6.21.4` (10 CVEs) and `setuptools>=84.1.0` (GHSA-xmj3-9gf7-h52w).
+  - Transitive floors via `[tool.uv] constraint-dependencies` (lock-only, not
+    new dependencies): `langgraph-sdk>=0.4.6`, `msgpack>=1.2.3`,
+    `pyasn1>=0.6.5`, `dnspython>=2.9.0`, `nltk>=3.10.4`, `pymongo>=4.18.3`,
+    `virtualenv>=21.14.13`.
+  - `filelock>=4.2.1` (9 CVEs, no 3.x backport) through
+    `override-dependencies`, because every `unstructured` release caps
+    `filelock<4`; unstructured only calls `FileLock(path, timeout=-1)`, which
+    4.x keeps. Remove the override once unstructured allows filelock 4.
+  - The cooldown exemptions now cover only `pyasn1` 0.6.5 and `pypdf` 6.21.4
+    (released inside the 7-day window); remove them after 2026-11-05.
+- `test_systemone_http`: the table-pricing test forces a litellm price-map
+  miss; litellm's remote map now lists `typesafe/jev-1.13.0`.
+- Dependency floors raised for advisories that have fixes: `pypdf>=6.21.1`,
+  `unstructured>=0.24.1`, `mcp>=1.30.0,<2` (stays on 1.x), `Pillow>=13.0.0`.
+  The lock also moves `virtualenv`, `apprise` and `certifi` forward, and
+  `virtualenv` pulls `prefect` 3.8.8 and `fastapi` 0.143.2 with it.
+- Dependency cooldown: `[tool.uv] exclude-newer = "7 days"`, so a hijacked
+  upload is pulled from the index before it can reach the lock.
+  `[tool.uv.exclude-newer-package]` exempts only the security fixes still
+  inside the window (pillow, pypdf, certifi, virtualenv). Each exemption is
+  capped at the day after the fixing release (see the 2026-11 entry above for
+  the current list).
+- Pillow 13 needs `[tool.uv] override-dependencies`, because `fastembed` (via
+  `nemoguardrails`) caps `pillow<13` on Python 3.13. Remove the override once
+  fastembed allows Pillow 13.
+
+### Changed
+- `.pre-commit-config.yaml` sets `language_version: python3.13` explicitly on
+  every `language: python` hook.
+
 ## [3.20.0] — 2026-10-12
 
 Measured token savings (TKE9-04) and the fixes that measurement uncovered:
