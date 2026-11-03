@@ -10,6 +10,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.22.1] — 2026-11-02
+
+Patch: the async graph closes correctly at shutdown even when no caller holds it.
+
+### Fixed
+- `aclose_async_compiled_graph()` no longer hangs when the module singleton holds the
+  last reference to the compiled graph (the usual case for hosts that call
+  `get_async_compiled_graph()` per request without keeping the result). It reset
+  `_async_graph` before closing, which let `aiosqlite.Connection.__del__` stop the
+  worker thread; the later `close()` then awaited a stop future that thread never
+  resolved, so the process never exited. It now snapshots strong references, closes
+  every checkpointer, and resets the singleton last. Hosts can drop workarounds that
+  kept the graph alive across shutdown (e.g. prismal-server's `hold_engine_graph`).
+
 ## [3.22.0] — 2026-11-02
 
 DEC3-07 calibration at full size and the DEC3-09 latency profile. Route and rag are now
