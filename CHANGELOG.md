@@ -10,6 +10,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.22.0] — 2026-11-02
+
 DEC3-07 calibration at full size and the DEC3-09 latency profile. Route and rag are now
 calibrated on both Ollama sub-tiers. The prompt-injection detector is widened. A per-sub-tier
 time budget is added.
