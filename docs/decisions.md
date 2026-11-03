@@ -359,11 +359,10 @@ Findings (each one fixed or tracked):
   end" vs "plan … without building or running it") took route accuracy from 84.5 % to 91.5 %
   on fast and from 90.1 % to 91.5 % on accurate, with no regressions (A/B in one session). The
   route `question_sha256` changed accordingly (`746ea6b9d599…`).
-- **Accurate route latency exceeds its budget (open, DEC3-09).** p50 2.38 s > the default
+- **Accurate route latency exceeds its budget (measured, DEC3-09).** p50 2.38 s > the default
   `decision_ollama_timeout_ms` = 2000 on this host (16 options), so in production most
-  `ollama:accurate` routing calls would time out to the next tier. Measure with `bench`
-  (n ≥ 200) before changing the default; until then keep accurate routing in shadow or raise
-  the budget per deployment.
+  `ollama:accurate` routing calls would time out to the next tier. Confirmed by the latency
+  profile below; fixed per deployment with `decision_ollama_timeout_ms_by_tier`.
 - **Remaining confusions** match the frontiers the blind review flagged: `parallel_researcher`
   → `researcher` / `END`, `ml_pipeline` / `file_manager` / `data_analyst` → `codeact`, a short
   follow-up and a UI task → `END` (accurate), and Spanish *programar* ("Programa un reporte
@@ -372,3 +371,53 @@ Findings (each one fixed or tracked):
   adjudicated partial case, where both models side with annotator B.
 - **Determinism.** Re-running route on both tiers gave the same top-1 everywhere; probabilities
   moved by up to 0.04 (fast) and 0.15 (accurate) across model reloads.
+
+### DEC3-09 latency profile (2026-11-02)
+
+`specs/typed-decision-models/bench/concurrency_bench.py` on the dev host (Ollama 0.40.0,
+`performance` profile, `OLLAMA_MAX_LOADED_MODELS=2`, flash attention, `q8_0` KV cache).
+Production question and state builders, the Spanish DEC3-07 sets, one shared adapter. Each
+concurrency level k runs on its own slice of 48 new cases, and the models are unloaded before each
+tier, so no level is answered from a prompt cache that an earlier level filled. Latency is the wall
+time around `decide`, queueing included; it is what a caller's budget sees. p50 in ms, with p95 in
+parentheses. "Over" is the share above the shared 2000 ms budget. 0 abstentions in every run.
+
+| Decision | Sub-tier | k = 1 | k = 2 | k = 4 | Throughput | Over (k = 1 / 2 / 4) |
+|---|---|---|---|---|---|---|
+| `route.supervisor` | fast `tev1:4b` | 1,461 (1,545) | 2,988 (3,147) | 5,836 (5,922) | 0.68/s | 0 / 98 / 98 % |
+| `route.supervisor` | accurate `nimble:9b-q4_K_M` | **2,319 (2,427)** | 4,614 (4,827) | 9,187 (9,264) | 0.43/s | **100** / 100 / 100 % |
+| `rag.chunk_relevance` | fast `tev1:4b` | 547 (592) | 1,090 (1,196) | 2,250 (2,297) | 1.80/s | 0 / 0 / 94 % |
+| `rag.chunk_relevance` | accurate `nimble:9b-q4_K_M` | 1,053 (1,149) | 2,059 (2,175) | 4,177 (4,350) | 0.97/s | 0 / 67 / 98 % |
+
+Configuration: `OLLAMA_NUM_PARALLEL=1` with Ollama debug logging off. The same run with
+`OLLAMA_NUM_PARALLEL=2`, and the baseline (unset, debug on), gave the same figures within 5 %. The one
+exception is route fast with debug on: 1,633 ms at k = 1, and 0.45/s with a 7–12 s p95 at k ≥ 2.
+
+Findings:
+
+- **Ollama serves these models one request at a time.** Latency grows linearly with k and
+  throughput stays flat. `OLLAMA_NUM_PARALLEL=2` changes nothing: the runner loads both models with
+  `n_seq_max = 1` / `n_slots = 1` ("the context does not support partial sequence removal", KV
+  shifting unsupported). `NUM_PARALLEL=4` was therefore not run. Treat a local Ollama decision
+  server as **serial**: every concurrent decision adds one full decision latency to the others.
+  Keep at most one blocking decision per turn, which is already the delta's rule. Run the other
+  decisions in shadow, or non-blocking.
+- **Accurate routing never fits the shared 2000 ms budget** (100 % over at k = 1, p95 2.4 s). The
+  per-turn path already skips accurate above `decision_ollama_accurate_max_p95_ms` (1000 ms). Off
+  the turn, or when the accurate tier is kept for routing, set
+  `PRISMAL_DECISION_OLLAMA_TIMEOUT_MS_BY_TIER='{"accurate": 3000}'`. The fast budget stays at
+  2000 ms: fast routing p95 is 1.5 s and rag p95 is 0.6 s. The **defaults are unchanged**. A
+  different host needs its own run.
+- **Per-question cost follows the prompt.** The 16-option route Choice costs 2.7× (fast) and 2.2×
+  (accurate) the yes/no rag question. That is the §1.4 gap of the Ollama delta: the question shape
+  explains it, not model residency.
+- **Debug logging** (`OLLAMA_DEBUG=1`, `OLLAMA_DEBUG_LOG_REQUESTS=true`) only hurts route fast under
+  load. Turn it off for measurements.
+- **Sample size.** The run used 48 cases per level, 144 per question and configuration, not the
+  200 planned: each level needs a slice of cases no other level has seen. The spread is tight
+  (p95/p50 ≤ 1.1 at k = 1), so the budget conclusion does not depend on it.
+- **Double-charge labels** (`bench/cases.batch.sample.jsonl`). A second blind annotator re-labelled the
+  seven double-charge labels ("Me cobraron dos veces…, quiero el reembolso ya") and agreed on 6. The
+  disputed "¿La solicitud es urgente?" was adjudicated to **false**: "ya" is impatience, and a
+  duplicate charge has an automatic refund path. §1.4 of the Ollama delta, which counted it as
+  a Nimble miss, used the old label.

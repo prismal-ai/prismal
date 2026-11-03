@@ -73,6 +73,11 @@ Source of truth: `specs/typed-decision-models/TASKS.md` and
 
 ### A2. DEC3-09: per-question latency profile (P2)
 
+> **DONE 2026-11-02.** Table and findings in
+> `docs/decisions.md#dec3-09-latency-profile-2026-11-02`; per-tier budget setting
+> `decision_ollama_timeout_ms_by_tier` added (defaults unchanged). `NUM_PARALLEL=4` was not run:
+> the runner pins these models to one slot.
+
 - **Goal.** p50 and p95 latency per question, per sub-tier, on the target
   host, at `OLLAMA_NUM_PARALLEL` = 1, 2 and 4. Also review the labels of the
   "double-charge" cases.
