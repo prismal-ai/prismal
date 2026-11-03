@@ -48,10 +48,6 @@ async def test_close_resets_the_singleton_and_is_idempotent(tmp_path: Path) -> N
     assert graph_module._async_graph is None
 
 
-def _non_daemon_threads() -> list[threading.Thread]:
-    return [t for t in threading.enumerate() if not t.daemon and t is not threading.main_thread()]
-
-
 async def test_close_returns_when_only_the_singleton_holds_the_checkpointer(
     tmp_path: Path,
 ) -> None:
@@ -61,13 +57,19 @@ async def test_close_returns_when_only_the_singleton_holds_the_checkpointer(
     worker thread first; the later ``close()`` then awaited a stop future the exited
     worker never resolved, and shutdown hung forever.
     """
-    graph_module._async_graph = await build_checkpointer(f"sqlite:///{tmp_path / 'ckpt.db'}")
+    saver = await build_checkpointer(f"sqlite:///{tmp_path / 'ckpt.db'}")
+    # The Thread object does not reference the connection, so holding it keeps the
+    # singleton as the only owner of the checkpointer (the scenario under test).
+    worker = saver.conn._thread
+    graph_module._async_graph = saver
+    del saver
     gc.collect()
 
     await asyncio.wait_for(aclose_async_compiled_graph(), timeout=5)
 
     assert graph_module._async_graph is None
-    assert _non_daemon_threads() == []
+    worker.join(timeout=5)  # the worker exits right after resolving the stop future
+    assert not worker.is_alive()
 
 
 _EXIT_SCRIPT = """
