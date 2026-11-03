@@ -10,6 +10,42 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+DEC3-07 calibration at full size and the DEC3-09 latency profile. Route and rag are now
+calibrated on both Ollama sub-tiers. The prompt-injection detector is widened. A per-sub-tier
+time budget is added.
+
+### Added
+- `decision_ollama_timeout_ms_by_tier` (`PRISMAL_DECISION_OLLAMA_TIMEOUT_MS_BY_TIER`): a
+  per-sub-tier time budget for the Ollama decision backend, as a mapping `fast|accurate → ms`.
+  Tiers it does not name keep `decision_ollama_timeout_ms`, and the empty default keeps 3.21.0
+  behaviour. DEC3-09 measured accurate routing (16 options) at p50 2.3 s on the reference host,
+  above the shared 2000 ms; deployments that keep it set `{"accurate": 3000}`.
+- Calibration records for `route.supervisor` and `rag.chunk_relevance` on `tev1:4b@9b5bb969e46c`
+  and `nimble:9b-q4_K_M@572f1f4c801d` in `config/decision_calibration/`. Each was fitted on 300+
+  blind-reviewed Spanish cases at target precision 0.95. They meet the `enforce` bar (ECE ≤ 0.05).
+  Promotion still requires a shadow period: `promotion_ready` needs 2000 decisions or 14 days.
+  Figures are in `docs/decisions.md#dec3-07-calibration-route--rag-2026-11-02`.
+- `specs/typed-decision-models/bench/concurrency_bench.py`: per-decision latency under k
+  concurrent decisions, with each level on its own case slice. Results:
+  `docs/decisions.md#dec3-09-latency-profile-2026-11-02`. Local Ollama serves these models one
+  request at a time whatever `OLLAMA_NUM_PARALLEL` says.
+- `docs/integration-prompts.md`: the engine's cross-project integration prompts.
+
+### Fixed
+- **Security:** the decision-state authority-claim detector now flags injection phrasings found
+  while scaling DEC3-07, all added to the append-only corpus (11 EN, 30 ES):
+  - fake `SYSTEM:` / admin channels and overrides;
+  - forced routes;
+  - developer-mode and role-play prompts;
+  - notes to the grader;
+  - approvals that target the assistant;
+  - forced verdicts.
+
+  It reports 0 false positives on the 655 cases and on new benign near-misses. The new
+  system-channel pattern is linear; a quadratic first version (ReDoS) was caught in review and
+  covered by a timing test.
+- Live provider tests moved to `tests/live/providers/` and the LiteLLM path is covered offline.
+
 ## [3.21.0] — 2026-11-02
 
 DEC3-07 calibration data work and what it uncovered: case-set tooling
