@@ -46,6 +46,11 @@ Source of truth: `specs/typed-decision-models/TASKS.md` and
 > `docs/decisions.md#dec3-07-live-pilot-2026-11-02`). Next: the human blind pass described in
 > `specs/typed-decision-models/data/review/README.md`, then scale route + rag to ≥ 300 (weight
 > the confused frontiers) and start the other six integrations.
+>
+> **Progress 2026-11-02 (later).** route 304 / rag 300 scaled, blind-reviewed and calibrated on
+> both sub-tiers; records committed to `config/decision_calibration/`
+> (`docs/decisions.md#dec3-07-calibration-route--rag-2026-11-02`). Open: human blind pass,
+> batch-accuracy records (step 5), the other six integrations.
 
 - **Goal.** For each decision integration (route, eval_judge, hitl, tool, rag,
   ctx, swarm, safety), at least 300 labeled Spanish cases. Include the HITL
@@ -72,6 +77,11 @@ Source of truth: `specs/typed-decision-models/TASKS.md` and
   - `enforce` without a valid record fails `Settings` load. That is by design.
 
 ### A2. DEC3-09: per-question latency profile (P2)
+
+> **DONE 2026-11-02.** Table and findings in
+> `docs/decisions.md#dec3-09-latency-profile-2026-11-02`; per-tier budget setting
+> `decision_ollama_timeout_ms_by_tier` added (defaults unchanged). `NUM_PARALLEL=4` was not run:
+> the runner pins these models to one slot.
 
 - **Goal.** p50 and p95 latency per question, per sub-tier, on the target
   host, at `OLLAMA_NUM_PARALLEL` = 1, 2 and 4. Also review the labels of the

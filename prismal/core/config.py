@@ -1181,6 +1181,10 @@ class Settings(BaseSettings):
     decision_ollama_timeout_ms: int = Field(
         default=2000, ge=1, description="Own per-sub-tier budget (not part of decision_timeout_ms)."
     )
+    decision_ollama_timeout_ms_by_tier: dict[str, int] = Field(
+        default_factory=dict,
+        description="Per-sub-tier budget override (fast | accurate → ms); else the shared one.",
+    )
     decision_ollama_max_batch: int = Field(
         default=4, ge=1, le=64, description="Max questions per request on the accurate tier."
     )
@@ -3000,6 +3004,12 @@ class Settings(BaseSettings):
                 raise ValueError(
                     f"PRISMAL_DECISION_OLLAMA_MODELS[{tier!r}]={model!r}; expected "
                     "fast|accurate → a non-empty model name."
+                )
+        for tier, budget in self.decision_ollama_timeout_ms_by_tier.items():
+            if tier not in {"fast", "accurate"} or budget < 1:
+                raise ValueError(
+                    f"PRISMAL_DECISION_OLLAMA_TIMEOUT_MS_BY_TIER[{tier!r}]={budget!r}; "
+                    "expected fast|accurate → a positive number of milliseconds."
                 )
         from prismal.decisions.catalog import HITL_QUESTION_IDS
 

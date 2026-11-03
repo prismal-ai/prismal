@@ -673,7 +673,9 @@ def build_ollama_backends(
             min_version=settings.decision_ollama_min_version,
             max_batch=settings.decision_ollama_max_batch,
             accurate_max_p95_ms=settings.decision_ollama_accurate_max_p95_ms,
-            budget_ms=settings.decision_ollama_timeout_ms,
+            budget_ms=settings.decision_ollama_timeout_ms_by_tier.get(
+                tier, settings.decision_ollama_timeout_ms
+            ),
             calibration_dir=settings.decision_calibration_dir,
             settings=settings,
             cost_meter=cost_meter,

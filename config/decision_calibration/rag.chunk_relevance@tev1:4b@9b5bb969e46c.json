@@ -1,0 +1,20 @@
+{
+  "created_at": "2026-11-03T00:38:40.165586+00:00",
+  "decision_id": "rag.chunk_relevance",
+  "ece_after": 0.012439346413456329,
+  "ece_before": 0.04619878697451303,
+  "method": "temperature",
+  "model": "tev1:4b@9b5bb969e46c",
+  "n_by_language": {
+    "es": 300
+  },
+  "params": {
+    "temperature": 0.67529
+  },
+  "precision_by_language": {
+    "es": 0.9755102040816327
+  },
+  "target_precision": 0.95,
+  "tau": 0.8588613675280664,
+  "version": "v1"
+}

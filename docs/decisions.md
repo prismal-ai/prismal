@@ -359,11 +359,10 @@ Findings (each one fixed or tracked):
   end" vs "plan … without building or running it") took route accuracy from 84.5 % to 91.5 %
   on fast and from 90.1 % to 91.5 % on accurate, with no regressions (A/B in one session). The
   route `question_sha256` changed accordingly (`746ea6b9d599…`).
-- **Accurate route latency exceeds its budget (open, DEC3-09).** p50 2.38 s > the default
+- **Accurate route latency exceeds its budget (measured, DEC3-09).** p50 2.38 s > the default
   `decision_ollama_timeout_ms` = 2000 on this host (16 options), so in production most
-  `ollama:accurate` routing calls would time out to the next tier. Measure with `bench`
-  (n ≥ 200) before changing the default; until then keep accurate routing in shadow or raise
-  the budget per deployment.
+  `ollama:accurate` routing calls would time out to the next tier. Confirmed by the latency
+  profile below; fixed per deployment with `decision_ollama_timeout_ms_by_tier`.
 - **Remaining confusions** match the frontiers the blind review flagged: `parallel_researcher`
   → `researcher` / `END`, `ml_pipeline` / `file_manager` / `data_analyst` → `codeact`, a short
   follow-up and a UI task → `END` (accurate), and Spanish *programar* ("Programa un reporte
@@ -372,3 +371,96 @@ Findings (each one fixed or tracked):
   adjudicated partial case, where both models side with annotator B.
 - **Determinism.** Re-running route on both tiers gave the same top-1 everywhere; probabilities
   moved by up to 0.04 (fast) and 0.15 (accurate) across model reloads.
+
+### DEC3-07 calibration, route + rag (2026-11-02)
+
+The pilot sets were scaled to `route.supervisor` 304 cases (19 per answer, `base` profile) and
+`rag.chunk_relevance` 300 (149 true / 151 false). Blind review gave route κ 1.000 (233/233) and rag
+κ 0.983 (238/240), adjudicated in `specs/typed-decision-models/data/review/acuerdo_revision.md`.
+Collected live on both sub-tiers (Ollama 0.40.0, `performance` profile, one question per request, 0
+abstentions) and calibrated with `--method temperature --target-precision 0.95` and the
+integration's floor (route 0.90, rag 0.85). The records are **committed** to
+`config/decision_calibration/`, and `Settings(decision_modes={"route": "enforce", "rag":
+"enforce"})` loads with them.
+
+| Decision | Sub-tier (model@digest12) | Accuracy | p50 / p95 ms | T | ECE raw → cal | τ | Coverage at τ | Precision at τ |
+|---|---|---|---|---|---|---|---|---|
+| `route.supervisor` | fast `tev1:4b@9b5bb969e46c` | 86.8 % | 1,524 / 2,994 | 0.66 | 0.103 → **0.047** | 0.901 | 53.9 % | 98.2 % |
+| `route.supervisor` | accurate `nimble:9b-q4_K_M@572f1f4c801d` | 90.8 % | 2,400 / 2,606 | 1.00 | 0.014 → 0.014 | 0.900 | 77.3 % | 97.9 % |
+| `rag.chunk_relevance` | fast `tev1:4b@9b5bb969e46c` | 92.0 % | 616 / 948 | 0.68 | 0.046 → 0.012 | 0.859 | 81.7 % | 97.6 % |
+| `rag.chunk_relevance` | accurate `nimble:9b-q4_K_M@572f1f4c801d` | 92.7 % | 1,099 / 1,240 | 1.39 | 0.031 → 0.010 | 0.850 | 85.7 % | 96.5 % |
+
+Findings:
+
+- **Every record meets the enforce bar**: ES slice ≥ 300 at the target precision, and ECE ≤
+  `decision_max_ece` (0.05). Route fast has the least margin (0.047). A model re-pull changes the
+  digest and makes the record stale, so refit after one.
+- **`promotion_ready` is not met for either integration**, and only for lack of shadow traffic:
+  it needs 2000 decisions or 14 days, with agreement on the accepted subset ≥ 0.97. The
+  calibration criteria (ECE, ES examples and precision) pass. Promotion stays an operator step
+  after a shadow period on real traffic.
+- **Accuracy fell from the pilot** (route fast 91.5 → 86.8 %, rag accurate 96.7 → 92.7 %). The
+  scaled sets weight the confused frontiers and the adversarial items on purpose. Calibration
+  absorbs the loss as lower coverage, not lower precision.
+- **Route confusions** are the same frontiers as in the pilot:
+  - `parallel_researcher` → `researcher`: 7 fast, 6 accurate.
+  - `critic` → `END`: 5, fast.
+  - `data_analyst` / `ml_pipeline` → `codeact`.
+  - `cron_manager` → `coder` (*programar*).
+  - `rag_agent` / `cua` → `END`: accurate.
+
+  The option texts of these pairs are the next lever, A/B'd as in the pilot.
+- **RAG errors are mostly false positives**: 17–18 of the 151 negatives, i.e. same-topic hard
+  negatives judged relevant, against 4–7 false negatives.
+- **Not done here.** Batch-mode accuracy (`batch@<name>@<digest12>.json`, DEC2-11), the human
+  blind pass and the other six integrations.
+
+### DEC3-09 latency profile (2026-11-02)
+
+`specs/typed-decision-models/bench/concurrency_bench.py` on the dev host (Ollama 0.40.0,
+`performance` profile, `OLLAMA_MAX_LOADED_MODELS=2`, flash attention, `q8_0` KV cache).
+Production question and state builders, the Spanish DEC3-07 sets, one shared adapter. Each
+concurrency level k runs on its own slice of 48 new cases, and the models are unloaded before each
+tier, so no level is answered from a prompt cache that an earlier level filled. Latency is the wall
+time around `decide`, queueing included; it is what a caller's budget sees. p50 in ms, with p95 in
+parentheses. "Over" is the share above the shared 2000 ms budget. 0 abstentions in every run.
+
+| Decision | Sub-tier | k = 1 | k = 2 | k = 4 | Throughput | Over (k = 1 / 2 / 4) |
+|---|---|---|---|---|---|---|
+| `route.supervisor` | fast `tev1:4b` | 1,461 (1,545) | 2,988 (3,147) | 5,836 (5,922) | 0.68/s | 0 / 98 / 98 % |
+| `route.supervisor` | accurate `nimble:9b-q4_K_M` | **2,319 (2,427)** | 4,614 (4,827) | 9,187 (9,264) | 0.43/s | **100** / 100 / 100 % |
+| `rag.chunk_relevance` | fast `tev1:4b` | 547 (592) | 1,090 (1,196) | 2,250 (2,297) | 1.80/s | 0 / 0 / 94 % |
+| `rag.chunk_relevance` | accurate `nimble:9b-q4_K_M` | 1,053 (1,149) | 2,059 (2,175) | 4,177 (4,350) | 0.97/s | 0 / 67 / 98 % |
+
+Configuration: `OLLAMA_NUM_PARALLEL=1` with Ollama debug logging off. The same run with
+`OLLAMA_NUM_PARALLEL=2`, and the baseline (unset, debug on), gave the same figures within 5 %. The one
+exception is route fast with debug on: 1,633 ms at k = 1, and 0.45/s with a 7–12 s p95 at k ≥ 2.
+
+Findings:
+
+- **Ollama serves these models one request at a time.** Latency grows linearly with k and
+  throughput stays flat. `OLLAMA_NUM_PARALLEL=2` changes nothing: the runner loads both models with
+  `n_seq_max = 1` / `n_slots = 1` ("the context does not support partial sequence removal", KV
+  shifting unsupported). `NUM_PARALLEL=4` was therefore not run. Treat a local Ollama decision
+  server as **serial**: every concurrent decision adds one full decision latency to the others.
+  Keep at most one blocking decision per turn, which is already the delta's rule. Run the other
+  decisions in shadow, or non-blocking.
+- **Accurate routing never fits the shared 2000 ms budget** (100 % over at k = 1, p95 2.4 s). The
+  per-turn path already skips accurate above `decision_ollama_accurate_max_p95_ms` (1000 ms). Off
+  the turn, or when the accurate tier is kept for routing, set
+  `PRISMAL_DECISION_OLLAMA_TIMEOUT_MS_BY_TIER='{"accurate": 3000}'`. The fast budget stays at
+  2000 ms: fast routing p95 is 1.5 s and rag p95 is 0.6 s. The **defaults are unchanged**. A
+  different host needs its own run.
+- **Per-question cost follows the prompt.** The 16-option route Choice costs 2.7× (fast) and 2.2×
+  (accurate) the yes/no rag question. That is the §1.4 gap of the Ollama delta: the question shape
+  explains it, not model residency.
+- **Debug logging** (`OLLAMA_DEBUG=1`, `OLLAMA_DEBUG_LOG_REQUESTS=true`) only hurts route fast under
+  load. Turn it off for measurements.
+- **Sample size.** The run used 48 cases per level, 144 per question and configuration, not the
+  200 planned: each level needs a slice of cases no other level has seen. The spread is tight
+  (p95/p50 ≤ 1.1 at k = 1), so the budget conclusion does not depend on it.
+- **Double-charge labels** (`bench/cases.batch.sample.jsonl`). A second blind annotator re-labelled the
+  seven double-charge labels ("Me cobraron dos veces…, quiero el reembolso ya") and agreed on 6. The
+  disputed "¿La solicitud es urgente?" was adjudicated to **false**: "ya" is impatience, and a
+  duplicate charge has an automatic refund path. §1.4 of the Ollama delta, which counted it as
+  a Nimble miss, used the old label.

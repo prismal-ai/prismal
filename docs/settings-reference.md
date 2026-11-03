@@ -4,7 +4,7 @@
 
 Every field of `prismal.core.config.Settings` (env prefix `PRISMAL_`) and
 `MaintenanceSettings` (env prefix `PRISMAL_MAINTENANCE_`), in source order.
-`Settings` declares **489** fields; `MaintenanceSettings` declares
+`Settings` declares **490** fields; `MaintenanceSettings` declares
 **6**. Values are resolved through the injected
 `ConfigSourcePort` — see [configuration.md](./configuration.md) for how
 sources are composed (env, `.env`, secrets managers, per-tenant).
@@ -33,7 +33,7 @@ Secret fields never show a default. Regenerate this page and
 - [Loop Hardening (Phase LH — SPEC-LH-CFG-001)](#loop-hardening-phase-lh--spec-lh-cfg-001) (9)
 - [TKE — Token Efficiency (Phase TKE — SPEC-TKE-CFG-001)](#tke--token-efficiency-phase-tke--spec-tke-cfg-001) (34)
 - [GW — LLM Gateway Providers (Phase GW — SPEC-GW-CFG-001)](#gw--llm-gateway-providers-phase-gw--spec-gw-cfg-001) (49)
-- [DEC — Typed Decision Models (Phase DEC — SPEC-DEC-CFG-001)](#dec--typed-decision-models-phase-dec--spec-dec-cfg-001) (50)
+- [DEC — Typed Decision Models (Phase DEC — SPEC-DEC-CFG-001)](#dec--typed-decision-models-phase-dec--spec-dec-cfg-001) (51)
 - [AMR — Adaptive Model Routing (Phase AMR — SPEC-AMR-CFG-001)](#amr--adaptive-model-routing-phase-amr--spec-amr-cfg-001) (28)
 - [PRT — Protocol Upgrades 2026 + Host Read Surface (SPEC-PRT-CFG-001, HRS)](#prt--protocol-upgrades-2026--host-read-surface-spec-prt-cfg-001-hrs) (20)
 - [MEM — Agentic Memory (Phase MEM — SPEC-MEM-CFG-001)](#mem--agentic-memory-phase-mem--spec-mem-cfg-001) (21)
@@ -404,6 +404,7 @@ Secret fields never show a default. Regenerate this page and
 | `PRISMAL_DECISION_OLLAMA_ALLOW_REMOTE` | `bool` | `false` | Allow a non-loopback Ollama (no auth on Ollama, OLL-010). |
 | `PRISMAL_DECISION_OLLAMA_ACCURATE_MAX_P95_MS` | `int` | `1000` | Per-turn use of the accurate tier above this p95: never. |
 | `PRISMAL_DECISION_OLLAMA_TIMEOUT_MS` | `int` | `2000` | Own per-sub-tier budget (not part of decision_timeout_ms). |
+| `PRISMAL_DECISION_OLLAMA_TIMEOUT_MS_BY_TIER` | `dict[str, int]` | `{}` | Per-sub-tier budget override (fast \| accurate → ms); else the shared one. |
 | `PRISMAL_DECISION_OLLAMA_MAX_BATCH` | `int` | `4` | Max questions per request on the accurate tier. |
 | `PRISMAL_DECISION_OLLAMA_MIN_VERSION` | `str` | `0.35.0` | Minimum Ollama version serving /v1/systemone (OLL-002). |
 | `PRISMAL_DECISION_HITL_RAISE_THRESHOLD` | `float` | `0.5` | P(true) at which a concrete question raises. |

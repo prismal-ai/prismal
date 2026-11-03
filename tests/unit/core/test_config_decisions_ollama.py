@@ -150,3 +150,14 @@ def test_ollama_has_its_own_time_budget() -> None:
     assert Settings().decision_ollama_timeout_ms == 2000
     with pytest.raises(ValidationError):
         Settings(decision_ollama_timeout_ms=0)
+
+
+def test_per_tier_budget_defaults_to_empty() -> None:
+    # DEC3-09: empty ⇒ every sub-tier keeps ``decision_ollama_timeout_ms`` (3.21.0 behaviour).
+    assert Settings().decision_ollama_timeout_ms_by_tier == {}
+
+
+@pytest.mark.parametrize("value", [{"slow": 3000}, {"accurate": 0}, {"fast": -1}])
+def test_per_tier_budget_rejects_unknown_tier_or_non_positive(value: dict[str, int]) -> None:
+    with pytest.raises(ValidationError, match="TIMEOUT_MS_BY_TIER"):
+        Settings(decision_ollama_timeout_ms_by_tier=value)
