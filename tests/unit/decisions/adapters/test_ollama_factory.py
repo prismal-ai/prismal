@@ -189,3 +189,18 @@ def test_sub_tiers_expose_their_own_budget() -> None:
 
     backends = build_backends("ollama", Settings(decision_ollama_timeout_ms=3500))
     assert [b.budget_ms for b in backends] == [3500, 3500]  # type: ignore[attr-defined]
+
+
+def test_per_tier_budget_overrides_the_shared_one() -> None:
+    # DEC3-09: accurate routing (16 options) has p50 ≈ 2.3 s on the reference host, so a
+    # deployment raises only that sub-tier's budget; fast keeps the shared one.
+    from prismal.core.config import Settings
+    from prismal.decisions.adapters.factory import build_backends
+
+    backends = build_backends(
+        "ollama",
+        Settings(
+            decision_ollama_timeout_ms=2000, decision_ollama_timeout_ms_by_tier={"accurate": 3000}
+        ),
+    )
+    assert [b.budget_ms for b in backends] == [2000, 3000]  # type: ignore[attr-defined]
