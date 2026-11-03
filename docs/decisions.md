@@ -372,6 +372,49 @@ Findings (each one fixed or tracked):
 - **Determinism.** Re-running route on both tiers gave the same top-1 everywhere; probabilities
   moved by up to 0.04 (fast) and 0.15 (accurate) across model reloads.
 
+### DEC3-07 calibration, route + rag (2026-11-02)
+
+The pilot sets were scaled to `route.supervisor` 304 cases (19 per answer, `base` profile) and
+`rag.chunk_relevance` 300 (149 true / 151 false). Blind review gave route κ 1.000 (233/233) and rag
+κ 0.983 (238/240), adjudicated in `specs/typed-decision-models/data/review/acuerdo_revision.md`.
+Collected live on both sub-tiers (Ollama 0.40.0, `performance` profile, one question per request, 0
+abstentions) and calibrated with `--method temperature --target-precision 0.95` and the
+integration's floor (route 0.90, rag 0.85). The records are **committed** to
+`config/decision_calibration/`, and `Settings(decision_modes={"route": "enforce", "rag":
+"enforce"})` loads with them.
+
+| Decision | Sub-tier (model@digest12) | Accuracy | p50 / p95 ms | T | ECE raw → cal | τ | Coverage at τ | Precision at τ |
+|---|---|---|---|---|---|---|---|---|
+| `route.supervisor` | fast `tev1:4b@9b5bb969e46c` | 86.8 % | 1,524 / 2,994 | 0.66 | 0.103 → **0.047** | 0.901 | 53.9 % | 98.2 % |
+| `route.supervisor` | accurate `nimble:9b-q4_K_M@572f1f4c801d` | 90.8 % | 2,400 / 2,606 | 1.00 | 0.014 → 0.014 | 0.900 | 77.3 % | 97.9 % |
+| `rag.chunk_relevance` | fast `tev1:4b@9b5bb969e46c` | 92.0 % | 616 / 948 | 0.68 | 0.046 → 0.012 | 0.859 | 81.7 % | 97.6 % |
+| `rag.chunk_relevance` | accurate `nimble:9b-q4_K_M@572f1f4c801d` | 92.7 % | 1,099 / 1,240 | 1.39 | 0.031 → 0.010 | 0.850 | 85.7 % | 96.5 % |
+
+Findings:
+
+- **Every record meets the enforce bar**: ES slice ≥ 300 at the target precision, and ECE ≤
+  `decision_max_ece` (0.05). Route fast has the least margin (0.047). A model re-pull changes the
+  digest and makes the record stale, so refit after one.
+- **`promotion_ready` is not met for either integration**, and only for lack of shadow traffic:
+  it needs 2000 decisions or 14 days, with agreement on the accepted subset ≥ 0.97. The
+  calibration criteria (ECE, ES examples and precision) pass. Promotion stays an operator step
+  after a shadow period on real traffic.
+- **Accuracy fell from the pilot** (route fast 91.5 → 86.8 %, rag accurate 96.7 → 92.7 %). The
+  scaled sets weight the confused frontiers and the adversarial items on purpose. Calibration
+  absorbs the loss as lower coverage, not lower precision.
+- **Route confusions** are the same frontiers as in the pilot:
+  - `parallel_researcher` → `researcher`: 7 fast, 6 accurate.
+  - `critic` → `END`: 5, fast.
+  - `data_analyst` / `ml_pipeline` → `codeact`.
+  - `cron_manager` → `coder` (*programar*).
+  - `rag_agent` / `cua` → `END`: accurate.
+
+  The option texts of these pairs are the next lever, A/B'd as in the pilot.
+- **RAG errors are mostly false positives**: 17–18 of the 151 negatives, i.e. same-topic hard
+  negatives judged relevant, against 4–7 false negatives.
+- **Not done here.** Batch-mode accuracy (`batch@<name>@<digest12>.json`, DEC2-11), the human
+  blind pass and the other six integrations.
+
 ### DEC3-09 latency profile (2026-11-02)
 
 `specs/typed-decision-models/bench/concurrency_bench.py` on the dev host (Ollama 0.40.0,

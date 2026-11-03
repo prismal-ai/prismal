@@ -3,34 +3,34 @@
   "question_sha256": "5ff6a40899a4ee7edd0a05381da0b3146f1a1a8c4f2fdc19ce63a4d8df024b3b",
   "backend": "ollama:fast",
   "model": "tev1:4b@9b5bb969e46c",
-  "n_cases": 60,
-  "n_predictions": 60,
+  "n_cases": 300,
+  "n_predictions": 300,
   "abstained": [],
-  "accuracy": 0.9333333333333333,
+  "accuracy": 0.92,
   "accuracy_by_label": {
     "false": {
-      "n": 28,
-      "accuracy": 0.8928571428571429
+      "n": 151,
+      "accuracy": 0.8874172185430463
     },
     "true": {
-      "n": 32,
-      "accuracy": 0.96875
+      "n": 149,
+      "accuracy": 0.9530201342281879
     }
   },
   "confusion": [
     {
       "label": "false",
       "predicted": "true",
-      "n": 3
+      "n": 17
     },
     {
       "label": "true",
       "predicted": "false",
-      "n": 1
+      "n": 7
     }
   ],
   "latency_ms": {
-    "p50": 612.880430999212,
-    "p95": 676.162801002647
+    "p50": 616.0516749951057,
+    "p95": 947.8067810050561
   }
 }

@@ -46,6 +46,11 @@ Source of truth: `specs/typed-decision-models/TASKS.md` and
 > `docs/decisions.md#dec3-07-live-pilot-2026-11-02`). Next: the human blind pass described in
 > `specs/typed-decision-models/data/review/README.md`, then scale route + rag to ≥ 300 (weight
 > the confused frontiers) and start the other six integrations.
+>
+> **Progress 2026-11-02 (later).** route 304 / rag 300 scaled, blind-reviewed and calibrated on
+> both sub-tiers; records committed to `config/decision_calibration/`
+> (`docs/decisions.md#dec3-07-calibration-route--rag-2026-11-02`). Open: human blind pass,
+> batch-accuracy records (step 5), the other six integrations.
 
 - **Goal.** For each decision integration (route, eval_judge, hitl, tool, rag,
   ctx, swarm, safety), at least 300 labeled Spanish cases. Include the HITL
