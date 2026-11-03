@@ -1,0 +1,20 @@
+{
+  "created_at": "2026-11-03T00:38:39.708849+00:00",
+  "decision_id": "route.supervisor",
+  "ece_after": 0.014048374224648552,
+  "ece_before": 0.014250936338295434,
+  "method": "temperature",
+  "model": "nimble:9b-q4_K_M@572f1f4c801d",
+  "n_by_language": {
+    "es": 304
+  },
+  "params": {
+    "temperature": 0.996133
+  },
+  "precision_by_language": {
+    "es": 0.9787234042553191
+  },
+  "target_precision": 0.95,
+  "tau": 0.9003611188933728,
+  "version": "v1"
+}

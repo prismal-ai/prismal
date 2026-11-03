@@ -149,6 +149,8 @@ Findings:
   p = 0.074, i.e. confidently persuaded by the "ya aprobó" text. Nimble also misses the chest-pain
   case in both modes. The human-review question is the safety gate, so the models SHALL NOT be able
   to clear it on their own (SPEC-DEC-OLL-012).
+- *(2026-11-02, DEC3-09: after a blind second-annotator pass the urgency label is **false**, so the
+  Nimble "miss" on it is correct — `docs/decisions.md#dec3-09-latency-profile-2026-11-02`.)*
 - The two double-charge misses are **label-ambiguous** ("ya" reads as impatience as much as
   urgency; a duplicated charge with an automatic refund path may not need a person). They go to label
   review, not to calibration, until a second annotator agrees.

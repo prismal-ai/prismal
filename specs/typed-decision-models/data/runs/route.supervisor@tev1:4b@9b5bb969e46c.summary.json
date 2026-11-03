@@ -3,85 +3,125 @@
   "question_sha256": "746ea6b9d599d5e0ec27c0bb6f75ec222d3a5da9a3aad620246b2c60c5cffdeb",
   "backend": "ollama:fast",
   "model": "tev1:4b@9b5bb969e46c",
-  "n_cases": 71,
-  "n_predictions": 71,
+  "n_cases": 304,
+  "n_predictions": 304,
   "abstained": [],
-  "accuracy": 0.9154929577464789,
+  "accuracy": 0.868421052631579,
   "accuracy_by_label": {
     "END": {
-      "n": 5,
+      "n": 19,
       "accuracy": 1.0
     },
     "codeact": {
-      "n": 4,
+      "n": 19,
       "accuracy": 1.0
     },
     "coder": {
-      "n": 5,
-      "accuracy": 1.0
+      "n": 19,
+      "accuracy": 0.9473684210526315
     },
     "critic": {
-      "n": 4,
-      "accuracy": 1.0
+      "n": 19,
+      "accuracy": 0.631578947368421
     },
     "cron_manager": {
-      "n": 4,
-      "accuracy": 0.75
+      "n": 19,
+      "accuracy": 0.8421052631578947
     },
     "cua": {
-      "n": 4,
-      "accuracy": 1.0
+      "n": 19,
+      "accuracy": 0.9473684210526315
     },
     "data_analyst": {
-      "n": 5,
-      "accuracy": 0.8
+      "n": 19,
+      "accuracy": 0.7368421052631579
     },
     "dev_pipeline": {
-      "n": 4,
-      "accuracy": 1.0
+      "n": 19,
+      "accuracy": 0.8421052631578947
     },
     "file_manager": {
-      "n": 4,
-      "accuracy": 0.75
+      "n": 19,
+      "accuracy": 0.9473684210526315
     },
     "financial_analyst": {
-      "n": 4,
-      "accuracy": 1.0
+      "n": 19,
+      "accuracy": 0.8947368421052632
     },
     "ml_pipeline": {
-      "n": 4,
-      "accuracy": 0.75
+      "n": 19,
+      "accuracy": 0.8421052631578947
     },
     "parallel_researcher": {
-      "n": 4,
-      "accuracy": 0.75
+      "n": 19,
+      "accuracy": 0.5263157894736842
     },
     "planner": {
-      "n": 5,
+      "n": 19,
       "accuracy": 1.0
     },
     "rag_agent": {
-      "n": 5,
-      "accuracy": 1.0
+      "n": 19,
+      "accuracy": 0.8421052631578947
     },
     "researcher": {
-      "n": 6,
-      "accuracy": 0.8333333333333334
+      "n": 19,
+      "accuracy": 0.8947368421052632
     },
     "skill_manager": {
-      "n": 4,
+      "n": 19,
       "accuracy": 1.0
     }
   },
   "confusion": [
     {
+      "label": "coder",
+      "predicted": "codeact",
+      "n": 1
+    },
+    {
+      "label": "critic",
+      "predicted": "END",
+      "n": 5
+    },
+    {
+      "label": "critic",
+      "predicted": "codeact",
+      "n": 1
+    },
+    {
+      "label": "critic",
+      "predicted": "file_manager",
+      "n": 1
+    },
+    {
       "label": "cron_manager",
       "predicted": "coder",
+      "n": 3
+    },
+    {
+      "label": "cua",
+      "predicted": "END",
       "n": 1
     },
     {
       "label": "data_analyst",
       "predicted": "codeact",
+      "n": 5
+    },
+    {
+      "label": "dev_pipeline",
+      "predicted": "codeact",
+      "n": 1
+    },
+    {
+      "label": "dev_pipeline",
+      "predicted": "cua",
+      "n": 1
+    },
+    {
+      "label": "dev_pipeline",
+      "predicted": "planner",
       "n": 1
     },
     {
@@ -90,13 +130,43 @@
       "n": 1
     },
     {
+      "label": "financial_analyst",
+      "predicted": "END",
+      "n": 2
+    },
+    {
       "label": "ml_pipeline",
+      "predicted": "codeact",
+      "n": 3
+    },
+    {
+      "label": "parallel_researcher",
+      "predicted": "END",
+      "n": 1
+    },
+    {
+      "label": "parallel_researcher",
       "predicted": "codeact",
       "n": 1
     },
     {
       "label": "parallel_researcher",
       "predicted": "researcher",
+      "n": 7
+    },
+    {
+      "label": "rag_agent",
+      "predicted": "END",
+      "n": 2
+    },
+    {
+      "label": "rag_agent",
+      "predicted": "researcher",
+      "n": 1
+    },
+    {
+      "label": "researcher",
+      "predicted": "END",
       "n": 1
     },
     {
@@ -106,7 +176,7 @@
     }
   ],
   "latency_ms": {
-    "p50": 1463.9097010003752,
-    "p95": 1519.3177449982613
+    "p50": 1524.4036340009188,
+    "p95": 2993.633685000532
   }
 }

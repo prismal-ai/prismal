@@ -1,0 +1,20 @@
+{
+  "created_at": "2026-11-03T00:38:40.606923+00:00",
+  "decision_id": "rag.chunk_relevance",
+  "ece_after": 0.009534809686596863,
+  "ece_before": 0.03053675746608155,
+  "method": "temperature",
+  "model": "nimble:9b-q4_K_M@572f1f4c801d",
+  "n_by_language": {
+    "es": 300
+  },
+  "params": {
+    "temperature": 1.387389
+  },
+  "precision_by_language": {
+    "es": 0.9649805447470817
+  },
+  "target_precision": 0.95,
+  "tau": 0.8504751052080104,
+  "version": "v1"
+}

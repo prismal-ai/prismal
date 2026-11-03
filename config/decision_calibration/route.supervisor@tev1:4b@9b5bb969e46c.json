@@ -1,0 +1,20 @@
+{
+  "created_at": "2026-11-03T00:38:38.926559+00:00",
+  "decision_id": "route.supervisor",
+  "ece_after": 0.04663003966369399,
+  "ece_before": 0.10347493466979549,
+  "method": "temperature",
+  "model": "tev1:4b@9b5bb969e46c",
+  "n_by_language": {
+    "es": 304
+  },
+  "params": {
+    "temperature": 0.663891
+  },
+  "precision_by_language": {
+    "es": 0.9817073170731707
+  },
+  "target_precision": 0.95,
+  "tau": 0.9009859735988244,
+  "version": "v1"
+}
