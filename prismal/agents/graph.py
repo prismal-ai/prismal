@@ -124,6 +124,8 @@ _checkpointer_cms: list[Any] = []
 # is non-daemon, so a connection kept alive (e.g. by the async graph singleton)
 # must be closed for the process to exit. Weak references: tracking must never
 # extend a connection's life (a collected connection stops its own thread).
+# ``aclose_async_compiled_graph()`` therefore snapshots strong references and
+# closes them before it resets the graph singleton.
 _checkpointer_conns: weakref.WeakSet[Any] = weakref.WeakSet()
 
 
@@ -134,8 +136,12 @@ async def aclose_async_compiled_graph() -> None:
     a failing close is logged and the rest are still closed.
     """
     global _async_graph
-    _async_graph = None
-    for conn in list(_checkpointer_conns):
+    # Order matters: take strong references and close BEFORE dropping the graph.
+    # If the singleton holds the last reference, resetting it first lets
+    # ``aiosqlite.Connection.__del__`` stop the worker thread, and the later
+    # ``close()`` then awaits a stop future that thread never resolves (hang).
+    conns = list(_checkpointer_conns)
+    for conn in conns:
         _checkpointer_conns.discard(conn)
         try:
             await conn.close()
@@ -149,6 +155,7 @@ async def aclose_async_compiled_graph() -> None:
             logger.warning(
                 "checkpointer_close_failed", backend="postgresql", error=type(exc).__name__
             )
+    _async_graph = None
 
 
 def _extract_sqlite_path(db_url: str) -> str:
